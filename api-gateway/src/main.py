@@ -1,20 +1,17 @@
-import os
+import secrets
+
 import grpc
-from fastapi import FastAPI, HTTPException, Header
+from fastapi import FastAPI, Header, HTTPException
 from pydantic import BaseModel
-from typing import Optional
 
+from config import get_settings
+from proto.aura.negotiation.v1 import negotiation_pb2, negotiation_pb2_grpc
 
-from src.proto.aura.negotiation.v1 import negotiation_pb2_grpc
-from src.proto.aura.negotiation.v1 import negotiation_pb2
-
+settings = get_settings()
 
 app = FastAPI(title="Aura Agent Gateway", version="1.0")
 
-# Настройка gRPC канала
-# CORE_HOST = os.getenv("CORE_SERVICE_HOST", "core-service:50051")
-CORE_HOST = os.getenv("CORE_SERVICE_HOST", "localhost:50051")
-channel = grpc.insecure_channel(CORE_HOST)
+channel = grpc.insecure_channel(settings.core_service_host)
 stub = negotiation_pb2_grpc.NegotiationServiceStub(channel)
 
 
@@ -29,7 +26,7 @@ class NegotiationRequestHTTP(BaseModel):
 @app.post("/v1/negotiate")
 async def negotiate(
     payload: NegotiationRequestHTTP,
-    x_agent_token: Optional[str] = Header(None),  # Auth Layer
+    x_agent_token: str | None = Header(None),  # Auth Layer
 ):
     # 1. Auth Check (Здесь могла бы быть проверка JWT)
     if not x_agent_token:
@@ -38,7 +35,7 @@ async def negotiate(
 
     # 2. Convert HTTP -> gRPC (Mapping)
     grpc_request = negotiation_pb2.NegotiateRequest(
-        request_id="req_" + os.urandom(4).hex(),
+        request_id="req_" + secrets.token_hex(4),
         item_id=payload.item_id,
         bid_amount=payload.bid_amount,
         currency_code=payload.currency,
@@ -81,7 +78,7 @@ async def negotiate(
         return output
 
     except grpc.RpcError as e:
-        raise HTTPException(status_code=500, detail=f"Core Error: {e.details()}")
+        raise HTTPException(status_code=500, detail=f"Core Error: {e.details()}") from e
 
 
 class SearchRequestHTTP(BaseModel):
@@ -108,4 +105,4 @@ async def search_items(payload: SearchRequestHTTP):
             ]
         }
     except grpc.RpcError as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail=str(e)) from e

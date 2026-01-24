@@ -1,15 +1,16 @@
-import os
 import uuid
 
-from sqlalchemy import Column, String, Float, Boolean, create_engine
-from sqlalchemy.orm import sessionmaker, declarative_base
-from sqlalchemy.dialects.postgresql import JSONB
 from pgvector.sqlalchemy import Vector
+from sqlalchemy import Boolean, Column, Float, String, create_engine
+from sqlalchemy.dialects.postgresql import JSONB
+from sqlalchemy.orm import declarative_base, sessionmaker
 
-DATABASE_URL = os.getenv("DATABASE_URL", "postgresql://user:pass@db:5432/aura_db")
+from config import get_settings
+
+settings = get_settings()
 
 Base = declarative_base()
-engine = create_engine(DATABASE_URL)
+engine = create_engine(settings.database_url)
 SessionLocal = sessionmaker(bind=engine)
 
 

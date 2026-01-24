@@ -1,6 +1,6 @@
-import requests
 import time
-import uuid
+
+import requests
 
 GATEWAY_URL = "http://localhost:8000/v1/negotiate"
 
@@ -31,26 +31,26 @@ def run_agent_scenario(scenario_name, item_id, bid, did="did:agent:007"):
         status = data.get("status")
 
         if status == "accepted":
-            print(f"✅ OFFER ACCEPTED!")
+            print("✅ OFFER ACCEPTED!")
             print(f"   Final Price: ${data['data']['final_price']}")
             print(f"   Reservation: {data['data']['reservation_code']}")
 
         elif status == "countered":
-            print(f"⚠️  OFFER COUNTERED")
+            print("⚠️  OFFER COUNTERED")
             print(f"   Server proposed: ${data['data']['proposed_price']}")
             print(f"   Message: '{data['data']['message']}'")
 
         elif status == "ui_required":
-            print(f"👮 UI REQUIRED (Human Loop)")
+            print("👮 UI REQUIRED (Human Loop)")
             print(f"   Template: {data['action_required']['template']}")
             print(f"   Context: {data['action_required']['context']}")
 
         elif status == "rejected":
-            print(f"⛔ REJECTED", data)
+            print("⛔ REJECTED", data)
             # Добавляем вывод причины, если она есть
-            if 'data' in data and 'message' in data['data']:
+            if "data" in data and "message" in data["data"]:
                 print(f"   Reason: {data['data']['message']}")
-            elif 'data' in data and 'reason_code' in data['data']:
+            elif "data" in data and "reason_code" in data["data"]:
                 print(f"   Code: {data['data']['reason_code']}")
 
     except Exception as e:
