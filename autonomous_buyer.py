@@ -1,6 +1,6 @@
-import requests
 import time
-import sys
+
+import requests
 
 # Конфигурация
 GATEWAY = "http://localhost:8000/v1"
@@ -81,7 +81,7 @@ class AutonomousBuyer:
                     current_bid = new_bid
 
             elif status == "ui_required":
-                print(f"\n👮 UI INTERVENTION REQUIRED")
+                print("\n👮 UI INTERVENTION REQUIRED")
                 print("   The amount is too high for autonomous decision.")
                 print(f"   Render Template: {data['action_required']['template']}")
                 return True  # Считаем успехом, так как передали человеку

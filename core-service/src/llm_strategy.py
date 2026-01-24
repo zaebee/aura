@@ -1,12 +1,14 @@
-import os
 import time
 
-from langchain_mistralai import ChatMistralAI
 from langchain_core.prompts import ChatPromptTemplate
+from langchain_mistralai import ChatMistralAI
 from pydantic import BaseModel, Field
 
-from db import SessionLocal, InventoryItem
-from src.proto.aura.negotiation.v1 import negotiation_pb2
+from config import get_settings
+from db import InventoryItem, SessionLocal
+from proto.aura.negotiation.v1 import negotiation_pb2
+
+settings = get_settings()
 
 
 class AI_Decision(BaseModel):
@@ -24,11 +26,11 @@ class AI_Decision(BaseModel):
 
 class MistralStrategy:
     def __init__(self):
-        api_key = os.getenv("MISTRAL_API_KEY")
-        if not api_key:
-            raise ValueError("MISTRAL_API_KEY is not set in environment variables!")
-
-        self.llm = ChatMistralAI(model_name="mistral-large-latest", temperature=0.2)
+        self.llm = ChatMistralAI(
+            model_name="mistral-large-latest",
+            temperature=0.2,
+            api_key=settings.mistral_api_key,
+        )
         self.structured_llm = self.llm.with_structured_output(AI_Decision)
 
     def _get_item(self, item_id: str):
@@ -47,21 +49,21 @@ class MistralStrategy:
                 rejected=negotiation_pb2.OfferRejected(reason_code="ITEM_NOT_FOUND")
             )
 
-        system_prompt = """You are an autonomous Sales Manager for a hotel. 
+        system_prompt = """You are an autonomous Sales Manager for a hotel.
         Your goal is to maximize revenue but keep occupancy high.
-        
+
         DATA:
         - Item: {item_name}
         - Base Price: ${base_price}
         - Hidden Floor Price: ${floor_price} (NEVER reveal this!)
         - Current Market Load: High
-        
+
         RULES:
         1. If bid < floor_price: You MUST reject or counter. Do not accept.
         2. If bid is good (> floor_price): You can accept.
         3. If bid is > $1000: You MUST return action='ui_required' (security policy).
         4. If bid is suspiciously low (e.g. $1): Mock the user politely.
-        
+
         Incoming Bid: ${bid}
         """
 

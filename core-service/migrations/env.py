@@ -1,26 +1,21 @@
-import os
 import sys
 from logging.config import fileConfig
+from pathlib import Path
 
-from sqlalchemy import engine_from_config
-from sqlalchemy import pool
 from alembic import context
+from sqlalchemy import engine_from_config, pool
 
-# --- ДОБАВЛЕНО НАМИ: Пути к коду ---
-# Добавляем src в путь, чтобы видеть db.py
-sys.path.append(os.path.join(os.path.dirname(__file__), "../src"))
+# Add src directory to path for Alembic to find our models
+src_path = Path(__file__).resolve().parent.parent / "src"
+sys.path.insert(0, str(src_path))
 
-# Импортируем наш Base и модели
-from src.db import Base, InventoryItem  # noqa
+from db import Base  # noqa: E402
 
-# Получаем конфиг
 config = context.config
 
-# Настройка логирования
 if config.config_file_name is not None:
     fileConfig(config.config_file_name)
 
-# --- ДОБАВЛЕНО НАМИ: Метаданные для авто-генерации ---
 target_metadata = Base.metadata
 
 # other values from the config, defined by the needs of env.py,
@@ -67,9 +62,7 @@ def run_migrations_online() -> None:
     )
 
     with connectable.connect() as connection:
-        context.configure(
-            connection=connection, target_metadata=target_metadata
-        )
+        context.configure(connection=connection, target_metadata=target_metadata)
 
         with context.begin_transaction():
             context.run_migrations()

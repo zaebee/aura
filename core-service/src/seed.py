@@ -1,9 +1,4 @@
-import sys
-import os
-
-sys.path.append(os.path.join(os.path.dirname(__file__), "."))
-
-from db import SessionLocal, InventoryItem
+from db import InventoryItem, SessionLocal
 from embeddings import generate_embedding
 
 
