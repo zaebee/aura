@@ -1,5 +1,6 @@
-import structlog
 from contextvars import ContextVar
+
+import structlog
 
 # Context variable to store request_id across async boundaries
 request_id_ctx: ContextVar[str | None] = ContextVar("request_id", default=None)

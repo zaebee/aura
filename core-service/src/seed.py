@@ -1,6 +1,7 @@
+from logging_config import configure_logging, get_logger
+
 from db import InventoryItem, SessionLocal
 from embeddings import generate_embedding
-from logging_config import configure_logging, get_logger
 
 # Configure structured logging on startup
 configure_logging()
