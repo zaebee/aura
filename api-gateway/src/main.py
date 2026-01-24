@@ -203,6 +203,7 @@ async def search_items(payload: SearchRequestHTTP):
             "grpc_call_failed",
             service="NegotiationService",
             method="Search",
-            error=str(e),
+            error=e.details(),
+            code=str(e.code()),
         )
         raise HTTPException(status_code=500, detail="Core service search error") from e

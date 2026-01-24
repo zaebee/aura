@@ -23,7 +23,7 @@ def configure_logging() -> None:
     )
 
 
-def get_logger(name: str | None = None) -> structlog.stdlib.BoundLogger:
+def get_logger(name: str | None = None) -> structlog.BoundLogger:
     """Get a logger instance, optionally with a specific name."""
     logger = structlog.get_logger()
     if name:
