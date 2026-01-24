@@ -10,6 +10,7 @@ from logging_config import (
     get_logger,
 )
 from pydantic import BaseModel
+from starlette.middleware.cors import CORSMiddleware
 
 from config import get_settings
 from proto.aura.negotiation.v1 import negotiation_pb2, negotiation_pb2_grpc
@@ -21,6 +22,13 @@ logger = get_logger("api-gateway")
 settings = get_settings()
 
 app = FastAPI(title="Aura Agent Gateway", version="1.0")
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins="http://localhost:3000",
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 channel = grpc.insecure_channel(settings.core_service_host)
 stub = negotiation_pb2_grpc.NegotiationServiceStub(channel)

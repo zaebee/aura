@@ -13,3 +13,8 @@ plugins:
     out: api-gateway/src/proto
   - remote: buf.build/protocolbuffers/python
     out: api-gateway/src/proto
+
+  - remote: buf.build/bufbuild/es
+    out: frontend/src/lib
+    opt:
+      - target=ts
