@@ -1,11 +1,7 @@
-import secrets
 import uuid
 
 import grpc
 from fastapi import FastAPI, Header, HTTPException, Request
-from pydantic import BaseModel
-
-from config import get_settings
 from logging_config import (
     bind_request_id,
     clear_request_context,
@@ -13,6 +9,9 @@ from logging_config import (
     get_current_request_id,
     get_logger,
 )
+from pydantic import BaseModel
+
+from config import get_settings
 from proto.aura.negotiation.v1 import negotiation_pb2, negotiation_pb2_grpc
 
 # Configure structured logging on startup

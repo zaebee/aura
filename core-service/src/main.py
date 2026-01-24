@@ -3,17 +3,17 @@ from concurrent import futures
 from typing import Protocol
 
 import grpc
-
-from config import get_settings
-from db import InventoryItem, SessionLocal
-from embeddings import generate_embedding
-from llm_strategy import MistralStrategy
 from logging_config import (
     bind_request_id,
     clear_request_context,
     configure_logging,
     get_logger,
 )
+
+from config import get_settings
+from db import InventoryItem, SessionLocal
+from embeddings import generate_embedding
+from llm_strategy import MistralStrategy
 from proto.aura.negotiation.v1 import negotiation_pb2, negotiation_pb2_grpc
 
 # Configure structured logging on startup
