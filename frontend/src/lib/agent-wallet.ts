@@ -1,6 +1,7 @@
 import nacl from 'tweetnacl'
 import { encode as encodeBase64 } from 'js-base64'
-import { SearchResultItem, SearchResponse, NegotiateRequest, NegotiateResponse } from './aura/negotiation/v1/negotiation_pb'
+import { fromJson } from "@bufbuild/protobuf";
+import { SearchResponseSchema, SearchResultItem, SearchResponse, NegotiateRequest, NegotiateResponse, NegotiateResponseSchema } from './aura/negotiation/v1/negotiation_pb'
 
 export class BrowserAgentWallet {
   private keyPair: nacl.SignKeyPair
@@ -98,7 +99,8 @@ export class BrowserAgentWallet {
       query,
       limit
     })
-    return response.json()
+    const json = await response.json()
+    return fromJson(SearchResponseSchema, json)
   }
 
   /**
@@ -116,6 +118,7 @@ export class BrowserAgentWallet {
       //   reputation_score: 0.8 // Default reputation score
       // }
     })
-    return response.json()
+    const json = await response.json()
+    return fromJson(NegotiateResponseSchema, json)
   }
 }
