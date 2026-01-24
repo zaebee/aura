@@ -6,9 +6,11 @@ from pydantic import BaseModel, Field
 
 from config import get_settings
 from db import InventoryItem, SessionLocal
+from logging_config import bind_request_id, get_logger
 from proto.aura.negotiation.v1 import negotiation_pb2
 
 settings = get_settings()
+logger = get_logger("llm-strategy")
 
 
 class AI_Decision(BaseModel):
@@ -41,10 +43,14 @@ class MistralStrategy:
             session.close()
 
     def evaluate(
-        self, item_id: str, bid: float, reputation: float
+        self, item_id: str, bid: float, reputation: float, request_id: str | None = None
     ) -> negotiation_pb2.NegotiateResponse:
+        if request_id:
+            bind_request_id(request_id)
+
         item = self._get_item(item_id)
         if not item:
+            logger.info("item_not_found", item_id=item_id)
             return negotiation_pb2.NegotiateResponse(
                 rejected=negotiation_pb2.OfferRejected(reason_code="ITEM_NOT_FOUND")
             )
@@ -71,7 +77,13 @@ class MistralStrategy:
             [("system", system_prompt), ("human", "Make a decision.")]
         )
 
-        print(f"🧠 Mistral is thinking about bid ${bid}...")
+        logger.info(
+            "llm_evaluation_started",
+            item_id=item_id,
+            bid_amount=bid,
+            item_name=item.name,
+            base_price=item.base_price,
+        )
         chain = prompt | self.structured_llm
 
         try:
@@ -83,10 +95,15 @@ class MistralStrategy:
                     "bid": bid,
                 }
             )
-            print(f"🤖 Mistral Logic: {decision.reasoning}")
+            logger.info(
+                "llm_decision_made",
+                action=decision.action,
+                price=decision.price,
+                reasoning=decision.reasoning,
+            )
 
         except Exception as e:
-            print(f"🔥 LLM Error: {e}")
+            logger.error("llm_error", error=str(e))
             return negotiation_pb2.NegotiateResponse(
                 rejected=negotiation_pb2.OfferRejected(reason_code="AI_ERROR")
             )

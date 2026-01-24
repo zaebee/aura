@@ -1,11 +1,16 @@
 from db import InventoryItem, SessionLocal
 from embeddings import generate_embedding
+from logging_config import configure_logging, get_logger
+
+# Configure structured logging on startup
+configure_logging()
+logger = get_logger("seed")
 
 
 def seed():
     session = SessionLocal()
 
-    # Список отелей для добавления
+    # List of hotels to add
     raw_items = [
         {
             "id": "hotel_alpha",
@@ -25,21 +30,21 @@ def seed():
         },
     ]
 
-    print("🌱 Starting Smart Seeding...")
+    logger.info("seeding_started", item_count=len(raw_items))
 
     for raw in raw_items:
-        # Проверяем, есть ли уже этот отель
+        # Check if hotel already exists
         existing = session.query(InventoryItem).filter_by(id=raw["id"]).first()
 
-        # Генерируем вектор
-        print(f"   🧠 Generating embedding for {raw['id']}...")
+        # Generate vector embedding
+        logger.info("embedding_generation_started", item_id=raw["id"])
         vector = generate_embedding(raw["desc"])
 
         if existing:
-            print(f"   🔄 Updating existing item {raw['id']}")
+            logger.info("item_updated", item_id=raw["id"])
             existing.embedding = vector  # type: ignore
         else:
-            print(f"   ✨ Creating new item {raw['id']}")
+            logger.info("item_created", item_id=raw["id"], name=raw["name"])
             item = InventoryItem(
                 id=raw["id"],
                 name=raw["name"],
@@ -51,7 +56,7 @@ def seed():
             session.add(item)
 
     session.commit()
-    print("✅ Seeding complete! Database is now semantic-ready.")
+    logger.info("seeding_completed", status="success")
     session.close()
 
 
