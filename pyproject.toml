@@ -28,6 +28,9 @@ dev = [
 [tool.ruff]
 target-version = "py313"
 line-length = 88
+exclude = [
+    "**/proto/**",  # Auto-generated protobuf files
+]
 
 [tool.ruff.lint]
 select = [

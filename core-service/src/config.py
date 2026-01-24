@@ -11,7 +11,7 @@ class Settings(BaseSettings):
     )
 
     # Database
-    database_url: str = "postgresql://user:pass@db:5432/aura_db"
+    database_url: str
 
     # Mistral AI
     mistral_api_key: str

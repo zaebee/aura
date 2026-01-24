@@ -1,3 +1,4 @@
+import logging
 import secrets
 
 import grpc
@@ -6,6 +7,8 @@ from pydantic import BaseModel
 
 from config import get_settings
 from proto.aura.negotiation.v1 import negotiation_pb2, negotiation_pb2_grpc
+
+logger = logging.getLogger(__name__)
 
 settings = get_settings()
 
@@ -78,7 +81,8 @@ async def negotiate(
         return output
 
     except grpc.RpcError as e:
-        raise HTTPException(status_code=500, detail=f"Core Error: {e.details()}") from e
+        logger.exception("gRPC error during negotiation: %s", e.details())
+        raise HTTPException(status_code=500, detail="Core service error") from e
 
 
 class SearchRequestHTTP(BaseModel):
@@ -105,4 +109,5 @@ async def search_items(payload: SearchRequestHTTP):
             ]
         }
     except grpc.RpcError as e:
-        raise HTTPException(status_code=500, detail=str(e)) from e
+        logger.exception("gRPC error during search: %s", e)
+        raise HTTPException(status_code=500, detail="Core service search error") from e
