@@ -24,6 +24,8 @@ services:
     environment:
       DATABASE_URL: postgresql://user:password@db:5432/aura_db
       MISTRAL_API_KEY: ${MISTRAL_API_KEY}
+      OTEL_SERVICE_NAME: "aura-core"
+      OTEL_EXPORTER_OTLP_ENDPOINT: "http://jaeger:4317"
     depends_on:
       db:
         condition: service_healthy
@@ -37,10 +39,22 @@ services:
     restart: on-failure
     environment:
       CORE_SERVICE_HOST: core-service:50051
+      OTEL_SERVICE_NAME: "aura-gateway"
+      OTEL_EXPORTER_OTLP_ENDPOINT: "http://jaeger:4317"
     ports:
       - "8000:8000"
     depends_on:
       - core-service
+
+  jaeger:
+    image: jaegertracing/all-in-one:latest
+    restart: always
+    environment:
+      - COLLECTOR_OTLP_ENABLED=true
+    ports:
+      - "16686:16686" # UI
+      - "4317:4317" # OTLP gRPC receiver
+      - "4318:4318" # OTLP HTTP receiver
 
 volumes:
   postgres_data:
