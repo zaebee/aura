@@ -2,6 +2,7 @@ import uuid
 
 import grpc
 from fastapi import FastAPI, Header, HTTPException, Request
+from google.protobuf.json_format import MessageToDict
 from logging_config import (
     bind_request_id,
     clear_request_context,
@@ -12,7 +13,10 @@ from logging_config import (
 from pydantic import BaseModel
 
 from config import get_settings
-from proto.aura.negotiation.v1 import negotiation_pb2, negotiation_pb2_grpc
+from proto.aura.negotiation.v1 import (
+    negotiation_pb2,  # type: ignore
+    negotiation_pb2_grpc,  # type: ignore
+)
 
 # Configure structured logging on startup
 configure_logging()
@@ -46,7 +50,10 @@ async def request_id_middleware(request: Request, call_next):
         return response
     except Exception as e:
         logger.error(
-            "request_failed", method=request.method, path=str(request.url.path), error=str(e)
+            "request_failed",
+            method=request.method,
+            path=str(request.url.path),
+            error=str(e),
         )
         raise
     finally:
@@ -91,47 +98,30 @@ async def negotiate(
         ),
     )
 
-    # Prepare gRPC metadata with request_id for tracing
     metadata = [(REQUEST_ID_METADATA_KEY, request_id)]
 
     try:
-        logger.info("grpc_call_started", service="NegotiationService", method="Negotiate")
+        logger.info(
+            "grpc_call_started", service="NegotiationService", method="Negotiate"
+        )
         response = stub.Negotiate(grpc_request, metadata=metadata)
-        logger.info("grpc_call_completed", service="NegotiationService", method="Negotiate")
-
-        # Convert gRPC -> HTTP (Mapping)
+        logger.info(
+            "grpc_call_completed", service="NegotiationService", method="Negotiate"
+        )
         result_type = response.WhichOneof("result")
 
-        output = {
-            "session_token": response.session_token,
-            "status": result_type,
-            "valid_until": response.valid_until_timestamp,
-        }
-
         if result_type == "accepted":
-            output["data"] = {
-                "final_price": response.accepted.final_price,
-                "reservation_code": response.accepted.reservation_code,
-            }
             logger.info(
                 "negotiation_accepted",
                 final_price=response.accepted.final_price,
                 reservation_code=response.accepted.reservation_code,
             )
         elif result_type == "countered":
-            output["data"] = {
-                "proposed_price": response.countered.proposed_price,
-                "message": response.countered.human_message,
-            }
             logger.info(
                 "negotiation_countered",
                 proposed_price=response.countered.proposed_price,
             )
         elif result_type == "ui_required":
-            output["action_required"] = {
-                "template": response.ui_required.template_id,
-                "context": dict(response.ui_required.context_data),
-            }
             logger.info(
                 "negotiation_ui_required",
                 template_id=response.ui_required.template_id,
@@ -139,7 +129,9 @@ async def negotiate(
         elif result_type == "rejected":
             logger.info("negotiation_rejected")
 
-        return output
+        return MessageToDict(
+            response, preserving_proto_field_name=False, use_integers_for_enums=False
+        )
 
     except grpc.RpcError as e:
         logger.error(
@@ -181,21 +173,10 @@ async def search_items(payload: SearchRequestHTTP):
             method="Search",
             result_count=len(response.results),
         )
-
-        results = [
-            {
-                "id": r.item_id,
-                "name": r.name,
-                "price": r.base_price,
-                "score": round(r.similarity_score, 4),
-                "details": r.description_snippet,
-            }
-            for r in response.results
-        ]
-
-        logger.info("search_completed", result_count=len(results))
-
-        return {"results": results}
+        logger.info("search_completed", result_count=len(response.results))
+        return MessageToDict(
+            response, preserving_proto_field_name=False, use_integers_for_enums=False
+        )
 
     except grpc.RpcError as e:
         logger.error(
