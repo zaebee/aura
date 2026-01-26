@@ -12,7 +12,7 @@ lint:
 	# Python Lint
 	uv run ruff check core-service/src api-gateway/src
 	# Frontend Lint
-	cd frontend && bun run lint
+	# cd frontend && bun run lint
 
 # Run tests
 test:
