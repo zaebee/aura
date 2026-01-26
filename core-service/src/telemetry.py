@@ -24,6 +24,7 @@ def init_telemetry(service_name: str, otlp_endpoint: str = "http://jaeger:4317")
     Raises:
         ValueError: If service_name is not provided
     """
+    service_name = service_name.lower().strip()
     if not service_name:
         raise ValueError("service_name must be provided for OpenTelemetry initialization")
 
