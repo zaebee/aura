@@ -23,6 +23,8 @@ jobs:
               uses: astral-sh/setup-uv@v1
             - name: Install Buf
               uses: bufbuild/buf-setup-action@v1
+            - name: Install Python Dependencies
+              run: make install-dev
 
             # Run linters and tests
             - name: Run Linters & Tests
