@@ -92,7 +92,8 @@ class TestMistralStrategy:
         assert response.HasField("countered")
         assert response.countered.proposed_price == 220.0
         assert (
-            response.countered.human_message == "We can offer you a better deal at $220."
+            response.countered.human_message
+            == "We can offer you a better deal at $220."
         )
         assert response.countered.reason_code == "NEGOTIATION_ONGOING"
 
