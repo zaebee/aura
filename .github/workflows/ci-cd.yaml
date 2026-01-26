@@ -24,10 +24,6 @@ jobs:
             - name: Install Buf
               uses: bufbuild/buf-setup-action@v1
 
-            # Install Python dependencies
-            - name: Install Python
-              run: uv python install 3.13
-
             # Run linters and tests
             - name: Run Linters & Tests
               run: make lint test
