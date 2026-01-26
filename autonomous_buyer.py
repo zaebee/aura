@@ -2,19 +2,38 @@ import time
 
 import requests
 
+from agent_identity import AgentWallet
+
 # Конфигурация
 GATEWAY = "http://localhost:8000/v1"
-AGENT_DID = "did:web:buyer-agent-001"
 
 
 class AutonomousBuyer:
     def __init__(self, budget_limit: float):
         self.budget = budget_limit
         self.session_token = None
+        self.wallet = AgentWallet()  # Generate wallet on initialization
+        print(f"🔑 Agent initialized with DID: {self.wallet.did}")
+
+    def _get_security_headers(self, method: str, path: str, body: dict) -> dict:
+        """Generate security headers for a request."""
+        x_agent_id, x_timestamp, x_signature = self.wallet.sign_request(
+            method, path, body
+        )
+        return {
+            "X-Agent-ID": x_agent_id,
+            "X-Timestamp": x_timestamp,
+            "X-Signature": x_signature,
+            "Content-Type": "application/json",
+        }
 
     def search(self, query: str):
         print(f"\n🔍 STEP 1: Searching for '{query}'...")
-        resp = requests.post(f"{GATEWAY}/search", json={"query": query, "limit": 1})
+
+        payload = {"query": query, "limit": 1}
+        headers = self._get_security_headers("POST", "/v1/search", payload)
+
+        resp = requests.post(f"{GATEWAY}/search", json=payload, headers=headers)
         results = resp.json().get("results", [])
 
         if not results:
@@ -42,12 +61,15 @@ class AutonomousBuyer:
             payload = {
                 "item_id": item["id"],
                 "bid_amount": round(current_bid, 2),
-                "agent_did": AGENT_DID,
+                "agent_did": self.wallet.did,
                 "currency": "USD",
             }
 
+            # Generate security headers
+            headers = self._get_security_headers("POST", "/v1/negotiate", payload)
+
             # Если есть сессия, могли бы передавать, но у нас stateless пока
-            resp = requests.post(f"{GATEWAY}/negotiate", json=payload)
+            resp = requests.post(f"{GATEWAY}/negotiate", json=payload, headers=headers)
             data = resp.json()
             status = data.get("status")
 

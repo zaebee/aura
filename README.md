@@ -210,11 +210,52 @@ POST /v1/search
 
 ## 🔒 Security
 
-The platform uses:
+The platform now includes **cryptographic signature verification** using Ed25519:
+
+### Security Features
+
 - **Signed Headers**: Agents must sign requests with `X-Agent-ID`, `X-Timestamp`, and `X-Signature`
+- **Replay Protection**: Timestamps validated within ±60 seconds
+- **Request Integrity**: Body hash included in signature to prevent tampering
+- **Agent Authentication**: DID-based identity verification using Ed25519
 - **Rate Limiting**: Prevents abuse through Redis-backed rate limiting
 - **Hidden Knowledge**: Floor prices are never exposed to agents
-- **JWT Authentication**: For agent identity verification
+
+### Running with Security
+
+1. **Generate agent keys**:
+   ```python
+   from agent_identity import AgentWallet
+   wallet = AgentWallet()
+   print(f"DID: {wallet.did}")
+   print(f"Private Key: {wallet.private_key_hex}")
+   ```
+
+2. **Run the secure gateway**:
+   ```bash
+   cd api-gateway
+   uv run python -m src.main
+   ```
+
+3. **Run secure simulators**:
+   ```bash
+   python agent_sim.py
+   python autonomous_buyer.py
+   ```
+
+4. **Test security**:
+   ```bash
+   python test_security.py
+   ```
+
+### Security Implementation Details
+
+- **Algorithm**: Ed25519 (PyNaCl library)
+- **Signature Format**: `METHOD + PATH + TIMESTAMP + BodyHash`
+- **DID Format**: `did:key:public_key_hex`
+- **Timestamp Validation**: ±60 seconds tolerance for clock skew
+
+See `docs/SECURITY.md` for comprehensive security documentation.
 
 ## 📊 Observability
 

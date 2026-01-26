@@ -1,7 +1,7 @@
 import uuid
 
 import grpc
-from fastapi import FastAPI, Header, HTTPException, Request
+from fastapi import Depends, FastAPI, Header, HTTPException, Request
 from logging_config import (
     bind_request_id,
     clear_request_context,
@@ -19,6 +19,7 @@ from proto.aura.negotiation.v1 import (
     negotiation_pb2,  # type: ignore
     negotiation_pb2_grpc,  # type: ignore
 )
+from src.security import verify_signature
 
 # Configure structured logging on startup
 configure_logging()
@@ -29,7 +30,11 @@ settings = get_settings()
 # Initialize OpenTelemetry tracing
 service_name = settings.otel_service_name
 tracer = init_telemetry(service_name, settings.otel_exporter_otlp_endpoint)
-logger.info("telemetry_initialized", service_name=service_name, endpoint=settings.otel_exporter_otlp_endpoint)
+logger.info(
+    "telemetry_initialized",
+    service_name=service_name,
+    endpoint=settings.otel_exporter_otlp_endpoint,
+)
 
 app = FastAPI(title="Aura Agent Gateway", version="1.0")
 
@@ -84,6 +89,7 @@ class NegotiationRequestHTTP(BaseModel):
 async def negotiate(
     payload: NegotiationRequestHTTP,
     x_agent_token: str | None = Header(None),
+    agent_did: str = Depends(verify_signature),
 ):
     request_id = get_current_request_id() or str(uuid.uuid4())
 
@@ -92,12 +98,11 @@ async def negotiate(
         item_id=payload.item_id,
         bid_amount=payload.bid_amount,
         currency=payload.currency,
-        agent_did=payload.agent_did,
+        agent_did=agent_did,  # Use the verified agent_did
     )
 
-    # Auth Check (JWT verification would go here in production)
-    if not x_agent_token:
-        pass
+    # Auth Check: Signature verification is now handled by the verify_signature dependency
+    # The agent_did parameter contains the verified DID from the security headers
 
     # Convert HTTP -> gRPC (Mapping)
     grpc_request = negotiation_pb2.NegotiateRequest(
@@ -106,7 +111,7 @@ async def negotiate(
         bid_amount=payload.bid_amount,
         currency_code=payload.currency,
         agent=negotiation_pb2.AgentIdentity(
-            did=payload.agent_did,
+            did=agent_did,  # Use the verified agent_did from security headers
             reputation_score=1.0,
         ),
     )
@@ -179,13 +184,16 @@ class SearchRequestHTTP(BaseModel):
 
 
 @app.post("/v1/search")
-async def search_items(payload: SearchRequestHTTP):
+async def search_items(
+    payload: SearchRequestHTTP, agent_did: str = Depends(verify_signature)
+):
     request_id = get_current_request_id() or str(uuid.uuid4())
 
     logger.info(
         "search_request_received",
         query=payload.query,
         limit=payload.limit,
+        agent_did=agent_did,
     )
 
     grpc_req = negotiation_pb2.SearchRequest(query=payload.query, limit=payload.limit)
