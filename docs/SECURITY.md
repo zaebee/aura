@@ -455,7 +455,6 @@ Client → [TLS] → API Gateway → [Signature Verification] → [Rate Limiting
 ### Cryptographic Standards
 - **Ed25519**: [RFC 8032](https://tools.ietf.org/html/rfc8032)
 - **SHA-256**: [FIPS 180-4](https://nvlpubs.nist.gov/nistpubs/FIPS/NIST.FIPS.180-4.pdf)
-- **JWT**: [RFC 7519](https://tools.ietf.org/html/rfc7519)
 
 ### Security Best Practices
 - **OWASP Top 10**: [https://owasp.org/www-project-top-ten/](https://owasp.org/www-project-top-ten/)
