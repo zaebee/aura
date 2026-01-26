@@ -12,6 +12,7 @@ from logging_config import (
 from opentelemetry.instrumentation.fastapi import FastAPIInstrumentor
 from opentelemetry.instrumentation.grpc import GrpcInstrumentorClient
 from pydantic import BaseModel
+from starlette.middleware.cors import CORSMiddleware
 from telemetry import init_telemetry
 
 from config import get_settings
@@ -32,6 +33,13 @@ tracer = init_telemetry(service_name, settings.otel_exporter_otlp_endpoint)
 logger.info("telemetry_initialized", service_name=service_name, endpoint=settings.otel_exporter_otlp_endpoint)
 
 app = FastAPI(title="Aura Agent Gateway", version="1.0")
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins="http://localhost:3000",
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 # Instrument FastAPI for automatic tracing
 FastAPIInstrumentor.instrument_app(app)

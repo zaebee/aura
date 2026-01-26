@@ -56,5 +56,17 @@ services:
       - "4317:4317" # OTLP gRPC receiver
       - "4318:4318" # OTLP HTTP receiver
 
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    restart: on-failure
+    environment:
+      NEXT_PUBLIC_API_GATEWAY_URL: http://api-gateway:8000
+    ports:
+      - "3000:3000"
+    depends_on:
+      - api-gateway
+
 volumes:
   postgres_data:
