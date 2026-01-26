@@ -29,7 +29,11 @@ settings = get_settings()
 # Initialize OpenTelemetry tracing
 service_name = settings.otel_service_name
 tracer = init_telemetry(service_name, settings.otel_exporter_otlp_endpoint)
-logger.info("telemetry_initialized", service_name=service_name, endpoint=settings.otel_exporter_otlp_endpoint)
+logger.info(
+    "telemetry_initialized",
+    service_name=service_name,
+    endpoint=settings.otel_exporter_otlp_endpoint,
+)
 
 # Instrument gRPC server for distributed tracing
 GrpcInstrumentorServer().instrument()

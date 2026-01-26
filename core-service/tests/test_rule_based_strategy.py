@@ -1,6 +1,5 @@
 """Unit tests for RuleBasedStrategy."""
 
-
 from llm_strategy import RuleBasedStrategy
 
 
@@ -67,9 +66,7 @@ class TestRuleBasedStrategy:
         assert response.accepted.final_price == 150.0
         assert response.accepted.reservation_code.startswith("RULE-")
 
-    def test_bid_between_floor_and_base_should_accept(
-        self, mock_repository, mock_item
-    ):
+    def test_bid_between_floor_and_base_should_accept(self, mock_repository, mock_item):
         """Test that bid between floor and base price is accepted."""
         strategy = RuleBasedStrategy(repository=mock_repository)
 
