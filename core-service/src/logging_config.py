@@ -35,8 +35,10 @@ def add_otel_context(logger, method_name, event_dict):
             if span_context and span_context.is_valid:
                 event_dict["trace_id"] = format(span_context.trace_id, "032x")
                 event_dict["span_id"] = format(span_context.span_id, "016x")
-    except Exception:
-        # Silently fail if OTel context is not available
+    except Exception as e:
+        # Log for debugging but otherwise fail silently.
+        import logging
+        logging.getLogger(__name__).debug("Could not add OTel context to log record.", exc_info=e)
         pass
     return event_dict
 
