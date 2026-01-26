@@ -10,7 +10,10 @@ from opentelemetry.sdk.trace.export import BatchSpanProcessor, ConsoleSpanExport
 # between api-gateway and core-service. For now, duplication is acceptable
 # to keep each service independent and avoid complex dependency management.
 
-def init_telemetry(service_name: str, otlp_endpoint: str = "http://jaeger:4317") -> trace.Tracer:
+
+def init_telemetry(
+    service_name: str, otlp_endpoint: str = "http://jaeger:4317"
+) -> trace.Tracer:
     """
     Initialize OpenTelemetry tracing with OTLP exporter.
 
@@ -26,7 +29,9 @@ def init_telemetry(service_name: str, otlp_endpoint: str = "http://jaeger:4317")
     """
     service_name = service_name.lower().strip()
     if not service_name:
-        raise ValueError("service_name must be provided for OpenTelemetry initialization")
+        raise ValueError(
+            "service_name must be provided for OpenTelemetry initialization"
+        )
 
     # Create resource with service name
     resource = Resource.create({"service.name": service_name})
@@ -41,7 +46,9 @@ def init_telemetry(service_name: str, otlp_endpoint: str = "http://jaeger:4317")
         provider.add_span_processor(span_processor)
 
     except Exception as e:
-        logging.warning(f"Failed to initialize OTLP exporter, falling back to console exporter: {e}")
+        logging.warning(
+            f"Failed to initialize OTLP exporter, falling back to console exporter: {e}"
+        )
         # Fallback to console exporter only
         console_exporter = ConsoleSpanExporter()
         span_processor = BatchSpanProcessor(console_exporter)

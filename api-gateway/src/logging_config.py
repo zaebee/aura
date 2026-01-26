@@ -38,7 +38,10 @@ def add_otel_context(logger, method_name, event_dict):
     except Exception as e:
         # Log for debugging but otherwise fail silently.
         import logging
-        logging.getLogger(__name__).debug("Could not add OTel context to log record.", exc_info=e)
+
+        logging.getLogger(__name__).debug(
+            "Could not add OTel context to log record.", exc_info=e
+        )
         pass
     return event_dict
 
