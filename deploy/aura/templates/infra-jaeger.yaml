@@ -1,0 +1,40 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: "{{ .Release.Name }}-jaeger"
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: jaeger
+  template:
+    metadata:
+      labels:
+        app: jaeger
+    spec:
+      containers:
+        - name: jaeger
+          image: jaegertracing/all-in-one:latest
+          env:
+            - name: COLLECTOR_OTLP_ENABLED
+              value: "true"
+          ports:
+            - containerPort: 16686 # UI
+            - containerPort: 4317  # OTLP gRPC
+            - containerPort: 4318  # OTLP HTTP
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: "{{ .Release.Name }}-jaeger"
+spec:
+  type: LoadBalancer # Expose Jaeger service
+  ports:
+    - port: 16686
+      targetPort: 16686
+      name: ui
+    - port: 4317
+      targetPort: 4317
+      name: otlp-grpc
+  selector:
+    app: jaeger

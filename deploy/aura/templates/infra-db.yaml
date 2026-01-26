@@ -1,0 +1,73 @@
+---
+# REDIS
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: "{{ .Release.Name }}-redis"
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: redis
+  template:
+    metadata:
+      labels:
+        app: redis
+    spec:
+      containers:
+        - name: redis
+          image: redis:7-alpine
+          ports:
+            - containerPort: 6379
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: "{{ .Release.Name }}-redis"
+spec:
+  ports:
+    - port: 6379
+  selector:
+    app: redis
+---
+# POSTGRES
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: "{{ .Release.Name }}-postgres"
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: postgres
+  template:
+    metadata:
+      labels:
+        app: postgres
+    spec:
+      containers:
+        - name: postgres
+          image: pgvector/pgvector:pg15
+          env:
+            - name: POSTGRES_USER
+              value: "{{ .Values.postgres.auth.username }}"
+            - name: POSTGRES_PASSWORD
+              value: "{{ .Values.postgres.auth.password }}"
+            - name: POSTGRES_DB
+              value: "{{ .Values.postgres.auth.database }}"
+          ports:
+            - containerPort: 5432
+          # Warn: For production, use PersistentVolumeClaims
+          volumeMounts:
+            - name: postgres-storage
+              mountPath: /var/lib/postgresql/data
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: "{{ .Release.Name }}-postgres"
+spec:
+  ports:
+    - port: 5432
+  selector:
+    app: postgres

@@ -1,0 +1,29 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: "{{ .Release.Name }}-gateway"
+spec:
+  replicas: {{ .Values.gateway.replicaCount }}
+  selector:
+    matchLabels:
+      app: gateway
+  template:
+    metadata:
+      labels:
+        app: gateway
+    spec:
+      containers:
+        - name: gateway
+          image: "{{ .Values.gateway.image.repository }}:{{ .Values.gateway.image.tag }}"
+          imagePullPolicy: {{ .Values.gateway.image.pullPolicy }}
+          ports:
+            - containerPort: 8000
+          env:
+            - name: CORE_SERVICE_HOST
+              value: "{{ .Release.Name }}-core:50051"
+            - name: REDIS_URL
+              value: "redis://{{ .Release.Name }}-redis:6379/0"
+            - name: OTEL_SERVICE_NAME
+              value: "aura-gateway"
+            - name: OTEL_EXPORTER_OTLP_ENDPOINT
+              value: "http://{{ .Release.Name }}-jaeger:4317"

@@ -1,0 +1,34 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: "{{ .Release.Name }}-core"
+spec:
+  replicas: {{ .Values.core.replicaCount }}
+  selector:
+    matchLabels:
+      app: core
+  template:
+    metadata:
+      labels:
+        app: core
+    spec:
+      containers:
+        - name: core
+          image: "{{ .Values.core.image.repository }}:{{ .Values.core.image.tag }}"
+          imagePullPolicy: {{ .Values.core.image.pullPolicy }}
+          ports:
+            - containerPort: 50051
+          env:
+            - name: DATABASE_URL
+              value: "postgresql://{{ .Values.postgres.auth.username }}:{{ .Values.postgres.auth.password }}@{{ .Release.Name }}-postgres:5432/{{ .Values.postgres.auth.database }}"
+            - name: REDIS_URL
+              value: "redis://{{ .Release.Name }}-redis:6379/0"
+            - name: MISTRAL_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: aura-secrets
+                  key: mistral-key
+            - name: OTEL_SERVICE_NAME
+              value: "aura-core"
+            - name: OTEL_EXPORTER_OTLP_ENDPOINT
+              value: "http://{{ .Release.Name }}-jaeger:4317"

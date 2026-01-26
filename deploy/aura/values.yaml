@@ -1,0 +1,46 @@
+global:
+  environment: local
+
+# API Gateway Service Configuration
+gateway:
+  image:
+    repository: aura-gateway # Docker image repository for the API Gateway
+    tag: latest
+    pullPolicy: IfNotPresent # Image pull policy
+  service:
+    type: LoadBalancer # Service type to expose the API Gateway
+    port: 8000
+  replicaCount: 1
+  resources:
+    limits:
+      cpu: 200m
+      memory: 256Mi
+  env:
+    LOG_LEVEL: info
+
+# Core Service Configuration
+core:
+  image:
+    repository: aura-core
+    tag: latest
+    pullPolicy: IfNotPresent
+  service:
+    port: 50051
+  replicaCount: 1
+  env:
+    LOG_LEVEL: info
+
+# PostgreSQL Database Configuration
+postgres:
+  enabled: true
+  image: pgvector/pgvector:pg15
+  storage: 1Gi
+  auth:
+    username: user
+    password: password
+    database: aura_db
+
+# Redis Configuration
+redis:
+  enabled: true
+  image: redis:7-alpine
