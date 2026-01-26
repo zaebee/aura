@@ -1,5 +1,9 @@
 # Aura Platform - Security Documentation
 
+## ⚠️ Important Note
+
+The code examples in this document are **conceptual implementations** designed to illustrate security principles. They include proper imports, function signatures, and docstrings to make them more practical, but may require adaptation for your specific environment and requirements.
+
 ## 🔒 Security Overview
 
 The Aura Platform implements a comprehensive security model to protect against unauthorized access, data tampering, and abuse while facilitating secure autonomous negotiations between AI agents and service providers.
@@ -50,8 +54,21 @@ signature = ed25519.sign(
 import ed25519
 import hashlib
 import json
+from datetime import datetime
 
-def verify_request_signature(headers, body):
+def verify_request_signature(headers, body, method, path):
+    """
+    Verify the signature of an incoming request.
+    
+    Args:
+        headers: Dictionary of HTTP headers
+        body: Request body as string
+        method: HTTP method (e.g., "POST")
+        path: Request path (e.g., "/v1/negotiate")
+        
+    Returns:
+        tuple: (is_valid: bool, message: str)
+    """
     # Extract headers
     agent_id = headers.get("X-Agent-ID")
     timestamp = headers.get("X-Timestamp")
@@ -77,6 +94,15 @@ def verify_request_signature(headers, body):
         return is_valid, "Signature valid" if is_valid else "Invalid signature"
     except Exception as e:
         return False, f"Signature verification failed: {str(e)}"
+
+def get_agent_public_key(agent_id):
+    """
+    Retrieve agent's public key from database.
+    This is a placeholder - actual implementation would query your database.
+    """
+    # In a real implementation, this would query your database
+    # Example: return db.query(Agent).filter_by(did=agent_id).first().public_key
+    return None  # Placeholder
 ```
 
 ## 🛡️ Security Mechanisms
@@ -90,7 +116,18 @@ def verify_request_signature(headers, body):
 
 **Implementation**:
 ```python
+from datetime import datetime
+
 def validate_timestamp(timestamp_str):
+    """
+    Validate that the request timestamp is within acceptable range.
+    
+    Args:
+        timestamp_str: ISO 8601 formatted timestamp string
+        
+    Returns:
+        bool: True if timestamp is valid (within ±5 minutes)
+    """
     try:
         request_time = datetime.fromisoformat(timestamp_str)
         current_time = datetime.utcnow()
@@ -111,11 +148,22 @@ def validate_timestamp(timestamp_str):
 
 **Implementation**:
 ```python
+from datetime import datetime
 from redis import Redis
 
 def check_rate_limit(agent_id):
+    """
+    Check if agent has exceeded rate limits.
+    
+    Args:
+        agent_id: Agent's DID
+        
+    Returns:
+        tuple: (is_allowed: bool, message: str)
+    """
     redis = Redis()
-    key = f"rate_limit:{agent_id}:{current_minute()}"
+    current_minute = datetime.utcnow().strftime("%Y-%m-%d-%H-%M")
+    key = f"rate_limit:{agent_id}:{current_minute}"
     
     # Increment request count
     count = redis.incr(key)
@@ -141,8 +189,18 @@ def check_rate_limit(agent_id):
 **Implementation**:
 ```python
 import hashlib
+import json
 
 def calculate_body_hash(body):
+    """
+    Calculate SHA-256 hash of request body for signature verification.
+    
+    Args:
+        body: Request body (dict or string)
+        
+    Returns:
+        str: Hexadecimal SHA-256 hash
+    """
     if isinstance(body, dict):
         body_str = json.dumps(body, sort_keys=True, separators=(',', ':'))
     else:
@@ -281,9 +339,25 @@ X-Client-Version: agent_software_version
 **Verification**:
 ```python
 import jwt
+import time
 from fastapi import Header, HTTPException
 
+# This would be loaded from environment variables in production
+SECRET_KEY = "your-secret-key-here"  # Replace with actual secret key
+
 def verify_jwt(x_agent_token: str = Header(None)):
+    """
+    Verify JWT token for additional authentication.
+    
+    Args:
+        x_agent_token: JWT token from X-Agent-Token header
+        
+    Returns:
+        dict: Decoded JWT payload
+        
+    Raises:
+        HTTPException: 401 if token is invalid or expired
+    """
     if not x_agent_token:
         raise HTTPException(status_code=401, detail="Missing token")
     
@@ -300,8 +374,12 @@ def verify_jwt(x_agent_token: str = Header(None)):
             raise HTTPException(status_code=401, detail="Token expired")
             
         return payload
-    except jwt.JWTError as e:
+    except jwt.ExpiredSignatureError:
+        raise HTTPException(status_code=401, detail="Token expired")
+    except jwt.InvalidTokenError as e:
         raise HTTPException(status_code=401, detail=f"Invalid token: {str(e)}")
+    except Exception as e:
+        raise HTTPException(status_code=401, detail=f"Authentication failed: {str(e)}")
 ```
 
 ## 📊 Security Monitoring
