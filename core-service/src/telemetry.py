@@ -36,17 +36,11 @@ def init_telemetry(service_name: str, otlp_endpoint: str = "http://jaeger:4317")
     # Set up OTLP exporter with error handling
     try:
         otlp_exporter = OTLPSpanExporter(endpoint=otlp_endpoint, insecure=True)
-
-        # Add batch span processor
         span_processor = BatchSpanProcessor(otlp_exporter)
         provider.add_span_processor(span_processor)
 
-        # Add console exporter as fallback for debugging
-        console_exporter = ConsoleSpanExporter()
-        provider.add_span_processor(BatchSpanProcessor(console_exporter))
-
     except Exception as e:
-        logging.warning(f"Failed to initialize OTLP exporter: {e}")
+        logging.warning(f"Failed to initialize OTLP exporter, falling back to console exporter: {e}")
         # Fallback to console exporter only
         console_exporter = ConsoleSpanExporter()
         span_processor = BatchSpanProcessor(console_exporter)
