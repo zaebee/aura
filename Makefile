@@ -48,7 +48,7 @@ push:
 # --- 5. DEV TASKS ---
 install-dev:
 	# Install development dependencies
-	uv sync --all-groups
+	uv sync --group dev
 
 format:
 	# Format code
