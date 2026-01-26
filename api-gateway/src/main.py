@@ -10,7 +10,10 @@ from logging_config import (
     get_current_request_id,
     get_logger,
 )
+from opentelemetry.instrumentation.fastapi import FastAPIInstrumentor
+from opentelemetry.instrumentation.grpc import GrpcInstrumentorClient
 from pydantic import BaseModel
+from telemetry import init_telemetry
 
 from config import get_settings
 from proto.aura.negotiation.v1 import (
@@ -24,7 +27,18 @@ logger = get_logger("api-gateway")
 
 settings = get_settings()
 
+# Initialize OpenTelemetry tracing
+service_name = settings.otel_service_name
+tracer = init_telemetry(service_name, settings.otel_exporter_otlp_endpoint)
+logger.info("telemetry_initialized", service_name=service_name, endpoint=settings.otel_exporter_otlp_endpoint)
+
 app = FastAPI(title="Aura Agent Gateway", version="1.0")
+
+# Instrument FastAPI for automatic tracing
+FastAPIInstrumentor.instrument_app(app)
+
+# Instrument gRPC client for distributed tracing
+GrpcInstrumentorClient().instrument()
 
 channel = grpc.insecure_channel(settings.core_service_host)
 stub = negotiation_pb2_grpc.NegotiationServiceStub(channel)

@@ -9,9 +9,13 @@ from logging_config import (
     configure_logging,
     get_logger,
 )
+from opentelemetry.instrumentation.grpc import GrpcInstrumentorServer
+from opentelemetry.instrumentation.langchain import LangchainInstrumentor
+from opentelemetry.instrumentation.sqlalchemy import SQLAlchemyInstrumentor
+from telemetry import init_telemetry
 
 from config import get_settings
-from db import InventoryItem, SessionLocal
+from db import InventoryItem, SessionLocal, engine
 from embeddings import generate_embedding
 from llm_strategy import MistralStrategy
 from proto.aura.negotiation.v1 import negotiation_pb2, negotiation_pb2_grpc
@@ -21,6 +25,20 @@ configure_logging()
 logger = get_logger("core-service")
 
 settings = get_settings()
+
+# Initialize OpenTelemetry tracing
+service_name = settings.otel_service_name
+tracer = init_telemetry(service_name, settings.otel_exporter_otlp_endpoint)
+logger.info("telemetry_initialized", service_name=service_name, endpoint=settings.otel_exporter_otlp_endpoint)
+
+# Instrument gRPC server for distributed tracing
+GrpcInstrumentorServer().instrument()
+
+# Instrument SQLAlchemy for database query tracing
+SQLAlchemyInstrumentor().instrument(engine=engine)
+
+# Instrument LangChain for LLM call tracing
+LangchainInstrumentor().instrument()
 
 # gRPC metadata key for request_id
 REQUEST_ID_METADATA_KEY = "x-request-id"

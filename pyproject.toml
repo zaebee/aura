@@ -19,6 +19,14 @@ dependencies = [
     "requests>=2.32.5",
     "sqlalchemy>=2.0.46",
     "uvicorn>=0.40.0",
+    # OpenTelemetry dependencies
+    "opentelemetry-api>=1.24.0",
+    "opentelemetry-sdk>=1.24.0",
+    "opentelemetry-exporter-otlp>=1.24.0",
+    "opentelemetry-instrumentation-fastapi>=0.45b0",
+    "opentelemetry-instrumentation-grpc>=0.45b0",
+    "opentelemetry-instrumentation-sqlalchemy>=0.45b0",
+    "opentelemetry-instrumentation-langchain>=0.1.0",
 ]
 
 [dependency-groups]
@@ -52,5 +60,5 @@ ignore = [
 [tool.ruff.lint.isort]
 known-first-party = ["config", "db", "embeddings", "llm_strategy", "proto"]
 
-[[tool.uv.index]]
-url = "https://buf.build/gen/python"
+# [[tool.uv.index]]
+# url = "https://buf.build/gen/python"

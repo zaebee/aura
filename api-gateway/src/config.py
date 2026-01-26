@@ -16,6 +16,10 @@ class Settings(BaseSettings):
     # HTTP Server
     http_port: int = 8000
 
+    # OpenTelemetry Configuration
+    otel_service_name: str = "aura-gateway"
+    otel_exporter_otlp_endpoint: str = "http://jaeger:4317"
+
 
 @lru_cache
 def get_settings() -> Settings:
