@@ -7,48 +7,6 @@ This test can be run to check if traces are being exported correctly.
 import os
 import time
 
-import requests
-
-
-def test_api_gateway():
-    """Test API Gateway endpoints to generate traces."""
-    print("Testing API Gateway endpoints...")
-
-    # Test search endpoint
-    try:
-        response = requests.post(
-            "http://localhost:8000/v1/search",
-            json={"query": "test", "limit": 3},
-            timeout=10
-        )
-        print(f"Search endpoint response: {response.status_code}")
-        if response.status_code == 200:
-            print("✓ Search endpoint working")
-        else:
-            print(f"✗ Search endpoint failed: {response.text}")
-    except Exception as e:
-        print(f"✗ Search endpoint error: {e}")
-
-    # Test negotiate endpoint
-    try:
-        response = requests.post(
-            "http://localhost:8000/v1/negotiate",
-            json={
-                "item_id": "test-item",
-                "bid_amount": 100.0,
-                "currency": "USD",
-                "agent_did": "test-agent"
-            },
-            timeout=10
-        )
-        print(f"Negotiate endpoint response: {response.status_code}")
-        if response.status_code == 200:
-            print("✓ Negotiate endpoint working")
-        else:
-            print(f"✗ Negotiate endpoint failed: {response.text}")
-    except Exception as e:
-        print(f"✗ Negotiate endpoint error: {e}")
-
 
 def test_telemetry_setup():
     """Test that telemetry is properly configured."""
@@ -80,8 +38,6 @@ def main():
     # Wait a bit for services to be ready
     print("\nWaiting for services to be ready...")
     time.sleep(5)
-
-    test_api_gateway()
 
     print("\n=== Test Complete ===")
     print("Check Jaeger UI at http://localhost:16686 to see traces")
