@@ -39,15 +39,21 @@ export class BrowserAgentWallet {
       dataToHash = new Uint8Array(0);
     } else {
       // Sort keys for consistent canonicalization
-      const sortedBody = typeof body === 'object' && body !== null
-        ? Object.keys(body as object).sort().reduce((acc, key) => {
-            acc[key] = (body as Record<string, unknown>)[key];
-            return acc;
-          }, {} as Record<string, unknown>)
-        : body;
-      
-      // Canonicalize JSON (sorted keys, no spaces)
-      const canonical = JSON.stringify(sortedBody);
+            // Recursively sort object keys to ensure a canonical JSON representation
+      // that matches the backend's implementation.
+      const deepSort = (obj: any): any => {
+        if (Array.isArray(obj)) {
+          return obj.map(v => deepSort(v));
+        }
+        if (obj !== null && typeof obj === 'object') {
+          return Object.keys(obj).sort().reduce((result, key) => {
+            result[key] = deepSort(obj[key]);
+            return result;
+          }, {} as Record<string, any>);
+        }
+        return obj;
+      };
+      const canonical = JSON.stringify(deepSort(body));
       const encoder = new TextEncoder();
       dataToHash = encoder.encode(canonical);
     }
