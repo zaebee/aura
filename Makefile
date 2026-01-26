@@ -1,4 +1,4 @@
-.PHONY: lint test build generate push install-dev format
+.PHONY: lint test test-cov test-verbose build generate push install-dev format
 
 # Makefile for Aura Project
 TAG ?= latest
@@ -36,7 +36,7 @@ build: generate
 # --- 3. HELPER ---
 generate:
 	# Generate Protobuf code
-	make -C proto generate  # (или просто команда buf generate)
+	buf generate
 
 # --- 4. PUBLISH (CI ONLY) ---
 push:
