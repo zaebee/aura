@@ -33,37 +33,33 @@ export class BrowserAgentWallet {
    * Returns SHA-256 hash as hex string to match backend format
    */
   private async hashBody(body: unknown): Promise<string> {
-    let dataToHash: Uint8Array;
+    // Recursively sort object keys to ensure a canonical JSON representation
+    // that matches the backend's implementation.
+    const deepSort = (obj: any): any => {
+      if (Array.isArray(obj)) {
+        return obj.map(v => deepSort(v));
+      }
+      if (obj !== null && typeof obj === 'object') {
+        return Object.keys(obj).sort().reduce((result, key) => {
+          result[key] = deepSort(obj[key]);
+          return result;
+        }, {} as Record<string, any>);
+      }
+      return obj;
+    };
 
-    if (!body) {
-      dataToHash = new Uint8Array(0);
-    } else {
-      // Sort keys for consistent canonicalization
-            // Recursively sort object keys to ensure a canonical JSON representation
-      // that matches the backend's implementation.
-      const deepSort = (obj: any): any => {
-        if (Array.isArray(obj)) {
-          return obj.map(v => deepSort(v));
-        }
-        if (obj !== null && typeof obj === 'object') {
-          return Object.keys(obj).sort().reduce((result, key) => {
-            result[key] = deepSort(obj[key]);
-            return result;
-          }, {} as Record<string, any>);
-        }
-        return obj;
-      };
-      const canonical = JSON.stringify(deepSort(body));
-      const encoder = new TextEncoder();
-      dataToHash = encoder.encode(canonical);
-    }
+    // Prepare data for hashing: empty array for no body, or encoded canonical JSON
+    const dataToHash = !body
+      ? new Uint8Array(0)
+      : new TextEncoder().encode(JSON.stringify(deepSort(body)));
 
+    // Calculate SHA-256 hash
     const hashBuffer = await crypto.subtle.digest('SHA-256', dataToHash);
 
     // Convert to hex string (matches Python hashlib.sha256().hexdigest())
     return Array.from(new Uint8Array(hashBuffer))
         .map(b => b.toString(16).padStart(2, '0'))
-        .join('');
+        .join('')
   }
 
   /**
