@@ -87,11 +87,15 @@ class NegotiationRequestHTTP(BaseModel):
 
 @app.post("/v1/negotiate")
 async def negotiate(
-    payload: NegotiationRequestHTTP,
+    request: Request,
     x_agent_token: str | None = Header(None),
     agent_did: str = Depends(verify_signature),
 ):
     request_id = get_current_request_id() or str(uuid.uuid4())
+
+    # Get the parsed body from request.state (stored by verify_signature)
+    payload_dict = getattr(request.state, "parsed_body", {})
+    payload = NegotiationRequestHTTP(**payload_dict)
 
     logger.info(
         "negotiate_request_received",
@@ -184,10 +188,12 @@ class SearchRequestHTTP(BaseModel):
 
 
 @app.post("/v1/search")
-async def search_items(
-    payload: SearchRequestHTTP, agent_did: str = Depends(verify_signature)
-):
+async def search_items(request: Request, agent_did: str = Depends(verify_signature)):
     request_id = get_current_request_id() or str(uuid.uuid4())
+
+    # Get the parsed body from request.state (stored by verify_signature)
+    payload_dict = getattr(request.state, "parsed_body", {})
+    payload = SearchRequestHTTP(**payload_dict)
 
     logger.info(
         "search_request_received",

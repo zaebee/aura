@@ -103,8 +103,12 @@ async def verify_signature(
                 body_json, sort_keys=True, separators=(",", ":")
             )
             body_hash = hashlib.sha256(body_canonical.encode("utf-8")).hexdigest()
+
+            # Store the parsed body in request.state for later use by FastAPI
+            request.state.parsed_body = body_json
         else:
             body_hash = hashlib.sha256(b"").hexdigest()
+            request.state.parsed_body = {}
 
         # Reconstruct message: METHOD + PATH + TIMESTAMP + BODY_HASH
         message = f"{request.method}{request.url.path}{x_timestamp}{body_hash}"
