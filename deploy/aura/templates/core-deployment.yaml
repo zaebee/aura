@@ -41,6 +41,6 @@ spec:
                   name: aura-secrets
                   key: mistral-key
             - name: OTEL_SERVICE_NAME
-              value: "aura-core"
+              value: "{{ .Release.Name }}-core"
             - name: OTEL_EXPORTER_OTLP_ENDPOINT
               value: "http://{{ .Release.Name }}-jaeger:4317"
