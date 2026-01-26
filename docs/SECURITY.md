@@ -1,12 +1,54 @@
 # Aura Platform - Security Documentation
 
-## ⚠️ Important Note
-
-The code examples in this document are **conceptual implementations** designed to illustrate security principles. They include proper imports, function signatures, and docstrings to make them more practical, but may require adaptation for your specific environment and requirements.
-
 ## 🔒 Security Overview
 
-The Aura Platform implements a comprehensive security model to protect against unauthorized access, data tampering, and abuse while facilitating secure autonomous negotiations between AI agents and service providers.
+The Aura Platform implements **cryptographic signature verification** using Ed25519 to secure all API communications. This modern security approach ensures request authenticity, integrity, and prevents replay attacks.
+
+**Current Implementation**:
+- **Algorithm**: Ed25519 (PyNaCl library)
+- **Authentication**: DID-based identity (`did:key:public_key_hex`)
+- **Signature Format**: `METHOD + PATH + TIMESTAMP + BodyHash`
+- **Replay Protection**: Timestamp validation (±60 seconds tolerance)
+
+## 🔐 Authentication and Authorization
+
+### Agent Identity
+
+**Decentralized Identifiers (DIDs)**:
+- Each agent is identified by a unique DID in the format: `did:key:public_key_hex`
+- DIDs are self-sovereign identifiers derived from the agent's Ed25519 public key
+- Format: `did:key:` followed by the hex-encoded public key
+
+**Agent Registration**:
+1. Agents generate an Ed25519 key pair using `AgentWallet()`
+2. The public key is embedded in the DID: `did:key:public_key_hex`
+3. Agents sign all requests using their private key
+4. The API Gateway verifies signatures using the public key from the DID
+
+### Signature Verification
+
+**Request Signing Process**:
+
+```
+signature = ed25519.sign(
+    private_key,
+    method + path + timestamp + body_hash
+)
+```
+
+**Components**:
+- `method`: HTTP method (e.g., "POST")
+- `path`: Request path (e.g., "/v1/negotiate")
+- `timestamp`: Unix timestamp from `X-Timestamp` header
+- `body_hash`: SHA-256 hash of the canonical JSON request body
+
+**Required Headers**:
+
+| Header | Description | Example |
+|--------|-------------|---------|
+| `X-Agent-ID` | Agent's DID | `did:key:663055bbbef3f78ecaec5d32a21e201fda6040588835171fb717efbd7bd6fc6c` |
+| `X-Timestamp` | Unix timestamp | `1735689600` |
+| `X-Signature` | Ed25519 signature (hex) | `cfef8b600ffd80b40eff1960978b91ea58672efae56fbc217f...` |
 
 ## 🔐 Authentication and Authorization
 
@@ -51,58 +93,31 @@ signature = ed25519.sign(
 ### Signature Verification Algorithm
 
 ```python
-import ed25519
-import hashlib
-import json
-from datetime import datetime
+from agent_identity import AgentWallet
 
-def verify_request_signature(headers, body, method, path):
-    """
-    Verify the signature of an incoming request.
-    
-    Args:
-        headers: Dictionary of HTTP headers
-        body: Request body as string
-        method: HTTP method (e.g., "POST")
-        path: Request path (e.g., "/v1/negotiate")
-        
-    Returns:
-        tuple: (is_valid: bool, message: str)
-    """
-    # Extract headers
-    agent_id = headers.get("X-Agent-ID")
-    timestamp = headers.get("X-Timestamp")
-    signature = headers.get("X-Signature")
-    
-    if not all([agent_id, timestamp, signature]):
-        return False, "Missing required headers"
-    
-    # Get agent's public key from database
-    public_key = get_agent_public_key(agent_id)
-    if not public_key:
-        return False, "Agent not registered"
-    
-    # Calculate body hash
-    body_hash = hashlib.sha256(body.encode('utf-8')).hexdigest()
-    
-    # Construct message for verification
-    message = f"{method}{path}{timestamp}{body_hash}"
-    
-    # Verify signature
-    try:
-        is_valid = ed25519.verify(signature, message, public_key)
-        return is_valid, "Signature valid" if is_valid else "Invalid signature"
-    except Exception as e:
-        return False, f"Signature verification failed: {str(e)}"
+# Example: Generate a wallet and sign a request
+wallet = AgentWallet()
+print(f"Agent DID: {wallet.did}")
 
-def get_agent_public_key(agent_id):
-    """
-    Retrieve agent's public key from database.
-    This is a placeholder - actual implementation would query your database.
-    """
-    # In a real implementation, this would query your database
-    # Example: return db.query(Agent).filter_by(did=agent_id).first().public_key
-    return None  # Placeholder
+# Create a request payload
+payload = {
+    "item_id": "hotel_alpha",
+    "bid_amount": 850.0,
+    "currency": "USD",
+    "agent_did": wallet.did
+}
+
+# Sign the request
+method = "POST"
+path = "/v1/negotiate"
+x_agent_id, x_timestamp, x_signature = wallet.sign_request(method, path, payload)
+
+print(f"Security Headers:")
+print(f"  X-Agent-ID: {x_agent_id}")
+print(f"  X-Timestamp: {x_timestamp}")
+print(f"  X-Signature: {x_signature[:50]}...")
+
+# The API Gateway will verify this signature using the public key from the DID
 ```
 
 ## 🛡️ Security Mechanisms
@@ -323,64 +338,23 @@ X-Request-ID: unique_request_identifier
 X-Client-Version: agent_software_version
 ```
 
-## 🔒 JWT Authentication (Optional)
+## 🔒 Implementation Details
 
-**JWT Structure**:
-```json
-{
-  "sub": "did:agent:007",
-  "iat": 1735689600,
-  "exp": 1735776000,
-  "scope": ["negotiate", "search"],
-  "agent_type": "autonomous"
-}
-```
+**AgentWallet Class**:
+- Located in `agent_identity.py`
+- Handles key generation, signing, and verification
+- Supports both full wallets (with private keys) and view-only wallets (public key only)
 
-**Verification**:
-```python
-import jwt
-import time
-from fastapi import Header, HTTPException
+**Security Module**:
+- Located in `api-gateway/src/security.py`
+- FastAPI dependency for signature verification
+- Validates headers, timestamps, and signatures
+- Stores parsed body in `request.state` for endpoint reuse
 
-# This would be loaded from environment variables in production
-SECRET_KEY = "your-secret-key-here"  # Replace with actual secret key
-
-def verify_jwt(x_agent_token: str = Header(None)):
-    """
-    Verify JWT token for additional authentication.
-    
-    Args:
-        x_agent_token: JWT token from X-Agent-Token header
-        
-    Returns:
-        dict: Decoded JWT payload
-        
-    Raises:
-        HTTPException: 401 if token is invalid or expired
-    """
-    if not x_agent_token:
-        raise HTTPException(status_code=401, detail="Missing token")
-    
-    try:
-        payload = jwt.decode(
-            x_agent_token,
-            SECRET_KEY,
-            algorithms=["HS256"],
-            audience=["aura-platform"]
-        )
-        
-        # Validate claims
-        if payload["exp"] < time.time():
-            raise HTTPException(status_code=401, detail="Token expired")
-            
-        return payload
-    except jwt.ExpiredSignatureError:
-        raise HTTPException(status_code=401, detail="Token expired")
-    except jwt.InvalidTokenError as e:
-        raise HTTPException(status_code=401, detail=f"Invalid token: {str(e)}")
-    except Exception as e:
-        raise HTTPException(status_code=401, detail=f"Authentication failed: {str(e)}")
-```
+**API Gateway Integration**:
+- Both `/v1/negotiate` and `/v1/search` endpoints use the `verify_signature` dependency
+- Endpoints retrieve the parsed body from `request.state.parsed_body`
+- Verified agent DID is passed to the endpoint for use in business logic
 
 ## 📊 Security Monitoring
 
