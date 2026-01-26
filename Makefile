@@ -2,7 +2,7 @@
 
 # Makefile for Aura Project
 TAG ?= latest
-REGISTRY ?= ghcr.io/zaebee
+REGISTRY ?= ghcr.io/myuser
 PLATFORM ?= linux/amd64
 
 # --- 1. CODE QUALITY ---
