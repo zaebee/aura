@@ -12,7 +12,7 @@ class Settings(BaseSettings):
     )
 
     # Database
-    DATABASE_URL: str = "sqlite:///./aura.db"
+    database_url: str = "sqlite:///./aura.db"
 
     # Mistral AI
     mistral_api_key: str = ""
