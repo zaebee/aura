@@ -37,10 +37,16 @@ logger.info(
     endpoint=settings.otel_exporter_otlp_endpoint,
 )
 
+origins = [
+    "http://localhost:3000", #  Local frontend dev
+    "http://127.0.0.1:3000",
+    "*" #  Allow all origins for testing purposes
+]
+
 app = FastAPI(title="Aura Agent Gateway", version="1.0")
 app.add_middleware(
     CORSMiddleware,
-    allow_origins="http://localhost:3000",
+    allow_origins=origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
