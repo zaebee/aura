@@ -189,6 +189,11 @@ class AuraMCPServer:
             logger.error(f"🔴 Unexpected error: {e}")
             return f"❌ Negotiation failed: {str(e)}"
 
+    async def shutdown(self):
+        """Close the underlying HTTP client."""
+        await self.client.aclose()
+        logger.info("🔌 Closed HTTP client.")
+
 
 def main():
     server = AuraMCPServer()
