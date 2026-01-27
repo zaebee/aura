@@ -161,16 +161,16 @@ class AuraMCPServer:
             status = data.get("status")
 
             if status == "accepted":
-                reservation_code = data["data"].get("reservation_code", "unknown")
+                reservation_code = data.get("data", {}).get("reservation_code", "unknown")
                 return f"🎉 SUCCESS! Reservation: {reservation_code}"
 
             elif status == "countered":
-                proposed_price = data["data"].get("proposed_price", bid)
-                message = data["data"].get("message", "No reason provided")
+                proposed_price = data.get("data", {}).get("proposed_price", bid)
+                message = data.get("data", {}).get("message", "No reason provided")
                 return f"🔄 COUNTER-OFFER: ${proposed_price:.2f}. Message: {message}"
 
             elif status == "ui_required":
-                template = data["action_required"].get("template", "unknown")
+                template = data.get("action_required", {}).get("template", "unknown")
                 return f"🚨 HUMAN INTERVENTION REQUIRED. Template: {template}"
 
             elif status == "rejected":
