@@ -85,6 +85,8 @@ jobs:
 
         if: github.ref == 'refs/heads/main'
         steps:
+            - uses: actions/checkout@v4
+
             - name: Deploy to Minikube
               env:
                 MISTRAL_API_KEY: ${{ secrets.MISTRAL_API_KEY }}
