@@ -18,6 +18,7 @@ def test_gateway_health_endpoints():
         "/readyz": "readiness",
         "/health": "detailed health",
     }
+    all_passed = True
 
     print("Testing API Gateway Health Endpoints\n" + "=" * 50)
 
@@ -25,18 +26,27 @@ def test_gateway_health_endpoints():
         url = f"{base_url}{endpoint}"
         try:
             response = requests.get(url, timeout=5)
-            status = "✓ PASS" if response.status_code == 200 else "✗ FAIL"
+            # We expect all endpoints to be healthy and return 200 for this test
+            if response.status_code == 200:
+                status = "✓ PASS"
+            else:
+                status = "✗ FAIL"
+                all_passed = False
+
             print(f"{status} [{endpoint}] ({description})")
             print(f"  Status: {response.status_code}")
-            print(f"  Response: {response.json()}")
+            try:
+                print(f"  Response: {response.json()}")
+            except requests.exceptions.JSONDecodeError:
+                print(f"  Response: {response.text}")
             print()
         except requests.exceptions.RequestException as e:
             print(f"✗ FAIL [{endpoint}] ({description})")
             print(f"  Error: {e}")
             print()
-            return False
+            all_passed = False
 
-    return True
+    return all_passed
 
 
 def test_core_service_grpc_health():

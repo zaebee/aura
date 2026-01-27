@@ -377,8 +377,11 @@ RUN apt-get update && apt-get install -y curl
 
 **Core Service Dockerfile** should include:
 ```dockerfile
-RUN go install github.com/grpc-ecosystem/grpc-health-probe@latest
-ENV PATH="${PATH}:/root/go/bin"
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends curl ca-certificates && \
+    curl -fsSL -o /bin/grpc_health_probe https://github.com/grpc-ecosystem/grpc-health-probe/releases/download/v0.4.44/grpc_health_probe-linux-amd64 && \
+    chmod +x /bin/grpc_health_probe && \
+    rm -rf /var/lib/apt/lists/*
 ```
 
 ---

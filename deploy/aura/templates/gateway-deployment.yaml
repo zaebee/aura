@@ -44,6 +44,7 @@ spec:
               port: 8000
             initialDelaySeconds: 0
             periodSeconds: 2
+            timeoutSeconds: 5
             failureThreshold: 30
           resources:
             {{ toYaml .Values.gateway.resources | nindent 12 }}

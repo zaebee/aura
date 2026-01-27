@@ -63,7 +63,7 @@ kubectl get pods -l app=core
 
 | Service | Checks |
 |---------|--------|
-| API Gateway | Core Service gRPC connectivity (2s timeout) |
+| API Gateway | Core Service gRPC connectivity (5s timeout) |
 | Core Service | PostgreSQL connectivity (`SELECT 1`) |
 
 ## Response Examples
