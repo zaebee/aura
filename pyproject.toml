@@ -10,6 +10,7 @@ dependencies = [
     "structlog>=25.0.0",
     "grpcio>=1.76.0",
     "grpcio-tools>=1.76.0",
+    "grpcio-health-checking>=1.76.0",
     "langchain-mistralai>=1.1.1",
     "mypy-protobuf>=5.0.0",
     "pgvector>=0.4.2",
