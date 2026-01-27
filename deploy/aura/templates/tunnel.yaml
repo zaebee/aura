@@ -9,7 +9,12 @@ data:
 
     [auth]
     method = "token"
-    token = "${FRP_TOKEN}"
+
+    [auth.tokenSource]
+    type = "file"
+
+    [auth.tokenSource.file]
+    path = "/etc/frp/token"
 
     [[proxies]]
     name = "frontend"
@@ -42,18 +47,23 @@ spec:
     spec:
       containers:
       - name: frpc
-        image: snowdreamtech/frpc:latest
-        env:
-        - name: FRP_TOKEN
-          valueFrom:
-            secretKeyRef:
-              name: "{{ .Release.Name }}-{{ .Values.secrets.frpClientToken.name }}"
-              key: token
+        image: "{{ .Values.tunnel.image.repository }}:{{ .Values.tunnel.image.tag }}"
+        imagePullPolicy: {{ .Values.tunnel.image.pullPolicy | default "IfNotPresent" }}
         volumeMounts:
         - name: config
           mountPath: /etc/frp/frpc.toml
           subPath: frpc.toml
+        - name: token
+          mountPath: /etc/frp/token
+          subPath: token
+          readOnly: true
       volumes:
       - name: config
         configMap:
           name: "{{ .Release.Name }}-frpc-config"
+      - name: token
+        secret:
+          secretName: "{{ .Release.Name }}-{{ .Values.secrets.frpClientToken.name }}"
+          items:
+          - key: token
+            path: token
