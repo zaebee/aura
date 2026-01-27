@@ -37,11 +37,9 @@ logger.info(
     endpoint=settings.otel_exporter_otlp_endpoint,
 )
 
-origins = [
-    "http://localhost:3000",
-    "http://127.0.0.1:3000",
-    "https://aura.zae.life",
-]
+# Parse CORS origins from settings (comma-separated string to list)
+origins = [origin.strip() for origin in settings.cors_origins.split(",") if origin.strip()]
+logger.info("cors_configured", allowed_origins=origins)
 
 app = FastAPI(title="Aura Agent Gateway", version="1.0")
 app.add_middleware(

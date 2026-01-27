@@ -33,3 +33,5 @@ spec:
               value: "{{ .Release.Name }}-gateway"
             - name: OTEL_EXPORTER_OTLP_ENDPOINT
               value: "http://{{ .Release.Name }}-jaeger:4317"
+            - name: CORS_ORIGINS
+              value: "{{ .Values.gateway.corsOrigins }}"

@@ -15,6 +15,8 @@ gateway:
     limits:
       cpu: 200m
       memory: 256Mi
+  # CORS allowed origins (comma-separated list)
+  corsOrigins: "https://aura.zae.life"
   env:
     LOG_LEVEL: info
 
@@ -89,5 +91,12 @@ secrets:
   # This value must be provided during installation.
   mistralApiKey:
     name: mistral-api-key
+  # Image pull secrets for private container registries
   imagePullSecrets:
   - name: ghcr-secret
+  # FRP client authentication token for tunnel access
+  # This value must be provided during installation via:
+  # helm install --set secrets.frpClientToken.value="your-token-here"
+  frpClientToken:
+    name: frp-client-token
+    value: ""  # Must be set during deployment

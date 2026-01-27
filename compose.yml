@@ -41,6 +41,7 @@ services:
       CORE_SERVICE_HOST: core-service:50051
       OTEL_SERVICE_NAME: "aura-gateway"
       OTEL_EXPORTER_OTLP_ENDPOINT: "http://jaeger:4317"
+      CORS_ORIGINS: "http://localhost:3000,http://127.0.0.1:3000"
     ports:
       - "8000:8000"
     depends_on:
