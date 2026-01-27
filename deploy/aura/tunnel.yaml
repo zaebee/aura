@@ -4,7 +4,7 @@ metadata:
   name: frpc-config
 data:
   frpc.toml: |
-    serverAddr = "89.167.23.25"
+    serverAddr = "aura.zae.life"
     serverPort = 7000
     
     [auth]

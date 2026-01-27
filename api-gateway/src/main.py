@@ -38,9 +38,9 @@ logger.info(
 )
 
 origins = [
-    "http://localhost:3000", #  Local frontend dev
+    "http://localhost:3000",
     "http://127.0.0.1:3000",
-    "*" #  Allow all origins for testing purposes
+    "https://aura.zae.life",
 ]
 
 app = FastAPI(title="Aura Agent Gateway", version="1.0")
