@@ -1,0 +1,52 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: frpc-config
+data:
+  frpc.toml: |
+    serverAddr = "89.167.23.25"
+    serverPort = 7000
+    
+    [auth]
+    token = "SUPER_SECRET_PUNK_TOKEN"
+
+    [[proxies]]
+    name = "frontend"
+    type = "tcp"
+    localIP = "aura-frontend"
+    localPort = 3000
+    remotePort = 8081
+
+    [[proxies]]
+    name = "gateway"
+    type = "tcp"
+    localIP = "aura-gateway"
+    localPort = 8000
+    remotePort = 8082
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: frpc-tunnel
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: frpc
+  template:
+    metadata:
+      labels:
+        app: frpc
+    spec:
+      containers:
+      - name: frpc
+        image: snowdreamtech/frpc:latest
+        volumeMounts:
+        - name: config
+          mountPath: /etc/frp/frpc.toml
+          subPath: frpc.toml
+      volumes:
+      - name: config
+        configMap:
+          name: frpc-config
