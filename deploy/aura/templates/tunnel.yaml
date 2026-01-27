@@ -47,7 +47,8 @@ spec:
     spec:
       containers:
       - name: frpc
-        image: snowdreamtech/frpc:alpine3.22
+        image: "{{ .Values.tunnel.image.repository }}:{{ .Values.tunnel.image.tag }}"
+        imagePullPolicy: {{ .Values.tunnel.image.pullPolicy | default "IfNotPresent" }}
         volumeMounts:
         - name: config
           mountPath: /etc/frp/frpc.toml

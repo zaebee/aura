@@ -1,6 +1,13 @@
 global:
   environment: local
 
+# Fast tunnel
+tunnel:
+  image:
+    repository: snowdreamtech/frpc
+    tag: alpine3.22
+    pullPolicy: IfNotPresent
+
 # API Gateway Service Configuration
 gateway:
   image:
