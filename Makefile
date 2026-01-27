@@ -1,4 +1,4 @@
-.PHONY: lint test test-cov test-verbose build generate push install-dev format
+.PHONY: lint test test-cov test-verbose build generate push install-dev format test-health
 
 # Makefile for Aura Project
 TAG ?= latest
@@ -25,6 +25,11 @@ test-cov:
 # Run tests with verbose output
 test-verbose:
 	uv run pytest core-service/tests/ -vv -s
+
+# Test health endpoints
+test-health:
+	# Test health check endpoints (requires running services)
+	uv run python test_health_endpoints.py
 
 # --- 2. BUILD ---
 build: generate

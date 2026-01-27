@@ -100,6 +100,23 @@ python search_sim.py
 
 # Comprehensive telemetry test
 python test_telemetry_comprehensive.py
+
+# Health check endpoints test
+python test_health_endpoints.py
+```
+
+### Health Checks
+```bash
+# Test health endpoints
+curl http://localhost:8000/healthz   # Liveness
+curl http://localhost:8000/readyz    # Readiness
+curl http://localhost:8000/health    # Detailed status
+
+# Check Docker Compose health status
+docker-compose ps
+
+# Test gRPC health (requires grpc_health_probe)
+grpc_health_probe -addr=localhost:50051
 ```
 
 ## Architecture Patterns
