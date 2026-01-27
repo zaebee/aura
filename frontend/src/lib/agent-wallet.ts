@@ -5,9 +5,14 @@ import { SearchResponseSchema, SearchResultItem, SearchResponse, NegotiateReques
 export class BrowserAgentWallet {
   private keyPair: nacl.SignKeyPair
   private agentId: string
-  private readonly GATEWAY_URL: string = 'http://localhost:8000/v1'
+  private readonly GATEWAY_URL: string
 
-  constructor() {
+  constructor(gatewayUrl?: string) {
+    // Configure API Gateway URL from environment or parameter
+    this.GATEWAY_URL = gatewayUrl ||
+      process.env.NEXT_PUBLIC_API_GATEWAY_URL ||
+      'http://localhost:8000/v1'
+
     // Generate Ed25519 key pair
     this.keyPair = nacl.sign.keyPair()
     // Create agent ID from public key (did:key format with full hex)

@@ -81,8 +81,19 @@ jobs:
 
     deploy:
         needs: build-and-push
-        runs-on: ubuntu-latest
+        runs-on: self-hosted
+
         if: github.ref == 'refs/heads/main'
         steps:
-            - name: Trigger Webhook on Portainer / Watchtower
-              run: curl -X POST ${{ secrets.DEPLOY_WEBHOOK_URL }}
+            - name: Deploy to Minikube
+              env:
+                MISTRAL_API_KEY: ${{ secrets.MISTRAL_API_KEY }}
+                FRP_CLIENT_TOKEN: ${{ secrets.FRP_CLIENT_TOKEN }}
+              run: |
+                  helm dependency update ./deploy/aura
+                  helm upgrade aura ./deploy/aura \
+                    --set gateway.image.tag=sha-$(git rev-parse --short HEAD) \
+                    --set core.image.tag=sha-$(git rev-parse --short HEAD) \
+                    --set frontend.image.tag=sha-$(git rev-parse --short HEAD) \
+                    --set secrets.mistralApiKey="$MISTRAL_API_KEY" \
+                    --set secrets.frpClientToken.value="$FRP_CLIENT_TOKEN"

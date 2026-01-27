@@ -19,9 +19,8 @@ if config.config_file_name is not None:
 
 db_url = os.getenv("DATABASE_URL")
 if db_url:
-    print(f"Migrating database at: {db_url}") # Лог для отладки
     config.set_main_option("sqlalchemy.url", db_url)
-    
+
 target_metadata = Base.metadata
 
 # other values from the config, defined by the needs of env.py,

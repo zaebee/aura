@@ -12,6 +12,10 @@ spec:
       labels:
         app: gateway
     spec:
+      {{- with .Values.secrets.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
       containers:
         - name: gateway
           image: "{{ .Values.gateway.image.repository }}:{{ .Values.gateway.image.tag }}"
@@ -29,3 +33,5 @@ spec:
               value: "{{ .Release.Name }}-gateway"
             - name: OTEL_EXPORTER_OTLP_ENDPOINT
               value: "http://{{ .Release.Name }}-jaeger:4317"
+            - name: CORS_ORIGINS
+              value: "{{ .Values.gateway.corsOrigins }}"

@@ -12,6 +12,10 @@ spec:
       labels:
         app: frontend
     spec:
+      {{- with .Values.secrets.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
       containers:
         - name: frontend
           image: "{{ .Values.frontend.image.repository }}:{{ .Values.frontend.image.tag }}"
@@ -19,8 +23,8 @@ spec:
           ports:
             - containerPort: 3000
           env:
-            - name: NEXT_PUBLIC_API_URL
-              value: "{{ .Values.frontend.env.NEXT_PUBLIC_API_URL }}"
+            - name: NEXT_PUBLIC_API_GATEWAY_URL
+              value: "{{ .Values.frontend.apiGatewayUrl }}"
 ---
 apiVersion: v1
 kind: Service

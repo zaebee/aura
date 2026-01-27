@@ -4,9 +4,9 @@ global:
 # API Gateway Service Configuration
 gateway:
   image:
-    repository: aura-gateway # Docker image repository for the API Gateway
+    repository: ghcr.io/zaebee/aura-gateway # Docker image repository for the API Gateway
     tag: latest
-    pullPolicy: IfNotPresent # Image pull policy
+    pullPolicy: Always # Image pull policy
   service:
     type: LoadBalancer # Service type to expose the API Gateway
     port: 8000
@@ -15,13 +15,15 @@ gateway:
     limits:
       cpu: 200m
       memory: 256Mi
+  # CORS allowed origins (comma-separated list)
+  corsOrigins: "https://aura.zae.life"
   env:
     LOG_LEVEL: info
 
 # Core Service Configuration
 core:
   image:
-    repository: aura-core
+    repository: ghcr.io/zaebee/aura-core
     tag: latest
     pullPolicy: IfNotPresent
   service:
@@ -66,7 +68,7 @@ jaeger:
 # Frontnend Configuration
 frontend:
   image:
-    repository: aura-frontend
+    repository: ghcr.io/zaebee/aura-frontend
     tag: latest
     pullPolicy: IfNotPresent
   service:
@@ -77,8 +79,8 @@ frontend:
     limits:
       cpu: 200m
       memory: 256Mi
+  apiGatewayUrl: "https://api.aura.zae.life/v1"
   env:
-    NEXT_PUBLIC_API_URL: "http://localhost:8000"
     LOG_LEVEL: info
 
 # Secrets for the application.
@@ -86,5 +88,15 @@ frontend:
 # like Vault or External Secrets Operator instead of providing plain-text secrets here.
 secrets:
   # API key for Mistral AI, required by the core service.
-  # This value must be provided during installation.
+  # This value must be provided during installation via CI/CD.
+  # Injected via: --set secrets.mistralApiKey="your-key"
   mistralApiKey: ""
+  # Image pull secrets for private container registries
+  imagePullSecrets:
+  - name: ghcr-secret
+  # FRP client authentication token for tunnel access
+  # This value must be provided during installation via:
+  # helm install --set secrets.frpClientToken.value="your-token-here"
+  frpClientToken:
+    name: frp-client-token
+    value: ""  # Must be set during deployment

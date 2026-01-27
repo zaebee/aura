@@ -161,7 +161,9 @@ class AuraMCPServer:
             status = data.get("status")
 
             if status == "accepted":
-                reservation_code = data.get("data", {}).get("reservation_code", "unknown")
+                reservation_code = data.get("data", {}).get(
+                    "reservation_code", "unknown"
+                )
                 return f"🎉 SUCCESS! Reservation: {reservation_code}"
 
             elif status == "countered":

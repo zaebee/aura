@@ -122,10 +122,6 @@ async def verify_signature(
 
     except json.JSONDecodeError:
         raise HTTPException(status_code=400, detail="Invalid JSON body") from None
-    except hashlib.error:
-        raise HTTPException(
-            status_code=401, detail="Failed to hash request body"
-        ) from None
     except nacl.exceptions.BadSignatureError:
         raise HTTPException(
             status_code=401,

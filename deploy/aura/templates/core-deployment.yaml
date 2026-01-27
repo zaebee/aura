@@ -12,6 +12,10 @@ spec:
       labels:
         app: core
     spec:
+      {{- with .Values.secrets.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
       containers:
         - name: core
           image: "{{ .Values.core.image.repository }}:{{ .Values.core.image.tag }}"
@@ -38,8 +42,8 @@ spec:
             - name: MISTRAL_API_KEY
               valueFrom:
                 secretKeyRef:
-                  name: aura-secrets
-                  key: mistral-key
+                  name: "{{ .Release.Name }}-secrets"
+                  key: "mistral-key"
             - name: OTEL_SERVICE_NAME
               value: "{{ .Release.Name }}-core"
             - name: OTEL_EXPORTER_OTLP_ENDPOINT
