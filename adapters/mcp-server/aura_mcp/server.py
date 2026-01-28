@@ -10,9 +10,9 @@ import os
 import httpx
 from dotenv import load_dotenv
 
-
 # Import AgentWallet from parent directory
 from aura_mcp.wallet import AgentWallet
+
 
 # Configure logging
 logging.basicConfig(
