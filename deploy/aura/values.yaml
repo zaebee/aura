@@ -46,6 +46,7 @@ core:
   env:
     LOG_LEVEL: info
     LLM_MODEL: "mistral/mistral-large-latest"  # Can override: openai/gpt-4o, ollama/mistral, rule
+    prometheusUrl: "http://prometheus-kube-prometheus-prometheus.monitoring:9090"
 
 # PostgreSQL Database Configuration
 postgres:

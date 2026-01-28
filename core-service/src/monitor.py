@@ -123,15 +123,13 @@ async def get_hive_metrics() -> dict[str, Any]:
             cpu_usage = 0.0
             mem_usage = 0.0
 
-            if cpu_data.get("status") == "success" and cpu_data.get("data", {}).get(
-                "result"
-            ):
-                cpu_usage = float(cpu_data["data"]["result"][0]["value"][1])
+            cpu_results = cpu_data.get("data", {}).get("result")
+            if cpu_data.get("status") == "success" and cpu_results:
+                cpu_usage = float(cpu_results[0]["value"][1])
 
-            if mem_data.get("status") == "success" and mem_data.get("data", {}).get(
-                "result"
-            ):
-                mem_usage = float(mem_data["data"]["result"][0]["value"][1])
+            mem_results = mem_data.get("data", {}).get("result")
+            if mem_data.get("status") == "success" and mem_results:
+                mem_usage = float(mem_results[0]["value"][1])
 
             metrics = {
                 "status": "ok",
