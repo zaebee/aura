@@ -14,11 +14,17 @@ const config: Config = {
         'cyberpunk-blue': '#00f2ff',
         'cyberpunk-purple': '#a855f7',
         'cyberpunk-pink': '#ec4899',
-        
-        // Neutral Colors - use Tailwind's default gray scale but override specific shades
+
+        // Neutral Colors
         'dark-bg': '#0a0a0a',
         'card-bg': '#1a1a1a',
-        
+        'gray-800': '#1f1f1f',
+        'gray-700': '#373737',
+        'gray-600': '#4b4b4b',
+        'gray-500': '#6b6b6b',
+        'gray-400': '#9ca3af',
+        'gray-300': '#d1d5db',
+
         // Semantic Colors
         'success': '#10b981',
         'warning': '#f59e0b',

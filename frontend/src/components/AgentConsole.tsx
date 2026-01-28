@@ -159,9 +159,9 @@ export default function AgentConsole() {
   return (
     <div className="max-w-7xl mx-auto space-y-6 p-4">
       <header className="flex justify-between items-center py-6 border-b border-gray-700 animate-fade-in">
-        <h1 className="h1 bg-brand-gradient bg-clip-text text-transparent">Aura Agent Console</h1>
+        <h1 className="h1 bg-cyberpunk-gradient bg-clip-text text-transparent">Aura Agent Console</h1>
         {wallet && (
-          <div className="flex items-center space-x-3 bg-[#1f1f1f] px-4 py-2 rounded-lg border border-[#373737]">
+          <div className="flex items-center space-x-3 bg-gray-800 px-4 py-2 rounded-lg border border-gray-700">
             <Wallet className="text-cyberpunk-purple" size={18} />
             <span className="body-text-sm">Agent: {wallet.getAgentId()}</span>
           </div>
@@ -169,7 +169,7 @@ export default function AgentConsole() {
       </header>
 
       {/* Search Section */}
-      <Card className="card-brand animate-fade-in">
+      <Card className="bg-card-bg border border-gray-700 rounded-lg shadow-card animate-fade-in">
         <CardHeader>
           <CardTitle className="text-cyberpunk-blue h4">Search Inventory</CardTitle>
           <CardDescription className="caption-text">Find items to negotiate</CardDescription>
@@ -182,12 +182,12 @@ export default function AgentConsole() {
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               onKeyPress={(e) => e.key === 'Enter' && handleSearch()}
-              className="input-brand flex-1"
+              className="bg-gray-800 border border-gray-600 text-white rounded-md py-2 px-3 focus:outline-none focus:border-cyberpunk-blue focus:ring-1 focus:ring-cyberpunk-blue flex-1"
             />
             <Button
               onClick={handleSearch}
               disabled={isLoading || !searchQuery.trim()}
-              className="btn-primary transition-brand"
+              className="bg-cyberpunk-blue hover:bg-cyberpunk-blue/90 text-white font-semibold py-2 px-4 rounded-md transition-all duration-200"
             >
               <Search className="mr-2" size={16} />
               {isLoading ? 'Searching...' : 'Search'}
@@ -210,7 +210,7 @@ export default function AgentConsole() {
           {searchResults.map((item) => (
             <Card
               key={item.itemId}
-              className={`card-brand cursor-pointer hover:border-cyberpunk-blue transition-brand ${selectedItem?.itemId === item.itemId ? 'border-cyberpunk-blue' : 'border-gray-700'}`}
+              className={`bg-card-bg border rounded-lg shadow-card cursor-pointer hover:border-cyberpunk-blue transition-all duration-200 ${selectedItem?.itemId === item.itemId ? 'border-cyberpunk-blue' : 'border-gray-700'}`}
               onClick={() => handleSelectItem(item)}
             >
               <CardHeader>
@@ -241,7 +241,7 @@ export default function AgentConsole() {
 
       {/* Negotiation Section */}
       {selectedItem && (
-        <Card className="card-brand animate-fade-in">
+        <Card className="bg-card-bg border border-gray-700 rounded-lg shadow-card animate-fade-in">
           <CardHeader>
             <CardTitle className="text-cyberpunk-purple h4">Negotiation</CardTitle>
             <CardDescription className="caption-text">Bid on {selectedItem.name}</CardDescription>
@@ -254,14 +254,14 @@ export default function AgentConsole() {
                   placeholder="Enter bid amount"
                   value={bidAmount}
                   onChange={(e) => setBidAmount(e.target.value)}
-                  className="input-brand flex-1"
+                  className="bg-gray-800 border border-gray-600 text-white rounded-md py-2 px-3 focus:outline-none focus:border-cyberpunk-blue focus:ring-1 focus:ring-cyberpunk-blue flex-1"
                   min="0"
                   step="0.01"
                 />
                 <Button
                   onClick={handleNegotiate}
                   disabled={isLoading || !bidAmount}
-                  className="btn-secondary transition-brand"
+                  className="bg-cyberpunk-purple hover:bg-cyberpunk-purple/90 text-white font-semibold py-2 px-4 rounded-md transition-all duration-200"
                 >
                   <MessageCircle className="mr-2" size={16} />
                   {isLoading ? 'Negotiating...' : 'Submit Bid'}

@@ -49,27 +49,45 @@ colors: {
 }
 ```
 
-### Usage Examples
+### Usage with Inline Classes
+
+Aura follows Tailwind's utility-first philosophy by using inline classes rather than custom utility classes. This approach:
+- Keeps styles explicit and visible in components
+- Enables tree-shaking for unused styles
+- Makes it easier to customize per-component
+- Reduces CSS file size
 
 **Primary CTA Button:**
 ```jsx
-<Button className="bg-cyberpunk-blue hover:bg-cyberpunk-blue/90 text-white">
+<Button className="bg-cyberpunk-blue hover:bg-cyberpunk-blue/90 text-white font-semibold py-2 px-4 rounded-md transition-all duration-200">
   Submit
 </Button>
 ```
 
 **Secondary Button:**
 ```jsx
-<Button className="bg-cyberpunk-purple hover:bg-cyberpunk-purple/90 text-white">
+<Button className="bg-cyberpunk-purple hover:bg-cyberpunk-purple/90 text-white font-semibold py-2 px-4 rounded-md transition-all duration-200">
   Cancel
 </Button>
+```
+
+**Card Component:**
+```jsx
+<Card className="bg-card-bg border border-gray-700 rounded-lg shadow-card">
+  {/* Card content */}
+</Card>
+```
+
+**Input Field:**
+```jsx
+<Input className="bg-gray-800 border border-gray-600 text-white rounded-md py-2 px-3 focus:outline-none focus:border-cyberpunk-blue focus:ring-1 focus:ring-cyberpunk-blue" />
 ```
 
 **Error State:**
 ```jsx
 <Alert className="bg-error/20 border-error">
-  <AlertTitle className="text-error">Error</AlertTitle>
-  <AlertDescription>Something went wrong</AlertDescription>
+  <AlertTitle className="text-error h4">Error</AlertTitle>
+  <AlertDescription className="body-text">Something went wrong</AlertDescription>
 </Alert>
 ```
 
@@ -89,20 +107,54 @@ The Inter font family is used as the primary typeface:
 
 ### Typography Classes
 
-Custom typography classes are defined in `globals.css`:
+Semantic typography classes are defined in `globals.css` for consistent text hierarchy:
 
 ```css
 /* Heading Styles */
-h1, .h1 { @apply text-h1 font-bold text-white; }
-h2, .h2 { @apply text-h2 font-semibold text-white; }
-h3, .h3 { @apply text-h3 font-semibold text-white; }
-h4, .h4 { @apply text-h4 font-semibold text-white; }
+h1, .h1 {
+  font-size: 3rem;
+  line-height: 1.2;
+  font-weight: 700;
+  color: white;
+}
+h2, .h2 {
+  font-size: 2.25rem;
+  line-height: 1.2;
+  font-weight: 600;
+  color: white;
+}
+h3, .h3 {
+  font-size: 1.875rem;
+  line-height: 1.2;
+  font-weight: 600;
+  color: white;
+}
+h4, .h4 {
+  font-size: 1.5rem;
+  line-height: 1.2;
+  font-weight: 600;
+  color: white;
+}
 
 /* Body Text */
-p, .body-text { @apply text-body text-gray-300; }
-.body-text-sm { @apply text-body-sm text-gray-400; }
-.caption-text { @apply text-caption text-gray-500; }
+p, .body-text {
+  font-size: 1rem;
+  line-height: 1.5;
+  color: #9ca3af;
+}
+.body-text-sm {
+  font-size: 0.875rem;
+  line-height: 1.5;
+  color: #9ca3af;
+}
+.caption-text {
+  font-size: 0.75rem;
+  line-height: 1.4;
+  color: #6b6b6b;
+}
 ```
+
+**Note**: These semantic classes use CSS properties directly rather than `@apply` directives due to Tailwind CSS v4 constraints with custom color references.
 
 ### Usage Examples
 
@@ -130,64 +182,81 @@ p, .body-text { @apply text-body text-gray-300; }
 
 ### Card Component
 
-Use the `card-brand` class for consistent card styling:
+Use inline Tailwind classes for consistent card styling:
 
 ```jsx
-<Card className="card-brand">
+<Card className="bg-card-bg border border-gray-700 rounded-lg shadow-card">
   {/* Card content */}
 </Card>
 ```
 
 This applies:
-- Background: `card-bg` (#1a1a1a)
-- Border: 1px solid `gray-700` (#373737)
-- Border Radius: 0.5rem (8px)
-- Shadow: subtle card shadow
+- Background: `bg-card-bg` (#1a1a1a)
+- Border: `border-gray-700` (#373737)
+- Border Radius: `rounded-lg` (0.5rem / 8px)
+- Shadow: `shadow-card` (subtle card shadow)
 
 ### Input Component
 
-Use the `input-brand` class for consistent input styling:
+Use inline Tailwind classes for consistent input styling:
 
 ```jsx
-<Input className="input-brand" />
+<Input className="bg-gray-800 border border-gray-600 text-white rounded-md py-2 px-3 focus:outline-none focus:border-cyberpunk-blue focus:ring-1 focus:ring-cyberpunk-blue" />
 ```
 
 This applies:
-- Background: `gray-800` (#1f1f1f)
-- Border: 1px solid `gray-600` (#4b4b4b)
-- Text: white
-- Focus: cyberpunk-blue ring
+- Background: `bg-gray-800` (#1f1f1f)
+- Border: `border-gray-600` (#4b4b4b)
+- Text: `text-white`
+- Focus: cyberpunk-blue ring with outline removal
 
 ### Button Components
 
-Use the predefined button classes:
+Use inline Tailwind classes for consistent button styling:
 
 ```jsx
 // Primary button
-<Button className="btn-primary">Submit</Button>
+<Button className="bg-cyberpunk-blue hover:bg-cyberpunk-blue/90 text-white font-semibold py-2 px-4 rounded-md transition-all duration-200">
+  Submit
+</Button>
 
 // Secondary button
-<Button className="btn-secondary">Cancel</Button>
+<Button className="bg-cyberpunk-purple hover:bg-cyberpunk-purple/90 text-white font-semibold py-2 px-4 rounded-md transition-all duration-200">
+  Cancel
+</Button>
 
 // Destructive button
-<Button className="btn-destructive">Delete</Button>
+<Button className="bg-error hover:bg-error/90 text-white font-semibold py-2 px-4 rounded-md transition-all duration-200">
+  Delete
+</Button>
 ```
 
 ## 🎭 Animations & Transitions
 
-### Brand Transitions
+### Transitions
 
-Use `transition-brand` for consistent transitions:
+Use inline Tailwind classes for consistent transitions:
 
 ```jsx
-<div className="transition-brand">
+<div className="transition-all duration-200">
   {/* Content with smooth transitions */}
 </div>
 ```
 
+Common transition patterns:
+```jsx
+// All properties
+className="transition-all duration-200"
+
+// Specific properties
+className="transition-colors duration-200"
+className="transition-transform duration-300"
+className="transition-opacity duration-150"
+```
+
 ### Fade-in Animation
 
-Use `animate-fade-in` for fade-in effects:
+Use the `animate-fade-in` utility class for fade-in effects:
 
 ```jsx
 <div className="animate-fade-in">
@@ -195,9 +264,7 @@ Use `animate-fade-in` for fade-in effects:
 </div>
 ```
 
-### Custom Animations
-
-Define custom animations in `globals.css`:
+This animation is defined in `globals.css` using `@keyframes`:
 
 ```css
 @keyframes fadeIn {
@@ -209,6 +276,10 @@ Define custom animations in `globals.css`:
     opacity: 1;
     transform: translateY(0);
   }
+}
+
+.animate-fade-in {
+  animation: fadeIn 0.3s ease-out forwards;
 }
 ```
 
@@ -254,12 +325,23 @@ Use Tailwind's built-in breakpoints:
 
 ### Focus Styles
 
-Brand focus styles are defined in `globals.css`:
+Global focus styles are defined in `globals.css`:
 
 ```css
 *:focus {
-  @apply outline-none ring-2 ring-cyberpunk-blue ring-offset-2 ring-offset-dark-bg;
+  outline: none;
+  box-shadow: 0 0 0 2px #0a0a0a, 0 0 0 4px #00f2ff;
 }
+```
+
+This creates a dual-ring focus indicator:
+- Inner ring: `dark-bg` (#0a0a0a) - 2px offset
+- Outer ring: `cyberpunk-blue` (#00f2ff) - 4px offset
+
+For component-specific focus states, use inline Tailwind classes:
+
+```jsx
+<Input className="focus:outline-none focus:border-cyberpunk-blue focus:ring-1 focus:ring-cyberpunk-blue" />
 ```
 
 ### Semantic HTML
@@ -288,13 +370,13 @@ Use proper ARIA attributes:
 
 ### Creating New Components
 
-1. **Color**: Use brand colors from Tailwind config
-2. **Typography**: Use defined typography classes
-3. **Spacing**: Use consistent spacing scale (4px increments)
-4. **Borders**: Use `gray-700` for standard borders
-5. **Transitions**: Add `transition-brand` for interactive elements
+1. **Color**: Use brand colors from Tailwind config (e.g., `bg-cyberpunk-blue`, `text-gray-400`)
+2. **Typography**: Use semantic typography classes (`.h1`, `.h2`, `.body-text`, `.caption-text`)
+3. **Spacing**: Use Tailwind's spacing scale (e.g., `p-4`, `space-y-2`, `gap-4`)
+4. **Borders**: Use `border-gray-700` for standard borders
+5. **Transitions**: Add `transition-all duration-200` for interactive elements
 6. **Accessibility**: Ensure proper focus states and ARIA attributes
-7. **Responsive**: Test on all breakpoints
+7. **Responsive**: Test on all breakpoints (use `sm:`, `md:`, `lg:` prefixes)
 8. **Dark Mode**: Verify dark mode compatibility
 
 ### Component Review
@@ -355,16 +437,25 @@ const checkContrast = (foreground, background) => {
 
 ### Gradient Backgrounds
 
+Use the `bg-cyberpunk-gradient` utility for gradient backgrounds:
+
 ```jsx
-<div className="bg-brand-gradient">
-  {/* Content with cyberpunk gradient */}
-</div>
+<h1 className="bg-cyberpunk-gradient bg-clip-text text-transparent">
+  Aura Agent Console
+</h1>
+```
+
+The gradient is defined in `tailwind.config.ts`:
+```typescript
+backgroundImage: {
+  'cyberpunk-gradient': 'linear-gradient(135deg, #00f2ff 0%, #a855f7 100%)',
+}
 ```
 
 ### Status Badges
 
 ```jsx
-<Badge variant={score > 0.8 ? 'default' : 'secondary'}>
+<Badge variant={score > 0.8 ? 'default' : 'secondary'} className="caption-text">
   {score}%
 </Badge>
 ```
@@ -372,9 +463,20 @@ const checkContrast = (foreground, background) => {
 ### Loading States
 
 ```jsx
-<Button disabled={isLoading}>
+<Button disabled={isLoading} className="bg-cyberpunk-blue hover:bg-cyberpunk-blue/90 text-white font-semibold py-2 px-4 rounded-md transition-all duration-200">
   {isLoading ? 'Processing...' : 'Submit'}
 </Button>
+```
+
+### Interactive Cards
+
+```jsx
+<Card
+  className="bg-card-bg border border-gray-700 rounded-lg shadow-card cursor-pointer hover:border-cyberpunk-blue transition-all duration-200"
+  onClick={handleClick}
+>
+  {/* Card content */}
+</Card>
 ```
 
 ## 🔗 Integration with Design Tools
