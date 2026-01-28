@@ -157,22 +157,22 @@ export default function AgentConsole() {
   }
 
   return (
-    <div className="max-w-6xl mx-auto space-y-6">
-      <header className="flex justify-between items-center py-4 border-b border-gray-700">
-        <h1 className="text-2xl font-bold text-cyberpunk-blue">Aura Agent Console</h1>
+    <div className="max-w-7xl mx-auto space-y-6 p-4">
+      <header className="flex justify-between items-center py-6 border-b border-gray-700 animate-fade-in">
+        <h1 className="h1 bg-cyberpunk-gradient bg-clip-text text-transparent">Aura Agent Console</h1>
         {wallet && (
-          <div className="flex items-center space-x-2">
-            <Wallet className="text-cyberpunk-purple" size={16} />
-            <span className="text-sm text-gray-300">Agent: {wallet.getAgentId()}</span>
+          <div className="flex items-center space-x-3 bg-gray-800 px-4 py-2 rounded-lg border border-gray-700">
+            <Wallet className="text-cyberpunk-purple" size={18} />
+            <span className="body-text-sm">Agent: {wallet.getAgentId()}</span>
           </div>
         )}
       </header>
 
       {/* Search Section */}
-      <Card className="bg-card-bg border border-gray-700">
+      <Card className="bg-card-bg border border-gray-700 rounded-lg shadow-card animate-fade-in">
         <CardHeader>
-          <CardTitle className="text-cyberpunk-blue">Search Inventory</CardTitle>
-          <CardDescription>Find items to negotiate</CardDescription>
+          <CardTitle className="text-cyberpunk-blue h4">Search Inventory</CardTitle>
+          <CardDescription className="caption-text">Find items to negotiate</CardDescription>
         </CardHeader>
         <CardContent>
           <div className="flex space-x-2">
@@ -182,12 +182,12 @@ export default function AgentConsole() {
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               onKeyPress={(e) => e.key === 'Enter' && handleSearch()}
-              className="flex-1 bg-gray-800 border-gray-600 text-white"
+              className="bg-gray-800 border border-gray-600 text-white rounded-md py-2 px-3 focus:outline-none focus:border-cyberpunk-blue focus:ring-1 focus:ring-cyberpunk-blue flex-1"
             />
             <Button
               onClick={handleSearch}
               disabled={isLoading || !searchQuery.trim()}
-              className="bg-cyberpunk-blue hover:bg-cyberpunk-blue/90"
+              className="bg-cyberpunk-blue hover:bg-cyberpunk-blue/90 text-white font-semibold py-2 px-4 rounded-md transition-all duration-200"
             >
               <Search className="mr-2" size={16} />
               {isLoading ? 'Searching...' : 'Search'}
@@ -198,41 +198,41 @@ export default function AgentConsole() {
 
       {/* Error Display */}
       {error && (
-        <Alert className="bg-red-900/50 border-red-700">
-          <AlertTitle>Error</AlertTitle>
-          <AlertDescription>{error}</AlertDescription>
+        <Alert className="bg-error/20 border-error animate-fade-in">
+          <AlertTitle className="text-error h4">Error</AlertTitle>
+          <AlertDescription className="body-text">{error}</AlertDescription>
         </Alert>
       )}
 
       {/* Search Results */}
       {searchResults.length > 0 && (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 animate-fade-in">
           {searchResults.map((item) => (
             <Card
               key={item.itemId}
-              className={`bg-card-bg border border-gray-700 cursor-pointer hover:border-cyberpunk-blue transition-colors ${selectedItem?.itemId === item.itemId ? 'border-cyberpunk-blue' : ''}`}
+              className={`bg-card-bg border rounded-lg shadow-card cursor-pointer hover:border-cyberpunk-blue transition-all duration-200 ${selectedItem?.itemId === item.itemId ? 'border-cyberpunk-blue' : 'border-gray-700'}`}
               onClick={() => handleSelectItem(item)}
             >
               <CardHeader>
                 <CardTitle className="text-cyberpunk-blue text-sm truncate">{item.name}</CardTitle>
-                <CardDescription className="text-xs">ID: {item.itemId}</CardDescription>
+                <CardDescription className="caption-text text-xs">ID: {item.itemId}</CardDescription>
               </CardHeader>
               <CardContent>
                 <div className="space-y-2">
                   <div className="flex justify-between items-center">
-                    <span className="text-sm text-gray-300">Base Price:</span>
-                    <Badge variant="secondary" className="bg-gray-700">
+                    <span className="body-text-sm">Base Price:</span>
+                    <Badge variant="secondary" className="bg-gray-700 caption-text">
                       ${item.basePrice?.toFixed(2) || 'N/A'}
                     </Badge>
                   </div>
                   <div className="flex justify-between items-center">
-                    <span className="text-sm text-gray-300">Relevance:</span>
-                    <Badge variant={item.similarityScore > 0.8 ? 'default' : 'secondary'}>
+                    <span className="body-text-sm">Relevance:</span>
+                    <Badge variant={item.similarityScore > 0.8 ? 'default' : 'secondary'} className="caption-text">
                       {(item.similarityScore * 100).toFixed(1)}%
                     </Badge>
                   </div>
                 </div>
-                <p className="text-xs text-gray-400 mt-2 truncate">{item.descriptionSnippet}</p>
+                <p className="caption-text mt-2 truncate">{item.descriptionSnippet}</p>
               </CardContent>
             </Card>
           ))}
@@ -241,10 +241,10 @@ export default function AgentConsole() {
 
       {/* Negotiation Section */}
       {selectedItem && (
-        <Card className="bg-card-bg border border-gray-700">
+        <Card className="bg-card-bg border border-gray-700 rounded-lg shadow-card animate-fade-in">
           <CardHeader>
-            <CardTitle className="text-cyberpunk-purple">Negotiation</CardTitle>
-            <CardDescription>Bid on {selectedItem.name}</CardDescription>
+            <CardTitle className="text-cyberpunk-purple h4">Negotiation</CardTitle>
+            <CardDescription className="caption-text">Bid on {selectedItem.name}</CardDescription>
           </CardHeader>
           <CardContent>
             <div className="space-y-4">
@@ -254,14 +254,14 @@ export default function AgentConsole() {
                   placeholder="Enter bid amount"
                   value={bidAmount}
                   onChange={(e) => setBidAmount(e.target.value)}
-                  className="flex-1 bg-gray-800 border-gray-600 text-white"
+                  className="bg-gray-800 border border-gray-600 text-white rounded-md py-2 px-3 focus:outline-none focus:border-cyberpunk-blue focus:ring-1 focus:ring-cyberpunk-blue flex-1"
                   min="0"
                   step="0.01"
                 />
                 <Button
                   onClick={handleNegotiate}
                   disabled={isLoading || !bidAmount}
-                  className="bg-cyberpunk-purple hover:bg-cyberpunk-purple/90"
+                  className="bg-cyberpunk-purple hover:bg-cyberpunk-purple/90 text-white font-semibold py-2 px-4 rounded-md transition-all duration-200"
                 >
                   <MessageCircle className="mr-2" size={16} />
                   {isLoading ? 'Negotiating...' : 'Submit Bid'}
