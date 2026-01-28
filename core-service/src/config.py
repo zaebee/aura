@@ -25,6 +25,16 @@ class Settings(BaseSettings):
     otel_service_name: str = "aura-core"
     otel_exporter_otlp_endpoint: str = "http://jaeger:4317"
 
+    # Prometheus Monitoring
+    prometheus_url: str = "http://prometheus-kube-prometheus-prometheus.monitoring:9090"
+
+    # LLM Configuration
+    llm_model: str = "mistral/mistral-large-latest"  # Default maintains backward compatibility
+    # API keys auto-discovered by litellm from environment:
+    # - OPENAI_API_KEY (for openai/*)
+    # - MISTRAL_API_KEY (for mistral/*)
+    # - ANTHROPIC_API_KEY (for anthropic/*)
+
     @model_validator(mode="after")
     def validate_otel_config(self) -> "Settings":
         """Validate OpenTelemetry configuration."""

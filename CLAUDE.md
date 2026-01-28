@@ -112,6 +112,9 @@ curl http://localhost:8000/healthz   # Liveness
 curl http://localhost:8000/readyz    # Readiness
 curl http://localhost:8000/health    # Detailed status
 
+# Test infrastructure monitoring
+curl http://localhost:8000/v1/system/status  # Prometheus metrics (CPU, memory)
+
 # Check Docker Compose health status
 docker-compose ps
 
@@ -143,19 +146,27 @@ HTTP Client → API Gateway (FastAPI:8000) → Core Service (gRPC:50051) → Pos
 
 ### Pricing Strategy Pattern
 
-The Core Service uses a pluggable strategy pattern for pricing decisions:
+The Core Service uses a pluggable strategy pattern for pricing decisions, configured via the `LLM_MODEL` environment variable:
 
-**RuleBasedStrategy**: Deterministic rules without LLM
+**RuleBasedStrategy** (`LLM_MODEL=rule`): Deterministic rules without LLM
 - Bid < floor_price → Counter offer
 - Bid >= floor_price → Accept
 - Bid > $1000 → Require UI confirmation
+- No API key required
+- Fastest response time
 
-**MistralStrategy**: LLM-based intelligent negotiation
-- Uses `langchain_mistralai` with structured output
+**LiteLLMStrategy** (any other `LLM_MODEL` value): LLM-based intelligent negotiation
+- Supports any provider via litellm (OpenAI, Mistral, Anthropic, Ollama, etc.)
+- Uses Jinja2 prompt templates from `core-service/src/prompts/system.md`
 - Returns decisions with reasoning
 - Handles complex negotiation scenarios
+- Example models: `mistral/mistral-large-latest`, `openai/gpt-4o`, `ollama/mistral`
 
-Implementation: `core-service/src/llm_strategy.py` defines both strategies. Change strategy in `core-service/src/main.py:171` by instantiating the desired class.
+Implementation:
+- Strategy factory: `core-service/src/main.py:create_strategy()`
+- Rule-based: `core-service/src/llm_strategy.py:RuleBasedStrategy`
+- LiteLLM: `core-service/src/llm/strategy.py:LiteLLMStrategy`
+- LLM engine: `core-service/src/llm/engine.py:LLMEngine`
 
 ### Vector Embeddings and Semantic Search
 
@@ -185,6 +196,20 @@ Request IDs flow through the entire system for distributed tracing:
 
 Implementation: `logging_config.py` provides `bind_request_id()` and `clear_request_context()` helpers.
 
+### Infrastructure Monitoring ("The Eyes")
+
+The Core Service can query its own infrastructure health from Prometheus:
+- Endpoint: `GET /v1/system/status` (API Gateway) → `GetSystemStatus` RPC (Core Service)
+- Metrics: CPU usage (%), Memory usage (MB), timestamp, cached status
+- Caching: 30-second TTL to reduce Prometheus load
+- Graceful degradation: Returns cached data or error dict on failure
+
+Implementation:
+- Prometheus client: `core-service/src/monitor.py:get_hive_metrics()`
+- Cache layer: `core-service/src/monitor.py:MetricsCache`
+- gRPC handler: `core-service/src/main.py:GetSystemStatus()`
+- HTTP endpoint: `api-gateway/src/main.py:/v1/system/status`
+
 ## Critical Code Locations
 
 ### Protocol Buffer Definitions
@@ -193,11 +218,16 @@ Implementation: `logging_config.py` provides `bind_request_id()` and `clear_requ
 
 ### Core Service (gRPC)
 - **Main service**: `core-service/src/main.py`
-  - `NegotiationService.Negotiate()` at line 63
-  - `NegotiationService.Search()` at line 105
-- **Pricing strategies**: `core-service/src/llm_strategy.py`
-  - `RuleBasedStrategy` at line 34
-  - `MistralStrategy` at line 119
+  - `NegotiationService.Negotiate()` handler
+  - `NegotiationService.Search()` handler
+  - `NegotiationService.GetSystemStatus()` handler
+  - `create_strategy()` factory for pricing strategy selection
+- **Pricing strategies**:
+  - `RuleBasedStrategy`: `core-service/src/llm_strategy.py`
+  - `LiteLLMStrategy`: `core-service/src/llm/strategy.py`
+  - `LLMEngine`: `core-service/src/llm/engine.py`
+- **Infrastructure monitoring**: `core-service/src/monitor.py`
+- **Prompt templates**: `core-service/src/prompts/system.md`
 - **Database models**: `core-service/src/db.py`
 - **Embeddings**: `core-service/src/embeddings.py`
 
@@ -207,7 +237,7 @@ Implementation: `logging_config.py` provides `bind_request_id()` and `clear_requ
 
 ### Tests
 - **Rule-based strategy tests**: `core-service/tests/test_rule_based_strategy.py`
-- **Mistral strategy tests**: `core-service/tests/test_mistral_strategy.py`
+- **LiteLLM strategy tests**: `core-service/tests/test_litellm_strategy.py`
 - **Test fixtures**: `core-service/tests/conftest.py`
 
 ## Configuration and Environment
@@ -216,9 +246,25 @@ Implementation: `logging_config.py` provides `bind_request_id()` and `clear_requ
 ```bash
 # Core Service
 DATABASE_URL=postgresql://user:password@localhost:5432/aura_db
-MISTRAL_API_KEY=your_mistral_api_key_here
 OTEL_SERVICE_NAME=aura-core
 OTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:4317
+
+# LLM Configuration (choose one strategy)
+LLM_MODEL=rule                              # No LLM, no API key needed
+# OR
+LLM_MODEL=mistral/mistral-large-latest      # Requires MISTRAL_API_KEY
+MISTRAL_API_KEY=sk-xxx
+# OR
+LLM_MODEL=openai/gpt-4o                     # Requires OPENAI_API_KEY
+OPENAI_API_KEY=sk-proj-xxx
+# OR
+LLM_MODEL=anthropic/claude-3-5-sonnet-20241022  # Requires ANTHROPIC_API_KEY
+ANTHROPIC_API_KEY=sk-ant-xxx
+# OR
+LLM_MODEL=ollama/mistral                    # No API key (assumes Ollama running locally)
+
+# Infrastructure Monitoring
+PROMETHEUS_URL=http://prometheus-kube-prometheus-prometheus.monitoring:9090
 
 # API Gateway
 CORE_SERVICE_HOST=localhost:50051
@@ -247,14 +293,57 @@ OTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:4317
 4. Add HTTP endpoint in `api-gateway/src/main.py`
 5. Add tests in `core-service/tests/`
 
+### Changing LLM Models
+
+To switch between LLM providers or use rule-based strategy:
+
+**Via Environment Variable** (Recommended):
+```bash
+# Rule-based (no LLM)
+export LLM_MODEL=rule
+
+# Mistral (backward compatible)
+export LLM_MODEL=mistral/mistral-large-latest
+export MISTRAL_API_KEY=sk-xxx
+
+# OpenAI
+export LLM_MODEL=openai/gpt-4o
+export OPENAI_API_KEY=sk-proj-xxx
+
+# Ollama (local)
+export LLM_MODEL=ollama/mistral
+
+# Then restart services
+docker-compose restart core-service
+```
+
+**Via Helm** (Kubernetes deployment):
+```bash
+# Deploy with OpenAI
+helm install aura deploy/aura \
+  --set core.env.LLM_MODEL="openai/gpt-4o" \
+  --set secrets.openaiApiKey="sk-proj-xxx"
+
+# Deploy with rule-based (no LLM)
+helm install aura deploy/aura \
+  --set core.env.LLM_MODEL="rule"
+```
+
 ### Modifying Pricing Strategy
 
-To add a new strategy:
-1. Create new class in `core-service/src/llm_strategy.py`
+To add a new pricing strategy:
+1. Create new class in `core-service/src/llm/` or `core-service/src/llm_strategy.py`
 2. Implement `PricingStrategy` protocol with `evaluate()` method
 3. Return `negotiation_pb2.NegotiateResponse` with one of: `accepted`, `countered`, `rejected`, or `ui_required`
-4. Update `core-service/src/main.py:171` to use new strategy
+4. Update `core-service/src/main.py:create_strategy()` factory to instantiate your strategy
 5. Add tests in `core-service/tests/test_<strategy_name>.py`
+
+### Customizing Prompt Templates
+
+To modify LLM prompts:
+1. Edit `core-service/src/prompts/system.md` (Jinja2 template)
+2. Available variables: `business_type`, `item_name`, `base_price`, `floor_price`, `market_load`, `trigger_price`, `bid`, `reputation`
+3. Test changes: `docker-compose restart core-service`
 
 ### Database Schema Changes
 
@@ -285,12 +374,59 @@ docker-compose logs -f api-gateway
 docker-compose logs -f
 ```
 
+## Migration Guide
+
+### Upgrading from Hardcoded Mistral to LiteLLM
+
+If you're upgrading from the old hardcoded `MistralStrategy`:
+
+**Before** (hardcoded Mistral):
+```python
+# core-service/src/main.py
+from llm_strategy import MistralStrategy
+strategy = MistralStrategy()
+
+# .env
+MISTRAL_API_KEY=sk-xxx
+```
+
+**After** (flexible litellm):
+```bash
+# .env - Option 1: Keep using Mistral (backward compatible)
+LLM_MODEL=mistral/mistral-large-latest
+MISTRAL_API_KEY=sk-xxx
+
+# .env - Option 2: Switch to OpenAI
+LLM_MODEL=openai/gpt-4o
+OPENAI_API_KEY=sk-proj-xxx
+
+# .env - Option 3: Use local Ollama (no API key)
+LLM_MODEL=ollama/mistral
+
+# .env - Option 4: No LLM (rule-based only)
+LLM_MODEL=rule
+```
+
+**Code changes required**: **None** - Configuration-driven via environment variables.
+
+**Test changes**: If you have custom tests importing `MistralStrategy`, update imports:
+```python
+# Before
+from llm_strategy import MistralStrategy
+
+# After
+from llm.strategy import LiteLLMStrategy
+```
+
+**Backward compatibility**: Default `LLM_MODEL=mistral/mistral-large-latest` maintains identical behavior to the old `MistralStrategy`.
+
 ## Important Notes
 
 - **Auto-generated code**: Never edit files in `*/src/proto/` directories - regenerate with `buf generate`
-- **Python version**: Requires Python 3.13+ (see `pyproject.toml:6`)
+- **Python version**: Requires Python 3.12+ (see `pyproject.toml:6`)
 - **Package manager**: Uses `uv`, not pip or poetry
 - **Stateless design**: Both services are stateless and horizontally scalable
 - **gRPC port**: Core Service runs on 50051 (configurable)
 - **HTTP port**: API Gateway runs on 8000 (configurable)
 - **Database**: PostgreSQL with pgvector extension is required for vector search
+- **LLM flexibility**: Supports 100+ models via litellm (OpenAI, Anthropic, Mistral, Ollama, etc.)

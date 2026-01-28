@@ -6,8 +6,11 @@ package aura.negotiation.v1;
 service NegotiationService {
     // RPC method for negotiating offers.
     rpc Negotiate (NegotiateRequest) returns (NegotiateResponse) {}
-    
+
     rpc Search (SearchRequest) returns (SearchResponse);
+
+    // RPC method for retrieving system status and metrics.
+    rpc GetSystemStatus (SystemStatusRequest) returns (SystemStatusResponse);
 }
 
 message NegotiateRequest {
@@ -74,4 +77,14 @@ message SearchResultItem {
   double base_price = 3;
   double similarity_score = 4; // Насколько это соответствует запросу
   string description_snippet = 5; // Для контекста агенту
+}
+
+message SystemStatusRequest {}
+
+message SystemStatusResponse {
+  string status = 1;              // "ok" | "error"
+  double cpu_usage_percent = 2;
+  double memory_usage_mb = 3;
+  string timestamp = 4;
+  bool cached = 5;
 }

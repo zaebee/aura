@@ -52,3 +52,13 @@ spec:
               value: "{{ .Release.Name }}-core"
             - name: OTEL_EXPORTER_OTLP_ENDPOINT
               value: "http://{{ .Release.Name }}-jaeger:4317"
+            - name: LLM_MODEL
+              value: "{{ .Values.core.env.LLM_MODEL }}"
+            - name: OPENAI_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: "{{ .Release.Name }}-secrets"
+                  key: "openai-key"
+                  optional: true  # Only required if LLM_MODEL starts with "openai/"
+            - name: PROMETHEUS_URL
+              value: "http://prometheus-kube-prometheus-prometheus.monitoring:9090"

@@ -45,6 +45,7 @@ core:
       memory: 128Mi
   env:
     LOG_LEVEL: info
+    LLM_MODEL: "mistral/mistral-large-latest"  # Can override: openai/gpt-4o, ollama/mistral, rule
 
 # PostgreSQL Database Configuration
 postgres:
@@ -98,6 +99,9 @@ secrets:
   # This value must be provided during installation via CI/CD.
   # Injected via: --set secrets.mistralApiKey="your-key"
   mistralApiKey: ""
+  # API key for OpenAI (optional, only if using openai/* models)
+  # Injected via: --set secrets.openaiApiKey="your-key"
+  openaiApiKey: ""
   # Image pull secrets for private container registries
   imagePullSecrets:
   - name: ghcr-secret

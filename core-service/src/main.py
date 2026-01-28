@@ -20,7 +20,7 @@ from telemetry import init_telemetry
 from config import get_settings
 from db import InventoryItem, SessionLocal, engine
 from embeddings import generate_embedding
-from llm_strategy import MistralStrategy
+from monitor import get_hive_metrics
 from proto.aura.negotiation.v1 import negotiation_pb2, negotiation_pb2_grpc
 
 # Configure structured logging on startup
@@ -173,6 +173,25 @@ class NegotiationService(negotiation_pb2_grpc.NegotiationServiceServicer):
             if request_id:
                 clear_request_context()
 
+    async def GetSystemStatus(
+        self, request: negotiation_pb2.SystemStatusRequest, context
+    ) -> negotiation_pb2.SystemStatusResponse:
+        """Return infrastructure metrics from Prometheus."""
+        try:
+            metrics = await get_hive_metrics()
+            return negotiation_pb2.SystemStatusResponse(
+                status=metrics["status"],
+                cpu_usage_percent=metrics.get("cpu_usage_percent", 0.0),
+                memory_usage_mb=metrics.get("memory_usage_mb", 0.0),
+                timestamp=metrics.get("timestamp", ""),
+                cached=metrics.get("cached", False),
+            )
+        except Exception as e:
+            logger.error("system_status_error", error=str(e), exc_info=True)
+            context.set_code(grpc.StatusCode.INTERNAL)
+            context.set_details("Failed to retrieve system metrics")
+            return negotiation_pb2.SystemStatusResponse(status="error")
+
 
 class HealthServicer(health_pb2_grpc.HealthServicer):
     """gRPC Health Checking Protocol implementation for Core Service.
@@ -231,8 +250,32 @@ class HealthServicer(health_pb2_grpc.HealthServicer):
         return health_pb2.HealthCheckResponse()
 
 
+def create_strategy():
+    """Create pricing strategy based on LLM_MODEL configuration.
+
+    Strategies:
+    - "rule": RuleBasedStrategy (no LLM required)
+    - Any litellm model: LiteLLMStrategy (e.g., "openai/gpt-4o", "mistral/mistral-large-latest")
+
+    Returns:
+        Strategy instance implementing PricingStrategy protocol
+    """
+    settings = get_settings()
+
+    if settings.llm_model == "rule":
+        logger.info("strategy_selected", type="RuleBasedStrategy", llm_required=False)
+        from llm_strategy import RuleBasedStrategy
+
+        return RuleBasedStrategy()
+    else:
+        logger.info("strategy_selected", type="LiteLLMStrategy", model=settings.llm_model)
+        from llm.strategy import LiteLLMStrategy
+
+        return LiteLLMStrategy(model=settings.llm_model)
+
+
 def serve():
-    strategy = MistralStrategy()
+    strategy = create_strategy()
 
     server = grpc.server(
         futures.ThreadPoolExecutor(max_workers=settings.grpc_max_workers)

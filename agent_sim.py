@@ -1,10 +1,14 @@
+import os
 import time
-
 import requests
+
+from dotenv import load_dotenv
 
 from agent_identity import AgentWallet
 
-GATEWAY_URL = "http://localhost:8000/v1/negotiate"
+load_dotenv()
+
+GATEWAY_URL = os.getenv("AURA_GATEWAY_URL", "http://localhost:8000")
 
 
 def run_agent_scenario(scenario_name, item_id, bid, wallet=None):
@@ -35,10 +39,11 @@ def run_agent_scenario(scenario_name, item_id, bid, wallet=None):
 
     try:
         start_ts = time.time()
+        method = "/v1/negotiate"
 
         # Sign the request
         x_agent_id, x_timestamp, x_signature = wallet.sign_request(
-            "POST", "/v1/negotiate", payload
+            "POST", method, payload
         )
 
         # Add headers to the request
@@ -49,7 +54,8 @@ def run_agent_scenario(scenario_name, item_id, bid, wallet=None):
             "Content-Type": "application/json",
         }
 
-        response = requests.post(GATEWAY_URL, json=payload, headers=headers)
+        response = requests.post(
+            f"{GATEWAY_URL}/{method}", json=payload, headers=headers)
         latency = (time.time() - start_ts) * 1000
 
         print(f"⏱️  Latency: {latency:.2f}ms")
