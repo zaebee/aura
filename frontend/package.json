@@ -11,6 +11,7 @@
   },
   "dependencies": {
     "@bufbuild/protobuf": "^2.11.0",
+    "@tailwindcss/forms": "^0.5.11",
     "@tailwindcss/postcss": "^4.1.18",
     "class-variance-authority": "^0.7.0",
     "clsx": "^2.1.0",
