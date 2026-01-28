@@ -55,7 +55,6 @@ class AuraMCPServer:
         logger.info("🔑 Generated temporary agent wallet")
         logger.info(f"DID: {self.wallet.did}")
 
-    @mcp.tool
     async def search_hotels(self, query: str, limit: int = 3) -> str:
         """
         Search hotels via Aura Gateway.
@@ -115,7 +114,6 @@ class AuraMCPServer:
             logger.error(f"🔴 Unexpected error in search_hotels: {e}", exc_info=True)
             return "❌ Search failed due to an unexpected internal error."
 
-    @mcp.tool
     async def negotiate_price(self, item_id: str, bid: float) -> str:
         """
         Negotiate price for an item via Aura Gateway.
@@ -199,8 +197,8 @@ class AuraMCPServer:
 
 def main():
     server = AuraMCPServer()
-    mcp.add_tool(server.search_hotels)
-    mcp.add_tool(server.negotiate_price)
+    mcp.tool(server.search_hotels)
+    mcp.tool(server.negotiate_price)
     mcp.run()
 
 
