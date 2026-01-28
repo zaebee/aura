@@ -8,7 +8,7 @@ authors = [
 ]
 readme = "README.md"
 dependencies = [
-    "fastmcp",
+    "fastmcp==2.12.3",
     "httpx",
     "pynacl",
     "python-dotenv",
