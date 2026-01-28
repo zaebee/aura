@@ -46,6 +46,16 @@ class AuraMCPServer:
         logger.info(f"DID: {self.wallet.did}")
 
     async def search_hotels(self, query: str, limit: int = 3) -> str:
+        """
+        Search hotels via Aura Gateway.
+
+        Args:
+            query: Search query string
+            limit: Maximum number of results (default: 3)
+
+        Returns:
+            Formatted string with search results for LLM consumption
+        """
         logger.info(f"🔍 Searching hotels: '{query}' (limit: {limit})")
         body = {"query": query, "limit": limit}
 
@@ -94,6 +104,16 @@ class AuraMCPServer:
             return "❌ Search failed due to an unexpected internal error."
 
     async def negotiate_price(self, item_id: str, bid: float) -> str:
+        """
+        Negotiate price for an item via Aura Gateway.
+
+        Args:
+            item_id: ID of the item to negotiate
+            bid: Bid amount in USD
+
+        Returns:
+            Formatted string with negotiation result for LLM consumption
+        """
         logger.info(f"💰 Negotiating {item_id}: ${bid:.2f}")
 
         body = {
