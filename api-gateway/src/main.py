@@ -194,15 +194,44 @@ async def negotiate(
         }
 
         if result_type == "accepted":
-            output["data"] = {
-                "final_price": response.accepted.final_price,
-                "reservation_code": response.accepted.reservation_code,
-            }
-            logger.info(
-                "negotiation_accepted",
-                final_price=response.accepted.final_price,
-                reservation_code=response.accepted.reservation_code,
-            )
+            # Check if crypto payment is required (oneof field)
+            reveal_method = response.accepted.WhichOneof("reveal_method")
+
+            if reveal_method == "crypto_payment":
+                # Payment required - return payment instructions
+                payment = response.accepted.crypto_payment
+                output["payment_required"] = True
+                output["data"] = {
+                    "final_price": response.accepted.final_price,
+                    "payment_instructions": {
+                        "deal_id": payment.deal_id,
+                        "wallet_address": payment.wallet_address,
+                        "amount": payment.amount,
+                        "currency": payment.currency,
+                        "memo": payment.memo,
+                        "network": payment.network,
+                        "expires_at": payment.expires_at,
+                    },
+                }
+                logger.info(
+                    "negotiation_accepted_with_payment",
+                    final_price=response.accepted.final_price,
+                    deal_id=payment.deal_id,
+                    amount=payment.amount,
+                    currency=payment.currency,
+                )
+            else:
+                # Legacy path - reservation code revealed immediately
+                output["payment_required"] = False
+                output["data"] = {
+                    "final_price": response.accepted.final_price,
+                    "reservation_code": response.accepted.reservation_code,
+                }
+                logger.info(
+                    "negotiation_accepted",
+                    final_price=response.accepted.final_price,
+                    reservation_code=response.accepted.reservation_code,
+                )
         elif result_type == "countered":
             output["data"] = {
                 "proposed_price": response.countered.proposed_price,
@@ -320,3 +349,97 @@ async def system_status():
         raise HTTPException(
             status_code=500, detail="Monitoring service unavailable"
         ) from e
+
+
+@app.post("/v1/deals/{deal_id}/status")
+async def check_deal_status(deal_id: str, agent_did: str = Depends(verify_signature)):
+    """
+    Check the payment status of a locked deal.
+
+    After payment is confirmed, returns the secret (reservation code).
+    """
+    request_id = get_current_request_id() or str(uuid.uuid4())
+
+    logger.info(
+        "check_deal_status_request",
+        deal_id=deal_id,
+        agent_did=agent_did,
+    )
+
+    grpc_request = negotiation_pb2.CheckDealStatusRequest(deal_id=deal_id)
+    metadata = [(REQUEST_ID_METADATA_KEY, request_id)]
+
+    try:
+        logger.info(
+            "grpc_call_started", service="NegotiationService", method="CheckDealStatus"
+        )
+        response = await stub.CheckDealStatus(grpc_request, metadata=metadata)
+        logger.info(
+            "grpc_call_completed",
+            service="NegotiationService",
+            method="CheckDealStatus",
+            status=response.status,
+        )
+
+        output = {"status": response.status}
+
+        if response.status == "PAID":
+            # Payment confirmed - reveal secret
+            output["secret"] = {
+                "reservation_code": response.secret.reservation_code,
+                "item_name": response.secret.item_name,
+                "final_price": response.secret.final_price,
+                "paid_at": response.secret.paid_at,
+            }
+            output["proof"] = {
+                "transaction_hash": response.proof.transaction_hash,
+                "block_number": response.proof.block_number,
+                "from_address": response.proof.from_address,
+                "confirmed_at": response.proof.confirmed_at,
+            }
+            logger.info(
+                "deal_paid_secret_revealed",
+                deal_id=deal_id,
+                transaction_hash=response.proof.transaction_hash,
+            )
+        elif response.status == "PENDING":
+            # Payment not yet received - return payment instructions
+            payment = response.payment_instructions
+            output["payment_instructions"] = {
+                "deal_id": payment.deal_id,
+                "wallet_address": payment.wallet_address,
+                "amount": payment.amount,
+                "currency": payment.currency,
+                "memo": payment.memo,
+                "network": payment.network,
+                "expires_at": payment.expires_at,
+            }
+            logger.info("deal_pending_payment", deal_id=deal_id)
+        elif response.status == "EXPIRED":
+            logger.info("deal_expired", deal_id=deal_id)
+        elif response.status == "NOT_FOUND":
+            logger.warning("deal_not_found", deal_id=deal_id)
+            raise HTTPException(status_code=404, detail="Deal not found")
+
+        return output
+
+    except grpc.RpcError as e:
+        error_code = e.code()
+        logger.error(
+            "grpc_call_failed",
+            service="NegotiationService",
+            method="CheckDealStatus",
+            error=e.details(),
+            code=str(error_code),
+        )
+
+        if error_code == grpc.StatusCode.INVALID_ARGUMENT:
+            raise HTTPException(status_code=400, detail="Invalid deal_id format") from e
+        elif error_code == grpc.StatusCode.UNIMPLEMENTED:
+            raise HTTPException(
+                status_code=501, detail="Crypto payments not enabled"
+            ) from e
+        else:
+            raise HTTPException(
+                status_code=500, detail="Payment verification failed"
+            ) from e

@@ -12,35 +12,33 @@ The Aura Platform implements **cryptographic signature verification** using Ed25
 
 ## 🔐 Authentication and Authorization
 
-### Agent Identity
+### Agent Identity (The Guard's Badge)
 
 **Decentralized Identifiers (DIDs)**:
 - Each agent is identified by a unique DID in the format: `did:key:public_key_hex`
-- DIDs are self-sovereign identifiers derived from the agent's Ed25519 public key
-- Format: `did:key:` followed by the hex-encoded public key
+- DIDs are self-sovereign identifiers derived from the agent's Ed25519 public key.
+- The hive verifies that the signature provided in the headers was created by the owner of the public key mentioned in the DID.
 
-**Agent Registration**:
-1. Agents generate an Ed25519 key pair using `AgentWallet()`
-2. The public key is embedded in the DID: `did:key:public_key_hex`
-3. Agents sign all requests using their private key
-4. The API Gateway verifies signatures using the public key from the DID
+**Agent Setup**:
+1. Agents generate an Ed25519 key pair using `AgentWallet()` (or standard OpenSSL tools).
+2. The public key is hex-encoded and prefixed with `did:key:`.
+3. Agents sign all requests using their private key.
+4. The API Gateway (Guard Bee) verifies signatures on-the-fly.
 
 ### Signature Verification
 
 **Request Signing Process**:
 
 ```
-signature = ed25519.sign(
-    private_key,
-    method + path + timestamp + body_hash
-)
+message = method + path + timestamp + body_hash
+signature = ed25519.sign(private_key, message)
 ```
 
 **Components**:
-- `method`: HTTP method (e.g., "POST")
-- `path`: Request path (e.g., "/v1/negotiate")
-- `timestamp`: Unix timestamp from `X-Timestamp` header
-- `body_hash`: SHA-256 hash of the canonical JSON request body
+- `method`: HTTP method in uppercase (e.g., "POST").
+- `path`: Request path (e.g., "/v1/negotiate").
+- `timestamp`: Unix timestamp (seconds) from `X-Timestamp` header.
+- `body_hash`: SHA-256 hash of the canonical JSON request body (sorted keys, no whitespace).
 
 **Required Headers**:
 
@@ -49,46 +47,6 @@ signature = ed25519.sign(
 | `X-Agent-ID` | Agent's DID | `did:key:663055bbbef3f78ecaec5d32a21e201fda6040588835171fb717efbd7bd6fc6c` |
 | `X-Timestamp` | Unix timestamp | `1735689600` |
 | `X-Signature` | Ed25519 signature (hex) | `cfef8b600ffd80b40eff1960978b91ea58672efae56fbc217f...` |
-
-## 🔐 Authentication and Authorization
-
-### Agent Identity
-
-**Decentralized Identifiers (DIDs)**:
-- Each agent is identified by a unique DID (e.g., `did:agent:007`)
-- DIDs are self-sovereign identifiers that don't rely on central authorities
-- Format: `did:method:specific-id`
-
-**Agent Registration**:
-1. Agents generate an Ed25519 key pair
-2. Agents register their public key with the platform
-3. Platform associates the public key with the agent's DID
-4. Agents use their private key to sign all requests
-
-### Signature Verification
-
-**Request Signing Process**:
-
-```
-signature = ed25519.sign(
-    private_key,
-    method + path + timestamp + body_hash
-)
-```
-
-**Components**:
-- `method`: HTTP method (e.g., "POST")
-- `path`: Request path (e.g., "/v1/negotiate")
-- `timestamp`: ISO 8601 timestamp from `X-Timestamp` header
-- `body_hash`: SHA-256 hash of the request body
-
-**Required Headers**:
-
-| Header | Description | Example |
-|--------|-------------|---------|
-| `X-Agent-ID` | Agent's DID | `did:agent:007` |
-| `X-Timestamp` | Request timestamp | `2023-12-01T12:00:00Z` |
-| `X-Signature` | Ed25519 signature | `base64_encoded_signature` |
 
 ### Signature Verification Algorithm
 
@@ -125,31 +83,22 @@ print(f"  X-Signature: {x_signature[:50]}...")
 ### 1. Request Replay Protection
 
 **Timestamp Validation**:
-- Each request includes an `X-Timestamp` header
-- Server validates that timestamp is within acceptable range (±5 minutes)
-- Prevents replay attacks by rejecting stale requests
+- Each request includes an `X-Timestamp` header (Unix seconds).
+- Server validates that the timestamp is within an acceptable range (**±60 seconds**).
+- Prevents replay attacks by rejecting stale requests.
 
-**Implementation**:
+**Implementation (conceptual)**:
 ```python
-from datetime import datetime
+import time
 
-def validate_timestamp(timestamp_str):
-    """
-    Validate that the request timestamp is within acceptable range.
-    
-    Args:
-        timestamp_str: ISO 8601 formatted timestamp string
-        
-    Returns:
-        bool: True if timestamp is valid (within ±5 minutes)
-    """
+def validate_timestamp(timestamp_val):
     try:
-        request_time = datetime.fromisoformat(timestamp_str)
-        current_time = datetime.utcnow()
-        time_diff = abs((current_time - request_time).total_seconds())
+        request_time = int(timestamp_val)
+        current_time = int(time.time())
+        time_diff = abs(current_time - request_time)
         
-        # Allow ±5 minutes clock skew
-        return time_diff <= 300
+        # Allow ±60 seconds clock skew
+        return time_diff <= 60
     except ValueError:
         return False
 ```
@@ -325,9 +274,9 @@ openssl pkey -in private_key.pem -pubout -out public_key.pem
 ### Required Security Headers
 
 ```
-X-Agent-ID: did:agent:007
-X-Timestamp: 2023-12-01T12:00:00Z
-X-Signature: base64_encoded_signature
+X-Agent-ID: did:key:public_key_hex
+X-Timestamp: 1735689600
+X-Signature: a1b2c3d4...
 ```
 
 ### Optional Security Headers

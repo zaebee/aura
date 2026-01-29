@@ -23,14 +23,31 @@ services:
     restart: on-failure
     environment:
       AURA_DATABASE__URL: postgresql://user:password@db:5432/aura_db
+      AURA_DATABASE__REDIS_URL: redis://redis:6379/0
       AURA_LLM__API_KEY: ${MISTRAL_API_KEY}
       AURA_SERVER__OTEL_SERVICE_NAME: "aura-core"
       AURA_SERVER__OTEL_EXPORTER_OTLP_ENDPOINT: "http://jaeger:4317"
+      AURA_SERVER__PROMETHEUS_URL: "http://prometheus:9090"
+      # Crypto Payment Configuration (disabled by default)
+      AURA_CRYPTO__ENABLED: ${AURA_CRYPTO__ENABLED:-false}
+      AURA_CRYPTO__PROVIDER: ${AURA_CRYPTO__PROVIDER:-solana}
+      AURA_CRYPTO__CURRENCY: ${AURA_CRYPTO__CURRENCY:-SOL}
+      # Solana Configuration (only needed if AURA_CRYPTO__ENABLED=true)
+      AURA_CRYPTO__SOLANA_PRIVATE_KEY: ${AURA_CRYPTO__SOLANA_PRIVATE_KEY:-}
+      AURA_CRYPTO__SOLANA_RPC_URL: ${AURA_CRYPTO__SOLANA_RPC_URL:-https://api.devnet.solana.com}
+      AURA_CRYPTO__SOLANA_NETWORK: ${AURA_CRYPTO__SOLANA_NETWORK:-devnet}
+      AURA_CRYPTO__SOLANA_USDC_MINT: ${AURA_CRYPTO__SOLANA_USDC_MINT:-EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v}
+      # Secret Encryption (REQUIRED when AURA_CRYPTO__ENABLED=true)
+      AURA_CRYPTO__SECRET_ENCRYPTION_KEY: ${AURA_CRYPTO__SECRET_ENCRYPTION_KEY:-}
+      AURA_CRYPTO__DEAL_TTL_SECONDS: ${AURA_CRYPTO__DEAL_TTL_SECONDS:-3600}
     depends_on:
       db:
         condition: service_healthy
+      redis:
+        condition: service_healthy
     ports:
       - "50051:50051"
+      - "9091:9091"
     healthcheck:
       test: ["CMD", "grpc_health_probe", "-addr=:50051"]
       interval: 15s
@@ -86,6 +103,25 @@ services:
       timeout: 5s
       retries: 3
       start_period: 10s
+
+  redis:
+    image: redis:7-alpine
+    restart: always
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  prometheus:
+    image: prom/prometheus:latest
+    restart: always
+    volumes:
+      - ./deploy/prometheus.yml:/etc/prometheus/prometheus.yml
+    ports:
+      - "9090:9090"
 
   telegram-bot:
     build:

@@ -21,7 +21,7 @@ gateway:
   resources:
     limits:
       cpu: 200m
-      memory: 256Mi
+      memory: 512Mi
   # CORS allowed origins (comma-separated list)
   corsOrigins: "https://aura.zae.life"
   env:
@@ -39,7 +39,7 @@ core:
   resources:
     limits:
       cpu: 200m
-      memory: 256Mi
+      memory: 1Gi
     requests:
       cpu: 100m
       memory: 128Mi

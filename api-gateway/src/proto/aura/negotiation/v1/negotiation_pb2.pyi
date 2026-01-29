@@ -45,12 +45,74 @@ class NegotiateResponse(_message.Message):
     def __init__(self, session_token: _Optional[str] = ..., valid_until_timestamp: _Optional[int] = ..., accepted: _Optional[_Union[OfferAccepted, _Mapping]] = ..., countered: _Optional[_Union[OfferCountered, _Mapping]] = ..., rejected: _Optional[_Union[OfferRejected, _Mapping]] = ..., ui_required: _Optional[_Union[JitUiRequest, _Mapping]] = ...) -> None: ...
 
 class OfferAccepted(_message.Message):
-    __slots__ = ("final_price", "reservation_code")
+    __slots__ = ("final_price", "reservation_code", "crypto_payment")
     FINAL_PRICE_FIELD_NUMBER: _ClassVar[int]
     RESERVATION_CODE_FIELD_NUMBER: _ClassVar[int]
+    CRYPTO_PAYMENT_FIELD_NUMBER: _ClassVar[int]
     final_price: float
     reservation_code: str
-    def __init__(self, final_price: _Optional[float] = ..., reservation_code: _Optional[str] = ...) -> None: ...
+    crypto_payment: CryptoPaymentInstructions
+    def __init__(self, final_price: _Optional[float] = ..., reservation_code: _Optional[str] = ..., crypto_payment: _Optional[_Union[CryptoPaymentInstructions, _Mapping]] = ...) -> None: ...
+
+class CryptoPaymentInstructions(_message.Message):
+    __slots__ = ("deal_id", "wallet_address", "amount", "currency", "memo", "network", "expires_at")
+    DEAL_ID_FIELD_NUMBER: _ClassVar[int]
+    WALLET_ADDRESS_FIELD_NUMBER: _ClassVar[int]
+    AMOUNT_FIELD_NUMBER: _ClassVar[int]
+    CURRENCY_FIELD_NUMBER: _ClassVar[int]
+    MEMO_FIELD_NUMBER: _ClassVar[int]
+    NETWORK_FIELD_NUMBER: _ClassVar[int]
+    EXPIRES_AT_FIELD_NUMBER: _ClassVar[int]
+    deal_id: str
+    wallet_address: str
+    amount: float
+    currency: str
+    memo: str
+    network: str
+    expires_at: int
+    def __init__(self, deal_id: _Optional[str] = ..., wallet_address: _Optional[str] = ..., amount: _Optional[float] = ..., currency: _Optional[str] = ..., memo: _Optional[str] = ..., network: _Optional[str] = ..., expires_at: _Optional[int] = ...) -> None: ...
+
+class CheckDealStatusRequest(_message.Message):
+    __slots__ = ("deal_id",)
+    DEAL_ID_FIELD_NUMBER: _ClassVar[int]
+    deal_id: str
+    def __init__(self, deal_id: _Optional[str] = ...) -> None: ...
+
+class CheckDealStatusResponse(_message.Message):
+    __slots__ = ("status", "secret", "proof", "payment_instructions")
+    STATUS_FIELD_NUMBER: _ClassVar[int]
+    SECRET_FIELD_NUMBER: _ClassVar[int]
+    PROOF_FIELD_NUMBER: _ClassVar[int]
+    PAYMENT_INSTRUCTIONS_FIELD_NUMBER: _ClassVar[int]
+    status: str
+    secret: DealSecret
+    proof: PaymentProof
+    payment_instructions: CryptoPaymentInstructions
+    def __init__(self, status: _Optional[str] = ..., secret: _Optional[_Union[DealSecret, _Mapping]] = ..., proof: _Optional[_Union[PaymentProof, _Mapping]] = ..., payment_instructions: _Optional[_Union[CryptoPaymentInstructions, _Mapping]] = ...) -> None: ...
+
+class DealSecret(_message.Message):
+    __slots__ = ("reservation_code", "item_name", "final_price", "paid_at")
+    RESERVATION_CODE_FIELD_NUMBER: _ClassVar[int]
+    ITEM_NAME_FIELD_NUMBER: _ClassVar[int]
+    FINAL_PRICE_FIELD_NUMBER: _ClassVar[int]
+    PAID_AT_FIELD_NUMBER: _ClassVar[int]
+    reservation_code: str
+    item_name: str
+    final_price: float
+    paid_at: int
+    def __init__(self, reservation_code: _Optional[str] = ..., item_name: _Optional[str] = ..., final_price: _Optional[float] = ..., paid_at: _Optional[int] = ...) -> None: ...
+
+class PaymentProof(_message.Message):
+    __slots__ = ("transaction_hash", "block_number", "from_address", "confirmed_at")
+    TRANSACTION_HASH_FIELD_NUMBER: _ClassVar[int]
+    BLOCK_NUMBER_FIELD_NUMBER: _ClassVar[int]
+    FROM_ADDRESS_FIELD_NUMBER: _ClassVar[int]
+    CONFIRMED_AT_FIELD_NUMBER: _ClassVar[int]
+    transaction_hash: str
+    block_number: str
+    from_address: str
+    confirmed_at: int
+    def __init__(self, transaction_hash: _Optional[str] = ..., block_number: _Optional[str] = ..., from_address: _Optional[str] = ..., confirmed_at: _Optional[int] = ...) -> None: ...
 
 class OfferCountered(_message.Message):
     __slots__ = ("proposed_price", "reason_code", "human_message")

@@ -1,10 +1,10 @@
-# OpenTelemetry Instrumentation for Aura Platform
+# Observability: Tracing and Metrics in the Hive
 
-This document describes the OpenTelemetry (OTel) tracing implementation for the Aura Platform.
+This document describes the OpenTelemetry (OTel) tracing and Prometheus metrics implementation for the Aura Platform.
 
 ## Overview
 
-The Aura Platform now includes distributed tracing across:
+The Aura Platform now includes full-stack observability across:
 - **API Gateway** (FastAPI)
 - **Core Service** (gRPC + SQLAlchemy + LangChain)
 - **Database** (PostgreSQL via SQLAlchemy)
@@ -31,6 +31,20 @@ The Aura Platform now includes distributed tracing across:
 
 All components export traces to **Jaeger** via OTLP protocol.
 
+### Metrics Architecture (The Hive Vital Signs)
+
+In addition to tracing, the hive monitors its vital signs using **Prometheus**.
+
+```
+┌─────────────┐     ┌──────────────┐     ┌─────────────┐
+│             │     │              │     │             │
+│ Core Service│────▶│ Prometheus   │────▶│ Grafana     │
+│ (Metrics)   │     │ (Storage)    │     │ (Visual)    │
+└─────────────┘     └──────────────┘     └─────────────┘
+```
+
+The Core Service exposes metrics such as CPU usage, memory consumption, and caching health, which are scraped by Prometheus and used by the `GetSystemStatus` gRPC method.
+
 ## Configuration
 
 ### Environment Variables
@@ -39,12 +53,13 @@ Both services use these environment variables:
 
 ```env
 # API Gateway
-OTEL_SERVICE_NAME=aura-gateway
-OTEL_EXPORTER_OTLP_ENDPOINT=http://jaeger:4317
+AURA_SERVER__OTEL_SERVICE_NAME=aura-gateway
+AURA_SERVER__OTEL_EXPORTER_OTLP_ENDPOINT=http://jaeger:4317
 
 # Core Service
-OTEL_SERVICE_NAME=aura-core
-OTEL_EXPORTER_OTLP_ENDPOINT=http://jaeger:4317
+AURA_SERVER__OTEL_SERVICE_NAME=aura-core
+AURA_SERVER__OTEL_EXPORTER_OTLP_ENDPOINT=http://jaeger:4317
+AURA_SERVER__PROMETHEUS_URL=http://prometheus:9090
 ```
 
 ### Docker Compose
@@ -158,7 +173,16 @@ You should see traces for:
 1. **API Gateway Requests**: `/v1/search`, `/v1/negotiate`
 2. **gRPC Calls**: `NegotiationService.Negotiate`, `NegotiationService.Search`
 3. **Database Queries**: SQLAlchemy queries to PostgreSQL
-4. **LLM Calls**: Mistral AI calls via LangChain
+4. **LLM Calls**: LiteLLM/DSPy inference calls
+
+### Key Metrics
+
+The following vital signs are monitored:
+
+- `cpu_usage_percent`: Average CPU load across the hive cells.
+- `memory_usage_mb`: Average memory footprint of the Core Engine.
+- `cache_hit_rate`: Success rate of the Semantic Nectar (Redis).
+- `negotiation_count`: Number of active economic interactions.
 
 ### Testing
 

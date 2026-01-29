@@ -32,6 +32,12 @@ dependencies = [
     "httpx>=0.27.0",
     "litellm>=1.63.0",
     "jinja2>=3.1.4",
+    "prometheus-client>=0.21.1",
+    # Solana dependencies for crypto payments
+    "solana>=0.34.0",
+    "solders>=0.21.0",
+    # Encryption for secret storage
+    "cryptography>=43.0.0",
 ]
 
 [dependency-groups]
