@@ -1,10 +1,12 @@
+import asyncio
 import time
 
 import structlog
+from crypto.pricing import PriceConverter
 from hive.dna import Decision, HiveContext, Observation
 
 from config import get_settings
-from db import InventoryItem, SessionLocal
+from db import SessionLocal
 from proto.aura.negotiation.v1 import negotiation_pb2
 
 logger = structlog.get_logger(__name__)
@@ -67,33 +69,37 @@ class HiveConnector:
         context: HiveContext,
     ):
         """Encrypts the reservation code and creates a locked deal on Solana."""
-        session = SessionLocal()
+
+        def create_offer_sync():
+            with SessionLocal() as session:
+                # Use item name from context to avoid redundant query
+                item_name = context.item_data.get("name", "Aura Item")
+
+                converter = PriceConverter(
+                    use_fixed_rates=self.settings.crypto.use_fixed_rates
+                )
+
+                # Convert USD price to crypto amount
+                crypto_amount = converter.convert_usd_to_crypto(
+                    usd_amount=action.price,
+                    crypto_currency=self.settings.crypto.currency,
+                )
+
+                # Create the offer via MarketService
+                return crypto_amount, self.market_service.create_offer(
+                    db=session,
+                    item_id=context.item_id,
+                    item_name=item_name,
+                    secret=response.accepted.reservation_code,
+                    price=crypto_amount,
+                    currency=self.settings.crypto.currency,
+                    buyer_did=context.agent_did,
+                    ttl_seconds=self.settings.crypto.deal_ttl_seconds,
+                )
+
         try:
-            # Re-fetch item to ensure we have name for crypto offer
-            item = session.query(InventoryItem).filter_by(id=context.item_id).first()
-            item_name = item.name if item else "Aura Item"
-
-            from crypto.pricing import PriceConverter
-
-            converter = PriceConverter(
-                use_fixed_rates=self.settings.crypto.use_fixed_rates
-            )
-
-            # Convert USD price to crypto amount
-            crypto_amount = converter.convert_usd_to_crypto(
-                usd_amount=action.price, crypto_currency=self.settings.crypto.currency
-            )
-
-            # Create the offer via MarketService
-            payment_instructions = self.market_service.create_offer(
-                db=session,
-                item_id=context.item_id,
-                item_name=item_name,
-                secret=response.accepted.reservation_code,
-                price=crypto_amount,
-                currency=self.settings.crypto.currency,
-                buyer_did=context.agent_did,
-                ttl_seconds=self.settings.crypto.deal_ttl_seconds,
+            crypto_amount, payment_instructions = await asyncio.to_thread(
+                create_offer_sync
             )
 
             # Update the response: clear plain reservation_code, set crypto_payment
@@ -111,5 +117,3 @@ class HiveConnector:
             logger.error("crypto_lock_failed", error=str(e), exc_info=True)
             # Fallback: keep the plain reservation_code if crypto fails
             # (or we could decide to fail the whole request)
-        finally:
-            session.close()

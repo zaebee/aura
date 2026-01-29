@@ -7,11 +7,17 @@ from hive.membrane import HiveMembrane
 @pytest.mark.asyncio
 async def test_aggregator_perceive(mocker):
     # Mock DB and monitor
-    mock_session = mocker.patch("hive.aggregator.SessionLocal")
-    mock_query = mock_session.return_value.query.return_value.filter_by.return_value.first
-    mock_query.return_value = MagicMock(name="Item", id="item1", base_price=150.0, floor_price=100.0, meta={})
+    mock_session_factory = mocker.patch("hive.aggregator.SessionLocal")
+    mock_session = mock_session_factory.return_value.__enter__.return_value
+    mock_query = mock_session.query.return_value.filter_by.return_value.first
+    mock_query.return_value = MagicMock(
+        name="Item", id="item1", base_price=150.0, floor_price=100.0, meta={}
+    )
 
-    mocker.patch("hive.aggregator.get_hive_metrics", side_effect=AsyncMock(return_value={"cpu_usage_percent": 10.0}))
+    mocker.patch(
+        "hive.aggregator.get_hive_metrics",
+        side_effect=AsyncMock(return_value={"cpu_usage_percent": 10.0}),
+    )
 
     aggregator = HiveAggregator()
     signal = MagicMock()

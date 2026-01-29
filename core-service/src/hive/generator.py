@@ -1,6 +1,7 @@
 import json
 import time
 
+import nats.errors
 import structlog
 from hive.dna import Event, Observation
 
@@ -72,7 +73,11 @@ class HiveGenerator:
                     await self.nc.publish(
                         event.topic, json.dumps(event.payload).encode()
                     )
-                except Exception as e:
+                except (
+                    nats.errors.ErrConnectionClosed,
+                    nats.errors.ErrTimeout,
+                    nats.errors.BadSubscriptionError,
+                ) as e:
                     logger.error("nats_publish_failed", topic=event.topic, error=str(e))
         else:
             logger.debug("nats_not_connected_skipping_emit")

@@ -1,3 +1,4 @@
+import asyncio
 from pathlib import Path
 
 import dspy
@@ -64,8 +65,9 @@ class HiveTransformer:
 
         try:
             # AuraNegotiator returns a dict with 'reasoning' and 'response'
-            # Note: dspy modules are usually called synchronously
-            result = self.negotiator(
+            # dspy modules are called synchronously, so we run in a thread
+            result = await asyncio.to_thread(
+                self.negotiator,
                 input_bid=context.bid_amount,
                 context=economic_context,
                 history=[],  # History tracking to be implemented later if needed
@@ -87,7 +89,7 @@ class HiveTransformer:
                 metadata={"dspy_result": result},
             )
 
-        except Exception as e:
+        except (ValueError, KeyError, RuntimeError) as e:
             logger.error("transformer_error", error=str(e), exc_info=True)
             # Safe default on error
             return Decision(

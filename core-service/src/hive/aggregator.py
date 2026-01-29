@@ -1,3 +1,4 @@
+import asyncio
 from typing import Any
 
 import structlog
@@ -29,11 +30,14 @@ class HiveAggregator:
             "aggregator_perceive_started", item_id=item_id, request_id=request_id
         )
 
-        # 1. Fetch item data from database
+        # 1. Fetch item data from database (using to_thread to avoid blocking)
+        def fetch_item_sync():
+            with SessionLocal() as session:
+                return session.query(InventoryItem).filter_by(id=item_id).first()
+
         item_data = {}
-        session = SessionLocal()
         try:
-            item = session.query(InventoryItem).filter_by(id=item_id).first()
+            item = await asyncio.to_thread(fetch_item_sync)
             if item:
                 item_data = {
                     "name": item.name,
@@ -45,8 +49,6 @@ class HiveAggregator:
                 logger.warning("item_not_found", item_id=item_id)
         except Exception as e:
             logger.error("aggregator_db_error", error=str(e))
-        finally:
-            session.close()
 
         # 2. Fetch system health metrics
         system_health = {}

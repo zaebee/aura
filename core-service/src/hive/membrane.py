@@ -7,6 +7,8 @@ from config import get_settings
 
 logger = structlog.get_logger(__name__)
 
+DEFAULT_MIN_MARGIN = 0.1
+
 
 class HiveMembrane:
     """The Immune System: Deterministic Guardrails for Inbound/Outbound signals."""
@@ -93,7 +95,7 @@ class HiveMembrane:
         # Required: (P - F) / P >= m  => P - F >= mP => P(1-m) >= F => P >= F / (1-m)
         if min_margin >= 1.0:
             logger.error("invalid_min_margin_config", margin=min_margin)
-            min_margin = 0.1  # Fallback to 10%
+            min_margin = DEFAULT_MIN_MARGIN  # Fallback to constant
 
         required_min_price = floor_price / (1 - min_margin)
 
