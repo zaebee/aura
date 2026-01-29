@@ -13,8 +13,8 @@ To use this bot, you need a token from Telegram's BotFather:
 
 ### 2. Configure Environment Variables
 Set the following environment variables (e.g., in your `.env` file or `compose.yml`):
-- `AURA_TELEGRAM__BOT_TOKEN`: The token you received from BotFather.
-- `AURA_TELEGRAM__CORE_GRPC_URL`: The address of the `core-service` (default: `core-service:50051`).
+- `AURA_TG__TOKEN`: The token you received from BotFather.
+- `AURA_TG__CORE_URL`: The address of the `core-service` (default: `core-service:50051`).
 
 ### 3. Run with Docker Compose
 From the root directory:

@@ -1,5 +1,5 @@
 from typing import Optional
-from pydantic import Field, HttpUrl, SecretStr
+from pydantic import SecretStr
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -7,15 +7,13 @@ class TelegramSettings(BaseSettings):
     model_config = SettingsConfigDict(
         env_file=".env",
         env_file_encoding="utf-8",
-        env_nested_delimiter="__",
-        env_prefix="AURA_TELEGRAM__",
+        env_prefix="AURA_TG__",
         extra="ignore",
     )
 
-    bot_token: SecretStr
-    core_grpc_url: str = "core-service:50051"
-    webhook_url: Optional[HttpUrl] = None
-    use_polling: bool = True
+    token: SecretStr
+    core_url: str = "core-service:50051"
+    webhook_domain: Optional[str] = None
 
 
 def get_settings() -> TelegramSettings:

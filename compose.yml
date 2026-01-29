@@ -89,13 +89,12 @@ services:
 
   telegram-bot:
     build:
-      context: ./adapters/telegram-bot
-      dockerfile: Dockerfile
+      context: .
+      dockerfile: adapters/telegram-bot/Dockerfile
     restart: on-failure
     environment:
-      AURA_TELEGRAM__BOT_TOKEN: ${AURA_TELEGRAM__BOT_TOKEN}
-      AURA_TELEGRAM__CORE_GRPC_URL: core-service:50051
-      AURA_TELEGRAM__USE_POLLING: "true"
+      AURA_TG__TOKEN: ${AURA_TG__TOKEN}
+      AURA_TG__CORE_URL: core-service:50051
     depends_on:
       core-service:
         condition: service_healthy

@@ -2,7 +2,7 @@ import asyncio
 import structlog
 from aiogram import Bot, Dispatcher
 from src.config import settings
-from src.handlers import router
+from src.bot import router
 from src.client import AuraClient
 
 # Setup logging
@@ -15,36 +15,30 @@ structlog.configure(
 )
 logger = structlog.get_logger()
 
-
 async def main():
     # Initialize gRPC client
-    client = AuraClient(settings.core_grpc_url)
+    client = AuraClient(settings.core_url)
 
     # Initialize Bot and Dispatcher
-    bot = Bot(token=settings.bot_token.get_secret_value())
+    bot = Bot(token=settings.token.get_secret_value())
     dp = Dispatcher()
 
-    # Register router and pass client to handlers
+    # Register router
     dp.include_router(router)
 
     logger.info(
         "Starting Aura Telegram Bot",
-        core_grpc_url=settings.core_grpc_url,
-        use_polling=settings.use_polling
+        core_url=settings.core_url,
     )
 
     try:
-        if settings.use_polling:
-            # We pass the client as a keyword argument to be available in handlers
-            await dp.start_polling(bot, client=client)
-        else:
-            logger.error("Webhook mode not implemented yet.")
+        # Pass client as dependency to handlers
+        await dp.start_polling(bot, client=client)
     except Exception as e:
         logger.error("Bot crashed", error=str(e))
     finally:
         await client.close()
         await bot.session.close()
-
 
 if __name__ == "__main__":
     asyncio.run(main())
