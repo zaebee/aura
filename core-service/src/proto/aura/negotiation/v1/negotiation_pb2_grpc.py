@@ -30,6 +30,11 @@ class NegotiationServiceStub(object):
                 request_serializer=aura_dot_negotiation_dot_v1_dot_negotiation__pb2.GetSystemStatusRequest.SerializeToString,
                 response_deserializer=aura_dot_negotiation_dot_v1_dot_negotiation__pb2.GetSystemStatusResponse.FromString,
                 _registered_method=True)
+        self.CheckDealStatus = channel.unary_unary(
+                '/aura.negotiation.v1.NegotiationService/CheckDealStatus',
+                request_serializer=aura_dot_negotiation_dot_v1_dot_negotiation__pb2.CheckDealStatusRequest.SerializeToString,
+                response_deserializer=aura_dot_negotiation_dot_v1_dot_negotiation__pb2.CheckDealStatusResponse.FromString,
+                _registered_method=True)
 
 
 class NegotiationServiceServicer(object):
@@ -56,6 +61,13 @@ class NegotiationServiceServicer(object):
         context.set_details('Method not implemented!')
         raise NotImplementedError('Method not implemented!')
 
+    def CheckDealStatus(self, request, context):
+        """RPC method for checking crypto payment status and retrieving secrets.
+        """
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
 
 def add_NegotiationServiceServicer_to_server(servicer, server):
     rpc_method_handlers = {
@@ -73,6 +85,11 @@ def add_NegotiationServiceServicer_to_server(servicer, server):
                     servicer.GetSystemStatus,
                     request_deserializer=aura_dot_negotiation_dot_v1_dot_negotiation__pb2.GetSystemStatusRequest.FromString,
                     response_serializer=aura_dot_negotiation_dot_v1_dot_negotiation__pb2.GetSystemStatusResponse.SerializeToString,
+            ),
+            'CheckDealStatus': grpc.unary_unary_rpc_method_handler(
+                    servicer.CheckDealStatus,
+                    request_deserializer=aura_dot_negotiation_dot_v1_dot_negotiation__pb2.CheckDealStatusRequest.FromString,
+                    response_serializer=aura_dot_negotiation_dot_v1_dot_negotiation__pb2.CheckDealStatusResponse.SerializeToString,
             ),
     }
     generic_handler = grpc.method_handlers_generic_handler(
@@ -157,6 +174,33 @@ class NegotiationService(object):
             '/aura.negotiation.v1.NegotiationService/GetSystemStatus',
             aura_dot_negotiation_dot_v1_dot_negotiation__pb2.GetSystemStatusRequest.SerializeToString,
             aura_dot_negotiation_dot_v1_dot_negotiation__pb2.GetSystemStatusResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def CheckDealStatus(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/aura.negotiation.v1.NegotiationService/CheckDealStatus',
+            aura_dot_negotiation_dot_v1_dot_negotiation__pb2.CheckDealStatusRequest.SerializeToString,
+            aura_dot_negotiation_dot_v1_dot_negotiation__pb2.CheckDealStatusResponse.FromString,
             options,
             channel_credentials,
             insecure,
