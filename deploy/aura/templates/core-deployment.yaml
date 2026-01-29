@@ -43,24 +43,24 @@ spec:
               value: "postgresql://{{ .Values.postgres.auth.username }}:{{ .Values.postgres.auth.password }}@{{ .Release.Name }}-postgres:5432/{{ .Values.postgres.auth.database }}"
             - name: AURA_DATABASE__REDIS_URL
               value: "redis://{{ .Release.Name }}-redis:6379/0"
-            - name: AURA_SERVER__NATS_URL
-              value: "nats://{{ .Release.Name }}-nats:4222"
-            - name: AURA_SERVER__OTEL_SERVICE_NAME
-              value: "{{ .Release.Name }}-core"
-            - name: AURA_SERVER__OTEL_EXPORTER_OTLP_ENDPOINT
-              value: "http://{{ .Release.Name }}-jaeger:4317"
-            - name: AURA_SERVER__PROMETHEUS_URL
-              value: "{{ .Values.core.env.AURA_SERVER__PROMETHEUS_URL }}"
-            - name: AURA_LLM__MODEL
-              value: "{{ .Values.core.env.AURA_LLM__MODEL }}"
             - name: AURA_LLM__API_KEY
               valueFrom:
                 secretKeyRef:
                   name: "{{ .Release.Name }}-secrets"
                   key: "mistral-key"
+            - name: AURA_LLM__MODEL
+              value: "{{ .Values.core.env.AURA_LLM__MODEL }}"
             - name: AURA_LLM__OPENAI_API_KEY
               valueFrom:
                 secretKeyRef:
                   name: "{{ .Release.Name }}-secrets"
                   key: "openai-key"
                   optional: true  # Only required if LLM_MODEL starts with "openai/"
+            - name: AURA_SERVER__NATS_URL
+              value: "nats://{{ .Release.Name }}-nats:4222"
+            - name: AURA_SERVER__PROMETHEUS_URL
+              value: "{{ .Values.core.env.AURA_SERVER__PROMETHEUS_URL }}"
+            - name: AURA_SERVER__OTEL_EXPORTER_OTLP_ENDPOINT
+              value: "http://{{ .Release.Name }}-jaeger:4317"
+            - name: AURA_SERVER__OTEL_SERVICE_NAME
+              value: "{{ .Release.Name }}-core"

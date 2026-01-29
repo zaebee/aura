@@ -15,6 +15,13 @@ spec:
       containers:
       - name: nats
         image: nats:2.10-alpine
+        resources:
+          limits:
+            cpu: 100m
+            memory: 128Mi
+          requests:
+            cpu: 50m
+            memory: 64Mi
         ports:
         - containerPort: 4222 # Client port
         - containerPort: 8222 # Monitoring port
