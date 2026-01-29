@@ -25,6 +25,11 @@ class CryptoSettings(BaseModel):
     # Secret Encryption
     secret_encryption_key: SecretStr = ""  # Base64-encoded Fernet key (32 bytes)
 
+    # Pricing Configuration
+    use_fixed_rates: bool = True  # Use fixed rates (not oracle)
+    sol_usd_rate: float = 100.0   # Fixed rate: 1 SOL = $100 USD
+    # Note: USDC rate is always 1.0 (stablecoin)
+
     @model_validator(mode="after")
     def validate_crypto_config(self) -> "CryptoSettings":
         """Validate crypto payment configuration when enabled."""

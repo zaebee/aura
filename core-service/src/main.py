@@ -116,13 +116,33 @@ class NegotiationService(negotiation_pb2_grpc.NegotiationServiceServicer):
                         .first()
                     )
                     if item:
-                        # Create locked deal with payment instructions
+                        # Convert USD price to crypto amount
+                        from crypto.pricing import PriceConverter
+
+                        converter = PriceConverter(
+                            use_fixed_rates=settings.crypto.use_fixed_rates
+                        )
+
+                        usd_price = response.accepted.final_price
+                        crypto_amount = converter.convert_usd_to_crypto(
+                            usd_amount=usd_price,
+                            crypto_currency=settings.crypto.currency
+                        )
+
+                        logger.info(
+                            "price_conversion",
+                            usd_price=usd_price,
+                            crypto_amount=crypto_amount,
+                            currency=settings.crypto.currency,
+                        )
+
+                        # Create locked deal with payment instructions (converted price)
                         payment_instructions = self.market_service.create_offer(
                             db=session,
                             item_id=request.item_id,
                             item_name=item.name,
                             secret=response.accepted.reservation_code,
-                            price=response.accepted.final_price,
+                            price=crypto_amount,
                             currency=settings.crypto.currency,
                             buyer_did=request.agent.did if request.agent.did else None,
                             ttl_seconds=settings.crypto.deal_ttl_seconds,
