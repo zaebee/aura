@@ -17,6 +17,7 @@ from dspy.teleprompt import BootstrapFewShot
 sys.path.append(str(Path(__file__).parent / "src"))
 
 from llm.engine import AuraNegotiator
+from llm.prepare.clean import clean_and_parse_json
 
 
 def load_training_data() -> list[dict]:
@@ -79,8 +80,8 @@ def economic_metric(gold, pred, trace=None):
 
     if isinstance(pred_resp, str):
         try:
-            pred_resp = json.loads(pred_resp)
-        except json.JSONDecodeError:
+            pred_resp = clean_and_parse_json(pred_resp)
+        except (ValueError, json.JSONDecodeError):
             return 0
 
     score = 0

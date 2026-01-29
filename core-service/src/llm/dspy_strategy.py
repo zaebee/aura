@@ -85,20 +85,25 @@ class DSPyStrategy:
             session.close()
 
     def _create_standard_context(self, item: InventoryItem) -> dict:
-        """Create standard economic context for DSPy module."""
+        """Create standard economic context for DSPy module.
+
+        Fetches dynamic context from item metadata if available.
+        """
+        # Default value-adds if not specified in metadata
+        default_value_adds = [
+            {"item": "Breakfast for two", "internal_cost": 20, "perceived_value": 60},
+            {"item": "Late checkout", "internal_cost": 0, "perceived_value": 40},
+            {"item": "Room upgrade", "internal_cost": 30, "perceived_value": 120},
+        ]
+
+        # Use item metadata for dynamic occupancy and perks
+        meta = item.meta or {}
+
         return {
             "base_price": item.base_price,
             "floor_price": item.floor_price,
-            "occupancy": "high",  # Could be made dynamic based on current inventory
-            "value_add_inventory": [
-                {
-                    "item": "Breakfast for two",
-                    "internal_cost": 20,
-                    "perceived_value": 60,
-                },
-                {"item": "Late checkout", "internal_cost": 0, "perceived_value": 40},
-                {"item": "Room upgrade", "internal_cost": 30, "perceived_value": 120},
-            ],
+            "occupancy": meta.get("occupancy", "medium"),
+            "value_add_inventory": meta.get("value_add_inventory", default_value_adds),
         }
 
     def evaluate(
