@@ -1,4 +1,4 @@
-FROM python:3.12-slim as builder
+FROM python:3.12-slim AS builder
 
 WORKDIR /app
 
@@ -8,8 +8,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && rm -rf /var/lib/apt/lists/*
 
 # Install uv for dependency management
-COPY --from=ghcr.io/astral-sh/uv:latest /uv /uv --link
-ENV PATH="/app/.venv/bin:$PATH"
+COPY --from=ghcr.io/astral-sh/uv:latest /uv /usr/local/bin/uv
 ENV UV_COMPILE_BYTECODE=1
 ENV UV_LINK_MODE=copy
 
@@ -31,14 +30,11 @@ RUN mkdir -p /app/src/proto && \
     /app/proto/aura/negotiation/v1/negotiation.proto
 
 # Final stage
-FROM python:3.12-slim
+FROM python:3.12-slim AS runtime
 
 WORKDIR /app
 
-# Copy virtual env from builder stage (only runtime deps)
-# We need to sync again without dev to keep the image small,
-# or just copy the .venv and be aware it has dev deps.
-# Actually, let's just use the builder venv for now, but in a real prod we'd prune.
+# Copy virtual env from builder stage
 COPY --from=builder /app/.venv /app/.venv
 ENV PATH="/app/.venv/bin:$PATH"
 
