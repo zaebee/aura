@@ -16,7 +16,10 @@ lint:
 
 # Run tests
 test:
-	PYTHONPATH=adapters/telegram-bot:adapters/telegram-bot/src uv run pytest core-service/tests/ adapters/telegram-bot/tests/ -v
+	# Run core-service tests
+	uv run pytest core-service/tests/ -v
+	# Run telegram-bot tests with isolated path to avoid 'src' collision
+	PYTHONPATH=adapters/telegram-bot:core-service/src/proto uv run pytest adapters/telegram-bot/tests/ -v
 
 # Run tests with coverage report
 test-cov:
