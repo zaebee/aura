@@ -1,6 +1,7 @@
 import asyncio
 import time
 import uuid
+import nats
 from concurrent import futures
 from typing import Protocol
 
@@ -26,6 +27,12 @@ from config import settings
 from db import InventoryItem, SessionLocal, engine
 from embeddings import generate_embedding
 from proto.aura.negotiation.v1 import negotiation_pb2, negotiation_pb2_grpc
+
+from hive.aggregator import HiveAggregator
+from hive.transformer import HiveTransformer
+from hive.connector import HiveConnector
+from hive.generator import HiveGenerator
+from hive.membrane import HiveMembrane
 
 # Configure structured logging on startup
 configure_logging(log_level=settings.server.log_level)
@@ -66,110 +73,74 @@ class PricingStrategy(Protocol):
 
 
 class NegotiationService(negotiation_pb2_grpc.NegotiationServiceServicer):
-    def __init__(self, strategy: PricingStrategy, market_service=None):
-        self.strategy = strategy
-        self.market_service = market_service
+    """
+    gRPC Service implementing the Aura Negotiation Protocol.
+    Refactored into a metabolic ATCG loop.
+    """
 
-    def Negotiate(self, request, context):
-        request_id = extract_request_id(context) or request.request_id
+    def __init__(self, aggregator, transformer, connector, generator, membrane, market_service=None):
+        self.aggregator = aggregator
+        self.transformer = transformer
+        self.connector = connector
+        self.generator = generator
+        self.membrane = membrane
+        self.market_service = market_service # Keep for other methods if needed
+
+    async def Negotiate(self, request, context):
+        """
+        Main metabolic loop for negotiation:
+        Signal -> Aggregator -> Membrane(In) -> Transformer -> Membrane(Out) -> Connector -> Generator
+        """
+        request_id = extract_request_id(context) or getattr(request, "request_id", str(uuid.uuid4()))
         bind_request_id(request_id)
 
         try:
-            logger.info(
-                "negotiate_request_received",
-                item_id=request.item_id,
-                bid_amount=request.bid_amount,
-                agent_did=request.agent.did,
-            )
+            with tracer.start_as_current_span("hive_metabolism") as span:
+                logger.info("metabolism_cycle_started", item_id=request.item_id, bid_amount=request.bid_amount)
 
-            if request.bid_amount <= 0:
-                logger.error(
-                    "invalid_bid_amount",
-                    bid_amount=request.bid_amount,
-                    error="Bid amount must be positive",
-                )
-                context.set_code(grpc.StatusCode.INVALID_ARGUMENT)
-                context.set_details("Bid amount must be positive")
-                return negotiation_pb2.NegotiateResponse()
+                # 1. Sense (Aggregator)
+                with tracer.start_as_current_span("hive_aggregator") as a_span:
+                    hive_context = await self.aggregator.perceive(request)
+                    a_span.set_attribute("item_id", hive_context.item_id)
+                    a_span.set_attribute("bid_amount", hive_context.bid_amount)
 
-            response = self.strategy.evaluate(
-                item_id=request.item_id,
-                bid=request.bid_amount,
-                reputation=request.agent.reputation_score,
-                request_id=request_id,
-            )
+                # 2. Filter Inbound (Membrane)
+                with tracer.start_as_current_span("hive_membrane_inbound") as m_in_span:
+                    request = await self.membrane.inspect_inbound(request)
 
-            response.session_token = "sess_" + request.request_id
-            response.valid_until_timestamp = int(time.time() + 600)
+                # 3. Think (Transformer)
+                with tracer.start_as_current_span("hive_transformer") as t_span:
+                    decision = await self.transformer.think(hive_context)
+                    t_span.set_attribute("action", decision.action)
+                    t_span.set_attribute("price", decision.price)
 
-            # If crypto payments enabled and offer accepted, lock behind payment
-            if (
-                settings.crypto.enabled
-                and self.market_service
-                and response.HasField("accepted")
-            ):
-                # Fetch item details from database
-                session = SessionLocal()
-                try:
-                    item = (
-                        session.query(InventoryItem)
-                        .filter_by(id=request.item_id)
-                        .first()
-                    )
-                    if item:
-                        # Convert USD price to crypto amount
-                        from crypto.pricing import PriceConverter
+                # 4. Filter Outbound (Membrane)
+                with tracer.start_as_current_span("hive_membrane_outbound") as m_out_span:
+                    safe_decision = await self.membrane.inspect_outbound(decision, hive_context)
+                    if safe_decision != decision:
+                        m_out_span.set_attribute("overridden", True)
+                        m_out_span.set_attribute("original_price", decision.price)
+                        m_out_span.set_attribute("safe_price", safe_decision.price)
 
-                        converter = PriceConverter(
-                            use_fixed_rates=settings.crypto.use_fixed_rates
-                        )
+                # 5. Act (Connector)
+                with tracer.start_as_current_span("hive_connector") as c_span:
+                    observation = await self.connector.act(safe_decision, hive_context)
 
-                        usd_price = response.accepted.final_price
-                        crypto_amount = converter.convert_usd_to_crypto(
-                            usd_amount=usd_price,
-                            crypto_currency=settings.crypto.currency,
-                        )
+                # 6. Pulse (Generator)
+                with tracer.start_as_current_span("hive_generator") as g_span:
+                    await self.generator.pulse(observation)
 
-                        logger.info(
-                            "price_conversion",
-                            usd_price=usd_price,
-                            crypto_amount=crypto_amount,
-                            currency=settings.crypto.currency,
-                        )
+                logger.info("metabolism_cycle_completed",
+                            action=safe_decision.action,
+                            price=safe_decision.price)
 
-                        # Create locked deal with payment instructions (converted price)
-                        payment_instructions = self.market_service.create_offer(
-                            db=session,
-                            item_id=request.item_id,
-                            item_name=item.name,
-                            secret=response.accepted.reservation_code,
-                            price=crypto_amount,
-                            currency=settings.crypto.currency,
-                            buyer_did=request.agent.did if request.agent.did else None,
-                            ttl_seconds=settings.crypto.deal_ttl_seconds,
-                        )
+                return observation.data
 
-                        # Clear reservation_code and set crypto_payment instead
-                        response.accepted.ClearField("reservation_code")
-                        response.accepted.crypto_payment.CopyFrom(payment_instructions)
-
-                        logger.info(
-                            "offer_locked_for_payment",
-                            deal_id=payment_instructions.deal_id,
-                            item_id=request.item_id,
-                            amount=payment_instructions.amount,
-                            currency=payment_instructions.currency,
-                        )
-                finally:
-                    session.close()
-
-            logger.info(
-                "negotiate_response_sent",
-                session_token=response.session_token,
-                result_type=response.WhichOneof("result"),
-            )
-
-            return response
+        except Exception as e:
+            logger.error("metabolic_failure", error=str(e), exc_info=True)
+            context.set_code(grpc.StatusCode.INTERNAL)
+            context.set_details(f"Metabolic failure: {e}")
+            return negotiation_pb2.NegotiateResponse()
         finally:
             clear_request_context()
 
@@ -450,7 +421,13 @@ async def serve():
     except Exception as e:
         logger.error("metrics_server_failed", error=str(e))
 
-    strategy = create_strategy()
+    # Initialize NATS for the Generator
+    nc = None
+    try:
+        nc = await nats.connect(settings.server.nats_url)
+        logger.info("nats_connected", url=settings.server.nats_url)
+    except Exception as e:
+        logger.warning("nats_connection_failed", url=settings.server.nats_url, error=str(e))
 
     # Initialize crypto provider and market service if enabled
     crypto_provider = create_crypto_provider()
@@ -471,13 +448,28 @@ async def serve():
             currency=settings.crypto.currency,
         )
 
+    # Initialize Hive Metabolic Components
+    aggregator = HiveAggregator()
+    transformer = HiveTransformer()
+    connector = HiveConnector(market_service=market_service)
+    generator = HiveGenerator(nats_client=nc)
+    membrane = HiveMembrane()
+
     server = grpc.aio.server(
         futures.ThreadPoolExecutor(max_workers=settings.server.grpc_max_workers)
     )
 
-    # Register negotiation service with market service
+    # Register negotiation service with Hive components
     negotiation_pb2_grpc.add_NegotiationServiceServicer_to_server(
-        NegotiationService(strategy, market_service), server
+        NegotiationService(
+            aggregator=aggregator,
+            transformer=transformer,
+            connector=connector,
+            generator=generator,
+            membrane=membrane,
+            market_service=market_service
+        ),
+        server
     )
 
     # Register health service
@@ -491,11 +483,15 @@ async def serve():
         database="postgres",
         services=["NegotiationService", "Health"],
         crypto_enabled=settings.crypto.enabled,
+        metabolism="ATCG",
     )
     await server.start()
     try:
         await server.wait_for_termination()
     finally:
+        if nc:
+            await nc.close()
+            logger.info("nats_connection_closed")
         if crypto_provider:
             await crypto_provider.close()
             logger.info("crypto_provider_closed")

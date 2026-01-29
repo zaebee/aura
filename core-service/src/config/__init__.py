@@ -6,6 +6,7 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 from .crypto import CryptoSettings
 from .database import DatabaseSettings
 from .llm import LLMSettings
+from .logic import LogicSettings
 from .server import ServerSettings
 
 
@@ -21,6 +22,7 @@ class Settings(BaseSettings):
     database: DatabaseSettings = Field(default_factory=DatabaseSettings)
     llm: LLMSettings = Field(default_factory=LLMSettings)
     crypto: CryptoSettings = Field(default_factory=CryptoSettings)
+    logic: LogicSettings = Field(default_factory=LogicSettings)
     server: ServerSettings = Field(default_factory=ServerSettings)
 
 

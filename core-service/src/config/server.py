@@ -33,3 +33,8 @@ class ServerSettings(BaseModel):
         "http://prometheus-kube-prometheus-prometheus.monitoring:9090",
         validation_alias=AliasChoices("AURA_SERVER__PROMETHEUS_URL", "PROMETHEUS_URL"),
     )
+
+    nats_url: str = Field(
+        "nats://nats:4222",
+        validation_alias=AliasChoices("AURA_SERVER__NATS_URL", "NATS_URL"),
+    )

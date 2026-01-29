@@ -1,0 +1,69 @@
+from typing import Any, Dict, List, Protocol, runtime_checkable
+from dataclasses import dataclass, field
+
+@dataclass
+class HiveContext:
+    """Consolidated context for the Hive's decision making."""
+    item_id: str
+    bid_amount: float
+    agent_did: str
+    reputation: float
+    item_data: Dict[str, Any] = field(default_factory=dict)
+    system_health: Dict[str, Any] = field(default_factory=dict)
+    request_id: str = ""
+    metadata: Dict[str, Any] = field(default_factory=dict)
+
+@dataclass
+class Decision:
+    """Decision made by the Transformer."""
+    action: str  # "accept", "counter", "reject"
+    price: float
+    message: str
+    reasoning: str = ""
+    metadata: Dict[str, Any] = field(default_factory=dict)
+
+@dataclass
+class Observation:
+    """Observation resulting from an action."""
+    success: bool
+    data: Any
+    event_type: str = ""
+    metadata: Dict[str, Any] = field(default_factory=dict)
+
+@dataclass
+class Event:
+    """An event emitted to the Hive's blood stream (NATS)."""
+    topic: str
+    payload: Dict[str, Any]
+    timestamp: float = field(default_factory=lambda: 0.0)
+
+@runtime_checkable
+class Aggregator(Protocol):
+    """A - Aggregator: perceive(signal) -> Context"""
+    async def perceive(self, signal: Any) -> HiveContext: ...
+
+@runtime_checkable
+class Transformer(Protocol):
+    """T - Transformer: think(context) -> Decision"""
+    async def think(self, context: HiveContext) -> Decision: ...
+
+@runtime_checkable
+class Connector(Protocol):
+    """C - Connector: act(action) -> Observation"""
+    async def act(self, action: Decision, context: HiveContext) -> Observation: ...
+
+@runtime_checkable
+class Generator(Protocol):
+    """G - Generator: pulse(observation) -> list[Event]"""
+    async def pulse(self, observation: Observation) -> List[Event]: ...
+
+@runtime_checkable
+class Membrane(Protocol):
+    """Inbound/Outbound safety checks (Guardrails)."""
+    async def inspect_inbound(self, signal: Any) -> Any:
+        """Sanitize and validate inbound signals."""
+        ...
+
+    async def inspect_outbound(self, decision: Decision, context: HiveContext) -> Decision:
+        """Verify and enforce economic rules on outbound decisions."""
+        ...
