@@ -17,6 +17,7 @@ structlog.configure(
 )
 logger = structlog.get_logger()
 
+
 async def main():
     # Initialize gRPC client
     client = GRPCNegotiationClient(settings.core_url)
@@ -41,6 +42,7 @@ async def main():
     finally:
         await client.close()
         await bot.session.close()
+
 
 if __name__ == "__main__":
     asyncio.run(main())
