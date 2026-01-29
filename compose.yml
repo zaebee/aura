@@ -23,11 +23,15 @@ services:
     restart: on-failure
     environment:
       AURA_DATABASE__URL: postgresql://user:password@db:5432/aura_db
+      AURA_DATABASE__REDIS_URL: redis://redis:6379/0
       AURA_LLM__API_KEY: ${MISTRAL_API_KEY}
       AURA_SERVER__OTEL_SERVICE_NAME: "aura-core"
       AURA_SERVER__OTEL_EXPORTER_OTLP_ENDPOINT: "http://jaeger:4317"
+      AURA_SERVER__PROMETHEUS_URL: "http://prometheus:9090"
     depends_on:
       db:
+        condition: service_healthy
+      redis:
         condition: service_healthy
     ports:
       - "50051:50051"
@@ -86,6 +90,37 @@ services:
       timeout: 5s
       retries: 3
       start_period: 10s
+
+  redis:
+    image: redis:7-alpine
+    restart: always
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  prometheus:
+    image: prom/prometheus:latest
+    restart: always
+    volumes:
+      - ./deploy/prometheus.yml:/etc/prometheus/prometheus.yml
+    ports:
+      - "9090:9090"
+
+  telegram-bot:
+    build:
+      context: .
+      dockerfile: adapters/telegram-bot/Dockerfile
+    restart: on-failure
+    environment:
+      AURA_TELEGRAM__BOT_TOKEN: ${AURA_TELEGRAM__BOT_TOKEN}
+      AURA_TELEGRAM__CORE_GRPC_URL: core-service:50051
+    depends_on:
+      core-service:
+        condition: service_healthy
 
 volumes:
   postgres_data:

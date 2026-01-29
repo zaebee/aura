@@ -28,7 +28,7 @@ graph TD
 
     %% Connections
     Browser -- "Signed HTTP" --> Gateway
-    Telegram -- "gRPC" --> Core
+    Telegram -- "via Adapter" --> Core
     MCP -- "Signed HTTP" --> Gateway
 
     Gateway -- "gRPC" --> Core
@@ -93,10 +93,14 @@ docker-compose up --build
 ```
 
 This will start:
-- PostgreSQL with pgvector extension (port 5432)
-- Core Service (gRPC on port 50051)
-- API Gateway (HTTP on port 8000)
-- Jaeger for distributed tracing (UI on port 16686)
+- **PostgreSQL** with pgvector extension (port 5432)
+- **Redis** for caching and rate limiting (port 6379)
+- **Prometheus** for metrics (port 9090)
+- **Core Service** (gRPC on port 50051)
+- **API Gateway** (HTTP on port 8000)
+- **Telegram Bot** (Telegram interface)
+- **Jaeger** for distributed tracing (UI on port 16686)
+- **Frontend** Agent Console (port 3000)
 
 ### Running Services Individually
 
