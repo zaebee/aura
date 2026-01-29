@@ -445,7 +445,7 @@ docker-compose exec db psql -U user -d aura_db -c \
 1. **Polling-based verification**: No WebSocket subscriptions (requires client to poll CheckDealStatus)
 2. **No refund mechanism**: If seller doesn't deliver, manual intervention required (future: escrow)
 3. **Single blockchain**: Only Solana supported (Ethereum/Polygon planned)
-4. **No encryption**: `secret_content` stored in plaintext (future: Fernet encryption)
+4. **Encrypted secrets**: `secret_content` encrypted at rest using Fernet (AES-128-CBC) - requires SECRET_ENCRYPTION_KEY
 5. **RPC dependency**: Relies on Solana RPC availability (use dedicated provider for production)
 
 ---

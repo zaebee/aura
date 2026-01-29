@@ -76,8 +76,7 @@ class Settings(BaseSettings):
             if not self.secret_encryption_key:
                 raise ValueError(
                     "SECRET_ENCRYPTION_KEY required when CRYPTO_ENABLED=true. "
-                    "Generate with: python -c 'from cryptography.fernet import Fernet; "
-                    "print(Fernet.generate_key().decode())'"
+                    "See .env.example for key generation instructions."
                 )
             if self.crypto_currency not in ["SOL", "USDC"]:
                 raise ValueError("CRYPTO_CURRENCY must be 'SOL' or 'USDC'")

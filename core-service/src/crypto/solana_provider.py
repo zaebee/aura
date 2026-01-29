@@ -180,9 +180,16 @@ class SolanaProvider:
             logger.info("No matching payment found in recent transactions")
             return None
 
-        except Exception as e:
+        except (httpx.RequestError, httpx.HTTPStatusError) as e:
             logger.error(
-                "Payment verification failed",
+                "RPC request failed during payment verification",
+                extra={"error": str(e), "memo": memo},
+                exc_info=True,
+            )
+            return None
+        except (KeyError, ValueError, TypeError) as e:
+            logger.error(
+                "Failed to parse transaction data",
                 extra={"error": str(e), "memo": memo},
                 exc_info=True,
             )
@@ -313,8 +320,8 @@ class SolanaProvider:
                         return True
 
             return False
-        except Exception as e:
-            logger.error("Error parsing memo", extra={"error": str(e)})
+        except (KeyError, ValueError, TypeError) as e:
+            logger.error("Error parsing memo from transaction", extra={"error": str(e)})
             return False
 
     def _has_sol_transfer(
@@ -361,17 +368,29 @@ class SolanaProvider:
             if our_idx is None:
                 return (False, "")
 
-            # Find the sender: account with largest balance decrease (excluding fees)
-            # First account is typically the fee payer/sender for simple transfers
+            # Find the sender: analyze balance changes to identify which account sent funds
+            # Look for the signer account with the largest balance decrease (excluding recipient)
             sender_addr = ""
-            if account_keys:
-                first_key = account_keys[0]
-                sender_addr = (
-                    first_key if isinstance(first_key, str) else first_key.get("pubkey", "")
-                )
+            max_decrease = 0
+
+            for idx, key_info in enumerate(account_keys):
+                if idx == our_idx:  # Skip recipient account
+                    continue
+
+                # Calculate balance change (negative = decrease)
+                balance_change = pre_balances[idx] - post_balances[idx]
+
+                # Find signer with largest decrease (actual sender)
+                # Note: First account is typically fee payer, but not always the sender
+                if balance_change > max_decrease:
+                    max_decrease = balance_change
+                    pubkey = (
+                        key_info if isinstance(key_info, str) else key_info.get("pubkey", "")
+                    )
+                    sender_addr = pubkey
 
             return (True, sender_addr)
-        except Exception as e:
+        except (KeyError, ValueError, TypeError, IndexError) as e:
             logger.error("Error parsing SOL transfer", extra={"error": str(e)})
             return (False, "")
 
@@ -421,7 +440,7 @@ class SolanaProvider:
                             return (True, authority)
 
             return (False, "")
-        except Exception as e:
+        except (KeyError, ValueError, TypeError) as e:
             logger.error("Error parsing USDC transfer", extra={"error": str(e)})
             return (False, "")
 

@@ -31,8 +31,8 @@ class SecretEncryption:
         """
         try:
             self.fernet = Fernet(encryption_key.encode())
-        except Exception as e:
-            logger.error("Invalid encryption key", extra={"error": str(e)})
+        except (ValueError, TypeError) as e:
+            logger.error("Invalid encryption key format", extra={"error": str(e)})
             raise ValueError(f"Invalid encryption key: {e}") from e
 
     def encrypt(self, plaintext: str) -> bytes:
@@ -50,7 +50,7 @@ class SecretEncryption:
         """
         try:
             return self.fernet.encrypt(plaintext.encode())
-        except Exception as e:
+        except (ValueError, TypeError, AttributeError) as e:
             logger.error("Encryption failed", extra={"error": str(e)})
             raise ValueError(f"Encryption failed: {e}") from e
 
@@ -72,7 +72,7 @@ class SecretEncryption:
         except InvalidToken as e:
             logger.error("Decryption failed: invalid token or wrong key")
             raise ValueError("Decryption failed: invalid token or wrong key") from e
-        except Exception as e:
+        except (ValueError, TypeError, AttributeError) as e:
             logger.error("Decryption failed", extra={"error": str(e)})
             raise ValueError(f"Decryption failed: {e}") from e
 

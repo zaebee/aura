@@ -1,5 +1,6 @@
 import asyncio
 import time
+import uuid
 from concurrent import futures
 from typing import Protocol
 
@@ -254,8 +255,6 @@ class NegotiationService(negotiation_pb2_grpc.NegotiationServiceServicer):
 
             # Validate UUID format
             try:
-                import uuid
-
                 uuid.UUID(request.deal_id)
             except ValueError:
                 logger.warning("invalid_deal_id", deal_id=request.deal_id)
@@ -451,7 +450,12 @@ async def serve():
         crypto_enabled=settings.crypto_enabled,
     )
     await server.start()
-    await server.wait_for_termination()
+    try:
+        await server.wait_for_termination()
+    finally:
+        if crypto_provider:
+            await crypto_provider.close()
+            logger.info("crypto_provider_closed")
 
 
 if __name__ == "__main__":

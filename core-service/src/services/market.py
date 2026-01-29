@@ -151,12 +151,8 @@ class MarketService:
         Returns:
             CheckDealStatusResponse proto message
         """
-        try:
-            # Parse and validate UUID
-            deal_uuid = uuid.UUID(deal_id)
-        except ValueError:
-            logger.warning("Invalid deal_id format", extra={"deal_id": deal_id})
-            return negotiation_pb2.CheckDealStatusResponse(status="NOT_FOUND")
+        # Parse UUID (already validated at API boundary)
+        deal_uuid = uuid.UUID(deal_id)
 
         # Query deal from database
         stmt = select(LockedDeal).where(LockedDeal.id == deal_uuid)
