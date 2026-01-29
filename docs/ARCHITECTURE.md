@@ -129,9 +129,9 @@ The Queen no longer uses static rules; she has been trained using **DSPy (Machin
 The permanent cells of our hive. It stores every item, every embedding, and the history of every negotiation (The Ledger).
 
 #### Redis (The Caching Cell)
-- **Semantic Nectar (Cache)**: Caches negotiation results to reduce database load and improve performance.
+- **Semantic Nectar (Cache)**: Caches negotiation results to reduce database load and improve performance. (Performance Optimization)
 - **Guard State (Rate Limiting)**: Tracks request rates per agent to prevent abuse.
-- **Session State**: Manages temporary session information for negotiation flows.
+- **Session State**: Manages temporary session information for negotiation flows. (Session Management)
 
 ### 4. Adapters (The Foragers)
 

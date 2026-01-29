@@ -5,6 +5,7 @@ from concurrent import futures
 from typing import Protocol
 
 import grpc
+from prometheus_client import start_http_server
 import grpc.aio
 from grpc_health.v1 import health_pb2, health_pb2_grpc
 from logging_config import (
@@ -436,6 +437,13 @@ def create_crypto_provider():
 
 
 async def serve():
+    # Start Prometheus metrics server on port 9091
+    try:
+        start_http_server(9091)
+        logger.info("metrics_server_started", port=9091)
+    except Exception as e:
+        logger.error("metrics_server_failed", error=str(e))
+
     strategy = create_strategy()
 
     # Initialize crypto provider and market service if enabled

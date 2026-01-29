@@ -4,4 +4,4 @@ global:
 scrape_configs:
   - job_name: 'aura-core'
     static_configs:
-      - targets: ['core-service:50051'] # This might not work if core-service doesn't expose metrics on gRPC port in a way prometheus likes
+      - targets: ['core-service:9091'] # Scrape metrics from the dedicated HTTP port

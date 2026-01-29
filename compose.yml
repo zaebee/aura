@@ -47,6 +47,7 @@ services:
         condition: service_healthy
     ports:
       - "50051:50051"
+      - "9091:9091"
     healthcheck:
       test: ["CMD", "grpc_health_probe", "-addr=:50051"]
       interval: 15s

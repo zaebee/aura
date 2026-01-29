@@ -26,5 +26,6 @@ COPY core-service/migrations ./migrations
 ENV PYTHONPATH=/app:/app/src:/app/src/proto
 
 EXPOSE 50051
+EXPOSE 9091
 
 CMD ["python", "src/main.py"]
