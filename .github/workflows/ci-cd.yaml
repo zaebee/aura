@@ -92,12 +92,14 @@ jobs:
               env:
                 MISTRAL_API_KEY: ${{ secrets.MISTRAL_API_KEY }}
                 FRP_CLIENT_TOKEN: ${{ secrets.FRP_CLIENT_TOKEN }}
+                TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
               run: |
                   helm dependency update ./deploy/aura
                   helm upgrade aura ./deploy/aura \
-                    --set gateway.image.tag=sha-$(git rev-parse --short HEAD) \
                     --set core.image.tag=sha-$(git rev-parse --short HEAD) \
+                    --set gateway.image.tag=sha-$(git rev-parse --short HEAD) \
                     --set frontend.image.tag=sha-$(git rev-parse --short HEAD) \
                     --set telegram.image.tag=sha-$(git rev-parse --short HEAD) \
+                    --set secrets.telegramToken="$TELEGRAM_TOKEN" \
                     --set secrets.mistralApiKey="$MISTRAL_API_KEY" \
                     --set secrets.frpClientToken.value="$FRP_CLIENT_TOKEN"
