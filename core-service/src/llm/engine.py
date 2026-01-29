@@ -3,15 +3,83 @@ Universal LLM client wrapper using litellm.
 
 Provides a consistent interface for calling any LLM provider (OpenAI, Mistral,
 Anthropic, Ollama, etc.) with structured output support.
+Also includes DSPy-based negotiation module for self-optimizing decisions.
 """
 
+import json
 from typing import Any
 
+import dspy
 import litellm
 import structlog
+from llm.prepare.clean import clean_and_parse_json
+from llm.signatures import Negotiate
 from pydantic import BaseModel
 
 logger = structlog.get_logger(__name__)
+
+
+class AuraNegotiator(dspy.Module):
+    """DSPy-based negotiation module with Chain-of-Thought reasoning.
+
+    This module uses the Negotiate signature to make optimized negotiation decisions
+    based on economic context and training examples.
+    """
+
+    def __init__(self):
+        super().__init__()
+        self.negotiate_chain = dspy.ChainOfThought(Negotiate)
+        logger.info("dspy_negotiator_initialized", module="AuraNegotiator")
+
+    def forward(self, input_bid: float, context: dict, history: list = None):
+        """Forward pass for negotiation decision.
+
+        Args:
+            input_bid: Buyer's current offer amount
+            context: Economic context dictionary
+            history: List of previous negotiation turns
+
+        Returns:
+            DSPy prediction with reasoning and response
+        """
+        history_json = json.dumps(history or [])
+        context_json = json.dumps(context)
+
+        logger.debug(
+            "dspy_forward_pass_started",
+            input_bid=input_bid,
+            context_keys=context,
+            history_length=len(history or []),
+        )
+
+        prediction = self.negotiate_chain(
+            input_bid=str(input_bid), context=context_json, history=history_json
+        )
+
+        # Parse and validate JSON response
+        try:
+            raw_response = prediction.response
+            if isinstance(raw_response, str):
+                response_data = clean_and_parse_json(raw_response)
+            elif isinstance(raw_response, dict):
+                response_data = raw_response
+            else:
+                raise ValueError(f"Unexpected response type: {type(raw_response)}")
+            prediction.response = response_data
+            logger.info(
+                "dspy_decision_made",
+                action=prediction.response.get("action", "unknown"),
+                price=prediction.response.get("price", 0),
+                reasoning_length=len(prediction.reasoning),
+            )
+
+        except json.JSONDecodeError as e:
+            logger.error(
+                "dspy_json_parse_error", error=str(e), response=prediction.response
+            )
+            # Keep original response for fallback handling
+
+        return prediction
 
 
 class LLMEngine:
