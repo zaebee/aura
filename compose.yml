@@ -22,10 +22,10 @@ services:
       dockerfile: core-service/Dockerfile
     restart: on-failure
     environment:
-      DATABASE_URL: postgresql://user:password@db:5432/aura_db
-      MISTRAL_API_KEY: ${MISTRAL_API_KEY}
-      OTEL_SERVICE_NAME: "aura-core"
-      OTEL_EXPORTER_OTLP_ENDPOINT: "http://jaeger:4317"
+      AURA_DATABASE__URL: postgresql://user:password@db:5432/aura_db
+      AURA_LLM__API_KEY: ${MISTRAL_API_KEY}
+      AURA_SERVER__OTEL_SERVICE_NAME: "aura-core"
+      AURA_SERVER__OTEL_EXPORTER_OTLP_ENDPOINT: "http://jaeger:4317"
     depends_on:
       db:
         condition: service_healthy

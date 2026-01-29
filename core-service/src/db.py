@@ -5,12 +5,10 @@ from sqlalchemy import Boolean, Column, Float, String, create_engine
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import declarative_base, sessionmaker
 
-from config import get_settings
-
-settings = get_settings()
+from config import settings
 
 Base = declarative_base()
-engine = create_engine(settings.database_url)
+engine = create_engine(str(settings.database.url))
 SessionLocal = sessionmaker(bind=engine)
 
 
@@ -23,7 +21,7 @@ class InventoryItem(Base):
     floor_price = Column(Float, nullable=False)
     is_active = Column(Boolean, default=True)
     meta = Column(JSONB, default={})
-    embedding = Column(Vector(1024))
+    embedding = Column(Vector(settings.database.vector_dimension))
 
 
 def init_db():

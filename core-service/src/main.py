@@ -20,24 +20,22 @@ from sqlalchemy import text
 from sqlalchemy.exc import SQLAlchemyError
 from telemetry import init_telemetry
 
-from config import get_settings
+from config import settings
 from db import InventoryItem, SessionLocal, engine
 from embeddings import generate_embedding
 from proto.aura.negotiation.v1 import negotiation_pb2, negotiation_pb2_grpc
 
 # Configure structured logging on startup
-configure_logging()
+configure_logging(log_level=settings.server.log_level)
 logger = get_logger("core-service")
 
-settings = get_settings()
-
 # Initialize OpenTelemetry tracing
-service_name = settings.otel_service_name
-tracer = init_telemetry(service_name, settings.otel_exporter_otlp_endpoint)
+service_name = settings.server.otel_service_name
+tracer = init_telemetry(service_name, str(settings.server.otel_exporter_otlp_endpoint))
 logger.info(
     "telemetry_initialized",
     service_name=service_name,
-    endpoint=settings.otel_exporter_otlp_endpoint,
+    endpoint=str(settings.server.otel_exporter_otlp_endpoint),
 )
 
 # Instrument gRPC server for distributed tracing
@@ -262,25 +260,36 @@ def create_strategy():
     Returns:
         Strategy instance implementing PricingStrategy protocol
     """
-    settings = get_settings()
-
-    if settings.llm_model == "rule":
+    if settings.llm.model == "rule":
         logger.info("strategy_selected", type="RuleBasedStrategy", llm_required=False)
         from llm_strategy import RuleBasedStrategy
 
         return RuleBasedStrategy()
     else:
-        logger.info("strategy_selected", type="LiteLLMStrategy", model=settings.llm_model)
+        logger.info(
+            "strategy_selected", type="LiteLLMStrategy", model=settings.llm.model
+        )
         from llm.strategy import LiteLLMStrategy
 
-        return LiteLLMStrategy(model=settings.llm_model)
+        # Select appropriate API key based on model provider
+        api_key = None
+        if settings.llm.model.startswith("openai/"):
+            api_key = settings.llm.openai_api_key.get_secret_value()
+        elif settings.llm.model.startswith("mistral/"):
+            api_key = settings.llm.mistral_api_key.get_secret_value()
+
+        return LiteLLMStrategy(
+            model=settings.llm.model,
+            temperature=settings.llm.temperature,
+            api_key=api_key,
+        )
 
 
 async def serve():
     strategy = create_strategy()
 
     server = grpc.aio.server(
-        futures.ThreadPoolExecutor(max_workers=settings.grpc_max_workers)
+        futures.ThreadPoolExecutor(max_workers=settings.server.grpc_max_workers)
     )
 
     # Register negotiation service
@@ -292,10 +301,10 @@ async def serve():
     health_servicer = HealthServicer()
     health_pb2_grpc.add_HealthServicer_to_server(health_servicer, server)
 
-    server.add_insecure_port(f"[::]:{settings.grpc_port}")
+    server.add_insecure_port(f"[::]:{settings.server.port}")
     logger.info(
         "server_started",
-        port=settings.grpc_port,
+        port=settings.server.port,
         database="postgres",
         services=["NegotiationService", "Health"],
     )

@@ -44,9 +44,9 @@ core:
       cpu: 100m
       memory: 128Mi
   env:
-    LOG_LEVEL: info
-    LLM_MODEL: "mistral/mistral-large-latest"  # Can override: openai/gpt-4o, ollama/mistral, rule
-    prometheusUrl: "http://prometheus-kube-prometheus-prometheus.monitoring:9090"
+    AURA_SERVER__LOG_LEVEL: info
+    AURA_LLM__MODEL: "mistral/mistral-large-latest"  # Can override: openai/gpt-4o, ollama/mistral, rule
+    AURA_SERVER__PROMETHEUS_URL: "http://prometheus-kube-prometheus-prometheus.monitoring:9090"
 
 # PostgreSQL Database Configuration
 postgres:
