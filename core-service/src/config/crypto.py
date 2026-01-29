@@ -13,10 +13,10 @@ class CryptoSettings(BaseModel):
 
     # Solana Configuration
     solana_private_key: SecretStr = ""  # Base58-encoded private key
-    solana_rpc_url: HttpUrl = "https://api.mainnet-beta.solana.com"
-    solana_network: str = "mainnet-beta"  # "mainnet-beta", "devnet", "testnet"
+    solana_rpc_url: HttpUrl = "https://api.devnet.solana.com"
+    solana_network: str = "devnet"  # "mainnet-beta", "devnet", "testnet"
     solana_usdc_mint: str = (
-        "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v"  # Mainnet USDC
+        "Gh9ZwEmdLJ8DscKNTkTqPbNwLNNBjuSzaG9Vp2KGtKJr"  # Devnet USDC
     )
 
     # Deal Expiration

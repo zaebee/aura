@@ -35,7 +35,7 @@ Successfully implemented a **chain-agnostic crypto payment system** for Aura Cor
   - UUID primary key
   - Item details (item_id, item_name)
   - Payment details (final_price, currency, payment_memo UNIQUE)
-  - Secret storage (secret_content - to be encrypted in future)
+  - Secret storage (secret_content - encrypted at rest using Fernet AES-128-CBC)
   - Status tracking (status enum with index)
   - Payment proof (transaction_hash, block_number, from_address)
   - Timestamps (created_at, expires_at INDEXED, paid_at, updated_at)

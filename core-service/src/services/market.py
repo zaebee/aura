@@ -154,8 +154,8 @@ class MarketService:
         # Parse UUID (already validated at API boundary)
         deal_uuid = uuid.UUID(deal_id)
 
-        # Query deal from database
-        stmt = select(LockedDeal).where(LockedDeal.id == deal_uuid)
+        # Query deal from database with row-level lock to prevent race conditions
+        stmt = select(LockedDeal).where(LockedDeal.id == deal_uuid).with_for_update()
         deal = db.scalars(stmt).first()
 
         if not deal:
