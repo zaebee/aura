@@ -164,7 +164,9 @@ class SolanaProvider:
                     tx_detail, amount, memo, currency
                 )
                 if is_match:
-                    proof = self._extract_payment_proof(tx_detail, signature, from_address)
+                    proof = self._extract_payment_proof(
+                        tx_detail, signature, from_address
+                    )
                     logger.info(
                         "Payment verified successfully",
                         extra={
@@ -385,7 +387,9 @@ class SolanaProvider:
                 if balance_change > max_decrease:
                     max_decrease = balance_change
                     pubkey = (
-                        key_info if isinstance(key_info, str) else key_info.get("pubkey", "")
+                        key_info
+                        if isinstance(key_info, str)
+                        else key_info.get("pubkey", "")
                     )
                     sender_addr = pubkey
 

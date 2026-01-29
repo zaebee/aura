@@ -31,7 +31,5 @@ class ServerSettings(BaseModel):
     # Monitoring
     prometheus_url: HttpUrl = Field(
         "http://prometheus-kube-prometheus-prometheus.monitoring:9090",
-        validation_alias=AliasChoices(
-            "AURA_SERVER__PROMETHEUS_URL", "PROMETHEUS_URL"
-        ),
+        validation_alias=AliasChoices("AURA_SERVER__PROMETHEUS_URL", "PROMETHEUS_URL"),
     )

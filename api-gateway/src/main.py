@@ -436,6 +436,10 @@ async def check_deal_status(deal_id: str, agent_did: str = Depends(verify_signat
         if error_code == grpc.StatusCode.INVALID_ARGUMENT:
             raise HTTPException(status_code=400, detail="Invalid deal_id format") from e
         elif error_code == grpc.StatusCode.UNIMPLEMENTED:
-            raise HTTPException(status_code=501, detail="Crypto payments not enabled") from e
+            raise HTTPException(
+                status_code=501, detail="Crypto payments not enabled"
+            ) from e
         else:
-            raise HTTPException(status_code=500, detail="Payment verification failed") from e
+            raise HTTPException(
+                status_code=500, detail="Payment verification failed"
+            ) from e

@@ -2,6 +2,7 @@
 Currency conversion for crypto payments.
 Converts fiat (USD) prices to cryptocurrency amounts.
 """
+
 import logging
 from decimal import Decimal
 from typing import Literal
@@ -22,8 +23,8 @@ class PriceConverter:
     # Fixed exchange rates (USD per 1 crypto unit)
     # TODO: Replace with oracle in production
     FIXED_RATES = {
-        "SOL": Decimal("100.0"),   # 1 SOL = $100 USD
-        "USDC": Decimal("1.0"),    # 1 USDC = $1 USD (stablecoin)
+        "SOL": Decimal("100.0"),  # 1 SOL = $100 USD
+        "USDC": Decimal("1.0"),  # 1 USDC = $1 USD (stablecoin)
     }
 
     def __init__(self, use_fixed_rates: bool = True):
@@ -38,9 +39,7 @@ class PriceConverter:
             raise NotImplementedError("Oracle integration not yet implemented")
 
     def convert_usd_to_crypto(
-        self,
-        usd_amount: float,
-        crypto_currency: CryptoCurrency
+        self, usd_amount: float, crypto_currency: CryptoCurrency
     ) -> float:
         """
         Convert USD amount to cryptocurrency amount.
@@ -71,7 +70,7 @@ class PriceConverter:
                 "crypto_currency": crypto_currency,
                 "rate": float(rate),
                 "crypto_amount": float(crypto_amount),
-            }
+            },
         )
 
         return float(crypto_amount)

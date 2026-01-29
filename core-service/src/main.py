@@ -126,7 +126,7 @@ class NegotiationService(negotiation_pb2_grpc.NegotiationServiceServicer):
                         usd_price = response.accepted.final_price
                         crypto_amount = converter.convert_usd_to_crypto(
                             usd_amount=usd_price,
-                            crypto_currency=settings.crypto.currency
+                            crypto_currency=settings.crypto.currency,
                         )
 
                         logger.info(

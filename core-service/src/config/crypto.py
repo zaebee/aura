@@ -27,7 +27,7 @@ class CryptoSettings(BaseModel):
 
     # Pricing Configuration
     use_fixed_rates: bool = True  # Use fixed rates (not oracle)
-    sol_usd_rate: float = 100.0   # Fixed rate: 1 SOL = $100 USD
+    sol_usd_rate: float = 100.0  # Fixed rate: 1 SOL = $100 USD
     # Note: USDC rate is always 1.0 (stablecoin)
 
     @model_validator(mode="after")
