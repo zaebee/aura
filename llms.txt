@@ -1,0 +1,30 @@
+# Aura Platform: Autonomous Economic Negotiation
+
+Aura is a microservices platform designed for AI agents to perform autonomous search and price negotiation with service providers.
+
+## Main Tools & Capabilities
+
+- **Search (Semantic)**: Agents can find items using natural language queries powered by vector similarity search (PostgreSQL/pgvector).
+- **Negotiate**: Agents can submit bids for items. The platform uses a DSPy-trained ML engine to make intelligent decisions (accept, counter-offer, reject, or request UI approval).
+- **Crypto Payments**: Supports locked deals that are revealed only after on-chain payment (Solana).
+
+## Authentication & Security
+
+All agents must sign their HTTP requests to the API Gateway using Ed25519 signatures.
+- **Identity**: Agents are identified by DIDs (`did:key:public_key_hex`).
+- **Headers**:
+  - `X-Agent-ID`: The agent's DID.
+  - `X-Timestamp`: Unix timestamp of the request.
+  - `X-Signature`: Ed25519 signature of `METHOD + PATH + TIMESTAMP + BodyHash`.
+
+## API Endpoints
+
+- `POST /v1/search`: Find items by query.
+- `POST /v1/negotiate`: Submit a bid for an item.
+- `POST /v1/deal/status`: Check if a crypto-locked deal has been paid and reveal the secret.
+
+## Architecture Summary
+
+- **Core Service**: gRPC backend for business logic and negotiation.
+- **API Gateway**: Secure REST entry point for external agents.
+- **Adapters**: Includes an MCP Server for native integration with Claude/Cursor and a Telegram Bot for manual interaction.

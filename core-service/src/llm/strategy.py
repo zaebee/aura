@@ -41,6 +41,7 @@ class LiteLLMStrategy:
         self,
         model: str,
         temperature: float = 0.7,
+        api_key: str | None = None,
         trigger_price: float = 1000.0,
     ):
         """
@@ -49,9 +50,10 @@ class LiteLLMStrategy:
         Args:
             model: Model identifier in litellm format (e.g., "openai/gpt-4o")
             temperature: Sampling temperature (0.0-1.0)
+            api_key: Optional API key for the provider
             trigger_price: Security threshold for UI confirmation
         """
-        self.engine = LLMEngine(model=model, temperature=temperature)
+        self.engine = LLMEngine(model=model, temperature=temperature, api_key=api_key)
         self.trigger_price = trigger_price
 
         # Load prompt template

@@ -13,7 +13,7 @@ from typing import Any
 import httpx
 import structlog
 
-from config import get_settings
+from config import settings
 
 logger = structlog.get_logger(__name__)
 
@@ -86,8 +86,6 @@ async def get_hive_metrics() -> dict[str, Any]:
         - Timeouts: Return cached data or error dict (5s timeout)
         - Parse errors: Return error dict
     """
-    settings = get_settings()
-
     # Check cache first
     cached = _metrics_cache.get()
     if cached:
@@ -106,11 +104,11 @@ async def get_hive_metrics() -> dict[str, Any]:
         async with httpx.AsyncClient(timeout=5.0) as client:
             # Query CPU and Memory concurrently
             cpu_task = client.get(
-                f"{settings.prometheus_url}/api/v1/query",
+                f"{settings.server.prometheus_url}/api/v1/query",
                 params={"query": cpu_query},
             )
             mem_task = client.get(
-                f"{settings.prometheus_url}/api/v1/query",
+                f"{settings.server.prometheus_url}/api/v1/query",
                 params={"query": mem_query},
             )
             cpu_response, mem_response = await asyncio.gather(cpu_task, mem_task)

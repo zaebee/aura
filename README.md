@@ -2,6 +2,45 @@
 
 Aura is a distributed microservices platform for autonomous economic negotiations between AI agents and service providers. It provides a scalable architecture with separate API Gateway and Core Service components, using Protocol Buffers for efficient communication and gRPC for internal service-to-service communication.
 
+## 🏗️ Architecture
+
+```mermaid
+graph TD
+    subgraph Clients ["Clients (Agents)"]
+        Browser["Agent Console (Next.js)"]
+        Telegram["Telegram Bot"]
+        MCP["MCP Server (Claude/Cursor)"]
+    end
+
+    subgraph Infrastructure ["Aura Platform"]
+        Gateway["API Gateway (FastAPI)"]
+        Core["Core Service (gRPC/Python)"]
+
+        DB[("PostgreSQL (pgvector)")]
+        Redis[("Redis (Cache/RateLimit)")]
+        Prometheus[("Prometheus (Metrics)")]
+    end
+
+    subgraph External ["External Services"]
+        Mistral["Mistral AI (Brain)"]
+        Solana["Solana Network (Payments)"]
+    end
+
+    %% Connections
+    Browser -- "Signed HTTP" --> Gateway
+    Telegram -- "via Adapter" --> Core
+    MCP -- "Signed HTTP" --> Gateway
+
+    Gateway -- "gRPC" --> Core
+    Gateway -. "Rate Limit" .-> Redis
+
+    Core -- "Vector Search" --> DB
+    Core -- "Cache" --> Redis
+    Core -- "Brain (DSPy)" --> Mistral
+    Core -- "Payments" --> Solana
+    Core -. "Metrics" .-> Prometheus
+```
+
 ## 🚀 Quick Start
 
 ### Prerequisites
@@ -11,6 +50,7 @@ Aura is a distributed microservices platform for autonomous economic negotiation
 - buf (Protocol Buffer toolkit) - [Installation Guide](https://buf.build/docs/installation)
 - Docker and Docker Compose
 - Mistral AI API key (for LLM-based negotiation)
+- Redis and PostgreSQL (provided via Docker)
 
 ### Setup
 
@@ -28,10 +68,17 @@ Aura is a distributed microservices platform for autonomous economic negotiation
 3. **Set up environment variables:**
    ```bash
    cp .env.example .env
-   # Edit .env and add your Mistral API key
+   # Edit .env and add your API keys using the new nested structure:
+   # AURA_LLM__API_KEY="your_mistral_key"
+   # AURA_DATABASE__URL="postgresql://user:password@localhost:5432/aura_db"
    ```
 
-4. **Generate Protocol Buffer code:**
+4. **Train the Brain (DSPy):**
+   ```bash
+   uv run core-service/train_dspy.py
+   ```
+
+5. **Generate Protocol Buffer code:**
    ```bash
    buf generate
    ```
@@ -41,15 +88,19 @@ Aura is a distributed microservices platform for autonomous economic negotiation
 ### Using Docker Compose (Recommended)
 
 ```bash
-# Start all services (PostgreSQL, Core Service, API Gateway, Jaeger)
+# Start all services (PostgreSQL, Redis, Core, Gateway, Telegram Bot, Prometheus)
 docker-compose up --build
 ```
 
 This will start:
-- PostgreSQL with pgvector extension (port 5432)
-- Core Service (gRPC on port 50051)
-- API Gateway (HTTP on port 8000)
-- Jaeger for distributed tracing (UI on port 16686)
+- **PostgreSQL** with pgvector extension (port 5432)
+- **Redis** for caching and rate limiting (port 6379)
+- **Prometheus** for metrics (port 9090)
+- **Core Service** (gRPC on port 50051)
+- **API Gateway** (HTTP on port 8000)
+- **Telegram Bot** (Telegram interface)
+- **Jaeger** for distributed tracing (UI on port 16686)
+- **Frontend** Agent Console (port 3000)
 
 ### Running Services Individually
 
@@ -93,36 +144,24 @@ python search_sim.py
 ```
 aura/
 ├── proto/                 # Protocol Buffer definitions
-│   ├── aura/
-│   │   └── negotiation/
-│   │       └── v1/
-│   │           └── negotiation.proto
-│   ├── buf.yaml          # Buf configuration
-│   └── buf.gen.yaml      # Code generation config
 ├── api-gateway/          # API Gateway service (FastAPI)
-│   ├── src/
-│   │   ├── main.py       # HTTP endpoints and routing
-│   │   └── proto/        # Generated protobuf code
-│   └── Dockerfile
-├── core-service/         # Core business logic service
-│   ├── src/
-│   │   ├── main.py       # gRPC service implementation
-│   │   ├── llm_strategy.py # LLM-based negotiation logic
-│   │   ├── db.py          # Database models and connections
-│   │   ├── embeddings.py  # Vector embedding generation
-│   │   └── proto/        # Generated protobuf code
-│   ├── tests/            # Unit and integration tests
-│   └── Dockerfile
-├── docs/                 # Documentation
-│   ├── ARCHITECTURE.md   # System architecture
-│   └── TELEMETRY.md      # Observability setup
-├── agent_sim.py          # Agent negotiation simulator
-├── search_sim.py         # Search functionality simulator
+├── core-service/         # Core business logic service (DSPy Engine)
+├── adapters/             # External interface adapters
+│   ├── telegram-bot/     # Telegram Bot interface
+│   └── mcp-server/       # Model Context Protocol (MCP) server
+├── docs/                 # Detailed documentation
+├── frontend/             # Next.js Agent Console
 ├── compose.yml           # Docker Compose configuration
 ├── pyproject.toml        # Python dependencies
-├── uv.lock              # Lock file
 └── Makefile              # Common development tasks
 ```
+
+### Services & Adapters
+
+- **Core Service**: The brain of the platform. Uses DSPy for ML-optimized negotiation strategies and PostgreSQL/pgvector for semantic search.
+- **API Gateway**: Secure entry point for autonomous agents. Handles signature verification and rate limiting.
+- **Telegram Bot**: User-friendly interface for manual search and negotiation via Telegram.
+- **MCP Server**: Allows AI agents (Claude/Cursor) to natively use Aura tools.
 
 ## 🔧 Development Workflow
 

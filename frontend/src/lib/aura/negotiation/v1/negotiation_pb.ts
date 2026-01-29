@@ -10,7 +10,7 @@ import type { Message } from "@bufbuild/protobuf";
  * Describes the file aura/negotiation/v1/negotiation.proto.
  */
 export const file_aura_negotiation_v1_negotiation: GenFile = /*@__PURE__*/
-  fileDesc("CiVhdXJhL25lZ290aWF0aW9uL3YxL25lZ290aWF0aW9uLnByb3RvEhNhdXJhLm5lZ290aWF0aW9uLnYxIpUBChBOZWdvdGlhdGVSZXF1ZXN0EhIKCnJlcXVlc3RfaWQYASABKAkSDwoHaXRlbV9pZBgCIAEoCRISCgpiaWRfYW1vdW50GAMgASgBEhUKDWN1cnJlbmN5X2NvZGUYBCABKAkSMQoFYWdlbnQYBSABKAsyIi5hdXJhLm5lZ290aWF0aW9uLnYxLkFnZW50SWRlbnRpdHkiNgoNQWdlbnRJZGVudGl0eRILCgNkaWQYASABKAkSGAoQcmVwdXRhdGlvbl9zY29yZRgCIAEoAiK3AgoRTmVnb3RpYXRlUmVzcG9uc2USFQoNc2Vzc2lvbl90b2tlbhgBIAEoCRIdChV2YWxpZF91bnRpbF90aW1lc3RhbXAYAiABKAMSNgoIYWNjZXB0ZWQYAyABKAsyIi5hdXJhLm5lZ290aWF0aW9uLnYxLk9mZmVyQWNjZXB0ZWRIABI4Cgljb3VudGVyZWQYBCABKAsyIy5hdXJhLm5lZ290aWF0aW9uLnYxLk9mZmVyQ291bnRlcmVkSAASNgoIcmVqZWN0ZWQYBSABKAsyIi5hdXJhLm5lZ290aWF0aW9uLnYxLk9mZmVyUmVqZWN0ZWRIABI4Cgt1aV9yZXF1aXJlZBgGIAEoCzIhLmF1cmEubmVnb3RpYXRpb24udjEuSml0VWlSZXF1ZXN0SABCCAoGcmVzdWx0Ij4KDU9mZmVyQWNjZXB0ZWQSEwoLZmluYWxfcHJpY2UYASABKAESGAoQcmVzZXJ2YXRpb25fY29kZRgCIAEoCSJUCg5PZmZlckNvdW50ZXJlZBIWCg5wcm9wb3NlZF9wcmljZRgBIAEoARITCgtyZWFzb25fY29kZRgCIAEoCRIVCg1odW1hbl9tZXNzYWdlGAMgASgJIiQKDU9mZmVyUmVqZWN0ZWQSEwoLcmVhc29uX2NvZGUYASABKAkioQEKDEppdFVpUmVxdWVzdBITCgt0ZW1wbGF0ZV9pZBgBIAEoCRJICgxjb250ZXh0X2RhdGEYAiADKAsyMi5hdXJhLm5lZ290aWF0aW9uLnYxLkppdFVpUmVxdWVzdC5Db250ZXh0RGF0YUVudHJ5GjIKEENvbnRleHREYXRhRW50cnkSCwoDa2V5GAEgASgJEg0KBXZhbHVlGAIgASgJOgI4ASJFCg1TZWFyY2hSZXF1ZXN0Eg0KBXF1ZXJ5GAEgASgJEg0KBWxpbWl0GAIgASgFEhYKDm1pbl9zaW1pbGFyaXR5GAMgASgBIkgKDlNlYXJjaFJlc3BvbnNlEjYKB3Jlc3VsdHMYASADKAsyJS5hdXJhLm5lZ290aWF0aW9uLnYxLlNlYXJjaFJlc3VsdEl0ZW0ifAoQU2VhcmNoUmVzdWx0SXRlbRIPCgdpdGVtX2lkGAEgASgJEgwKBG5hbWUYAiABKAkSEgoKYmFzZV9wcmljZRgDIAEoARIYChBzaW1pbGFyaXR5X3Njb3JlGAQgASgBEhsKE2Rlc2NyaXB0aW9uX3NuaXBwZXQYBSABKAkiGAoWR2V0U3lzdGVtU3RhdHVzUmVxdWVzdCKAAQoXR2V0U3lzdGVtU3RhdHVzUmVzcG9uc2USDgoGc3RhdHVzGAEgASgJEhkKEWNwdV91c2FnZV9wZXJjZW50GAIgASgBEhcKD21lbW9yeV91c2FnZV9tYhgDIAEoARIRCgl0aW1lc3RhbXAYBCABKAkSDgoGY2FjaGVkGAUgASgIMrMCChJOZWdvdGlhdGlvblNlcnZpY2USXAoJTmVnb3RpYXRlEiUuYXVyYS5uZWdvdGlhdGlvbi52MS5OZWdvdGlhdGVSZXF1ZXN0GiYuYXVyYS5uZWdvdGlhdGlvbi52MS5OZWdvdGlhdGVSZXNwb25zZSIAElEKBlNlYXJjaBIiLmF1cmEubmVnb3RpYXRpb24udjEuU2VhcmNoUmVxdWVzdBojLmF1cmEubmVnb3RpYXRpb24udjEuU2VhcmNoUmVzcG9uc2USbAoPR2V0U3lzdGVtU3RhdHVzEisuYXVyYS5uZWdvdGlhdGlvbi52MS5HZXRTeXN0ZW1TdGF0dXNSZXF1ZXN0GiwuYXVyYS5uZWdvdGlhdGlvbi52MS5HZXRTeXN0ZW1TdGF0dXNSZXNwb25zZWIGcHJvdG8z");
+  fileDesc("CiVhdXJhL25lZ290aWF0aW9uL3YxL25lZ290aWF0aW9uLnByb3RvEhNhdXJhLm5lZ290aWF0aW9uLnYxIpUBChBOZWdvdGlhdGVSZXF1ZXN0EhIKCnJlcXVlc3RfaWQYASABKAkSDwoHaXRlbV9pZBgCIAEoCRISCgpiaWRfYW1vdW50GAMgASgBEhUKDWN1cnJlbmN5X2NvZGUYBCABKAkSMQoFYWdlbnQYBSABKAsyIi5hdXJhLm5lZ290aWF0aW9uLnYxLkFnZW50SWRlbnRpdHkiNgoNQWdlbnRJZGVudGl0eRILCgNkaWQYASABKAkSGAoQcmVwdXRhdGlvbl9zY29yZRgCIAEoAiK3AgoRTmVnb3RpYXRlUmVzcG9uc2USFQoNc2Vzc2lvbl90b2tlbhgBIAEoCRIdChV2YWxpZF91bnRpbF90aW1lc3RhbXAYAiABKAMSNgoIYWNjZXB0ZWQYAyABKAsyIi5hdXJhLm5lZ290aWF0aW9uLnYxLk9mZmVyQWNjZXB0ZWRIABI4Cgljb3VudGVyZWQYBCABKAsyIy5hdXJhLm5lZ290aWF0aW9uLnYxLk9mZmVyQ291bnRlcmVkSAASNgoIcmVqZWN0ZWQYBSABKAsyIi5hdXJhLm5lZ290aWF0aW9uLnYxLk9mZmVyUmVqZWN0ZWRIABI4Cgt1aV9yZXF1aXJlZBgGIAEoCzIhLmF1cmEubmVnb3RpYXRpb24udjEuSml0VWlSZXF1ZXN0SABCCAoGcmVzdWx0IpsBCg1PZmZlckFjY2VwdGVkEhMKC2ZpbmFsX3ByaWNlGAEgASgBEhoKEHJlc2VydmF0aW9uX2NvZGUYAiABKAlIABJICg5jcnlwdG9fcGF5bWVudBgDIAEoCzIuLmF1cmEubmVnb3RpYXRpb24udjEuQ3J5cHRvUGF5bWVudEluc3RydWN0aW9uc0gAQg8KDXJldmVhbF9tZXRob2QimQEKGUNyeXB0b1BheW1lbnRJbnN0cnVjdGlvbnMSDwoHZGVhbF9pZBgBIAEoCRIWCg53YWxsZXRfYWRkcmVzcxgCIAEoCRIOCgZhbW91bnQYAyABKAESEAoIY3VycmVuY3kYBCABKAkSDAoEbWVtbxgFIAEoCRIPCgduZXR3b3JrGAYgASgJEhIKCmV4cGlyZXNfYXQYByABKAMiKQoWQ2hlY2tEZWFsU3RhdHVzUmVxdWVzdBIPCgdkZWFsX2lkGAEgASgJItoBChdDaGVja0RlYWxTdGF0dXNSZXNwb25zZRIOCgZzdGF0dXMYASABKAkSLwoGc2VjcmV0GAIgASgLMh8uYXVyYS5uZWdvdGlhdGlvbi52MS5EZWFsU2VjcmV0EjAKBXByb29mGAMgASgLMiEuYXVyYS5uZWdvdGlhdGlvbi52MS5QYXltZW50UHJvb2YSTAoUcGF5bWVudF9pbnN0cnVjdGlvbnMYBCABKAsyLi5hdXJhLm5lZ290aWF0aW9uLnYxLkNyeXB0b1BheW1lbnRJbnN0cnVjdGlvbnMiXwoKRGVhbFNlY3JldBIYChByZXNlcnZhdGlvbl9jb2RlGAEgASgJEhEKCWl0ZW1fbmFtZRgCIAEoCRITCgtmaW5hbF9wcmljZRgDIAEoARIPCgdwYWlkX2F0GAQgASgDImoKDFBheW1lbnRQcm9vZhIYChB0cmFuc2FjdGlvbl9oYXNoGAEgASgJEhQKDGJsb2NrX251bWJlchgCIAEoCRIUCgxmcm9tX2FkZHJlc3MYAyABKAkSFAoMY29uZmlybWVkX2F0GAQgASgDIlQKDk9mZmVyQ291bnRlcmVkEhYKDnByb3Bvc2VkX3ByaWNlGAEgASgBEhMKC3JlYXNvbl9jb2RlGAIgASgJEhUKDWh1bWFuX21lc3NhZ2UYAyABKAkiJAoNT2ZmZXJSZWplY3RlZBITCgtyZWFzb25fY29kZRgBIAEoCSKhAQoMSml0VWlSZXF1ZXN0EhMKC3RlbXBsYXRlX2lkGAEgASgJEkgKDGNvbnRleHRfZGF0YRgCIAMoCzIyLmF1cmEubmVnb3RpYXRpb24udjEuSml0VWlSZXF1ZXN0LkNvbnRleHREYXRhRW50cnkaMgoQQ29udGV4dERhdGFFbnRyeRILCgNrZXkYASABKAkSDQoFdmFsdWUYAiABKAk6AjgBIkUKDVNlYXJjaFJlcXVlc3QSDQoFcXVlcnkYASABKAkSDQoFbGltaXQYAiABKAUSFgoObWluX3NpbWlsYXJpdHkYAyABKAEiSAoOU2VhcmNoUmVzcG9uc2USNgoHcmVzdWx0cxgBIAMoCzIlLmF1cmEubmVnb3RpYXRpb24udjEuU2VhcmNoUmVzdWx0SXRlbSJ8ChBTZWFyY2hSZXN1bHRJdGVtEg8KB2l0ZW1faWQYASABKAkSDAoEbmFtZRgCIAEoCRISCgpiYXNlX3ByaWNlGAMgASgBEhgKEHNpbWlsYXJpdHlfc2NvcmUYBCABKAESGwoTZGVzY3JpcHRpb25fc25pcHBldBgFIAEoCSIYChZHZXRTeXN0ZW1TdGF0dXNSZXF1ZXN0IoABChdHZXRTeXN0ZW1TdGF0dXNSZXNwb25zZRIOCgZzdGF0dXMYASABKAkSGQoRY3B1X3VzYWdlX3BlcmNlbnQYAiABKAESFwoPbWVtb3J5X3VzYWdlX21iGAMgASgBEhEKCXRpbWVzdGFtcBgEIAEoCRIOCgZjYWNoZWQYBSABKAgyoQMKEk5lZ290aWF0aW9uU2VydmljZRJcCglOZWdvdGlhdGUSJS5hdXJhLm5lZ290aWF0aW9uLnYxLk5lZ290aWF0ZVJlcXVlc3QaJi5hdXJhLm5lZ290aWF0aW9uLnYxLk5lZ290aWF0ZVJlc3BvbnNlIgASUQoGU2VhcmNoEiIuYXVyYS5uZWdvdGlhdGlvbi52MS5TZWFyY2hSZXF1ZXN0GiMuYXVyYS5uZWdvdGlhdGlvbi52MS5TZWFyY2hSZXNwb25zZRJsCg9HZXRTeXN0ZW1TdGF0dXMSKy5hdXJhLm5lZ290aWF0aW9uLnYxLkdldFN5c3RlbVN0YXR1c1JlcXVlc3QaLC5hdXJhLm5lZ290aWF0aW9uLnYxLkdldFN5c3RlbVN0YXR1c1Jlc3BvbnNlEmwKD0NoZWNrRGVhbFN0YXR1cxIrLmF1cmEubmVnb3RpYXRpb24udjEuQ2hlY2tEZWFsU3RhdHVzUmVxdWVzdBosLmF1cmEubmVnb3RpYXRpb24udjEuQ2hlY2tEZWFsU3RhdHVzUmVzcG9uc2ViBnByb3RvMw");
 
 /**
  * @generated from message aura.negotiation.v1.NegotiateRequest
@@ -152,9 +152,23 @@ export type OfferAccepted = Message<"aura.negotiation.v1.OfferAccepted"> & {
   finalPrice: number;
 
   /**
-   * @generated from field: string reservation_code = 2;
+   * Either reservation_code (legacy) or crypto_payment (new)
+   *
+   * @generated from oneof aura.negotiation.v1.OfferAccepted.reveal_method
    */
-  reservationCode: string;
+  revealMethod: {
+    /**
+     * @generated from field: string reservation_code = 2;
+     */
+    value: string;
+    case: "reservationCode";
+  } | {
+    /**
+     * @generated from field: aura.negotiation.v1.CryptoPaymentInstructions crypto_payment = 3;
+     */
+    value: CryptoPaymentInstructions;
+    case: "cryptoPayment";
+  } | { case: undefined; value?: undefined };
 };
 
 /**
@@ -163,6 +177,214 @@ export type OfferAccepted = Message<"aura.negotiation.v1.OfferAccepted"> & {
  */
 export const OfferAcceptedSchema: GenMessage<OfferAccepted> = /*@__PURE__*/
   messageDesc(file_aura_negotiation_v1_negotiation, 3);
+
+/**
+ * Instructions for completing a crypto payment to unlock the deal
+ *
+ * @generated from message aura.negotiation.v1.CryptoPaymentInstructions
+ */
+export type CryptoPaymentInstructions = Message<"aura.negotiation.v1.CryptoPaymentInstructions"> & {
+  /**
+   * UUID of the locked deal
+   *
+   * @generated from field: string deal_id = 1;
+   */
+  dealId: string;
+
+  /**
+   * Payment destination address
+   *
+   * @generated from field: string wallet_address = 2;
+   */
+  walletAddress: string;
+
+  /**
+   * Amount to pay
+   *
+   * @generated from field: double amount = 3;
+   */
+  amount: number;
+
+  /**
+   * "SOL" or "USDC"
+   *
+   * @generated from field: string currency = 4;
+   */
+  currency: string;
+
+  /**
+   * Unique memo to include in transaction
+   *
+   * @generated from field: string memo = 5;
+   */
+  memo: string;
+
+  /**
+   * "mainnet-beta", "devnet", "testnet"
+   *
+   * @generated from field: string network = 6;
+   */
+  network: string;
+
+  /**
+   * Unix timestamp when deal expires
+   *
+   * @generated from field: int64 expires_at = 7;
+   */
+  expiresAt: bigint;
+};
+
+/**
+ * Describes the message aura.negotiation.v1.CryptoPaymentInstructions.
+ * Use `create(CryptoPaymentInstructionsSchema)` to create a new message.
+ */
+export const CryptoPaymentInstructionsSchema: GenMessage<CryptoPaymentInstructions> = /*@__PURE__*/
+  messageDesc(file_aura_negotiation_v1_negotiation, 4);
+
+/**
+ * Request to check the status of a locked deal
+ *
+ * @generated from message aura.negotiation.v1.CheckDealStatusRequest
+ */
+export type CheckDealStatusRequest = Message<"aura.negotiation.v1.CheckDealStatusRequest"> & {
+  /**
+   * UUID of the deal to check
+   *
+   * @generated from field: string deal_id = 1;
+   */
+  dealId: string;
+};
+
+/**
+ * Describes the message aura.negotiation.v1.CheckDealStatusRequest.
+ * Use `create(CheckDealStatusRequestSchema)` to create a new message.
+ */
+export const CheckDealStatusRequestSchema: GenMessage<CheckDealStatusRequest> = /*@__PURE__*/
+  messageDesc(file_aura_negotiation_v1_negotiation, 5);
+
+/**
+ * Response containing deal status and secret (if paid)
+ *
+ * @generated from message aura.negotiation.v1.CheckDealStatusResponse
+ */
+export type CheckDealStatusResponse = Message<"aura.negotiation.v1.CheckDealStatusResponse"> & {
+  /**
+   * "PENDING", "PAID", "EXPIRED", "NOT_FOUND"
+   *
+   * @generated from field: string status = 1;
+   */
+  status: string;
+
+  /**
+   * Only present if status == "PAID"
+   *
+   * @generated from field: aura.negotiation.v1.DealSecret secret = 2;
+   */
+  secret?: DealSecret;
+
+  /**
+   * @generated from field: aura.negotiation.v1.PaymentProof proof = 3;
+   */
+  proof?: PaymentProof;
+
+  /**
+   * Only present if status == "PENDING"
+   *
+   * @generated from field: aura.negotiation.v1.CryptoPaymentInstructions payment_instructions = 4;
+   */
+  paymentInstructions?: CryptoPaymentInstructions;
+};
+
+/**
+ * Describes the message aura.negotiation.v1.CheckDealStatusResponse.
+ * Use `create(CheckDealStatusResponseSchema)` to create a new message.
+ */
+export const CheckDealStatusResponseSchema: GenMessage<CheckDealStatusResponse> = /*@__PURE__*/
+  messageDesc(file_aura_negotiation_v1_negotiation, 6);
+
+/**
+ * The revealed secret after successful payment
+ *
+ * @generated from message aura.negotiation.v1.DealSecret
+ */
+export type DealSecret = Message<"aura.negotiation.v1.DealSecret"> & {
+  /**
+   * The actual reservation code
+   *
+   * @generated from field: string reservation_code = 1;
+   */
+  reservationCode: string;
+
+  /**
+   * Name of purchased item
+   *
+   * @generated from field: string item_name = 2;
+   */
+  itemName: string;
+
+  /**
+   * Final agreed price
+   *
+   * @generated from field: double final_price = 3;
+   */
+  finalPrice: number;
+
+  /**
+   * Unix timestamp of payment confirmation
+   *
+   * @generated from field: int64 paid_at = 4;
+   */
+  paidAt: bigint;
+};
+
+/**
+ * Describes the message aura.negotiation.v1.DealSecret.
+ * Use `create(DealSecretSchema)` to create a new message.
+ */
+export const DealSecretSchema: GenMessage<DealSecret> = /*@__PURE__*/
+  messageDesc(file_aura_negotiation_v1_negotiation, 7);
+
+/**
+ * Proof of on-chain payment
+ *
+ * @generated from message aura.negotiation.v1.PaymentProof
+ */
+export type PaymentProof = Message<"aura.negotiation.v1.PaymentProof"> & {
+  /**
+   * Blockchain transaction ID
+   *
+   * @generated from field: string transaction_hash = 1;
+   */
+  transactionHash: string;
+
+  /**
+   * Block number for verification
+   *
+   * @generated from field: string block_number = 2;
+   */
+  blockNumber: string;
+
+  /**
+   * Payer's wallet address
+   *
+   * @generated from field: string from_address = 3;
+   */
+  fromAddress: string;
+
+  /**
+   * Unix timestamp of confirmation
+   *
+   * @generated from field: int64 confirmed_at = 4;
+   */
+  confirmedAt: bigint;
+};
+
+/**
+ * Describes the message aura.negotiation.v1.PaymentProof.
+ * Use `create(PaymentProofSchema)` to create a new message.
+ */
+export const PaymentProofSchema: GenMessage<PaymentProof> = /*@__PURE__*/
+  messageDesc(file_aura_negotiation_v1_negotiation, 8);
 
 /**
  * @generated from message aura.negotiation.v1.OfferCountered
@@ -195,7 +417,7 @@ export type OfferCountered = Message<"aura.negotiation.v1.OfferCountered"> & {
  * Use `create(OfferCounteredSchema)` to create a new message.
  */
 export const OfferCounteredSchema: GenMessage<OfferCountered> = /*@__PURE__*/
-  messageDesc(file_aura_negotiation_v1_negotiation, 4);
+  messageDesc(file_aura_negotiation_v1_negotiation, 9);
 
 /**
  * @generated from message aura.negotiation.v1.OfferRejected
@@ -214,7 +436,7 @@ export type OfferRejected = Message<"aura.negotiation.v1.OfferRejected"> & {
  * Use `create(OfferRejectedSchema)` to create a new message.
  */
 export const OfferRejectedSchema: GenMessage<OfferRejected> = /*@__PURE__*/
-  messageDesc(file_aura_negotiation_v1_negotiation, 5);
+  messageDesc(file_aura_negotiation_v1_negotiation, 10);
 
 /**
  * @generated from message aura.negotiation.v1.JitUiRequest
@@ -240,7 +462,7 @@ export type JitUiRequest = Message<"aura.negotiation.v1.JitUiRequest"> & {
  * Use `create(JitUiRequestSchema)` to create a new message.
  */
 export const JitUiRequestSchema: GenMessage<JitUiRequest> = /*@__PURE__*/
-  messageDesc(file_aura_negotiation_v1_negotiation, 6);
+  messageDesc(file_aura_negotiation_v1_negotiation, 11);
 
 /**
  * @generated from message aura.negotiation.v1.SearchRequest
@@ -273,7 +495,7 @@ export type SearchRequest = Message<"aura.negotiation.v1.SearchRequest"> & {
  * Use `create(SearchRequestSchema)` to create a new message.
  */
 export const SearchRequestSchema: GenMessage<SearchRequest> = /*@__PURE__*/
-  messageDesc(file_aura_negotiation_v1_negotiation, 7);
+  messageDesc(file_aura_negotiation_v1_negotiation, 12);
 
 /**
  * @generated from message aura.negotiation.v1.SearchResponse
@@ -290,7 +512,7 @@ export type SearchResponse = Message<"aura.negotiation.v1.SearchResponse"> & {
  * Use `create(SearchResponseSchema)` to create a new message.
  */
 export const SearchResponseSchema: GenMessage<SearchResponse> = /*@__PURE__*/
-  messageDesc(file_aura_negotiation_v1_negotiation, 8);
+  messageDesc(file_aura_negotiation_v1_negotiation, 13);
 
 /**
  * @generated from message aura.negotiation.v1.SearchResultItem
@@ -331,7 +553,7 @@ export type SearchResultItem = Message<"aura.negotiation.v1.SearchResultItem"> &
  * Use `create(SearchResultItemSchema)` to create a new message.
  */
 export const SearchResultItemSchema: GenMessage<SearchResultItem> = /*@__PURE__*/
-  messageDesc(file_aura_negotiation_v1_negotiation, 9);
+  messageDesc(file_aura_negotiation_v1_negotiation, 14);
 
 /**
  * @generated from message aura.negotiation.v1.GetSystemStatusRequest
@@ -344,7 +566,7 @@ export type GetSystemStatusRequest = Message<"aura.negotiation.v1.GetSystemStatu
  * Use `create(GetSystemStatusRequestSchema)` to create a new message.
  */
 export const GetSystemStatusRequestSchema: GenMessage<GetSystemStatusRequest> = /*@__PURE__*/
-  messageDesc(file_aura_negotiation_v1_negotiation, 10);
+  messageDesc(file_aura_negotiation_v1_negotiation, 15);
 
 /**
  * @generated from message aura.negotiation.v1.GetSystemStatusResponse
@@ -383,7 +605,7 @@ export type GetSystemStatusResponse = Message<"aura.negotiation.v1.GetSystemStat
  * Use `create(GetSystemStatusResponseSchema)` to create a new message.
  */
 export const GetSystemStatusResponseSchema: GenMessage<GetSystemStatusResponse> = /*@__PURE__*/
-  messageDesc(file_aura_negotiation_v1_negotiation, 11);
+  messageDesc(file_aura_negotiation_v1_negotiation, 16);
 
 /**
  * Service for handling negotiations.
@@ -418,6 +640,16 @@ export const NegotiationService: GenService<{
     methodKind: "unary";
     input: typeof GetSystemStatusRequestSchema;
     output: typeof GetSystemStatusResponseSchema;
+  },
+  /**
+   * RPC method for checking crypto payment status and retrieving secrets.
+   *
+   * @generated from rpc aura.negotiation.v1.NegotiationService.CheckDealStatus
+   */
+  checkDealStatus: {
+    methodKind: "unary";
+    input: typeof CheckDealStatusRequestSchema;
+    output: typeof CheckDealStatusResponseSchema;
   },
 }> = /*@__PURE__*/
   serviceDesc(file_aura_negotiation_v1_negotiation, 0);

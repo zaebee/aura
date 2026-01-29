@@ -21,7 +21,7 @@ gateway:
   resources:
     limits:
       cpu: 200m
-      memory: 256Mi
+      memory: 512Mi
   # CORS allowed origins (comma-separated list)
   corsOrigins: "https://aura.zae.life"
   env:
@@ -39,14 +39,14 @@ core:
   resources:
     limits:
       cpu: 200m
-      memory: 256Mi
+      memory: 1Gi
     requests:
       cpu: 100m
       memory: 128Mi
   env:
-    LOG_LEVEL: info
-    LLM_MODEL: "mistral/mistral-large-latest"  # Can override: openai/gpt-4o, ollama/mistral, rule
-    prometheusUrl: "http://prometheus-kube-prometheus-prometheus.monitoring:9090"
+    AURA_SERVER__LOG_LEVEL: info
+    AURA_LLM__MODEL: "mistral/mistral-large-latest"  # Can override: openai/gpt-4o, ollama/mistral, rule
+    AURA_SERVER__PROMETHEUS_URL: "http://prometheus-kube-prometheus-prometheus.monitoring:9090"
 
 # PostgreSQL Database Configuration
 postgres:
@@ -92,6 +92,23 @@ frontend:
   env:
     LOG_LEVEL: info
 
+# Telegram Bot Service Configuration
+telegram:
+  image:
+    repository: ghcr.io/zaebee/aura-telegram-bot
+    tag: latest
+    pullPolicy: IfNotPresent
+  replicaCount: 1
+  resources:
+    limits:
+      cpu: 100m
+      memory: 128Mi
+    requests:
+      cpu: 50m
+      memory: 64Mi
+  env:
+    LOG_LEVEL: info
+
 # Secrets for the application.
 # For production, it is strongly recommended to use a secret management solution
 # like Vault or External Secrets Operator instead of providing plain-text secrets here.
@@ -100,6 +117,10 @@ secrets:
   # This value must be provided during installation via CI/CD.
   # Injected via: --set secrets.mistralApiKey="your-key"
   mistralApiKey: ""
+  # Telegram Bot Token, required by the telegram bot service.
+  # This value must be provided during installation via CI/CD.
+  # Injected via: --set secrets.telegramToken="your-token"
+  telegramToken: ""
   # API key for OpenAI (optional, only if using openai/* models)
   # Injected via: --set secrets.openaiApiKey="your-key"
   openaiApiKey: ""

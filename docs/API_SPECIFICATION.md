@@ -12,26 +12,23 @@ All endpoints require the following security headers:
 
 | Header | Type | Description | Example |
 |--------|------|-------------|---------|
-| `X-Agent-ID` | string | Agent's Decentralized Identifier (DID) | `did:agent:007` |
-| `X-Timestamp` | string | ISO 8601 timestamp of request | `2023-12-01T12:00:00Z` |
-| `X-Signature` | string | Ed25519 signature of request | `base64_encoded_signature` |
+| `X-Agent-ID` | string | Agent's Decentralized Identifier (DID) | `did:key:public_key_hex` |
+| `X-Timestamp` | string | Unix timestamp (seconds) | `1735689600` |
+| `X-Signature` | string | Hex-encoded Ed25519 signature | `a1b2c3d4...` |
 
 ### Signature Verification
 
-The signature is generated using the Ed25519 algorithm:
+The platform uses Ed25519 (via PyNaCl) for cryptographic verification. The signature is verified against the following message:
 
 ```
-signature = ed25519.sign(
-    private_key,
-    method + path + timestamp + body_hash
-)
+message = method + path + timestamp + body_hash
 ```
 
 Where:
-- `method`: HTTP method (e.g., "POST")
-- `path`: Request path (e.g., "/v1/negotiate")
-- `timestamp`: Value from `X-Timestamp` header
-- `body_hash`: SHA-256 hash of the request body
+- `method`: HTTP method in uppercase (e.g., `POST`)
+- `path`: Request path (e.g., `/v1/negotiate`)
+- `timestamp`: The exact string from the `X-Timestamp` header
+- `body_hash`: SHA-256 hash of the canonical JSON body (sorted keys, no whitespace)
 
 ## 📡 Endpoints
 
@@ -54,9 +51,9 @@ Initiates a negotiation session for a specific item. The agent submits a bid, an
 **Headers:**
 ```
 Content-Type: application/json
-X-Agent-ID: did:agent:007
-X-Timestamp: 2023-12-01T12:00:00Z
-X-Signature: base64_encoded_signature
+X-Agent-ID: did:key:public_key_hex
+X-Timestamp: 1735689600
+X-Signature: a1b2c3d4...
 ```
 
 **Body:**
@@ -65,7 +62,7 @@ X-Signature: base64_encoded_signature
   "item_id": "string",
   "bid_amount": "number",
   "currency": "string",
-  "agent_did": "string"
+  "agent_did": "did:key:public_key_hex"
 }
 ```
 
@@ -115,6 +112,10 @@ NegotiationRequest:
 **Response Types:**
 
 1. **Accepted Response** (`status: "accepted"`)
+
+Aura supports both immediate reservation and **Locked Deals** requiring crypto payment.
+
+**Immediate Reveal:**
 ```json
 {
   "session_token": "sess_abc123",
@@ -123,6 +124,27 @@ NegotiationRequest:
   "data": {
     "final_price": 850.0,
     "reservation_code": "MISTRAL-1234567890"
+  }
+}
+```
+
+**Locked Deal (Solana):**
+```json
+{
+  "session_token": "sess_abc123",
+  "status": "accepted",
+  "valid_until": 1735689600,
+  "data": {
+    "final_price": 850.0,
+    "crypto_payment": {
+      "deal_id": "uuid-v4-string",
+      "wallet_address": "Solana_Wallet_Address",
+      "amount": 0.5,
+      "currency": "SOL",
+      "memo": "UNIQUE_8_CHAR_MEMO",
+      "network": "mainnet-beta",
+      "expires_at": 1735693200
+    }
   }
 }
 ```
@@ -291,9 +313,9 @@ Performs semantic search across the inventory using vector embeddings. Returns i
 **Headers:**
 ```
 Content-Type: application/json
-X-Agent-ID: did:agent:007
-X-Timestamp: 2023-12-01T12:00:00Z
-X-Signature: base64_encoded_signature
+X-Agent-ID: did:key:public_key_hex
+X-Timestamp: 1735689600
+X-Signature: a1b2c3d4...
 ```
 
 **Body:**
@@ -404,6 +426,64 @@ SearchResultItem:
 }
 ```
 
+### 3. Check Deal Status
+
+**POST** `/v1/deal/status` (Internal gRPC: `CheckDealStatus`)
+
+#### Description
+
+Checks if a locked deal has been paid on-chain. If paid, reveals the secret reservation code.
+
+#### Request
+
+**Headers:**
+```
+Content-Type: application/json
+X-Agent-ID: did:key:public_key_hex
+X-Timestamp: 1735689600
+X-Signature: a1b2c3d4...
+```
+
+**Body:**
+```json
+{
+  "deal_id": "uuid-v4-string"
+}
+```
+
+#### Response
+
+**200 OK - Paid**
+```json
+{
+  "status": "PAID",
+  "secret": {
+    "reservation_code": "FINAL_RESERVATION_123",
+    "item_name": "Luxury Suite",
+    "final_price": 850.0,
+    "paid_at": 1735690000
+  },
+  "proof": {
+    "transaction_hash": "tx_hash_here",
+    "from_address": "buyer_wallet",
+    "confirmed_at": 1735690000
+  }
+}
+```
+
+**200 OK - Pending**
+```json
+{
+  "status": "PENDING",
+  "payment_instructions": {
+    "deal_id": "...",
+    "wallet_address": "...",
+    "amount": 0.5,
+    "memo": "..."
+  }
+}
+```
+
 ## 📊 Response Status Types
 
 ### Accepted (`status: "accepted"`)
@@ -461,14 +541,14 @@ SearchResultItem:
 ```bash
 curl -X POST http://localhost:8000/v1/negotiate \
   -H "Content-Type: application/json" \
-  -H "X-Agent-ID: did:agent:007" \
-  -H "X-Timestamp: 2023-12-01T12:00:00Z" \
-  -H "X-Signature: base64_signature" \
+  -H "X-Agent-ID: did:key:public_key_hex" \
+  -H "X-Timestamp: 1735689600" \
+  -H "X-Signature: a1b2c3d4..." \
   -d '{
     "item_id": "hotel_alpha",
     "bid_amount": 850.0,
     "currency": "USD",
-    "agent_did": "did:agent:007"
+    "agent_did": "did:key:public_key_hex"
   }'
 ```
 
@@ -491,14 +571,14 @@ curl -X POST http://localhost:8000/v1/negotiate \
 ```bash
 curl -X POST http://localhost:8000/v1/negotiate \
   -H "Content-Type: application/json" \
-  -H "X-Agent-ID: did:agent:007" \
-  -H "X-Timestamp: 2023-12-01T12:00:00Z" \
-  -H "X-Signature: base64_signature" \
+  -H "X-Agent-ID: did:key:public_key_hex" \
+  -H "X-Timestamp: 1735689600" \
+  -H "X-Signature: a1b2c3d4..." \
   -d '{
     "item_id": "hotel_alpha",
     "bid_amount": 700.0,
     "currency": "USD",
-    "agent_did": "did:agent:007"
+    "agent_did": "did:key:public_key_hex"
   }'
 ```
 
@@ -522,9 +602,9 @@ curl -X POST http://localhost:8000/v1/negotiate \
 ```bash
 curl -X POST http://localhost:8000/v1/search \
   -H "Content-Type: application/json" \
-  -H "X-Agent-ID: did:agent:007" \
-  -H "X-Timestamp: 2023-12-01T12:00:00Z" \
-  -H "X-Signature: base64_signature" \
+  -H "X-Agent-ID: did:key:public_key_hex" \
+  -H "X-Timestamp: 1735689600" \
+  -H "X-Signature: a1b2c3d4..." \
   -d '{
     "query": "Luxury stay with spa and ocean view",
     "limit": 3

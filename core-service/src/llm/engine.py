@@ -85,7 +85,9 @@ class AuraNegotiator(dspy.Module):
 class LLMEngine:
     """Universal LLM client supporting multiple providers via litellm."""
 
-    def __init__(self, model: str, temperature: float = 0.7):
+    def __init__(
+        self, model: str, temperature: float = 0.7, api_key: str | None = None
+    ):
         """
         Initialize LLM engine.
 
@@ -93,9 +95,11 @@ class LLMEngine:
             model: Model identifier in litellm format (e.g., "openai/gpt-4o",
                    "mistral/mistral-large-latest", "ollama/mistral")
             temperature: Sampling temperature (0.0-1.0)
+            api_key: Optional API key for the provider
         """
         self.model = model
         self.temperature = temperature
+        self.api_key = api_key
         logger.info(
             "llm_engine_initialized",
             model=model,
@@ -137,6 +141,9 @@ class LLMEngine:
                 "messages": messages,
                 "temperature": self.temperature,
             }
+
+            if self.api_key:
+                kwargs["api_key"] = self.api_key
 
             if response_format:
                 kwargs["response_model"] = response_format

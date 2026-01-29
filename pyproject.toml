@@ -33,6 +33,12 @@ dependencies = [
     "litellm>=1.63.0",
     "jinja2>=3.1.4",
     "dspy-ai>=2.0.0",
+    "prometheus-client>=0.21.1",
+    # Solana dependencies for crypto payments
+    "solana>=0.34.0",
+    "solders>=0.21.0",
+    # Encryption for secret storage
+    "cryptography>=43.0.0",
 ]
 
 [dependency-groups]
@@ -40,6 +46,9 @@ dev = [
     "ruff>=0.8.0",
     "pytest>=8.0.0",
     "pytest-cov>=4.0.0",
+    "pytest-asyncio>=1.3.0",
+    "pytest-mock>=3.15.1",
+    "aiogram>=3.24.0",
 ]
 
 [tool.ruff]
