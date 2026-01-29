@@ -24,7 +24,7 @@ _sym_db = _symbol_database.Default()
 
 
 
-DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(b'\n%aura/negotiation/v1/negotiation.proto\x12\x13\x61ura.negotiation.v1\"\xc8\x01\n\x10NegotiateRequest\x12\x1d\n\nrequest_id\x18\x01 \x01(\tR\trequestId\x12\x17\n\x07item_id\x18\x02 \x01(\tR\x06itemId\x12\x1d\n\nbid_amount\x18\x03 \x01(\x01R\tbidAmount\x12#\n\rcurrency_code\x18\x04 \x01(\tR\x0c\x63urrencyCode\x12\x38\n\x05\x61gent\x18\x05 \x01(\x0b\x32\".aura.negotiation.v1.AgentIdentityR\x05\x61gent\"L\n\rAgentIdentity\x12\x10\n\x03\x64id\x18\x01 \x01(\tR\x03\x64id\x12)\n\x10reputation_score\x18\x02 \x01(\x02R\x0freputationScore\"\x85\x03\n\x11NegotiateResponse\x12#\n\rsession_token\x18\x01 \x01(\tR\x0csessionToken\x12\x32\n\x15valid_until_timestamp\x18\x02 \x01(\x03R\x13validUntilTimestamp\x12@\n\x08\x61\x63\x63\x65pted\x18\x03 \x01(\x0b\x32\".aura.negotiation.v1.OfferAcceptedH\x00R\x08\x61\x63\x63\x65pted\x12\x43\n\tcountered\x18\x04 \x01(\x0b\x32#.aura.negotiation.v1.OfferCounteredH\x00R\tcountered\x12@\n\x08rejected\x18\x05 \x01(\x0b\x32\".aura.negotiation.v1.OfferRejectedH\x00R\x08rejected\x12\x44\n\x0bui_required\x18\x06 \x01(\x0b\x32!.aura.negotiation.v1.JitUiRequestH\x00R\nuiRequiredB\x08\n\x06result\"[\n\rOfferAccepted\x12\x1f\n\x0b\x66inal_price\x18\x01 \x01(\x01R\nfinalPrice\x12)\n\x10reservation_code\x18\x02 \x01(\tR\x0freservationCode\"}\n\x0eOfferCountered\x12%\n\x0eproposed_price\x18\x01 \x01(\x01R\rproposedPrice\x12\x1f\n\x0breason_code\x18\x02 \x01(\tR\nreasonCode\x12#\n\rhuman_message\x18\x03 \x01(\tR\x0chumanMessage\"0\n\rOfferRejected\x12\x1f\n\x0breason_code\x18\x01 \x01(\tR\nreasonCode\"\xc6\x01\n\x0cJitUiRequest\x12\x1f\n\x0btemplate_id\x18\x01 \x01(\tR\ntemplateId\x12U\n\x0c\x63ontext_data\x18\x02 \x03(\x0b\x32\x32.aura.negotiation.v1.JitUiRequest.ContextDataEntryR\x0b\x63ontextData\x1a>\n\x10\x43ontextDataEntry\x12\x10\n\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n\x05value\x18\x02 \x01(\tR\x05value:\x02\x38\x01\"b\n\rSearchRequest\x12\x14\n\x05query\x18\x01 \x01(\tR\x05query\x12\x14\n\x05limit\x18\x02 \x01(\x05R\x05limit\x12%\n\x0emin_similarity\x18\x03 \x01(\x01R\rminSimilarity\"Q\n\x0eSearchResponse\x12?\n\x07results\x18\x01 \x03(\x0b\x32%.aura.negotiation.v1.SearchResultItemR\x07results\"\xba\x01\n\x10SearchResultItem\x12\x17\n\x07item_id\x18\x01 \x01(\tR\x06itemId\x12\x12\n\x04name\x18\x02 \x01(\tR\x04name\x12\x1d\n\nbase_price\x18\x03 \x01(\x01R\tbasePrice\x12)\n\x10similarity_score\x18\x04 \x01(\x01R\x0fsimilarityScore\x12/\n\x13\x64\x65scription_snippet\x18\x05 \x01(\tR\x12\x64\x65scriptionSnippet\"\x18\n\x16GetSystemStatusRequest\"\xbb\x01\n\x17GetSystemStatusResponse\x12\x16\n\x06status\x18\x01 \x01(\tR\x06status\x12*\n\x11\x63pu_usage_percent\x18\x02 \x01(\x01R\x0f\x63puUsagePercent\x12&\n\x0fmemory_usage_mb\x18\x03 \x01(\x01R\rmemoryUsageMb\x12\x1c\n\ttimestamp\x18\x04 \x01(\tR\ttimestamp\x12\x16\n\x06\x63\x61\x63hed\x18\x05 \x01(\x08R\x06\x63\x61\x63hed2\xb3\x02\n\x12NegotiationService\x12\\\n\tNegotiate\x12%.aura.negotiation.v1.NegotiateRequest\x1a&.aura.negotiation.v1.NegotiateResponse\"\x00\x12Q\n\x06Search\x12\".aura.negotiation.v1.SearchRequest\x1a#.aura.negotiation.v1.SearchResponse\x12l\n\x0fGetSystemStatus\x12+.aura.negotiation.v1.GetSystemStatusRequest\x1a,.aura.negotiation.v1.GetSystemStatusResponseb\x06proto3')
+DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(b'\n%aura/negotiation/v1/negotiation.proto\x12\x13\x61ura.negotiation.v1\"\xc8\x01\n\x10NegotiateRequest\x12\x1d\n\nrequest_id\x18\x01 \x01(\tR\trequestId\x12\x17\n\x07item_id\x18\x02 \x01(\tR\x06itemId\x12\x1d\n\nbid_amount\x18\x03 \x01(\x01R\tbidAmount\x12#\n\rcurrency_code\x18\x04 \x01(\tR\x0c\x63urrencyCode\x12\x38\n\x05\x61gent\x18\x05 \x01(\x0b\x32\".aura.negotiation.v1.AgentIdentityR\x05\x61gent\"L\n\rAgentIdentity\x12\x10\n\x03\x64id\x18\x01 \x01(\tR\x03\x64id\x12)\n\x10reputation_score\x18\x02 \x01(\x02R\x0freputationScore\"\x85\x03\n\x11NegotiateResponse\x12#\n\rsession_token\x18\x01 \x01(\tR\x0csessionToken\x12\x32\n\x15valid_until_timestamp\x18\x02 \x01(\x03R\x13validUntilTimestamp\x12@\n\x08\x61\x63\x63\x65pted\x18\x03 \x01(\x0b\x32\".aura.negotiation.v1.OfferAcceptedH\x00R\x08\x61\x63\x63\x65pted\x12\x43\n\tcountered\x18\x04 \x01(\x0b\x32#.aura.negotiation.v1.OfferCounteredH\x00R\tcountered\x12@\n\x08rejected\x18\x05 \x01(\x0b\x32\".aura.negotiation.v1.OfferRejectedH\x00R\x08rejected\x12\x44\n\x0bui_required\x18\x06 \x01(\x0b\x32!.aura.negotiation.v1.JitUiRequestH\x00R\nuiRequiredB\x08\n\x06result\"\xc7\x01\n\rOfferAccepted\x12\x1f\n\x0b\x66inal_price\x18\x01 \x01(\x01R\nfinalPrice\x12+\n\x10reservation_code\x18\x02 \x01(\tH\x00R\x0freservationCode\x12W\n\x0e\x63rypto_payment\x18\x03 \x01(\x0b\x32..aura.negotiation.v1.CryptoPaymentInstructionsH\x00R\rcryptoPaymentB\x0f\n\rreveal_method\"\xdc\x01\n\x19\x43ryptoPaymentInstructions\x12\x17\n\x07\x64\x65\x61l_id\x18\x01 \x01(\tR\x06\x64\x65\x61lId\x12%\n\x0ewallet_address\x18\x02 \x01(\tR\rwalletAddress\x12\x16\n\x06\x61mount\x18\x03 \x01(\x01R\x06\x61mount\x12\x1a\n\x08\x63urrency\x18\x04 \x01(\tR\x08\x63urrency\x12\x12\n\x04memo\x18\x05 \x01(\tR\x04memo\x12\x18\n\x07network\x18\x06 \x01(\tR\x07network\x12\x1d\n\nexpires_at\x18\x07 \x01(\x03R\texpiresAt\"1\n\x16\x43heckDealStatusRequest\x12\x17\n\x07\x64\x65\x61l_id\x18\x01 \x01(\tR\x06\x64\x65\x61lId\"\x86\x02\n\x17\x43heckDealStatusResponse\x12\x16\n\x06status\x18\x01 \x01(\tR\x06status\x12\x37\n\x06secret\x18\x02 \x01(\x0b\x32\x1f.aura.negotiation.v1.DealSecretR\x06secret\x12\x37\n\x05proof\x18\x03 \x01(\x0b\x32!.aura.negotiation.v1.PaymentProofR\x05proof\x12\x61\n\x14payment_instructions\x18\x04 \x01(\x0b\x32..aura.negotiation.v1.CryptoPaymentInstructionsR\x13paymentInstructions\"\x8e\x01\n\nDealSecret\x12)\n\x10reservation_code\x18\x01 \x01(\tR\x0freservationCode\x12\x1b\n\titem_name\x18\x02 \x01(\tR\x08itemName\x12\x1f\n\x0b\x66inal_price\x18\x03 \x01(\x01R\nfinalPrice\x12\x17\n\x07paid_at\x18\x04 \x01(\x03R\x06paidAt\"\xa2\x01\n\x0cPaymentProof\x12)\n\x10transaction_hash\x18\x01 \x01(\tR\x0ftransactionHash\x12!\n\x0c\x62lock_number\x18\x02 \x01(\tR\x0b\x62lockNumber\x12!\n\x0c\x66rom_address\x18\x03 \x01(\tR\x0b\x66romAddress\x12!\n\x0c\x63onfirmed_at\x18\x04 \x01(\x03R\x0b\x63onfirmedAt\"}\n\x0eOfferCountered\x12%\n\x0eproposed_price\x18\x01 \x01(\x01R\rproposedPrice\x12\x1f\n\x0breason_code\x18\x02 \x01(\tR\nreasonCode\x12#\n\rhuman_message\x18\x03 \x01(\tR\x0chumanMessage\"0\n\rOfferRejected\x12\x1f\n\x0breason_code\x18\x01 \x01(\tR\nreasonCode\"\xc6\x01\n\x0cJitUiRequest\x12\x1f\n\x0btemplate_id\x18\x01 \x01(\tR\ntemplateId\x12U\n\x0c\x63ontext_data\x18\x02 \x03(\x0b\x32\x32.aura.negotiation.v1.JitUiRequest.ContextDataEntryR\x0b\x63ontextData\x1a>\n\x10\x43ontextDataEntry\x12\x10\n\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n\x05value\x18\x02 \x01(\tR\x05value:\x02\x38\x01\"b\n\rSearchRequest\x12\x14\n\x05query\x18\x01 \x01(\tR\x05query\x12\x14\n\x05limit\x18\x02 \x01(\x05R\x05limit\x12%\n\x0emin_similarity\x18\x03 \x01(\x01R\rminSimilarity\"Q\n\x0eSearchResponse\x12?\n\x07results\x18\x01 \x03(\x0b\x32%.aura.negotiation.v1.SearchResultItemR\x07results\"\xba\x01\n\x10SearchResultItem\x12\x17\n\x07item_id\x18\x01 \x01(\tR\x06itemId\x12\x12\n\x04name\x18\x02 \x01(\tR\x04name\x12\x1d\n\nbase_price\x18\x03 \x01(\x01R\tbasePrice\x12)\n\x10similarity_score\x18\x04 \x01(\x01R\x0fsimilarityScore\x12/\n\x13\x64\x65scription_snippet\x18\x05 \x01(\tR\x12\x64\x65scriptionSnippet\"\x18\n\x16GetSystemStatusRequest\"\xbb\x01\n\x17GetSystemStatusResponse\x12\x16\n\x06status\x18\x01 \x01(\tR\x06status\x12*\n\x11\x63pu_usage_percent\x18\x02 \x01(\x01R\x0f\x63puUsagePercent\x12&\n\x0fmemory_usage_mb\x18\x03 \x01(\x01R\rmemoryUsageMb\x12\x1c\n\ttimestamp\x18\x04 \x01(\tR\ttimestamp\x12\x16\n\x06\x63\x61\x63hed\x18\x05 \x01(\x08R\x06\x63\x61\x63hed2\xa1\x03\n\x12NegotiationService\x12\\\n\tNegotiate\x12%.aura.negotiation.v1.NegotiateRequest\x1a&.aura.negotiation.v1.NegotiateResponse\"\x00\x12Q\n\x06Search\x12\".aura.negotiation.v1.SearchRequest\x1a#.aura.negotiation.v1.SearchResponse\x12l\n\x0fGetSystemStatus\x12+.aura.negotiation.v1.GetSystemStatusRequest\x1a,.aura.negotiation.v1.GetSystemStatusResponse\x12l\n\x0f\x43heckDealStatus\x12+.aura.negotiation.v1.CheckDealStatusRequest\x1a,.aura.negotiation.v1.CheckDealStatusResponseb\x06proto3')
 
 _globals = globals()
 _builder.BuildMessageAndEnumDescriptors(DESCRIPTOR, _globals)
@@ -39,26 +39,36 @@ if not _descriptor._USE_C_DESCRIPTORS:
   _globals['_AGENTIDENTITY']._serialized_end=341
   _globals['_NEGOTIATERESPONSE']._serialized_start=344
   _globals['_NEGOTIATERESPONSE']._serialized_end=733
-  _globals['_OFFERACCEPTED']._serialized_start=735
-  _globals['_OFFERACCEPTED']._serialized_end=826
-  _globals['_OFFERCOUNTERED']._serialized_start=828
-  _globals['_OFFERCOUNTERED']._serialized_end=953
-  _globals['_OFFERREJECTED']._serialized_start=955
-  _globals['_OFFERREJECTED']._serialized_end=1003
-  _globals['_JITUIREQUEST']._serialized_start=1006
-  _globals['_JITUIREQUEST']._serialized_end=1204
-  _globals['_JITUIREQUEST_CONTEXTDATAENTRY']._serialized_start=1142
-  _globals['_JITUIREQUEST_CONTEXTDATAENTRY']._serialized_end=1204
-  _globals['_SEARCHREQUEST']._serialized_start=1206
-  _globals['_SEARCHREQUEST']._serialized_end=1304
-  _globals['_SEARCHRESPONSE']._serialized_start=1306
-  _globals['_SEARCHRESPONSE']._serialized_end=1387
-  _globals['_SEARCHRESULTITEM']._serialized_start=1390
-  _globals['_SEARCHRESULTITEM']._serialized_end=1576
-  _globals['_GETSYSTEMSTATUSREQUEST']._serialized_start=1578
-  _globals['_GETSYSTEMSTATUSREQUEST']._serialized_end=1602
-  _globals['_GETSYSTEMSTATUSRESPONSE']._serialized_start=1605
-  _globals['_GETSYSTEMSTATUSRESPONSE']._serialized_end=1792
-  _globals['_NEGOTIATIONSERVICE']._serialized_start=1795
-  _globals['_NEGOTIATIONSERVICE']._serialized_end=2102
+  _globals['_OFFERACCEPTED']._serialized_start=736
+  _globals['_OFFERACCEPTED']._serialized_end=935
+  _globals['_CRYPTOPAYMENTINSTRUCTIONS']._serialized_start=938
+  _globals['_CRYPTOPAYMENTINSTRUCTIONS']._serialized_end=1158
+  _globals['_CHECKDEALSTATUSREQUEST']._serialized_start=1160
+  _globals['_CHECKDEALSTATUSREQUEST']._serialized_end=1209
+  _globals['_CHECKDEALSTATUSRESPONSE']._serialized_start=1212
+  _globals['_CHECKDEALSTATUSRESPONSE']._serialized_end=1474
+  _globals['_DEALSECRET']._serialized_start=1477
+  _globals['_DEALSECRET']._serialized_end=1619
+  _globals['_PAYMENTPROOF']._serialized_start=1622
+  _globals['_PAYMENTPROOF']._serialized_end=1784
+  _globals['_OFFERCOUNTERED']._serialized_start=1786
+  _globals['_OFFERCOUNTERED']._serialized_end=1911
+  _globals['_OFFERREJECTED']._serialized_start=1913
+  _globals['_OFFERREJECTED']._serialized_end=1961
+  _globals['_JITUIREQUEST']._serialized_start=1964
+  _globals['_JITUIREQUEST']._serialized_end=2162
+  _globals['_JITUIREQUEST_CONTEXTDATAENTRY']._serialized_start=2100
+  _globals['_JITUIREQUEST_CONTEXTDATAENTRY']._serialized_end=2162
+  _globals['_SEARCHREQUEST']._serialized_start=2164
+  _globals['_SEARCHREQUEST']._serialized_end=2262
+  _globals['_SEARCHRESPONSE']._serialized_start=2264
+  _globals['_SEARCHRESPONSE']._serialized_end=2345
+  _globals['_SEARCHRESULTITEM']._serialized_start=2348
+  _globals['_SEARCHRESULTITEM']._serialized_end=2534
+  _globals['_GETSYSTEMSTATUSREQUEST']._serialized_start=2536
+  _globals['_GETSYSTEMSTATUSREQUEST']._serialized_end=2560
+  _globals['_GETSYSTEMSTATUSRESPONSE']._serialized_start=2563
+  _globals['_GETSYSTEMSTATUSRESPONSE']._serialized_end=2750
+  _globals['_NEGOTIATIONSERVICE']._serialized_start=2753
+  _globals['_NEGOTIATIONSERVICE']._serialized_end=3170
 # @@protoc_insertion_point(module_scope)
