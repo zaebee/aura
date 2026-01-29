@@ -35,6 +35,8 @@ services:
       SOLANA_RPC_URL: ${SOLANA_RPC_URL:-https://api.devnet.solana.com}
       SOLANA_NETWORK: ${SOLANA_NETWORK:-devnet}
       SOLANA_USDC_MINT: ${SOLANA_USDC_MINT:-EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v}
+      # Secret Encryption (REQUIRED when CRYPTO_ENABLED=true)
+      SECRET_ENCRYPTION_KEY: ${SECRET_ENCRYPTION_KEY:-}
       DEAL_TTL_SECONDS: ${DEAL_TTL_SECONDS:-3600}
     depends_on:
       db:

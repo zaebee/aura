@@ -416,9 +416,13 @@ async def serve():
     crypto_provider = create_crypto_provider()
     market_service = None
     if crypto_provider:
+        from crypto.encryption import SecretEncryption
         from services.market import MarketService
 
-        market_service = MarketService(crypto_provider)
+        # Initialize encryption handler
+        encryption = SecretEncryption(settings.secret_encryption_key)
+
+        market_service = MarketService(crypto_provider, encryption)
         logger.info(
             "market_service_initialized",
             provider=settings.crypto_provider,

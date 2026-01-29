@@ -9,8 +9,8 @@ from sqlalchemy import (
     DateTime,
     Enum,
     Float,
+    LargeBinary,
     String,
-    Text,
     create_engine,
 )
 from sqlalchemy.dialects.postgresql import JSONB, UUID
@@ -59,7 +59,7 @@ class LockedDeal(Base):
     final_price = Column(Float, nullable=False)
     currency = Column(String, nullable=False)  # "SOL" or "USDC"
     payment_memo = Column(String, nullable=False, unique=True, index=True)
-    secret_content = Column(Text, nullable=False)  # Encrypted reservation code
+    secret_content = Column(LargeBinary, nullable=False)  # Encrypted reservation code
     status = Column(
         Enum(DealStatus), nullable=False, default=DealStatus.PENDING, index=True
     )

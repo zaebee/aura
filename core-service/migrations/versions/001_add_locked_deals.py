@@ -33,7 +33,7 @@ def upgrade() -> None:
         sa.Column("final_price", sa.Float(), nullable=False),
         sa.Column("currency", sa.String(), nullable=False),
         sa.Column("payment_memo", sa.String(), nullable=False, unique=True, index=True),
-        sa.Column("secret_content", sa.Text(), nullable=False),
+        sa.Column("secret_content", sa.LargeBinary(), nullable=False),
         sa.Column(
             "status",
             sa.Enum("PENDING", "PAID", "EXPIRED", name="dealstatus"),

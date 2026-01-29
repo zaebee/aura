@@ -53,6 +53,9 @@ class Settings(BaseSettings):
     # Deal Expiration
     deal_ttl_seconds: int = 3600  # 1 hour default
 
+    # Secret Encryption
+    secret_encryption_key: str = ""  # Base64-encoded Fernet key (32 bytes)
+
     @model_validator(mode="after")
     def validate_otel_config(self) -> "Settings":
         """Validate OpenTelemetry configuration."""
@@ -70,6 +73,12 @@ class Settings(BaseSettings):
         if self.crypto_enabled:
             if not self.solana_private_key:
                 raise ValueError("SOLANA_PRIVATE_KEY required when CRYPTO_ENABLED=true")
+            if not self.secret_encryption_key:
+                raise ValueError(
+                    "SECRET_ENCRYPTION_KEY required when CRYPTO_ENABLED=true. "
+                    "Generate with: python -c 'from cryptography.fernet import Fernet; "
+                    "print(Fernet.generate_key().decode())'"
+                )
             if self.crypto_currency not in ["SOL", "USDC"]:
                 raise ValueError("CRYPTO_CURRENCY must be 'SOL' or 'USDC'")
             if self.crypto_provider not in ["solana"]:

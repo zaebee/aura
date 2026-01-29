@@ -8,6 +8,7 @@ import secrets
 import uuid
 from datetime import datetime, timedelta
 
+from crypto.encryption import SecretEncryption
 from crypto.interfaces import CryptoProvider
 from sqlalchemy import select
 from sqlalchemy.orm import Session
@@ -24,19 +25,22 @@ class MarketService:
 
     Responsibilities:
     - Creating locked deals with unique payment memos
+    - Encrypting secrets with Fernet encryption
     - Checking payment status via blockchain verification
-    - Revealing secrets after payment confirmation
+    - Revealing decrypted secrets after payment confirmation
     - Managing deal expiration
     """
 
-    def __init__(self, crypto_provider: CryptoProvider):
+    def __init__(self, crypto_provider: CryptoProvider, encryption: SecretEncryption):
         """
         Initialize market service.
 
         Args:
             crypto_provider: Blockchain payment provider (e.g., SolanaProvider)
+            encryption: Secret encryption handler for encrypting/decrypting reservation codes
         """
         self.provider = crypto_provider
+        self.encryption = encryption
 
     def create_offer(
         self,
@@ -77,6 +81,9 @@ class MarketService:
         now = datetime.utcnow()
         expires_at = now + timedelta(seconds=ttl_seconds)
 
+        # Encrypt secret before storing
+        encrypted_secret = self.encryption.encrypt(secret)
+
         # Create locked deal record
         deal = LockedDeal(
             id=uuid.uuid4(),
@@ -85,7 +92,7 @@ class MarketService:
             final_price=price,
             currency=currency,
             payment_memo=memo,
-            secret_content=secret,  # TODO: Encrypt in future enhancement
+            secret_content=encrypted_secret,  # Encrypted with Fernet
             status=DealStatus.PENDING,
             buyer_did=buyer_did,
             created_at=now,
@@ -251,7 +258,7 @@ class MarketService:
         self, deal: LockedDeal
     ) -> negotiation_pb2.CheckDealStatusResponse:
         """
-        Builds response for PAID deals with secret and proof.
+        Builds response for PAID deals with decrypted secret and proof.
 
         Args:
             deal: LockedDeal record with payment confirmed
@@ -259,8 +266,11 @@ class MarketService:
         Returns:
             CheckDealStatusResponse with status="PAID"
         """
+        # Decrypt secret before revealing
+        decrypted_secret = self.encryption.decrypt(deal.secret_content)
+
         secret = negotiation_pb2.DealSecret(
-            reservation_code=deal.secret_content,
+            reservation_code=decrypted_secret,
             item_name=deal.item_name,
             final_price=deal.final_price,
             paid_at=int(deal.paid_at.timestamp()) if deal.paid_at else 0,

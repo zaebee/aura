@@ -9,6 +9,7 @@ from typing import Any
 
 import httpx
 from solders.keypair import Keypair  # type: ignore
+from solders.pubkey import Pubkey  # type: ignore
 
 from .interfaces import PaymentProof
 
@@ -17,8 +18,9 @@ logger = logging.getLogger(__name__)
 # Solana RPC commitment levels
 FINALIZED_COMMITMENT = "finalized"  # ~32 slots confirmation (highest security)
 
-# SPL Token Program ID (for USDC transfers)
+# SPL Token Program IDs
 TOKEN_PROGRAM_ID = "TokenkegQfeZyiNJbNbNbNbNbNbNbNbNbNbNbNbNbN"
+ASSOCIATED_TOKEN_PROGRAM_ID = "ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL"
 
 # Amount tolerance for floating-point comparison (0.01%)
 AMOUNT_TOLERANCE = 0.0001
@@ -56,10 +58,18 @@ class SolanaProvider:
         self.usdc_mint = usdc_mint
         self.client = httpx.AsyncClient(timeout=30.0)
 
+        # Derive Associated Token Account (ATA) for USDC
+        # This is the address where USDC payments must be sent
+        self.usdc_token_account = self._derive_associated_token_address(
+            owner=self.keypair.pubkey(),
+            mint=Pubkey.from_string(usdc_mint),
+        )
+
         logger.info(
             "Initialized Solana provider",
             extra={
                 "wallet_address": str(self.keypair.pubkey()),
+                "usdc_token_account": str(self.usdc_token_account),
                 "network": network,
                 "rpc_url": rpc_url,
             },
@@ -72,6 +82,33 @@ class SolanaProvider:
     def get_network_name(self) -> str:
         """Returns the Solana network name."""
         return self.network
+
+    def _derive_associated_token_address(self, owner: Pubkey, mint: Pubkey) -> Pubkey:
+        """
+        Derives the Associated Token Account (ATA) address for a given owner and mint.
+
+        ATAs are deterministic addresses derived from the owner's wallet and token mint.
+        This ensures that USDC payments are sent to the correct account.
+
+        Args:
+            owner: Owner's public key (our wallet)
+            mint: Token mint public key (USDC mint address)
+
+        Returns:
+            Associated Token Account public key
+
+        Formula:
+            find_program_address([owner, TOKEN_PROGRAM_ID, mint], ASSOCIATED_TOKEN_PROGRAM_ID)
+        """
+        seeds = [
+            bytes(owner),
+            bytes(Pubkey.from_string(TOKEN_PROGRAM_ID)),
+            bytes(mint),
+        ]
+        ata, _ = Pubkey.find_program_address(
+            seeds, Pubkey.from_string(ASSOCIATED_TOKEN_PROGRAM_ID)
+        )
+        return ata
 
     async def verify_payment(
         self, amount: float, memo: str, currency: str = "SOL"
@@ -123,8 +160,11 @@ class SolanaProvider:
                     continue
 
                 # Step 3: Verify transaction matches criteria
-                if self._is_matching_payment(tx_detail, amount, memo, currency):
-                    proof = self._extract_payment_proof(tx_detail, signature)
+                is_match, from_address = self._is_matching_payment(
+                    tx_detail, amount, memo, currency
+                )
+                if is_match:
+                    proof = self._extract_payment_proof(tx_detail, signature, from_address)
                     logger.info(
                         "Payment verified successfully",
                         extra={
@@ -132,6 +172,7 @@ class SolanaProvider:
                             "amount": amount,
                             "currency": currency,
                             "memo": memo,
+                            "from_address": from_address,
                         },
                     )
                     return proof
@@ -218,9 +259,9 @@ class SolanaProvider:
         expected_amount: float,
         expected_memo: str,
         currency: str,
-    ) -> bool:
+    ) -> tuple[bool, str]:
         """
-        Checks if transaction matches payment criteria.
+        Checks if transaction matches payment criteria and extracts source address.
 
         Args:
             tx_detail: Full transaction details from RPC
@@ -229,20 +270,22 @@ class SolanaProvider:
             currency: "SOL" or "USDC"
 
         Returns:
-            True if transaction matches all criteria
+            Tuple of (matches, from_address). from_address is empty string if no match.
         """
         # Check for memo instruction
         if not self._has_memo(tx_detail, expected_memo):
-            return False
+            return (False, "")
 
-        # Check for amount match (currency-specific)
+        # Check for amount match (currency-specific) and extract source
         if currency == "SOL":
-            return self._has_sol_transfer(tx_detail, expected_amount)
+            is_match, from_addr = self._has_sol_transfer(tx_detail, expected_amount)
+            return (is_match, from_addr)
         elif currency == "USDC":
-            return self._has_usdc_transfer(tx_detail, expected_amount)
+            is_match, from_addr = self._has_usdc_transfer(tx_detail, expected_amount)
+            return (is_match, from_addr)
         else:
             logger.warning("Unsupported currency", extra={"currency": currency})
-            return False
+            return (False, "")
 
     def _has_memo(self, tx_detail: dict[str, Any], expected_memo: str) -> bool:
         """
@@ -276,16 +319,16 @@ class SolanaProvider:
 
     def _has_sol_transfer(
         self, tx_detail: dict[str, Any], expected_amount: float
-    ) -> bool:
+    ) -> tuple[bool, str]:
         """
-        Checks if transaction contains SOL transfer to our wallet.
+        Checks if transaction contains SOL transfer to our wallet and extracts sender.
 
         Args:
             tx_detail: Transaction details
             expected_amount: Expected SOL amount
 
         Returns:
-            True if SOL transfer matches
+            Tuple of (matches, from_address). Extracts actual sender from balance changes.
         """
         try:
             my_address = str(self.keypair.pubkey())
@@ -297,7 +340,8 @@ class SolanaProvider:
                 .get("accountKeys", [])
             )
 
-            # Find our account index
+            # Find our account index and verify we received the correct amount
+            our_idx = None
             for idx, key_info in enumerate(account_keys):
                 pubkey = (
                     key_info if isinstance(key_info, str) else key_info.get("pubkey")
@@ -310,16 +354,30 @@ class SolanaProvider:
                     )  # 1 SOL = 1e9 lamports
 
                     # Compare with tolerance
-                    return abs(sol_received - expected_amount) < AMOUNT_TOLERANCE
+                    if abs(sol_received - expected_amount) < AMOUNT_TOLERANCE:
+                        our_idx = idx
+                        break
 
-            return False
+            if our_idx is None:
+                return (False, "")
+
+            # Find the sender: account with largest balance decrease (excluding fees)
+            # First account is typically the fee payer/sender for simple transfers
+            sender_addr = ""
+            if account_keys:
+                first_key = account_keys[0]
+                sender_addr = (
+                    first_key if isinstance(first_key, str) else first_key.get("pubkey", "")
+                )
+
+            return (True, sender_addr)
         except Exception as e:
             logger.error("Error parsing SOL transfer", extra={"error": str(e)})
-            return False
+            return (False, "")
 
     def _has_usdc_transfer(
         self, tx_detail: dict[str, Any], expected_amount: float
-    ) -> bool:
+    ) -> tuple[bool, str]:
         """
         Checks if transaction contains USDC (SPL token) transfer to our wallet.
 
@@ -328,7 +386,7 @@ class SolanaProvider:
             expected_amount: Expected USDC amount
 
         Returns:
-            True if USDC transfer matches
+            Tuple of (matches, from_address). Extracts source from SPL token instruction.
         """
         try:
             instructions = (
@@ -345,9 +403,10 @@ class SolanaProvider:
                 ):
                     info = instr.get("parsed", {}).get("info", {})
 
-                    # Check if transfer is to our address
+                    # CRITICAL: Verify destination is our Associated Token Account
+                    # This prevents attackers from bypassing payment by sending to their own account
                     destination = info.get("destination")
-                    if not destination:
+                    if destination != str(self.usdc_token_account):
                         continue
 
                     # Check if amount matches (USDC has 6 decimals)
@@ -355,15 +414,19 @@ class SolanaProvider:
                     if amount_str:
                         usdc_amount = int(amount_str) / 1_000_000  # USDC has 6 decimals
                         if abs(usdc_amount - expected_amount) < AMOUNT_TOLERANCE:
-                            return True
+                            # Extract source address from the SPL token transfer instruction
+                            source_addr = info.get("source", "")
+                            # Source is the token account, get authority (owner) if available
+                            authority = info.get("authority", source_addr)
+                            return (True, authority)
 
-            return False
+            return (False, "")
         except Exception as e:
             logger.error("Error parsing USDC transfer", extra={"error": str(e)})
-            return False
+            return (False, "")
 
     def _extract_payment_proof(
-        self, tx_detail: dict[str, Any], signature: str
+        self, tx_detail: dict[str, Any], signature: str, from_address: str
     ) -> PaymentProof:
         """
         Extracts payment proof from verified transaction.
@@ -371,6 +434,7 @@ class SolanaProvider:
         Args:
             tx_detail: Transaction details
             signature: Transaction signature
+            from_address: Source address extracted from the transfer instruction
 
         Returns:
             PaymentProof with transaction metadata
@@ -378,23 +442,10 @@ class SolanaProvider:
         block_time = tx_detail.get("blockTime", 0)
         slot = tx_detail.get("slot", "0")
 
-        # Extract sender address (first account key, usually the signer)
-        account_keys = (
-            tx_detail.get("transaction", {}).get("message", {}).get("accountKeys", [])
-        )
-        from_address = "unknown"
-        if account_keys:
-            first_key = account_keys[0]
-            from_address = (
-                first_key
-                if isinstance(first_key, str)
-                else first_key.get("pubkey", "unknown")
-            )
-
         return PaymentProof(
             transaction_hash=signature,
             block_number=str(slot),
-            from_address=from_address,
+            from_address=from_address or "unknown",
             confirmed_at=datetime.utcfromtimestamp(block_time)
             if block_time
             else datetime.utcnow(),
