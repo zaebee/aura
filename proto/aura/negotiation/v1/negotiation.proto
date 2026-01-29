@@ -11,6 +11,9 @@ service NegotiationService {
 
     // RPC method for retrieving system status and metrics.
     rpc GetSystemStatus (GetSystemStatusRequest) returns (GetSystemStatusResponse);
+
+    // RPC method for checking crypto payment status and retrieving secrets.
+    rpc CheckDealStatus (CheckDealStatusRequest) returns (CheckDealStatusResponse);
 }
 
 message NegotiateRequest {
@@ -43,7 +46,56 @@ message NegotiateResponse {
 
 message OfferAccepted {
   double final_price = 1;
-  string reservation_code = 2;
+
+  // Either reservation_code (legacy) or crypto_payment (new)
+  oneof reveal_method {
+    string reservation_code = 2;
+    CryptoPaymentInstructions crypto_payment = 3;
+  }
+}
+
+// Instructions for completing a crypto payment to unlock the deal
+message CryptoPaymentInstructions {
+  string deal_id = 1;              // UUID of the locked deal
+  string wallet_address = 2;       // Payment destination address
+  double amount = 3;               // Amount to pay
+  string currency = 4;             // "SOL" or "USDC"
+  string memo = 5;                 // Unique memo to include in transaction
+  string network = 6;              // "mainnet-beta", "devnet", "testnet"
+  int64 expires_at = 7;            // Unix timestamp when deal expires
+}
+
+// Request to check the status of a locked deal
+message CheckDealStatusRequest {
+  string deal_id = 1;              // UUID of the deal to check
+}
+
+// Response containing deal status and secret (if paid)
+message CheckDealStatusResponse {
+  string status = 1;               // "PENDING", "PAID", "EXPIRED", "NOT_FOUND"
+
+  // Only present if status == "PAID"
+  DealSecret secret = 2;
+  PaymentProof proof = 3;
+
+  // Only present if status == "PENDING"
+  CryptoPaymentInstructions payment_instructions = 4;
+}
+
+// The revealed secret after successful payment
+message DealSecret {
+  string reservation_code = 1;     // The actual reservation code
+  string item_name = 2;            // Name of purchased item
+  double final_price = 3;          // Final agreed price
+  int64 paid_at = 4;               // Unix timestamp of payment confirmation
+}
+
+// Proof of on-chain payment
+message PaymentProof {
+  string transaction_hash = 1;     // Blockchain transaction ID
+  string block_number = 2;         // Block number for verification
+  string from_address = 3;         // Payer's wallet address
+  int64 confirmed_at = 4;          // Unix timestamp of confirmation
 }
 
 message OfferCountered {
