@@ -17,3 +17,4 @@ class LLMSettings(BaseModel):
         validation_alias=AliasChoices("AURA_LLM__OPENAI_API_KEY", "OPENAI_API_KEY"),
     )
     temperature: float = 0.7
+    compiled_program_path: str = "aura_brain.json"

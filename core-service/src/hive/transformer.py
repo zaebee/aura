@@ -14,9 +14,11 @@ logger = structlog.get_logger(__name__)
 class HiveTransformer:
     """T - Transformer: Wraps DSPy for self-reflective reasoning."""
 
-    def __init__(self, compiled_program_path: str = "aura_brain.json"):
+    def __init__(self, compiled_program_path: str | None = None):
         self.settings = get_settings()
-        self.compiled_program_path = compiled_program_path
+        self.compiled_program_path = (
+            compiled_program_path or self.settings.llm.compiled_program_path
+        )
 
         # Configure DSPy
         dspy.configure(lm=self.settings.llm.model)
@@ -25,9 +27,12 @@ class HiveTransformer:
 
     def _load_negotiator(self) -> AuraNegotiator:
         try:
-            # Look for compiled program in the parent directory of this file's parent
-            # (assuming it's in src/aura_brain.json)
-            program_path = Path(__file__).parent.parent / self.compiled_program_path
+            # Use absolute path if provided, otherwise resolve relative to project root (src/)
+            program_path = Path(self.compiled_program_path)
+            if not program_path.is_absolute():
+                # Resolve relative to the src/ directory (parent of hive/)
+                program_path = Path(__file__).parent.parent / self.compiled_program_path
+
             if program_path.exists():
                 logger.info("loading_compiled_dspy_program", path=str(program_path))
                 return dspy.load(str(program_path))

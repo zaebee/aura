@@ -101,8 +101,12 @@ class HiveMembrane:
         # 2. Min Margin Check
         # Margin = (Price - Floor) / Price
         # Required: (P - F) / P >= m  => P - F >= mP => P(1-m) >= F => P >= F / (1-m)
-        if min_margin >= 1.0:
-            logger.error("invalid_min_margin_config", margin=min_margin)
+        if not (0 <= min_margin < 1.0):
+            logger.error(
+                "invalid_min_margin_config",
+                margin=min_margin,
+                error="Margin must be in the range [0, 1)",
+            )
             min_margin = DEFAULT_MIN_MARGIN  # Fallback to constant
 
         required_min_price = floor_price / (1 - min_margin)

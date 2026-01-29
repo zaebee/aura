@@ -76,7 +76,6 @@ class HiveGenerator:
                 except (
                     nats.errors.ErrConnectionClosed,
                     nats.errors.ErrTimeout,
-                    nats.errors.BadSubscriptionError,
                 ) as e:
                     logger.error("nats_publish_failed", topic=event.topic, error=str(e))
         else:
