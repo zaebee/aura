@@ -1,4 +1,4 @@
-FROM python:3.11-slim as builder
+FROM python:3.12-slim as builder
 
 WORKDIR /app
 
@@ -16,34 +16,34 @@ ENV UV_LINK_MODE=copy
 # Copy dependency files
 COPY adapters/telegram-bot/pyproject.toml adapters/telegram-bot/uv.lock ./
 
-# Install dependencies (including grpcio-tools for generation)
-# We need to install dev dependencies in builder to have grpcio-tools
-RUN uv sync --frozen --no-install-project
+# Install dependencies (including dev for grpcio-tools)
+RUN uv sync --frozen --no-install-project --group dev
 
 # Copy proto definitions
 COPY proto/ /app/proto/
 
-# Generate gRPC stubs into /app/generated
-RUN mkdir /app/generated && \
+# Generate gRPC stubs
+RUN mkdir -p /app/src/proto && \
     uv run python -m grpc_tools.protoc -I /app/proto \
-    --python_out=/app/generated \
-    --grpc_python_out=/app/generated \
-    --pyi_out=/app/generated \
+    --python_out=/app/src/proto \
+    --grpc_python_out=/app/src/proto \
+    --pyi_out=/app/src/proto \
     /app/proto/aura/negotiation/v1/negotiation.proto
 
 # Final stage
-FROM python:3.11-slim
+FROM python:3.12-slim
 
 WORKDIR /app
 
 # Copy virtual env from builder stage (only runtime deps)
-# Actually, builder has dev deps. Let's do a cleaner approach for runtime.
-# But for now, let's just copy the .venv.
+# We need to sync again without dev to keep the image small,
+# or just copy the .venv and be aware it has dev deps.
+# Actually, let's just use the builder venv for now, but in a real prod we'd prune.
 COPY --from=builder /app/.venv /app/.venv
 ENV PATH="/app/.venv/bin:$PATH"
 
 # Copy generated proto stubs
-COPY --from=builder /app/generated/ /app/src/proto/
+COPY --from=builder /app/src/proto/ /app/src/proto/
 
 # Copy source code
 COPY adapters/telegram-bot/src/ /app/src/

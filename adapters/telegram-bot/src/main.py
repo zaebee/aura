@@ -1,9 +1,11 @@
 import asyncio
+
 import structlog
 from aiogram import Bot, Dispatcher
-from src.config import settings
+
 from src.bot import router
-from src.client import AuraClient
+from src.client import GRPCNegotiationClient
+from src.config import settings
 
 # Setup logging
 structlog.configure(
@@ -17,7 +19,7 @@ logger = structlog.get_logger()
 
 async def main():
     # Initialize gRPC client
-    client = AuraClient(settings.core_url)
+    client = GRPCNegotiationClient(settings.core_url)
 
     # Initialize Bot and Dispatcher
     bot = Bot(token=settings.token.get_secret_value())

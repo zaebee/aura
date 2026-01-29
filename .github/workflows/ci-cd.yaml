@@ -68,6 +68,7 @@ jobs:
                       ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}/gateway
                       ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}/core
                       ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}/frontend
+                      ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}/telegram-bot
 
             # Setup Buf
             - uses: bufbuild/buf-setup-action@v1
@@ -97,5 +98,6 @@ jobs:
                     --set gateway.image.tag=sha-$(git rev-parse --short HEAD) \
                     --set core.image.tag=sha-$(git rev-parse --short HEAD) \
                     --set frontend.image.tag=sha-$(git rev-parse --short HEAD) \
+                    --set telegram.image.tag=sha-$(git rev-parse --short HEAD) \
                     --set secrets.mistralApiKey="$MISTRAL_API_KEY" \
                     --set secrets.frpClientToken.value="$FRP_CLIENT_TOKEN"

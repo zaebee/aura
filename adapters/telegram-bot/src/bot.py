@@ -1,9 +1,15 @@
-from aiogram import Router, F
+from aiogram import F, Router
 from aiogram.filters import Command, CommandObject
-from aiogram.types import Message, CallbackQuery, InlineKeyboardMarkup, InlineKeyboardButton
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
-from src.client import AuraClient
+from aiogram.types import (
+    CallbackQuery,
+    InlineKeyboardButton,
+    InlineKeyboardMarkup,
+    Message,
+)
+
+from src.interfaces import NegotiationProvider
 
 router = Router()
 
@@ -22,7 +28,7 @@ async def cmd_start(message: Message):
 async def cmd_search(
     message: Message,
     command: CommandObject,
-    client: AuraClient
+    client: NegotiationProvider
 ):
     if not command.args:
         await message.answer("Usage: /search <query>")
@@ -63,7 +69,7 @@ async def process_select_hotel(callback: CallbackQuery, state: FSMContext):
     await callback.answer()
 
 @router.message(NegotiationStates.WaitingForBid, F.text.regexp(r'^\d+(\.\d+)?$'))
-async def process_bid(message: Message, state: FSMContext, client: AuraClient):
+async def process_bid(message: Message, state: FSMContext, client: NegotiationProvider):
     data = await state.get_data()
     item_id = data.get("item_id")
 

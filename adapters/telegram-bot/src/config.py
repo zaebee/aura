@@ -1,4 +1,4 @@
-from typing import Optional
+
 from pydantic import SecretStr
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
@@ -13,7 +13,7 @@ class TelegramSettings(BaseSettings):
 
     token: SecretStr
     core_url: str = "core-service:50051"
-    webhook_domain: Optional[str] = None
+    webhook_domain: str | None = None
 
 
 def get_settings() -> TelegramSettings:
