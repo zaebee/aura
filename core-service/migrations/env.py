@@ -10,6 +10,7 @@ from sqlalchemy import engine_from_config, pool
 src_path = Path(__file__).resolve().parent.parent / "src"
 sys.path.insert(0, str(src_path))
 
+from config import settings
 from db import Base  # noqa: E402
 
 config = context.config
@@ -17,9 +18,8 @@ config = context.config
 if config.config_file_name is not None:
     fileConfig(config.config_file_name)
 
-db_url = os.getenv("DATABASE_URL")
-if db_url:
-    config.set_main_option("sqlalchemy.url", db_url)
+target_url = str(settings.database.url)
+config.set_main_option("sqlalchemy.url", target_url)
 
 target_metadata = Base.metadata
 
