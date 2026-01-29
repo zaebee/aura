@@ -55,9 +55,7 @@ class LiteLLMStrategy:
         self.trigger_price = trigger_price
 
         # Load prompt template
-        template_path = (
-            Path(__file__).parent.parent / "prompts" / "system.md"
-        )
+        template_path = Path(__file__).parent.parent / "prompts" / "system.md"
         with open(template_path) as f:
             self.prompt_template = Template(f.read())
 
