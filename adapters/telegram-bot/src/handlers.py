@@ -2,10 +2,15 @@ from aiogram import Router, F
 from aiogram.filters import Command, CommandObject
 from aiogram.types import Message, CallbackQuery, InlineKeyboardMarkup, InlineKeyboardButton
 from aiogram.fsm.context import FSMContext
+from aiogram.filters.callback_data import CallbackData
 from src.states import NegotiationStates
 from src.client import AuraClient
 
 router = Router()
+
+
+class DealCallback(CallbackData, prefix="deal"):
+    item_id: str
 
 
 @router.message(Command("start"))
@@ -37,7 +42,7 @@ async def cmd_search(
     for item in results:
         keyboard.append([InlineKeyboardButton(
             text=f"{item.name} - ${item.base_price}",
-            callback_data=f"deal_{item.item_id}"
+            callback_data=DealCallback(item_id=item.item_id).pack()
         )])
 
     markup = InlineKeyboardMarkup(inline_keyboard=keyboard)
@@ -45,9 +50,13 @@ async def cmd_search(
     await state.set_state(NegotiationStates.searching)
 
 
-@router.callback_query(F.data.startswith("deal_"))
-async def process_callback_deal(callback: CallbackQuery, state: FSMContext):
-    item_id = callback.data.split("_", 1)[1]
+@router.callback_query(DealCallback.filter())
+async def process_callback_deal(
+    callback: CallbackQuery,
+    callback_data: DealCallback,
+    state: FSMContext
+):
+    item_id = callback_data.item_id
     await state.update_data(item_id=item_id)
     await state.set_state(NegotiationStates.negotiating)
     await callback.message.answer(
@@ -66,11 +75,7 @@ async def process_bid(message: Message, state: FSMContext, client: AuraClient):
         await state.clear()
         return
 
-    try:
-        bid_amount = float(message.text)
-    except ValueError:
-        await message.answer("Please enter a valid number for your bid.")
-        return
+    bid_amount = float(message.text)
 
     response = await client.negotiate(item_id, bid_amount)
 

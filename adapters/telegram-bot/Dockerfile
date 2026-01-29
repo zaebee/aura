@@ -1,4 +1,4 @@
-FROM python:3.11-slim
+FROM python:3.11-slim as builder
 
 WORKDIR /app
 
@@ -18,6 +18,15 @@ COPY pyproject.toml uv.lock ./
 
 # Install dependencies
 RUN uv sync --frozen --no-dev --no-install-project
+
+# Final stage
+FROM python:3.11-slim
+
+WORKDIR /app
+
+# Copy virtual env from builder stage
+COPY --from=builder /app/.venv /app/.venv
+ENV PATH="/app/.venv/bin:$PATH"
 
 # Copy source code
 COPY src/ ./src/
