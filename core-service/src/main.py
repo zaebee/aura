@@ -5,7 +5,6 @@ from concurrent import futures
 from typing import Protocol
 
 import grpc
-from prometheus_client import start_http_server
 import grpc.aio
 from grpc_health.v1 import health_pb2, health_pb2_grpc
 from logging_config import (
@@ -18,6 +17,7 @@ from monitor import get_hive_metrics
 from opentelemetry.instrumentation.grpc import GrpcInstrumentorServer
 from opentelemetry.instrumentation.langchain import LangchainInstrumentor
 from opentelemetry.instrumentation.sqlalchemy import SQLAlchemyInstrumentor
+from prometheus_client import start_http_server
 from sqlalchemy import text
 from sqlalchemy.exc import SQLAlchemyError
 from telemetry import init_telemetry
