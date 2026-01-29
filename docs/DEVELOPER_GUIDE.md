@@ -55,16 +55,28 @@ uv sync --group dev
 
 ### 3. Set Up Environment Variables
 
+Aura uses a modular configuration system powered by **Pydantic V2 Settings**. Environment variables are prefixed with `AURA_` and use `__` (double underscore) as a nested delimiter.
+
 ```bash
 # Copy the example environment file
 cp .env.example .env
 
-# Edit the .env file and add your Mistral API key
-# MISTRAL_API_KEY="your_api_key_here"
+# Edit the .env file with the new nested structure
+# AURA_LLM__API_KEY="your_api_key"
+# AURA_DATABASE__URL="postgresql://user:password@localhost:5432/aura_db"
+# AURA_DATABASE__REDIS_URL="redis://localhost:6379/0"
 
-# For local development, you might want to adjust other settings
 nano .env
 ```
+
+#### Configuration Mapping
+
+| Domain | Config Class | Env Prefix | Description |
+|--------|--------------|------------|-------------|
+| Database | `DatabaseSettings` | `AURA_DATABASE__` | Postgres and Redis connections |
+| LLM | `LLMSettings` | `AURA_LLM__` | Model selection and API keys |
+| Server | `ServerSettings` | `AURA_SERVER__` | gRPC/HTTP ports and Telemetry |
+| Crypto | `CryptoSettings` | `AURA_CRYPTO__` | Solana RPC and Private keys |
 
 ### 4. Install buf (Protocol Buffer Toolkit)
 
@@ -105,6 +117,13 @@ docker-compose up --build
 
 #### Core Service
 
+**1. Train the Brain (Mandatory)**
+Before running the Core service, you must train the DSPy-based negotiation engine:
+```bash
+uv run core-service/train_dspy.py
+```
+
+**2. Run the Service**
 ```bash
 # Navigate to core-service directory
 cd core-service
@@ -178,6 +197,10 @@ python search_sim.py
 ```
 
 ## 📦 Database Setup
+
+### PostgreSQL Requirement
+
+Aura now requires **PostgreSQL with pgvector** for all environments. SQLite is no longer supported due to the requirement for vector similarity search and complex concurrent negotiations.
 
 ### Running Migrations
 
