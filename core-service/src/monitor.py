@@ -103,12 +103,13 @@ async def get_hive_metrics() -> dict[str, Any]:
     try:
         async with httpx.AsyncClient(timeout=5.0) as client:
             # Query CPU and Memory concurrently
+            base_url = str(settings.server.prometheus_url).rstrip("/")
             cpu_task = client.get(
-                f"{settings.server.prometheus_url}/api/v1/query",
+                f"{base_url}/api/v1/query",
                 params={"query": cpu_query},
             )
             mem_task = client.get(
-                f"{settings.server.prometheus_url}/api/v1/query",
+                f"{base_url}/api/v1/query",
                 params={"query": mem_query},
             )
             cpu_response, mem_response = await asyncio.gather(cpu_task, mem_task)
