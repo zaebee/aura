@@ -83,6 +83,8 @@ jobs:
     deploy:
         needs: build-and-push
         runs-on: self-hosted
+        env:
+            KUBECONFIG: /home/runner/.kube/config
         if: github.ref == 'refs/heads/main'
         steps:
             - uses: actions/checkout@v4
