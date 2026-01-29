@@ -23,6 +23,14 @@ class HiveMembrane:
         Args:
             signal: The inbound gRPC request.
         """
+        if hasattr(signal, "bid_amount") and signal.bid_amount <= 0:
+            logger.warning(
+                "membrane_inbound_invalid_bid",
+                bid_amount=signal.bid_amount,
+                error="Bid amount must be positive",
+            )
+            raise ValueError("Bid amount must be positive")
+
         # Common prompt injection patterns
         injection_patterns = [
             "ignore all previous instructions",

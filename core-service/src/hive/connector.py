@@ -1,9 +1,11 @@
 import asyncio
 import time
+import uuid
 
 import structlog
 from crypto.pricing import PriceConverter
 from hive.dna import Decision, HiveContext, Observation
+from sqlalchemy.exc import SQLAlchemyError
 
 from config import get_settings
 from db import SessionLocal
@@ -31,13 +33,13 @@ class HiveConnector:
 
         # 1. Map Decision to Protobuf NegotiateResponse
         response = negotiation_pb2.NegotiateResponse()
-        response.session_token = "sess_" + (context.request_id or str(int(time.time())))
+        response.session_token = "sess_" + (context.request_id or str(uuid.uuid4()))
         response.valid_until_timestamp = int(time.time() + 600)
 
         if action.action == "accept":
             response.accepted.final_price = action.price
             # Default reservation code if crypto not used
-            response.accepted.reservation_code = f"HIVE-{int(time.time())}"
+            response.accepted.reservation_code = f"HIVE-{uuid.uuid4()}"
 
             # 2. Handle Solana logic if enabled and MarketService is provided
             if self.settings.crypto.enabled and self.market_service:
@@ -113,7 +115,7 @@ class HiveConnector:
                 currency=self.settings.crypto.currency,
             )
 
-        except Exception as e:
+        except (ValueError, SQLAlchemyError) as e:
             logger.error("crypto_lock_failed", error=str(e), exc_info=True)
             # Fallback: keep the plain reservation_code if crypto fails
             # (or we could decide to fail the whole request)

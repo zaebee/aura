@@ -1,9 +1,11 @@
 import asyncio
 from typing import Any
 
+import httpx
 import structlog
 from hive.dna import HiveContext
 from monitor import get_hive_metrics
+from sqlalchemy.exc import SQLAlchemyError
 
 from db import InventoryItem, SessionLocal
 
@@ -47,14 +49,14 @@ class HiveAggregator:
                 }
             else:
                 logger.warning("item_not_found", item_id=item_id)
-        except Exception as e:
+        except SQLAlchemyError as e:
             logger.error("aggregator_db_error", error=str(e))
 
         # 2. Fetch system health metrics
         system_health = {}
         try:
             system_health = await get_hive_metrics()
-        except Exception as e:
+        except httpx.HTTPError as e:
             logger.error("aggregator_metrics_error", error=str(e))
 
         return HiveContext(

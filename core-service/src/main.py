@@ -155,6 +155,11 @@ class NegotiationService(negotiation_pb2_grpc.NegotiationServiceServicer):
 
                 return observation.data
 
+        except ValueError as e:
+            logger.warning("invalid_argument", error=str(e))
+            context.set_code(grpc.StatusCode.INVALID_ARGUMENT)
+            context.set_details(str(e))
+            return negotiation_pb2.NegotiateResponse()
         except Exception as e:
             logger.error("metabolic_failure", error=str(e), exc_info=True)
             # Record exception in the OTel span
