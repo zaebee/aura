@@ -4,94 +4,279 @@
     "train": [],
     "demos": [
       {
-        "augmented": true,
         "input_bid": "600",
-        "context": "\"{\\\"base_price\\\": 1000, \\\"floor_price\\\": 800, \\\"occupancy\\\": \\\"high\\\", \\\"value_add_inventory\\\": [{\\\"item\\\": \\\"Breakfast for two\\\", \\\"internal_cost\\\": 20, \\\"perceived_value\\\": 60}, {\\\"item\\\": \\\"Late checkout\\\", \\\"internal_cost\\\": 0, \\\"perceived_value\\\": 40}, {\\\"item\\\": \\\"Room upgrade\\\", \\\"internal_cost\\\": 30, \\\"perceived_value\\\": 120}]}\"",
-        "history": "\"[]\"",
-        "reasoning": "1. **Margin Analysis**: The bid of $600 is significantly below our floor price of $800, leaving no margin for profitability.\n2. **Occupancy Considerations**: Current occupancy is high, meaning we have less incentive to accept low-ball offers.\n3. **Value-Add Utilization**: While we could sweeten the deal with perks, the gap ($200 below floor) is too large to bridge with value-adds alone.\n4. **Competitive Positioning**: Rejecting firmly maintains pricing integrity and avoids setting a precedent for future negotiations.",
-        "response": {
-          "action": "reject",
-          "price": 0,
-          "message": "I appreciate your offer, but $600 is below our minimum acceptable rate. Given high demand, we cannot accommodate this request. I’d be happy to discuss rates starting at $950 with added perks."
-        }
-      },
-      {
-        "augmented": true,
-        "input_bid": "700",
-        "context": "\"{\\\"base_price\\\": 1000, \\\"floor_price\\\": 800, \\\"occupancy\\\": \\\"high\\\", \\\"value_add_inventory\\\": [{\\\"item\\\": \\\"Breakfast for two\\\", \\\"internal_cost\\\": 20, \\\"perceived_value\\\": 60}, {\\\"item\\\": \\\"Late checkout\\\", \\\"internal_cost\\\": 0, \\\"perceived_value\\\": 40}, {\\\"item\\\": \\\"Room upgrade\\\", \\\"internal_cost\\\": 30, \\\"perceived_value\\\": 120}]}\"",
-        "history": "\"[]\"",
-        "reasoning": "The bid of $700 is below the floor price ($800) but only by $100 in a high-occupancy context. Given strong demand, we can counter firmly while leveraging value-adds to justify the price increase. A room upgrade (high perceived value, low internal cost) is ideal here to bridge the gap without sacrificing margin. This maintains revenue integrity while offering tangible value to the buyer.",
+        "context": {
+          "base_price": 1000,
+          "floor_price": 800,
+          "occupancy": "high",
+          "value_add_inventory": [
+            {
+              "item": "Breakfast for two",
+              "internal_cost": 20,
+              "perceived_value": 60
+            },
+            {
+              "item": "Late checkout",
+              "internal_cost": 0,
+              "perceived_value": 40
+            },
+            {
+              "item": "Room upgrade",
+              "internal_cost": 30,
+              "perceived_value": 120
+            }
+          ]
+        },
+        "history": [],
+        "reasoning": "Offer is far below acceptable range. High occupancy allows firm pricing with value substitution.",
         "response": {
           "action": "counter",
-          "price": 850,
-          "message": "Given high demand, I can't accept $700, but I can offer $850 with a complimentary room upgrade included."
+          "price": 980,
+          "message": "We can’t accommodate $600 due to strong demand. I can offer $980 and include complimentary breakfast for two."
         }
       },
       {
-        "augmented": true,
+        "input_bid": "700",
+        "context": {
+          "base_price": 1000,
+          "floor_price": 800,
+          "occupancy": "high",
+          "value_add_inventory": [
+            {
+              "item": "Breakfast for two",
+              "internal_cost": 20,
+              "perceived_value": 60
+            },
+            {
+              "item": "Late checkout",
+              "internal_cost": 0,
+              "perceived_value": 40
+            },
+            {
+              "item": "Room upgrade",
+              "internal_cost": 30,
+              "perceived_value": 120
+            }
+          ]
+        },
+        "history": [],
+        "reasoning": "User improves but still below floor. Maintain price discipline and add another low-cost perk.",
+        "response": {
+          "action": "counter",
+          "price": 950,
+          "message": "I can’t go that low, but I can do $950 and include breakfast plus late checkout."
+        }
+      },
+      {
         "input_bid": "900",
-        "context": "\"{\\\"base_price\\\": 1000, \\\"floor_price\\\": 800, \\\"occupancy\\\": \\\"high\\\", \\\"value_add_inventory\\\": [{\\\"item\\\": \\\"Breakfast for two\\\", \\\"internal_cost\\\": 20, \\\"perceived_value\\\": 60}, {\\\"item\\\": \\\"Late checkout\\\", \\\"internal_cost\\\": 0, \\\"perceived_value\\\": 40}, {\\\"item\\\": \\\"Room upgrade\\\", \\\"internal_cost\\\": 30, \\\"perceived_value\\\": 120}]}\"",
-        "history": "\"[]\"",
-        "reasoning": "The buyer's offer of $900 is at the upper end of our acceptable range (floor_price = $800) during high occupancy. Given strong demand, we can accept this offer while still maintaining profitability. To enhance perceived value and justify the price, we'll include a high-value, low-cost perk (room upgrade) to encourage future bookings and positive guest experience.",
+        "context": {
+          "base_price": 1000,
+          "floor_price": 800,
+          "occupancy": "high",
+          "value_add_inventory": [
+            {
+              "item": "Breakfast for two",
+              "internal_cost": 20,
+              "perceived_value": 60
+            },
+            {
+              "item": "Late checkout",
+              "internal_cost": 0,
+              "perceived_value": 40
+            },
+            {
+              "item": "Room upgrade",
+              "internal_cost": 30,
+              "perceived_value": 120
+            }
+          ]
+        },
+        "history": [],
+        "reasoning": "User is now within acceptable range. Close the deal while preserving margin.",
         "response": {
           "action": "accept",
           "price": 900,
-          "message": "Excellent. I'll confirm your stay at $900 and include a complimentary room upgrade as a thank-you for booking with us during this busy period."
-        }
-      },
-      {
-        "augmented": true,
-        "input_bid": "710",
-        "context": "\"{\\\"base_price\\\": 850, \\\"floor_price\\\": 700, \\\"occupancy\\\": \\\"low\\\", \\\"value_add_inventory\\\": [{\\\"item\\\": \\\"Breakfast for two\\\", \\\"internal_cost\\\": 20, \\\"perceived_value\\\": 60}, {\\\"item\\\": \\\"Late checkout\\\", \\\"internal_cost\\\": 0, \\\"perceived_value\\\": 40}]}\"",
-        "history": "\"[]\"",
-        "reasoning": "The bid of $710 is just above our floor price of $700 during a low-occupancy period, making it strategically acceptable. To incentivize the booking while preserving perceived value, we can include a low-cost/high-perceived-value perk (late checkout) to create goodwill without significantly impacting margin. This approach maintains pricing integrity while addressing the buyer's offer.",
-        "response": {
-          "action": "accept",
-          "price": 710,
-          "message": "I can confirm your stay at $710 with complimentary late checkout included. This offer is available for immediate booking."
+          "message": "That works. I’ll confirm your stay at $900 with breakfast and late checkout included."
         }
       },
       {
         "input_bid": "680",
-        "context": "{\"base_price\": 850, \"floor_price\": 700, \"occupancy\": \"low\", \"value_add_inventory\": [{\"item\": \"Breakfast for two\", \"internal_cost\": 20, \"perceived_value\": 60}, {\"item\": \"Late checkout\", \"internal_cost\": 0, \"perceived_value\": 40}]}",
-        "history": "[]",
+        "context": {
+          "base_price": 850,
+          "floor_price": 700,
+          "occupancy": "low",
+          "value_add_inventory": [
+            {
+              "item": "Breakfast for two",
+              "internal_cost": 20,
+              "perceived_value": 60
+            },
+            {
+              "item": "Late checkout",
+              "internal_cost": 0,
+              "perceived_value": 40
+            }
+          ]
+        },
+        "history": [],
         "reasoning": "Bid is slightly below floor. Low occupancy allows a near-floor counter to encourage booking.",
-        "response": "{\"action\": \"counter\", \"price\": 730, \"message\": \"I can\\u2019t do $680, but I can offer $730 and include late checkout.\"}"
+        "response": {
+          "action": "counter",
+          "price": 730,
+          "message": "I can’t do $680, but I can offer $730 and include late checkout."
+        }
       },
       {
-        "input_bid": "820",
-        "context": "{\"base_price\": 950, \"floor_price\": 780, \"occupancy\": \"high\", \"value_add_inventory\": [{\"item\": \"Breakfast for two\", \"internal_cost\": 20, \"perceived_value\": 60}, {\"item\": \"Room upgrade\", \"internal_cost\": 30, \"perceived_value\": 120}]}",
-        "history": "[]",
-        "reasoning": "Buyer moves into acceptable range. Close confidently with value reinforcement.",
-        "response": "{\"action\": \"accept\", \"price\": 820, \"message\": \"That works. I\\u2019ll confirm the room at $820 and include breakfast for two.\"}"
-      },
-      {
-        "input_bid": "880",
-        "context": "{\"base_price\": 1100, \"floor_price\": 900, \"occupancy\": \"high\", \"value_add_inventory\": [{\"item\": \"Late checkout\", \"internal_cost\": 0, \"perceived_value\": 40}]}",
-        "history": "[]",
-        "reasoning": "Offer is below floor and availability is tight. Use scarcity and minimal perks to defend price.",
-        "response": "{\"action\": \"counter\", \"price\": 1050, \"message\": \"We\\u2019re nearly sold out, so I can\\u2019t go below that. I can offer $1050 and include late checkout.\"}"
-      },
-      {
-        "input_bid": "750",
-        "context": "{\"base_price\": 950, \"floor_price\": 780, \"occupancy\": \"high\", \"value_add_inventory\": [{\"item\": \"Breakfast for two\", \"internal_cost\": 20, \"perceived_value\": 60}, {\"item\": \"Room upgrade\", \"internal_cost\": 30, \"perceived_value\": 120}]}",
-        "history": "[]",
-        "reasoning": "Offer is below floor and likely an anchoring tactic. Respond firmly without revealing constraints.",
-        "response": "{\"action\": \"counter\", \"price\": 920, \"message\": \"I can\\u2019t go to $750, but I can offer $920 and include complimentary breakfast.\"}"
+        "input_bid": "710",
+        "context": {
+          "base_price": 850,
+          "floor_price": 700,
+          "occupancy": "low",
+          "value_add_inventory": [
+            {
+              "item": "Breakfast for two",
+              "internal_cost": 20,
+              "perceived_value": 60
+            },
+            {
+              "item": "Late checkout",
+              "internal_cost": 0,
+              "perceived_value": 40
+            }
+          ]
+        },
+        "history": [],
+        "reasoning": "User is approaching the minimum acceptable level. Small concession closes the deal.",
+        "response": {
+          "action": "accept",
+          "price": 710,
+          "message": "That works. I’ll confirm the room at $710 with late checkout included."
+        }
       },
       {
         "input_bid": "1300",
-        "context": "{\"base_price\": 1200, \"floor_price\": 900, \"occupancy\": \"high\", \"value_add_inventory\": [{\"item\": \"Suite upgrade\", \"internal_cost\": 40, \"perceived_value\": 200}, {\"item\": \"Welcome champagne\", \"internal_cost\": 25, \"perceived_value\": 100}]}",
-        "history": "[]",
+        "context": {
+          "base_price": 1200,
+          "floor_price": 900,
+          "occupancy": "high",
+          "value_add_inventory": [
+            {
+              "item": "Suite upgrade",
+              "internal_cost": 40,
+              "perceived_value": 200
+            },
+            {
+              "item": "Welcome champagne",
+              "internal_cost": 25,
+              "perceived_value": 100
+            }
+          ]
+        },
+        "history": [],
         "reasoning": "Buyer exceeds asking price. Accept immediately and reinforce premium experience.",
-        "response": "{\"action\": \"accept\", \"price\": 1300, \"message\": \"Absolutely. I\\u2019ll confirm your stay at $1300 and include a complimentary suite upgrade and welcome champagne.\"}"
+        "response": {
+          "action": "accept",
+          "price": 1300,
+          "message": "Absolutely. I’ll confirm your stay at $1300 and include a complimentary suite upgrade and welcome champagne."
+        }
+      },
+      {
+        "input_bid": "750",
+        "context": {
+          "base_price": 950,
+          "floor_price": 780,
+          "occupancy": "high",
+          "value_add_inventory": [
+            {
+              "item": "Breakfast for two",
+              "internal_cost": 20,
+              "perceived_value": 60
+            },
+            {
+              "item": "Room upgrade",
+              "internal_cost": 30,
+              "perceived_value": 120
+            }
+          ]
+        },
+        "history": [],
+        "reasoning": "Offer is below floor and likely an anchoring tactic. Respond firmly without revealing constraints.",
+        "response": {
+          "action": "counter",
+          "price": 920,
+          "message": "I can’t go to $750, but I can offer $920 and include complimentary breakfast."
+        }
+      },
+      {
+        "input_bid": "820",
+        "context": {
+          "base_price": 950,
+          "floor_price": 780,
+          "occupancy": "high",
+          "value_add_inventory": [
+            {
+              "item": "Breakfast for two",
+              "internal_cost": 20,
+              "perceived_value": 60
+            },
+            {
+              "item": "Room upgrade",
+              "internal_cost": 30,
+              "perceived_value": 120
+            }
+          ]
+        },
+        "history": [],
+        "reasoning": "Buyer moves into acceptable range. Close confidently with value reinforcement.",
+        "response": {
+          "action": "accept",
+          "price": 820,
+          "message": "That works. I’ll confirm the room at $820 and include breakfast for two."
+        }
+      },
+      {
+        "input_bid": "880",
+        "context": {
+          "base_price": 1100,
+          "floor_price": 900,
+          "occupancy": "high",
+          "value_add_inventory": [
+            {
+              "item": "Late checkout",
+              "internal_cost": 0,
+              "perceived_value": 40
+            }
+          ]
+        },
+        "history": [],
+        "reasoning": "Offer is below floor and availability is tight. Use scarcity and minimal perks to defend price.",
+        "response": {
+          "action": "counter",
+          "price": 1050,
+          "message": "We’re nearly sold out, so I can’t go below that. I can offer $1050 and include late checkout."
+        }
       },
       {
         "input_bid": "1000",
-        "context": "{\"base_price\": 1100, \"floor_price\": 900, \"occupancy\": \"high\", \"value_add_inventory\": [{\"item\": \"Late checkout\", \"internal_cost\": 0, \"perceived_value\": 40}]}",
-        "history": "[]",
+        "context": {
+          "base_price": 1100,
+          "floor_price": 900,
+          "occupancy": "high",
+          "value_add_inventory": [
+            {
+              "item": "Late checkout",
+              "internal_cost": 0,
+              "perceived_value": 40
+            }
+          ]
+        },
+        "history": [],
         "reasoning": "User concedes upward. Accept strong rate and close quickly.",
-        "response": "{\"action\": \"accept\", \"price\": 1000, \"message\": \"Perfect. I\\u2019ll lock in your stay at $1000 with late checkout included.\"}"
+        "response": {
+          "action": "accept",
+          "price": 1000,
+          "message": "Perfect. I’ll lock in your stay at $1000 with late checkout included."
+        }
       }
     ],
     "signature": {
