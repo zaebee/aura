@@ -34,9 +34,16 @@ FROM python:3.12-slim AS runtime
 
 WORKDIR /app
 
-# Copy virtual env from builder stage
-COPY --from=builder /app/.venv /app/.venv
-ENV PATH="/app/.venv/bin:$PATH"
+# Install uv
+COPY --from=ghcr.io/astral-sh/uv:latest /uv /usr/local/bin/uv
+ENV UV_COMPILE_BYTECODE=1
+ENV UV_LINK_MODE=copy
+
+# Copy dependency files
+COPY adapters/telegram-bot/pyproject.toml adapters/telegram-bot/uv.lock ./
+
+# Install only production dependencies
+RUN uv sync --frozen --no-install-project
 
 # Copy generated proto stubs
 COPY --from=builder /app/src/proto/ /app/src/proto/
@@ -45,6 +52,7 @@ COPY --from=builder /app/src/proto/ /app/src/proto/
 COPY adapters/telegram-bot/src/ /app/src/
 
 # Set environment variables
+ENV PATH="/app/.venv/bin:$PATH"
 ENV PYTHONPATH=/app:/app/src:/app/src/proto
 
 # Command to run the bot

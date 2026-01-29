@@ -9,7 +9,7 @@ class MockNegotiationProvider(NegotiationProvider):
         self.search_results = []
         self.negotiation_result = {}
 
-    async def search(self, query: str) -> list[SearchResult]:
+    async def search(self, query: str, limit: int = 5) -> list[SearchResult]:
         return self.search_results
 
     async def negotiate(self, item_id: str, bid: float) -> NegotiationResult:

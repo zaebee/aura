@@ -15,7 +15,7 @@ class NegotiationResult(TypedDict, total=False):
     error: str | None
 
 class NegotiationProvider(Protocol):
-    async def search(self, query: str) -> list[SearchResult]:
+    async def search(self, query: str, limit: int = 5) -> list[SearchResult]:
         """Search for items to negotiate."""
         ...
 
