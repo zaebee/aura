@@ -83,23 +83,31 @@ jobs:
     deploy:
         needs: build-and-push
         runs-on: self-hosted
-
         if: github.ref == 'refs/heads/main'
         steps:
             - uses: actions/checkout@v4
 
-            - name: Deploy to Minikube
-              env:
-                MISTRAL_API_KEY: ${{ secrets.MISTRAL_API_KEY }}
-                FRP_CLIENT_TOKEN: ${{ secrets.FRP_CLIENT_TOKEN }}
-                TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
+            - name: Sync K8s Secrets
+              run: |
+                  kubectl create secret generic aura-secrets \
+                    --from-literal=telegram-token="${{ secrets.AURA_TELEGRAM_TOKEN }}" \
+                    --from-literal=mistral-key="${{ secrets.MISTRAL_API_KEY }}" \
+                    --from-literal=openai-key="${{ secrets.OPENAI_API_KEY }}" \
+                    --from-literal=solana-private-key="${{ secrets.SOLANA_PRIVATE_KEY }}" \
+                    --from-literal=frp-client-token="${{ secrets.FRP_CLIENT_TOKEN }}" \
+                    --dry-run=client -o yaml | kubectl apply -f -
+
+            - name: Deploy to Cluster
               run: |
                   helm dependency update ./deploy/aura
-                  helm upgrade aura ./deploy/aura \
+
+                  helm upgrade aura ./deploy/aura --install --wait --timeout 5m \
                     --set core.image.tag=sha-$(git rev-parse --short HEAD) \
                     --set gateway.image.tag=sha-$(git rev-parse --short HEAD) \
                     --set frontend.image.tag=sha-$(git rev-parse --short HEAD) \
-                    --set telegram.image.tag=sha-$(git rev-parse --short HEAD) \
-                    --set secrets.telegramToken="$TELEGRAM_TOKEN" \
-                    --set secrets.mistralApiKey="$MISTRAL_API_KEY" \
-                    --set secrets.frpClientToken.value="$FRP_CLIENT_TOKEN"
+                    --set telegram.image.tag=sha-$(git rev-parse --short HEAD)
+
+            - name: Verify Rollout
+              run: |
+                  kubectl rollout status deployment/aura-core --timeout=60s
+                  kubectl rollout status deployment/aura-telegram --timeout=60s
