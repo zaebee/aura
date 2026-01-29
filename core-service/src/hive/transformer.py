@@ -1,11 +1,14 @@
-import structlog
-import dspy
 from pathlib import Path
-from hive.dna import HiveContext, Decision
+
+import dspy
+import structlog
+from hive.dna import Decision, HiveContext
 from llm.engine import AuraNegotiator
+
 from config import get_settings
 
 logger = structlog.get_logger(__name__)
+
 
 class HiveTransformer:
     """T - Transformer: Wraps DSPy for self-reflective reasoning."""
@@ -28,7 +31,9 @@ class HiveTransformer:
                 logger.info("loading_compiled_dspy_program", path=str(program_path))
                 return dspy.load(str(program_path))
             else:
-                logger.warning("compiled_program_not_found_using_untrained", path=str(program_path))
+                logger.warning(
+                    "compiled_program_not_found_using_untrained", path=str(program_path)
+                )
                 return AuraNegotiator()
         except Exception as e:
             logger.error("failed_to_load_dspy_program", error=str(e))
@@ -43,7 +48,9 @@ class HiveTransformer:
         cpu_load = context.system_health.get("cpu_usage_percent", 0.0)
         constraints = []
         if cpu_load > 80.0:
-            constraints.append("SYSTEM_LOAD_HIGH: Be extremely concise and prioritize finishing the deal quickly.")
+            constraints.append(
+                "SYSTEM_LOAD_HIGH: Be extremely concise and prioritize finishing the deal quickly."
+            )
             logger.warning("high_cpu_reflection", cpu_load=cpu_load)
 
         # Build economic context for DSPy
@@ -52,7 +59,7 @@ class HiveTransformer:
             "floor_price": context.item_data.get("floor_price", 0.0),
             "reputation": context.reputation,
             "system_constraints": constraints,
-            "meta": context.item_data.get("meta", {})
+            "meta": context.item_data.get("meta", {}),
         }
 
         try:
@@ -61,21 +68,23 @@ class HiveTransformer:
             result = self.negotiator(
                 input_bid=context.bid_amount,
                 context=economic_context,
-                history=[]  # History tracking to be implemented later if needed
+                history=[],  # History tracking to be implemented later if needed
             )
 
             response_data = result["response"]
 
-            logger.info("transformer_thought_complete",
-                        action=response_data.get("action"),
-                        price=response_data.get("price"))
+            logger.info(
+                "transformer_thought_complete",
+                action=response_data.get("action"),
+                price=response_data.get("price"),
+            )
 
             return Decision(
                 action=response_data["action"],
                 price=response_data["price"],
                 message=response_data["message"],
                 reasoning=result.get("reasoning", ""),
-                metadata={"dspy_result": result}
+                metadata={"dspy_result": result},
             )
 
         except Exception as e:
@@ -85,5 +94,5 @@ class HiveTransformer:
                 action="reject",
                 price=0.0,
                 message="Service temporarily unavailable. Please try again later.",
-                reasoning=f"Error in Transformer: {e}"
+                reasoning=f"Error in Transformer: {e}",
             )

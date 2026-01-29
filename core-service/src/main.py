@@ -1,13 +1,17 @@
 import asyncio
-import time
 import uuid
-import nats
 from concurrent import futures
 from typing import Protocol
 
 import grpc
 import grpc.aio
+import nats
 from grpc_health.v1 import health_pb2, health_pb2_grpc
+from hive.aggregator import HiveAggregator
+from hive.connector import HiveConnector
+from hive.generator import HiveGenerator
+from hive.membrane import HiveMembrane
+from hive.transformer import HiveTransformer
 from logging_config import (
     bind_request_id,
     clear_request_context,
@@ -15,6 +19,7 @@ from logging_config import (
     get_logger,
 )
 from monitor import get_hive_metrics
+from opentelemetry import trace
 from opentelemetry.instrumentation.grpc import GrpcInstrumentorServer
 from opentelemetry.instrumentation.langchain import LangchainInstrumentor
 from opentelemetry.instrumentation.sqlalchemy import SQLAlchemyInstrumentor
@@ -27,12 +32,6 @@ from config import settings
 from db import InventoryItem, SessionLocal, engine
 from embeddings import generate_embedding
 from proto.aura.negotiation.v1 import negotiation_pb2, negotiation_pb2_grpc
-
-from hive.aggregator import HiveAggregator
-from hive.transformer import HiveTransformer
-from hive.connector import HiveConnector
-from hive.generator import HiveGenerator
-from hive.membrane import HiveMembrane
 
 # Configure structured logging on startup
 configure_logging(log_level=settings.server.log_level)
@@ -78,35 +77,49 @@ class NegotiationService(negotiation_pb2_grpc.NegotiationServiceServicer):
     Refactored into a metabolic ATCG loop.
     """
 
-    def __init__(self, aggregator, transformer, connector, generator, membrane, market_service=None):
+    def __init__(
+        self,
+        aggregator,
+        transformer,
+        connector,
+        generator,
+        membrane,
+        market_service=None,
+    ):
         self.aggregator = aggregator
         self.transformer = transformer
         self.connector = connector
         self.generator = generator
         self.membrane = membrane
-        self.market_service = market_service # Keep for other methods if needed
+        self.market_service = market_service  # Keep for other methods if needed
 
     async def Negotiate(self, request, context):
         """
         Main metabolic loop for negotiation:
-        Signal -> Aggregator -> Membrane(In) -> Transformer -> Membrane(Out) -> Connector -> Generator
+        Signal -> Membrane(In) -> Aggregator -> Transformer -> Membrane(Out) -> Connector -> Generator
         """
-        request_id = extract_request_id(context) or getattr(request, "request_id", str(uuid.uuid4()))
+        request_id = extract_request_id(context) or getattr(
+            request, "request_id", str(uuid.uuid4())
+        )
         bind_request_id(request_id)
 
         try:
-            with tracer.start_as_current_span("hive_metabolism") as span:
-                logger.info("metabolism_cycle_started", item_id=request.item_id, bid_amount=request.bid_amount)
+            with tracer.start_as_current_span("hive_metabolism"):
+                logger.info(
+                    "metabolism_cycle_started",
+                    item_id=request.item_id,
+                    bid_amount=request.bid_amount,
+                )
 
-                # 1. Sense (Aggregator)
+                # 1. Filter Inbound (Membrane) - Sanitize as early as possible
+                with tracer.start_as_current_span("hive_membrane_inbound"):
+                    request = await self.membrane.inspect_inbound(request)
+
+                # 2. Sense (Aggregator)
                 with tracer.start_as_current_span("hive_aggregator") as a_span:
                     hive_context = await self.aggregator.perceive(request)
                     a_span.set_attribute("item_id", hive_context.item_id)
                     a_span.set_attribute("bid_amount", hive_context.bid_amount)
-
-                # 2. Filter Inbound (Membrane)
-                with tracer.start_as_current_span("hive_membrane_inbound") as m_in_span:
-                    request = await self.membrane.inspect_inbound(request)
 
                 # 3. Think (Transformer)
                 with tracer.start_as_current_span("hive_transformer") as t_span:
@@ -115,29 +128,41 @@ class NegotiationService(negotiation_pb2_grpc.NegotiationServiceServicer):
                     t_span.set_attribute("price", decision.price)
 
                 # 4. Filter Outbound (Membrane)
-                with tracer.start_as_current_span("hive_membrane_outbound") as m_out_span:
-                    safe_decision = await self.membrane.inspect_outbound(decision, hive_context)
+                with tracer.start_as_current_span(
+                    "hive_membrane_outbound"
+                ) as m_out_span:
+                    safe_decision = await self.membrane.inspect_outbound(
+                        decision, hive_context
+                    )
                     if safe_decision != decision:
                         m_out_span.set_attribute("overridden", True)
                         m_out_span.set_attribute("original_price", decision.price)
                         m_out_span.set_attribute("safe_price", safe_decision.price)
 
                 # 5. Act (Connector)
-                with tracer.start_as_current_span("hive_connector") as c_span:
+                with tracer.start_as_current_span("hive_connector"):
                     observation = await self.connector.act(safe_decision, hive_context)
 
                 # 6. Pulse (Generator)
-                with tracer.start_as_current_span("hive_generator") as g_span:
+                with tracer.start_as_current_span("hive_generator"):
                     await self.generator.pulse(observation)
 
-                logger.info("metabolism_cycle_completed",
-                            action=safe_decision.action,
-                            price=safe_decision.price)
+                logger.info(
+                    "metabolism_cycle_completed",
+                    action=safe_decision.action,
+                    price=safe_decision.price,
+                )
 
                 return observation.data
 
         except Exception as e:
             logger.error("metabolic_failure", error=str(e), exc_info=True)
+            # Record exception in the OTel span
+            current_span = trace.get_current_span()
+            if current_span:
+                current_span.record_exception(e)
+                current_span.set_status(trace.Status(trace.StatusCode.ERROR, str(e)))
+
             context.set_code(grpc.StatusCode.INTERNAL)
             context.set_details(f"Metabolic failure: {e}")
             return negotiation_pb2.NegotiateResponse()
@@ -427,7 +452,9 @@ async def serve():
         nc = await nats.connect(settings.server.nats_url)
         logger.info("nats_connected", url=settings.server.nats_url)
     except Exception as e:
-        logger.warning("nats_connection_failed", url=settings.server.nats_url, error=str(e))
+        logger.warning(
+            "nats_connection_failed", url=settings.server.nats_url, error=str(e)
+        )
 
     # Initialize crypto provider and market service if enabled
     crypto_provider = create_crypto_provider()
@@ -467,9 +494,9 @@ async def serve():
             connector=connector,
             generator=generator,
             membrane=membrane,
-            market_service=market_service
+            market_service=market_service,
         ),
-        server
+        server,
     )
 
     # Register health service

@@ -46,9 +46,7 @@ class AuraNegotiator(dspy.Module):
         history_json = (
             history if isinstance(history, str) else json.dumps(history or [])
         )
-        context_json = (
-            context if isinstance(context, str) else json.dumps(context)
-        )
+        context_json = context if isinstance(context, str) else json.dumps(context)
 
         # 2. Extract keys for safe logging
         try:
@@ -65,7 +63,9 @@ class AuraNegotiator(dspy.Module):
             "dspy_forward_pass_started",
             input_bid=input_bid,
             context_keys=context_keys,
-            history_length=len(history or []) if not isinstance(history, str) else "N/A",
+            history_length=len(history or [])
+            if not isinstance(history, str)
+            else "N/A",
         )
 
         # 3. Execute DSPy chain

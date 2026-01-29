@@ -1,11 +1,13 @@
-import time
 import json
+import time
+
 import structlog
-from typing import List
-from hive.dna import Observation, Event
+from hive.dna import Event, Observation
+
 from config import get_settings
 
 logger = structlog.get_logger(__name__)
+
 
 class HiveGenerator:
     """G - Generator: Emits events (heartbeats, transactions) to the Hive's blood stream (NATS)."""
@@ -20,7 +22,7 @@ class HiveGenerator:
         self.nc = nats_client
         self.settings = get_settings()
 
-    async def pulse(self, observation: Observation) -> List[Event]:
+    async def pulse(self, observation: Observation) -> list[Event]:
         """
         Generate events based on the observation and emit them.
 
@@ -42,30 +44,33 @@ class HiveGenerator:
             if hasattr(observation.data, "session_token"):
                 payload["session_token"] = observation.data.session_token
 
-            events.append(Event(
-                topic=f"aura.hive.events.{observation.event_type}",
-                payload=payload,
-                timestamp=now
-            ))
+            events.append(
+                Event(
+                    topic=f"aura.hive.events.{observation.event_type}",
+                    payload=payload,
+                    timestamp=now,
+                )
+            )
 
         # 2. System Heartbeat
-        events.append(Event(
-            topic="aura.hive.heartbeat",
-            payload={
-                "status": "active",
-                "timestamp": now,
-                "service": "core-service"
-            },
-            timestamp=now
-        ))
+        events.append(
+            Event(
+                topic="aura.hive.heartbeat",
+                payload={
+                    "status": "active",
+                    "timestamp": now,
+                    "service": "core-service",
+                },
+                timestamp=now,
+            )
+        )
 
         # 3. Emit to NATS
         if self.nc and self.nc.is_connected:
             for event in events:
                 try:
                     await self.nc.publish(
-                        event.topic,
-                        json.dumps(event.payload).encode()
+                        event.topic, json.dumps(event.payload).encode()
                     )
                 except Exception as e:
                     logger.error("nats_publish_failed", topic=event.topic, error=str(e))

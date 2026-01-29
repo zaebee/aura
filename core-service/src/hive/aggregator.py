@@ -1,10 +1,13 @@
 from typing import Any
+
 import structlog
 from hive.dna import HiveContext
-from db import SessionLocal, InventoryItem
 from monitor import get_hive_metrics
 
+from db import InventoryItem, SessionLocal
+
 logger = structlog.get_logger(__name__)
+
 
 class HiveAggregator:
     """A - Aggregator: Consolidates database and system health signals."""
@@ -22,7 +25,9 @@ class HiveAggregator:
         reputation = signal.agent.reputation_score
         request_id = getattr(signal, "request_id", "")
 
-        logger.debug("aggregator_perceive_started", item_id=item_id, request_id=request_id)
+        logger.debug(
+            "aggregator_perceive_started", item_id=item_id, request_id=request_id
+        )
 
         # 1. Fetch item data from database
         item_data = {}
@@ -34,7 +39,7 @@ class HiveAggregator:
                     "name": item.name,
                     "base_price": item.base_price,
                     "floor_price": item.floor_price,
-                    "meta": item.meta or {}
+                    "meta": item.meta or {},
                 }
             else:
                 logger.warning("item_not_found", item_id=item_id)
@@ -57,5 +62,5 @@ class HiveAggregator:
             reputation=reputation,
             item_data=item_data,
             system_health=system_health,
-            request_id=request_id
+            request_id=request_id,
         )

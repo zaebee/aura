@@ -1,9 +1,12 @@
-import structlog
 from typing import Any
+
+import structlog
 from hive.dna import Decision, HiveContext
+
 from config import get_settings
 
 logger = structlog.get_logger(__name__)
+
 
 class HiveMembrane:
     """The Immune System: Deterministic Guardrails for Inbound/Outbound signals."""
@@ -25,7 +28,7 @@ class HiveMembrane:
             "system override",
             "act as a",
             "you are now",
-            "disregard"
+            "disregard",
         ]
 
         # Scan string fields for injection attempts
@@ -42,9 +45,11 @@ class HiveMembrane:
                 lowered_val = value.lower()
                 for pattern in injection_patterns:
                     if pattern in lowered_val:
-                        logger.warning("membrane_inbound_injection_detected",
-                                       field=field_name,
-                                       pattern=pattern)
+                        logger.warning(
+                            "membrane_inbound_injection_detected",
+                            field=field_name,
+                            pattern=pattern,
+                        )
                         # Sanitize by clearing or marking the signal as suspicious
                         # In a real scenario, we might raise an error here.
                         # For now, we'll just redact the suspicious part.
@@ -55,7 +60,9 @@ class HiveMembrane:
 
         return signal
 
-    async def inspect_outbound(self, decision: Decision, context: HiveContext) -> Decision:
+    async def inspect_outbound(
+        self, decision: Decision, context: HiveContext
+    ) -> Decision:
         """
         Enforce hard economic rules on outbound decisions.
 
@@ -71,31 +78,41 @@ class HiveMembrane:
 
         # 1. Floor Price Check
         if decision.price < floor_price:
-            logger.warning("membrane_rule_violation",
-                           rule="floor_price",
-                           proposed=decision.price,
-                           floor=floor_price)
-            return self._override_with_safe_offer(decision, floor_price, "FLOOR_PRICE_VIOLATION")
+            logger.warning(
+                "membrane_rule_violation",
+                rule="floor_price",
+                proposed=decision.price,
+                floor=floor_price,
+            )
+            return self._override_with_safe_offer(
+                decision, floor_price, "FLOOR_PRICE_VIOLATION"
+            )
 
         # 2. Min Margin Check
         # Margin = (Price - Floor) / Price
         # Required: (P - F) / P >= m  => P - F >= mP => P(1-m) >= F => P >= F / (1-m)
         if min_margin >= 1.0:
             logger.error("invalid_min_margin_config", margin=min_margin)
-            min_margin = 0.1 # Fallback to 10%
+            min_margin = 0.1  # Fallback to 10%
 
         required_min_price = floor_price / (1 - min_margin)
 
         if decision.price < required_min_price:
-            logger.warning("membrane_rule_violation",
-                           rule="min_margin",
-                           proposed=decision.price,
-                           required=required_min_price)
-            return self._override_with_safe_offer(decision, required_min_price, "MIN_MARGIN_VIOLATION")
+            logger.warning(
+                "membrane_rule_violation",
+                rule="min_margin",
+                proposed=decision.price,
+                required=required_min_price,
+            )
+            return self._override_with_safe_offer(
+                decision, required_min_price, "MIN_MARGIN_VIOLATION"
+            )
 
         return decision
 
-    def _override_with_safe_offer(self, original: Decision, safe_price: float, reason: str) -> Decision:
+    def _override_with_safe_offer(
+        self, original: Decision, safe_price: float, reason: str
+    ) -> Decision:
         """Override an unsafe decision with a safe counter-offer."""
         return Decision(
             action="counter",
@@ -105,6 +122,6 @@ class HiveMembrane:
             metadata={
                 "original_decision": original.action,
                 "original_price": original.price,
-                "override_reason": reason
-            }
+                "override_reason": reason,
+            },
         )

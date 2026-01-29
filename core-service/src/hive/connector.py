@@ -1,12 +1,14 @@
 import time
+
 import structlog
-from typing import Any
-from hive.dna import Decision, Observation, HiveContext
-from proto.aura.negotiation.v1 import negotiation_pb2
-from db import SessionLocal, InventoryItem
+from hive.dna import Decision, HiveContext, Observation
+
 from config import get_settings
+from db import InventoryItem, SessionLocal
+from proto.aura.negotiation.v1 import negotiation_pb2
 
 logger = structlog.get_logger(__name__)
+
 
 class HiveConnector:
     """C - Connector: Maps decisions to gRPC responses and interacts with external systems (Solana)."""
@@ -55,12 +57,15 @@ class HiveConnector:
             success=True,
             data=response,
             event_type=f"negotiation_{action.action}",
-            metadata={"decision": action}
+            metadata={"decision": action},
         )
 
-    async def _handle_crypto_lock(self, response: negotiation_pb2.NegotiateResponse,
-                                action: Decision,
-                                context: HiveContext):
+    async def _handle_crypto_lock(
+        self,
+        response: negotiation_pb2.NegotiateResponse,
+        action: Decision,
+        context: HiveContext,
+    ):
         """Encrypts the reservation code and creates a locked deal on Solana."""
         session = SessionLocal()
         try:
@@ -69,12 +74,14 @@ class HiveConnector:
             item_name = item.name if item else "Aura Item"
 
             from crypto.pricing import PriceConverter
-            converter = PriceConverter(use_fixed_rates=self.settings.crypto.use_fixed_rates)
+
+            converter = PriceConverter(
+                use_fixed_rates=self.settings.crypto.use_fixed_rates
+            )
 
             # Convert USD price to crypto amount
             crypto_amount = converter.convert_usd_to_crypto(
-                usd_amount=action.price,
-                crypto_currency=self.settings.crypto.currency
+                usd_amount=action.price, crypto_currency=self.settings.crypto.currency
             )
 
             # Create the offer via MarketService
@@ -86,17 +93,19 @@ class HiveConnector:
                 price=crypto_amount,
                 currency=self.settings.crypto.currency,
                 buyer_did=context.agent_did,
-                ttl_seconds=self.settings.crypto.deal_ttl_seconds
+                ttl_seconds=self.settings.crypto.deal_ttl_seconds,
             )
 
             # Update the response: clear plain reservation_code, set crypto_payment
             response.accepted.ClearField("reservation_code")
             response.accepted.crypto_payment.CopyFrom(payment_instructions)
 
-            logger.info("crypto_offer_created",
-                        deal_id=payment_instructions.deal_id,
-                        amount=crypto_amount,
-                        currency=self.settings.crypto.currency)
+            logger.info(
+                "crypto_offer_created",
+                deal_id=payment_instructions.deal_id,
+                amount=crypto_amount,
+                currency=self.settings.crypto.currency,
+            )
 
         except Exception as e:
             logger.error("crypto_lock_failed", error=str(e), exc_info=True)
