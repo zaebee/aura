@@ -26,6 +26,7 @@ load_dotenv()
 
 GATEWAY_URL = os.getenv("AURA_GATEWAY_URL", "http://localhost:8000")
 
+
 class AuraMCPServer:
     """
     MCP Server that exposes Aura Platform capabilities to AI models.
