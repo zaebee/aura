@@ -93,9 +93,7 @@ async def get_hive_metrics() -> dict[str, Any]:
         return cached
 
     # Query Prometheus
-    cpu_query = (
-        'avg(rate(container_cpu_usage_seconds_total{namespace="default"}[5m])) * 100'
-    )
+    cpu_query = 'avg(rate(container_cpu_usage_seconds_total{namespace="default"}[5m])) * 100'
     mem_query = (
         'avg(container_memory_working_set_bytes{namespace="default"}) / 1024 / 1024'
     )

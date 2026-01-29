@@ -53,11 +53,15 @@ class LiteLLMStrategy:
             api_key: Optional API key for the provider
             trigger_price: Security threshold for UI confirmation
         """
-        self.engine = LLMEngine(model=model, temperature=temperature, api_key=api_key)
+        self.engine = LLMEngine(
+            model=model, temperature=temperature, api_key=api_key
+        )
         self.trigger_price = trigger_price
 
         # Load prompt template
-        template_path = Path(__file__).parent.parent / "prompts" / "system.md"
+        template_path = (
+            Path(__file__).parent.parent / "prompts" / "system.md"
+        )
         with open(template_path) as f:
             self.prompt_template = Template(f.read())
 

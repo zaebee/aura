@@ -95,16 +95,10 @@ export default function AgentConsole() {
       if (result.result.case === 'accepted') {
         const accepted = result.result.value
         setCurrentStatus('accepted')
-
-        // Handle oneof reveal_method (reservationCode or cryptoPayment)
-        const reservationCode = accepted.revealMethod?.case === 'reservationCode'
-          ? accepted.revealMethod.value
-          : undefined
-
         setNegotiationHistory(prev => [...prev, {
           type: 'accept',
           amount: accepted.finalPrice,
-          reservationCode: reservationCode,
+          reservationCode: accepted.reservationCode,
           timestamp: new Date().toISOString()
         }])
       } else if (result.result.case === 'countered') {

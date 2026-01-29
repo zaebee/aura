@@ -28,18 +28,6 @@ services:
       AURA_SERVER__OTEL_SERVICE_NAME: "aura-core"
       AURA_SERVER__OTEL_EXPORTER_OTLP_ENDPOINT: "http://jaeger:4317"
       AURA_SERVER__PROMETHEUS_URL: "http://prometheus:9090"
-      # Crypto Payment Configuration (disabled by default)
-      AURA_CRYPTO__ENABLED: ${AURA_CRYPTO__ENABLED:-false}
-      AURA_CRYPTO__PROVIDER: ${AURA_CRYPTO__PROVIDER:-solana}
-      AURA_CRYPTO__CURRENCY: ${AURA_CRYPTO__CURRENCY:-SOL}
-      # Solana Configuration (only needed if AURA_CRYPTO__ENABLED=true)
-      AURA_CRYPTO__SOLANA_PRIVATE_KEY: ${AURA_CRYPTO__SOLANA_PRIVATE_KEY:-}
-      AURA_CRYPTO__SOLANA_RPC_URL: ${AURA_CRYPTO__SOLANA_RPC_URL:-https://api.devnet.solana.com}
-      AURA_CRYPTO__SOLANA_NETWORK: ${AURA_CRYPTO__SOLANA_NETWORK:-devnet}
-      AURA_CRYPTO__SOLANA_USDC_MINT: ${AURA_CRYPTO__SOLANA_USDC_MINT:-EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v}
-      # Secret Encryption (REQUIRED when AURA_CRYPTO__ENABLED=true)
-      AURA_CRYPTO__SECRET_ENCRYPTION_KEY: ${AURA_CRYPTO__SECRET_ENCRYPTION_KEY:-}
-      AURA_CRYPTO__DEAL_TTL_SECONDS: ${AURA_CRYPTO__DEAL_TTL_SECONDS:-3600}
     depends_on:
       db:
         condition: service_healthy
