@@ -1,5 +1,6 @@
-from config import settings
 from langchain_mistralai import MistralAIEmbeddings
+
+from config import settings
 
 
 def get_embeddings_model():
