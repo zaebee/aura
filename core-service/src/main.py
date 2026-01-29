@@ -1,5 +1,6 @@
 import asyncio
 import time
+import uuid
 from concurrent import futures
 from typing import Protocol
 
@@ -64,8 +65,9 @@ class PricingStrategy(Protocol):
 
 
 class NegotiationService(negotiation_pb2_grpc.NegotiationServiceServicer):
-    def __init__(self, strategy: PricingStrategy):
+    def __init__(self, strategy: PricingStrategy, market_service=None):
         self.strategy = strategy
+        self.market_service = market_service
 
     def Negotiate(self, request, context):
         request_id = extract_request_id(context) or request.request_id
@@ -98,6 +100,67 @@ class NegotiationService(negotiation_pb2_grpc.NegotiationServiceServicer):
 
             response.session_token = "sess_" + request.request_id
             response.valid_until_timestamp = int(time.time() + 600)
+
+            # If crypto payments enabled and offer accepted, lock behind payment
+            if (
+                settings.crypto.enabled
+                and self.market_service
+                and response.HasField("accepted")
+            ):
+                # Fetch item details from database
+                session = SessionLocal()
+                try:
+                    item = (
+                        session.query(InventoryItem)
+                        .filter_by(id=request.item_id)
+                        .first()
+                    )
+                    if item:
+                        # Convert USD price to crypto amount
+                        from crypto.pricing import PriceConverter
+
+                        converter = PriceConverter(
+                            use_fixed_rates=settings.crypto.use_fixed_rates
+                        )
+
+                        usd_price = response.accepted.final_price
+                        crypto_amount = converter.convert_usd_to_crypto(
+                            usd_amount=usd_price,
+                            crypto_currency=settings.crypto.currency,
+                        )
+
+                        logger.info(
+                            "price_conversion",
+                            usd_price=usd_price,
+                            crypto_amount=crypto_amount,
+                            currency=settings.crypto.currency,
+                        )
+
+                        # Create locked deal with payment instructions (converted price)
+                        payment_instructions = self.market_service.create_offer(
+                            db=session,
+                            item_id=request.item_id,
+                            item_name=item.name,
+                            secret=response.accepted.reservation_code,
+                            price=crypto_amount,
+                            currency=settings.crypto.currency,
+                            buyer_did=request.agent.did if request.agent.did else None,
+                            ttl_seconds=settings.crypto.deal_ttl_seconds,
+                        )
+
+                        # Clear reservation_code and set crypto_payment instead
+                        response.accepted.ClearField("reservation_code")
+                        response.accepted.crypto_payment.CopyFrom(payment_instructions)
+
+                        logger.info(
+                            "offer_locked_for_payment",
+                            deal_id=payment_instructions.deal_id,
+                            item_id=request.item_id,
+                            amount=payment_instructions.amount,
+                            currency=payment_instructions.currency,
+                        )
+                finally:
+                    session.close()
 
             logger.info(
                 "negotiate_response_sent",
@@ -192,6 +255,63 @@ class NegotiationService(negotiation_pb2_grpc.NegotiationServiceServicer):
             context.set_details("Failed to retrieve system metrics")
             return negotiation_pb2.GetSystemStatusResponse(status="error")
 
+    async def CheckDealStatus(
+        self, request: negotiation_pb2.CheckDealStatusRequest, context
+    ) -> negotiation_pb2.CheckDealStatusResponse:
+        """Check crypto payment status and reveal secret if paid."""
+        request_id = extract_request_id(context)
+        if request_id:
+            bind_request_id(request_id)
+
+        try:
+            # Feature toggle check
+            if not settings.crypto.enabled or not self.market_service:
+                logger.warning("crypto_disabled", deal_id=request.deal_id)
+                context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+                context.set_details("Crypto payments not enabled")
+                return negotiation_pb2.CheckDealStatusResponse(status="NOT_FOUND")
+
+            # Validate UUID format
+            try:
+                uuid.UUID(request.deal_id)
+            except ValueError:
+                logger.warning("invalid_deal_id", deal_id=request.deal_id)
+                context.set_code(grpc.StatusCode.INVALID_ARGUMENT)
+                context.set_details("Invalid deal_id format")
+                return negotiation_pb2.CheckDealStatusResponse(status="NOT_FOUND")
+
+            logger.info("check_deal_status_started", deal_id=request.deal_id)
+
+            # Check payment status
+            session = SessionLocal()
+            try:
+                response = await self.market_service.check_status(
+                    db=session, deal_id=request.deal_id
+                )
+
+                logger.info(
+                    "check_deal_status_completed",
+                    deal_id=request.deal_id,
+                    status=response.status,
+                )
+                return response
+            finally:
+                session.close()
+
+        except Exception as e:
+            logger.error(
+                "check_deal_status_error",
+                deal_id=request.deal_id,
+                error=str(e),
+                exc_info=True,
+            )
+            context.set_code(grpc.StatusCode.INTERNAL)
+            context.set_details("Payment verification failed")
+            return negotiation_pb2.CheckDealStatusResponse(status="NOT_FOUND")
+        finally:
+            if request_id:
+                clear_request_context()
+
 
 class HealthServicer(health_pb2_grpc.HealthServicer):
     """gRPC Health Checking Protocol implementation for Core Service.
@@ -285,16 +405,65 @@ def create_strategy():
         )
 
 
+def create_crypto_provider():
+    """Create crypto payment provider if enabled.
+
+    Returns:
+        CryptoProvider instance or None if crypto disabled
+    """
+    if not settings.crypto.enabled:
+        logger.info("crypto_disabled", feature="crypto_payments")
+        return None
+
+    if settings.crypto.provider == "solana":
+        logger.info(
+            "crypto_provider_initialized",
+            provider="solana",
+            network=settings.crypto.solana_network,
+            currency=settings.crypto.currency,
+        )
+        from crypto.solana_provider import SolanaProvider
+
+        return SolanaProvider(
+            private_key_base58=settings.crypto.solana_private_key.get_secret_value(),
+            rpc_url=str(settings.crypto.solana_rpc_url),
+            network=settings.crypto.solana_network,
+            usdc_mint=settings.crypto.solana_usdc_mint,
+        )
+    else:
+        logger.warning("unknown_crypto_provider", provider=settings.crypto.provider)
+        return None
+
+
 async def serve():
     strategy = create_strategy()
+
+    # Initialize crypto provider and market service if enabled
+    crypto_provider = create_crypto_provider()
+    market_service = None
+    if crypto_provider:
+        from crypto.encryption import SecretEncryption
+        from services.market import MarketService
+
+        # Initialize encryption handler
+        encryption = SecretEncryption(
+            settings.crypto.secret_encryption_key.get_secret_value()
+        )
+
+        market_service = MarketService(crypto_provider, encryption)
+        logger.info(
+            "market_service_initialized",
+            provider=settings.crypto.provider,
+            currency=settings.crypto.currency,
+        )
 
     server = grpc.aio.server(
         futures.ThreadPoolExecutor(max_workers=settings.server.grpc_max_workers)
     )
 
-    # Register negotiation service
+    # Register negotiation service with market service
     negotiation_pb2_grpc.add_NegotiationServiceServicer_to_server(
-        NegotiationService(strategy), server
+        NegotiationService(strategy, market_service), server
     )
 
     # Register health service
@@ -307,9 +476,15 @@ async def serve():
         port=settings.server.port,
         database="postgres",
         services=["NegotiationService", "Health"],
+        crypto_enabled=settings.crypto.enabled,
     )
     await server.start()
-    await server.wait_for_termination()
+    try:
+        await server.wait_for_termination()
+    finally:
+        if crypto_provider:
+            await crypto_provider.close()
+            logger.info("crypto_provider_closed")
 
 
 if __name__ == "__main__":
