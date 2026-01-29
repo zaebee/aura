@@ -387,7 +387,7 @@ def create_strategy():
         from llm_strategy import RuleBasedStrategy
 
         return RuleBasedStrategy()
-    elif settings.llm_model == "dspy":
+    elif settings.llm.model == "dspy":
         logger.info("strategy_selected", type="DSPyStrategy", model="self-optimizing")
         from llm.dspy_strategy import DSPyStrategy
 

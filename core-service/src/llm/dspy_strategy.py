@@ -50,7 +50,7 @@ class DSPyStrategy:
     def _load_compiled_program(self):
         """Load compiled DSPy program with fallback to untrained module."""
         try:
-            program_path = Path(self.compiled_program_path)
+            program_path = Path(__file__).parent.parent / self.compiled_program_path
             if program_path.exists():
                 logger.info("Loading compiled DSPy program", path=str(program_path))
                 return dspy.load(str(program_path))

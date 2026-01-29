@@ -48,7 +48,7 @@ class AuraNegotiator(dspy.Module):
         logger.debug(
             "dspy_forward_pass_started",
             input_bid=input_bid,
-            context_keys=context,
+            context_keys=list(context.keys()),
             history_length=len(history or []),
         )
 
