@@ -19,8 +19,7 @@ RUN uv sync --frozen --no-dev --no-install-project
 ENV PATH="/app/.venv/bin:$PATH"
 
 # Verify critical packages installed
-RUN python -c "import grpc_health.v1.health_pb2" || \
-    (echo "ERROR: grpcio-health-checking not installed" && exit 1)
+RUN python -c "import grpc_health.v1.health_pb2"
 
 COPY core-service/src ./src
 
