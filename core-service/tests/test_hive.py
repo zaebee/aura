@@ -4,6 +4,7 @@ from hive.dna import HiveContext, Decision, Observation
 from hive.aggregator import HiveAggregator
 from hive.membrane import HiveMembrane
 
+
 @pytest.mark.asyncio
 async def test_aggregator_perceive(mocker):
     # Mock DB and monitor
@@ -32,6 +33,7 @@ async def test_aggregator_perceive(mocker):
     assert context.system_health["cpu_usage_percent"] == 10.0
     assert context.item_data["floor_price"] == 100.0
 
+
 @pytest.mark.asyncio
 async def test_membrane_outbound_override(mocker):
     membrane = HiveMembrane()
@@ -43,7 +45,7 @@ async def test_membrane_outbound_override(mocker):
         bid_amount=50.0,
         agent_did="did1",
         reputation=0.9,
-        item_data={"floor_price": 100.0}
+        item_data={"floor_price": 100.0},
     )
 
     # LLM tries to accept below floor - should trigger FLOOR_PRICE_VIOLATION
@@ -61,6 +63,7 @@ async def test_membrane_outbound_override(mocker):
     assert safe_decision2.price == 111.11
     assert safe_decision2.metadata["override_reason"] == "MIN_MARGIN_VIOLATION"
     assert "Membrane Override" in safe_decision2.reasoning
+
 
 @pytest.mark.asyncio
 async def test_membrane_inbound_sanitization():

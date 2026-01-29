@@ -13,8 +13,10 @@ from src.interfaces import NegotiationProvider
 
 router = Router()
 
+
 class NegotiationStates(StatesGroup):
     WaitingForBid = State()
+
 
 @router.message(Command("start"))
 async def cmd_start(message: Message):
@@ -24,11 +26,10 @@ async def cmd_start(message: Message):
         "Use /search <destination> to start."
     )
 
+
 @router.message(Command("search"))
 async def cmd_search(
-    message: Message,
-    command: CommandObject,
-    client: NegotiationProvider
+    message: Message, command: CommandObject, client: NegotiationProvider
 ):
     if not command.args:
         await message.answer("Usage: /search <query>")
@@ -46,13 +47,17 @@ async def cmd_search(
         name = item.get("name", "Unknown")
         price = item.get("basePrice", item.get("base_price", 0))
 
-        keyboard.append([InlineKeyboardButton(
-            text=f"{name} (${price})",
-            callback_data=f"select:{item_id}"
-        )])
+        keyboard.append(
+            [
+                InlineKeyboardButton(
+                    text=f"{name} (${price})", callback_data=f"select:{item_id}"
+                )
+            ]
+        )
 
     markup = InlineKeyboardMarkup(inline_keyboard=keyboard)
     await message.answer("Choose a hotel to negotiate:", reply_markup=markup)
+
 
 @router.callback_query(F.data.startswith("select:"))
 async def process_select_hotel(callback: CallbackQuery, state: FSMContext):
@@ -63,12 +68,11 @@ async def process_select_hotel(callback: CallbackQuery, state: FSMContext):
     await state.update_data(item_id=item_id)
     await state.set_state(NegotiationStates.WaitingForBid)
 
-    await callback.message.answer(
-        f"Enter your bid for this item (ID: {item_id}):"
-    )
+    await callback.message.answer(f"Enter your bid for this item (ID: {item_id}):")
     await callback.answer()
 
-@router.message(NegotiationStates.WaitingForBid, F.text.regexp(r'^\d+(\.\d+)?$'))
+
+@router.message(NegotiationStates.WaitingForBid, F.text.regexp(r"^\d+(\.\d+)?$"))
 async def process_bid(message: Message, state: FSMContext, client: NegotiationProvider):
     data = await state.get_data()
     item_id = data.get("item_id")
@@ -90,15 +94,15 @@ async def process_bid(message: Message, state: FSMContext, client: NegotiationPr
         final_price = acc.get("finalPrice", acc.get("final_price"))
         code = acc.get("reservationCode", acc.get("reservation_code"))
 
-        keyboard = [[InlineKeyboardButton(text="Pay Now (Stub)", callback_data="pay_stub")]]
+        keyboard = [
+            [InlineKeyboardButton(text="Pay Now (Stub)", callback_data="pay_stub")]
+        ]
         markup = InlineKeyboardMarkup(inline_keyboard=keyboard)
 
         await message.answer(
-            f"✅ **Deal!**\n"
-            f"Final Price: ${final_price}\n"
-            f"Code: `{code}`",
+            f"✅ **Deal!**\nFinal Price: ${final_price}\nCode: `{code}`",
             reply_markup=markup,
-            parse_mode="Markdown"
+            parse_mode="Markdown",
         )
         await state.clear()
     elif "countered" in response:
@@ -110,7 +114,7 @@ async def process_bid(message: Message, state: FSMContext, client: NegotiationPr
             f"⚠️ **Offer: ${price}**\n"
             f"{msg}\n\n"
             "You can enter a new bid or say /search to restart.",
-            parse_mode="Markdown"
+            parse_mode="Markdown",
         )
         # Stay in WaitingForBid state
     elif "ui_required" in response:
@@ -120,6 +124,7 @@ async def process_bid(message: Message, state: FSMContext, client: NegotiationPr
         await message.answer("❌ Offer rejected. Try a higher bid.")
     else:
         await message.answer("Received an unknown response from Aura Core.")
+
 
 @router.callback_query(F.data == "pay_stub")
 async def process_pay_stub(callback: CallbackQuery):

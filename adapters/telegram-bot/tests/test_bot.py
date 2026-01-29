@@ -1,13 +1,21 @@
 import pytest
 from unittest.mock import AsyncMock, MagicMock
 from aiogram.filters import CommandObject
-from src.bot import cmd_start, cmd_search, process_select_hotel, process_bid, NegotiationStates
+from src.bot import (
+    cmd_start,
+    cmd_search,
+    process_select_hotel,
+    process_bid,
+    NegotiationStates,
+)
+
 
 @pytest.mark.asyncio
 async def test_cmd_start(message):
     await cmd_start(message)
     message.answer.assert_called()
     assert "Welcome to Aura!" in message.answer.call_args[0][0]
+
 
 @pytest.mark.asyncio
 async def test_cmd_search_results(message, mock_client):
@@ -31,6 +39,7 @@ async def test_cmd_search_results(message, mock_client):
     assert keyboard[0][0].text == "Hotel Alpha ($100.0)"
     assert keyboard[0][0].callback_data == "select:hotel_1"
 
+
 @pytest.mark.asyncio
 async def test_process_select_hotel(callback_query):
     callback_query.data = "select:hotel_1"
@@ -43,6 +52,7 @@ async def test_process_select_hotel(callback_query):
     callback_query.message.answer.assert_called()
     assert "hotel_1" in callback_query.message.answer.call_args[0][0]
 
+
 @pytest.mark.asyncio
 async def test_process_bid_accepted(message, mock_client):
     state = AsyncMock()
@@ -50,10 +60,7 @@ async def test_process_bid_accepted(message, mock_client):
     message.text = "90"
 
     mock_client.negotiation_result = {
-        "accepted": {
-            "final_price": 90.0,
-            "reservation_code": "SUCCESS123"
-        }
+        "accepted": {"final_price": 90.0, "reservation_code": "SUCCESS123"}
     }
 
     await process_bid(message, state, mock_client)
