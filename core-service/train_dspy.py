@@ -140,7 +140,7 @@ def train_negotiator():
     print(f"🤖 Configuring DSPy with LLM: {litellm_model}")
 
     try:
-        dspy.configure(lm=dspy.LM(litellm_model))
+        dspy.configure(lm=dspy.LM(model=litellm_model))
     except Exception as e:
         print(f"⚠️  Failed to configure with LM object: {e}")
 

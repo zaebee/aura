@@ -38,7 +38,7 @@ class DSPyStrategy:
 
         # Configure DSPy with litellm backend
         litellm_model = self.settings.llm.model
-        dspy.configure(lm=litellm_model)
+        dspy.configure(lm=dspy.LM(model=litellm_model))
 
         logger.info(
             "dspy_strategy_initialized",

@@ -19,7 +19,7 @@ def test_minimal_dspy():
     print("🧪 Testing minimal DSPy functionality...")
 
     # Configure DSPy with proper LM object
-    dspy.configure(lm=dspy.LM("mistral/mistral-large-latest"))
+    dspy.configure(lm=dspy.LM(model="mistral/mistral-large-latest"))
 
     # Create a simple example
     _simple_example = dspy.Example(
@@ -52,9 +52,9 @@ def test_minimal_dspy():
         )
 
         print("✅ Prediction successful")
-        print(f"Response type: {type(prediction.response)}")
-        print(f"Response value: {prediction.response}")
-        print(f"Reasoning: {prediction.reasoning[:50]}...")
+        print(f"Response type: {type(prediction['response'])}")
+        print(f"Response value: {prediction['response']}")
+        print(f"Reasoning: {prediction['reasoning'][:50]}...")
 
         return True
 
