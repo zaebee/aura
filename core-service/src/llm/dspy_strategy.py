@@ -10,7 +10,6 @@ from pathlib import Path
 import dspy
 import structlog
 from llm.engine import AuraNegotiator
-from llm.prepare.clean import clean_and_parse_json
 
 from config import get_settings
 from db import InventoryItem, SessionLocal
@@ -33,12 +32,12 @@ class DSPyStrategy:
             compiled_program_path: Path to compiled DSPy program
         """
         self.compiled_program_path = compiled_program_path
-        self.negotiator = self._load_compiled_program()
         self.settings = get_settings()
+        self.negotiator = self._load_compiled_program()
         self.fallback_strategy = None
 
         # Configure DSPy with litellm backend
-        litellm_model = self.settings.llm_model
+        litellm_model = self.settings.llm.model
         dspy.configure(lm=litellm_model)
 
         logger.info(
@@ -70,7 +69,7 @@ class DSPyStrategy:
             try:
                 from llm.strategy import LiteLLMStrategy
 
-                self.fallback_strategy = LiteLLMStrategy(model=self.settings.llm_model)
+                self.fallback_strategy = LiteLLMStrategy(model=self.settings.llm.model)
             except ImportError:
                 from llm_strategy import RuleBasedStrategy
 
@@ -140,46 +139,24 @@ class DSPyStrategy:
 
         # Get prediction from DSPy module
         try:
-            prediction = self.negotiator(
+            # AuraNegotiator.forward now returns a clean dictionary with 'reasoning' and 'response'
+            result = self.negotiator(
                 input_bid=bid,
                 context=context,
                 history=[],  # Would include previous turns in multi-turn negotiation
             )
 
-            # Parse response using robust JSON extraction
-            try:
-                raw_response = prediction.response
-                if isinstance(raw_response, str):
-                    response_data = clean_and_parse_json(raw_response)
-                elif isinstance(raw_response, dict):
-                    response_data = raw_response
-                else:
-                    raise ValueError(f"Unexpected response type: {type(raw_response)}")
-
-                action = response_data["action"]
-                price = response_data["price"]
-                message = response_data["message"]
-            except Exception as e:
-                logger.error(
-                    "dspy_response_parse_error",
-                    error=str(e),
-                    raw_response=prediction.response
-                    if hasattr(prediction, "response")
-                    else "N/A",
-                    item_id=item_id,
-                    bid_amount=bid,
-                )
-                # Fallback to rule-based strategy on parsing error
-                return self._get_fallback_strategy().evaluate(
-                    item_id, bid, reputation, request_id
-                )
+            response_data = result["response"]
+            action = response_data["action"]
+            price = response_data["price"]
+            message = response_data["message"]
 
             logger.info(
                 "dspy_decision_made",
                 action=action,
                 price=price,
                 item_id=item_id,
-                reasoning_length=len(prediction.reasoning),
+                reasoning_length=len(result.get("reasoning", "")),
             )
 
             # Map to protobuf response

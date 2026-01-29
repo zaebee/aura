@@ -31,55 +31,78 @@ class AuraNegotiator(dspy.Module):
         self.negotiate_chain = dspy.ChainOfThought(Negotiate)
         logger.info("dspy_negotiator_initialized", module="AuraNegotiator")
 
-    def forward(self, input_bid: float, context: dict, history: list = None):
+    def forward(self, input_bid: float, context: Any, history: Any = None) -> dict:
         """Forward pass for negotiation decision.
 
         Args:
             input_bid: Buyer's current offer amount
-            context: Economic context dictionary
-            history: List of previous negotiation turns
+            context: Economic context (dict or JSON string)
+            history: Negotiation history (list or JSON string)
 
         Returns:
-            DSPy prediction with reasoning and response
+            Dictionary containing 'reasoning' and 'response' (parsed dict)
         """
-        history_json = json.dumps(history or [])
-        context_json = json.dumps(context)
+        # 1. Normalize inputs to JSON strings for DSPy (avoiding double-encoding)
+        history_json = (
+            history if isinstance(history, str) else json.dumps(history or [])
+        )
+        context_json = (
+            context if isinstance(context, str) else json.dumps(context)
+        )
+
+        # 2. Extract keys for safe logging
+        try:
+            ctx_dict = (
+                json.loads(context_json)
+                if isinstance(context_json, str)
+                else context_json
+            )
+            context_keys = list(ctx_dict.keys()) if isinstance(ctx_dict, dict) else []
+        except Exception:
+            context_keys = []
 
         logger.debug(
             "dspy_forward_pass_started",
             input_bid=input_bid,
-            context_keys=list(context.keys()),
-            history_length=len(history or []),
+            context_keys=context_keys,
+            history_length=len(history or []) if not isinstance(history, str) else "N/A",
         )
 
+        # 3. Execute DSPy chain
         prediction = self.negotiate_chain(
             input_bid=str(input_bid), context=context_json, history=history_json
         )
 
-        # Parse and validate JSON response
+        # 4. Parse and validate JSON response
         try:
             raw_response = prediction.response
-            if isinstance(raw_response, str):
-                response_data = clean_and_parse_json(raw_response)
-            elif isinstance(raw_response, dict):
-                response_data = raw_response
-            else:
-                raise ValueError(f"Unexpected response type: {type(raw_response)}")
-            prediction.response = response_data
+            response_data = clean_and_parse_json(raw_response)
+
+            # Validation: ensure required keys exist
+            for key in ["action", "price", "message"]:
+                if key not in response_data:
+                    raise ValueError(f"Missing required key '{key}' in LLM response")
+
             logger.info(
                 "dspy_decision_made",
-                action=prediction.response.get("action", "unknown"),
-                price=prediction.response.get("price", 0),
+                action=response_data.get("action", "unknown"),
+                price=response_data.get("price", 0),
                 reasoning_length=len(prediction.reasoning),
             )
 
-        except json.JSONDecodeError as e:
-            logger.error(
-                "dspy_json_parse_error", error=str(e), response=prediction.response
-            )
-            # Keep original response for fallback handling
+            # 5. Return clean dictionary
+            return {
+                "reasoning": prediction.reasoning,
+                "response": response_data,
+            }
 
-        return prediction
+        except Exception as e:
+            logger.error(
+                "dspy_parsing_failed",
+                error=str(e),
+                raw_response=getattr(prediction, "response", "N/A"),
+            )
+            raise ValueError(f"Failed to parse negotiator response: {e}") from e
 
 
 class LLMEngine:

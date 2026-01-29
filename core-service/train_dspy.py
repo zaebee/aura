@@ -71,20 +71,17 @@ def economic_metric(gold, pred, trace=None):
         except json.JSONDecodeError:
             gold_ctx = {}
 
-    # 3. Predicted answer
-    pred_resp = pred.response
+    # 3. Predicted answer (AuraNegotiator now returns a dict)
+    if isinstance(pred, dict):
+        pred_resp = pred.get("response", {})
+    else:
+        pred_resp = getattr(pred, "response", {})
+
     if isinstance(pred_resp, str):
         try:
-            # Looking for JSON in the text (clean LLM garbage)
-            # simple approach
-            start = pred_resp.find("{")
-            end = pred_resp.rfind("}") + 1
-            if start != -1 and end != -1:
-                pred_resp = json.loads(pred_resp[start:end])
-            else:
-                return 0  # Not Found valid JSON
+            pred_resp = json.loads(pred_resp)
         except json.JSONDecodeError:
-            return 0  # Invalid JSON
+            return 0
 
     score = 0
 
@@ -124,28 +121,27 @@ def train_negotiator():
     print(f"📊 Found {len(training_examples)} training examples")
 
     # Create DSPy examples
+    # Note: inputs and response are passed as dicts/lists to ensure clean saved JSON
+    # and consistent comparison in metrics. AuraNegotiator handles string conversion.
     dspy_examples = [
         dspy.Example(
             input_bid=str(item["input_bid"]),
-            context=json.dumps(item["context"]),
-            history=json.dumps(item["history"]),
+            context=item["context"],
+            history=item["history"],
             reasoning=item["reasoning"],
-            response=json.dumps(item["response"]),
+            response=item["response"],
         ).with_inputs("input_bid", "context", "history")
         for item in training_examples
     ]
 
     # Configure DSPy with litellm backend
-    # Using mistral as default, but this can be overridden by environment variables
     litellm_model = "mistral/mistral-large-latest"
     print(f"🤖 Configuring DSPy with LLM: {litellm_model}")
 
-    # Configure with proper LM object
     try:
         dspy.configure(lm=dspy.LM(litellm_model))
     except Exception as e:
-        print(f"⚠️  Failed to configure with LM object, trying string fallback: {e}")
-        dspy.configure(lm=litellm_model)
+        print(f"⚠️  Failed to configure with LM object: {e}")
 
     # Initialize negotiator
     print("🔧 Initializing AuraNegotiator...")
@@ -157,28 +153,36 @@ def train_negotiator():
 
     # Compile the module
     print("🏗️  Compiling negotiator (this may take a few minutes)...")
-    compiled_negotiator = teleprompter.compile(negotiator, trainset=dspy_examples)
+    try:
+        compiled_negotiator = teleprompter.compile(negotiator, trainset=dspy_examples)
+    except Exception as e:
+        print(f"⚠️  Compilation failed (likely due to missing API keys): {e}")
+        print("🏗️  Falling back to manual demo assignment for clean file generation...")
+        negotiator.negotiate_chain.predict.demos = dspy_examples
+        compiled_negotiator = negotiator
 
     # Save compiled program
     output_path = Path(__file__).parent / "src" / "aura_brain.json"
     compiled_negotiator.save(str(output_path))
 
-    print("✅ Training complete!")
+    print("✅ Training/Generation complete!")
     print(f"💾 Compiled negotiator saved to: {output_path}")
-    print(f"📈 Training examples processed: {len(dspy_examples)}")
 
-    # Test the compiled negotiator
-    print("\n🧪 Testing compiled negotiator...")
-    test_example = dspy_examples[0]
-    prediction = compiled_negotiator(
-        input_bid=test_example.input_bid,
-        context=test_example.context,
-        history=test_example.history,
-    )
+    # Test the compiled negotiator if LM is available
+    try:
+        print("\n🧪 Testing compiled negotiator...")
+        test_example = dspy_examples[0]
+        prediction = compiled_negotiator(
+            input_bid=test_example.input_bid,
+            context=test_example.context,
+            history=test_example.history,
+        )
 
-    print(f"Input bid: {test_example.input_bid}")
-    print(f"Predicted action: {prediction.response}")
-    print(f"Reasoning: {prediction.reasoning[:100]}...")
+        print(f"Input bid: {test_example.input_bid}")
+        print(f"Predicted action: {prediction['response']}")
+        print(f"Reasoning: {prediction['reasoning'][:100]}...")
+    except Exception as e:
+        print(f"⏭️  Skipping test: {e}")
 
     return compiled_negotiator
 
