@@ -10,6 +10,7 @@
     "gen:proto": "ts-proto proto/../proto/aura/negotiation/v1/negotiation.proto --output src/lib/proto"
   },
   "dependencies": {
+    "@bufbuild/buf": "^1.64.0",
     "@bufbuild/protobuf": "^2.11.0",
     "@tailwindcss/forms": "^0.5.11",
     "@tailwindcss/postcss": "^4.1.18",

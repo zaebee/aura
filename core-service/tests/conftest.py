@@ -7,8 +7,10 @@ from pathlib import Path
 import pytest
 
 # Set required environment variables before importing any modules
-os.environ.setdefault("DATABASE_URL", "postgresql://test:test@localhost:5432/test_db")
-os.environ.setdefault("MISTRAL_API_KEY", "test-api-key")
+os.environ.setdefault(
+    "AURA_DATABASE__URL", "postgresql://test:test@localhost:5432/test_db"
+)
+os.environ.setdefault("AURA_LLM__API_KEY", "test-api-key")
 
 # Add the src directory to the Python path
 src_path = Path(__file__).parent.parent / "src"

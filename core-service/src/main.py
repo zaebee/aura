@@ -21,24 +21,22 @@ from sqlalchemy import text
 from sqlalchemy.exc import SQLAlchemyError
 from telemetry import init_telemetry
 
-from config import get_settings
+from config import settings
 from db import InventoryItem, SessionLocal, engine
 from embeddings import generate_embedding
 from proto.aura.negotiation.v1 import negotiation_pb2, negotiation_pb2_grpc
 
 # Configure structured logging on startup
-configure_logging()
+configure_logging(log_level=settings.server.log_level)
 logger = get_logger("core-service")
 
-settings = get_settings()
-
 # Initialize OpenTelemetry tracing
-service_name = settings.otel_service_name
-tracer = init_telemetry(service_name, settings.otel_exporter_otlp_endpoint)
+service_name = settings.server.otel_service_name
+tracer = init_telemetry(service_name, str(settings.server.otel_exporter_otlp_endpoint))
 logger.info(
     "telemetry_initialized",
     service_name=service_name,
-    endpoint=settings.otel_exporter_otlp_endpoint,
+    endpoint=str(settings.server.otel_exporter_otlp_endpoint),
 )
 
 # Instrument gRPC server for distributed tracing
@@ -105,7 +103,7 @@ class NegotiationService(negotiation_pb2_grpc.NegotiationServiceServicer):
 
             # If crypto payments enabled and offer accepted, lock behind payment
             if (
-                settings.crypto_enabled
+                settings.crypto.enabled
                 and self.market_service
                 and response.HasField("accepted")
             ):
@@ -125,9 +123,9 @@ class NegotiationService(negotiation_pb2_grpc.NegotiationServiceServicer):
                             item_name=item.name,
                             secret=response.accepted.reservation_code,
                             price=response.accepted.final_price,
-                            currency=settings.crypto_currency,
+                            currency=settings.crypto.currency,
                             buyer_did=request.agent.did if request.agent.did else None,
-                            ttl_seconds=settings.deal_ttl_seconds,
+                            ttl_seconds=settings.crypto.deal_ttl_seconds,
                         )
 
                         # Clear reservation_code and set crypto_payment instead
@@ -247,7 +245,7 @@ class NegotiationService(negotiation_pb2_grpc.NegotiationServiceServicer):
 
         try:
             # Feature toggle check
-            if not settings.crypto_enabled or not self.market_service:
+            if not settings.crypto.enabled or not self.market_service:
                 logger.warning("crypto_disabled", deal_id=request.deal_id)
                 context.set_code(grpc.StatusCode.UNIMPLEMENTED)
                 context.set_details("Crypto payments not enabled")
@@ -362,20 +360,29 @@ def create_strategy():
     Returns:
         Strategy instance implementing PricingStrategy protocol
     """
-    settings = get_settings()
-
-    if settings.llm_model == "rule":
+    if settings.llm.model == "rule":
         logger.info("strategy_selected", type="RuleBasedStrategy", llm_required=False)
         from llm_strategy import RuleBasedStrategy
 
         return RuleBasedStrategy()
     else:
         logger.info(
-            "strategy_selected", type="LiteLLMStrategy", model=settings.llm_model
+            "strategy_selected", type="LiteLLMStrategy", model=settings.llm.model
         )
         from llm.strategy import LiteLLMStrategy
 
-        return LiteLLMStrategy(model=settings.llm_model)
+        # Select appropriate API key based on model provider
+        api_key = None
+        if settings.llm.model.startswith("openai/"):
+            api_key = settings.llm.openai_api_key.get_secret_value()
+        elif settings.llm.model.startswith("mistral/"):
+            api_key = settings.llm.mistral_api_key.get_secret_value()
+
+        return LiteLLMStrategy(
+            model=settings.llm.model,
+            temperature=settings.llm.temperature,
+            api_key=api_key,
+        )
 
 
 def create_crypto_provider():
@@ -384,27 +391,27 @@ def create_crypto_provider():
     Returns:
         CryptoProvider instance or None if crypto disabled
     """
-    if not settings.crypto_enabled:
+    if not settings.crypto.enabled:
         logger.info("crypto_disabled", feature="crypto_payments")
         return None
 
-    if settings.crypto_provider == "solana":
+    if settings.crypto.provider == "solana":
         logger.info(
             "crypto_provider_initialized",
             provider="solana",
-            network=settings.solana_network,
-            currency=settings.crypto_currency,
+            network=settings.crypto.solana_network,
+            currency=settings.crypto.currency,
         )
         from crypto.solana_provider import SolanaProvider
 
         return SolanaProvider(
-            private_key_base58=settings.solana_private_key,
-            rpc_url=settings.solana_rpc_url,
-            network=settings.solana_network,
-            usdc_mint=settings.solana_usdc_mint,
+            private_key_base58=settings.crypto.solana_private_key.get_secret_value(),
+            rpc_url=str(settings.crypto.solana_rpc_url),
+            network=settings.crypto.solana_network,
+            usdc_mint=settings.crypto.solana_usdc_mint,
         )
     else:
-        logger.warning("unknown_crypto_provider", provider=settings.crypto_provider)
+        logger.warning("unknown_crypto_provider", provider=settings.crypto.provider)
         return None
 
 
@@ -419,17 +426,19 @@ async def serve():
         from services.market import MarketService
 
         # Initialize encryption handler
-        encryption = SecretEncryption(settings.secret_encryption_key)
+        encryption = SecretEncryption(
+            settings.crypto.secret_encryption_key.get_secret_value()
+        )
 
         market_service = MarketService(crypto_provider, encryption)
         logger.info(
             "market_service_initialized",
-            provider=settings.crypto_provider,
-            currency=settings.crypto_currency,
+            provider=settings.crypto.provider,
+            currency=settings.crypto.currency,
         )
 
     server = grpc.aio.server(
-        futures.ThreadPoolExecutor(max_workers=settings.grpc_max_workers)
+        futures.ThreadPoolExecutor(max_workers=settings.server.grpc_max_workers)
     )
 
     # Register negotiation service with market service
@@ -441,13 +450,13 @@ async def serve():
     health_servicer = HealthServicer()
     health_pb2_grpc.add_HealthServicer_to_server(health_servicer, server)
 
-    server.add_insecure_port(f"[::]:{settings.grpc_port}")
+    server.add_insecure_port(f"[::]:{settings.server.port}")
     logger.info(
         "server_started",
-        port=settings.grpc_port,
+        port=settings.server.port,
         database="postgres",
         services=["NegotiationService", "Health"],
-        crypto_enabled=settings.crypto_enabled,
+        crypto_enabled=settings.crypto.enabled,
     )
     await server.start()
     try:
