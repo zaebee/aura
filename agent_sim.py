@@ -55,10 +55,11 @@ def run_agent_scenario(scenario_name, item_id, bid, wallet=None):
         }
 
         response = requests.post(
-            f"{GATEWAY_URL}{method}", json=payload, headers=headers)
+            f"{GATEWAY_URL}{method}", json=payload, headers=headers
+        )
         latency = (time.time() - start_ts) * 1000
 
-        print(f"⏱️  Latency: {latency:.2f}ms")
+        print(f"⏱️  Latency[{GATEWAY_URL}]: {latency:.2f}ms")
 
         if response.status_code != 200:
             print(f"❌ Error {response.status_code}: {response.text}")
