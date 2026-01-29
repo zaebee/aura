@@ -26,6 +26,16 @@ services:
       MISTRAL_API_KEY: ${MISTRAL_API_KEY}
       OTEL_SERVICE_NAME: "aura-core"
       OTEL_EXPORTER_OTLP_ENDPOINT: "http://jaeger:4317"
+      # Crypto Payment Configuration (disabled by default)
+      CRYPTO_ENABLED: ${CRYPTO_ENABLED:-false}
+      CRYPTO_PROVIDER: ${CRYPTO_PROVIDER:-solana}
+      CRYPTO_CURRENCY: ${CRYPTO_CURRENCY:-SOL}
+      # Solana Configuration (only needed if CRYPTO_ENABLED=true)
+      SOLANA_PRIVATE_KEY: ${SOLANA_PRIVATE_KEY:-}
+      SOLANA_RPC_URL: ${SOLANA_RPC_URL:-https://api.devnet.solana.com}
+      SOLANA_NETWORK: ${SOLANA_NETWORK:-devnet}
+      SOLANA_USDC_MINT: ${SOLANA_USDC_MINT:-EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v}
+      DEAL_TTL_SECONDS: ${DEAL_TTL_SECONDS:-3600}
     depends_on:
       db:
         condition: service_healthy
