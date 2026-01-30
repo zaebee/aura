@@ -1,11 +1,6 @@
-import sys
-from pathlib import Path
 import pytest
-
-# Add src to path
-sys.path.append(str(Path(__file__).parent.parent / "src"))
-
 from guard.membrane import OutputGuard, SafetyViolation
+
 
 def test_margin_violation():
     guard = OutputGuard()
