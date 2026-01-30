@@ -42,6 +42,7 @@ dependencies = [
     "cryptography>=43.0.0",
     "nats-py>=2.9.0",
     "pygithub>=2.8.1",
+    "types-pyyaml>=6.0.12.20250915",
 ]
 
 [dependency-groups]

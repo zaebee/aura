@@ -37,4 +37,4 @@ jobs:
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
           PROMETHEUS_URL: "http://prometheus-kube-prometheus-prometheus.monitoring:9090"
         run: |
-          uv run python scripts/bee_keeper.py
+          PYTHONPATH=. uv run python scripts/bee_keeper_agent.py

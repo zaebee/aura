@@ -1,0 +1,18 @@
+hive:
+  version: "1.0"
+  nucleotides:
+    A: "aggregator.py"
+    T: "transformer.py"
+    C: "connector.py"
+    G: "generator.py"
+  core_path: "core-service/src/hive"
+  dna_path: "core-service/src/hive/dna.py"
+  allowed_files:
+    - "__init__.py"
+    - "aggregator.py"
+    - "transformer.py"
+    - "connector.py"
+    - "generator.py"
+    - "membrane.py"
+    - "metabolism.py"
+    - "dna.py"
