@@ -85,6 +85,13 @@ jobs:
         runs-on: self-hosted
         env:
             KUBECONFIG: /home/runner/.kube/config
+
+            API_KEY: ${{ secrets.MISTRAL_API_KEY }}
+            FRP_CLIENT_TOKEN: ${{ secrets.FRP_CLIENT_TOKEN }}
+            OPENAI_KEY: ${{ secrets.OPENAI_API_KEY }}
+            SECRET_ENCRYPTION_KEY: ${{ secrets.AURA_SECRET_ENCRYPTION_KEY }}
+            SOLANA_PRIVATE_KEY: ${{ secrets.SOLANA_PRIVATE_KEY }}
+            TELEGRAM_TOKEN: ${{ secrets.AURA_TELEGRAM_TOKEN }}
         if: github.ref == 'refs/heads/main'
         steps:
             - uses: actions/checkout@v4
@@ -93,12 +100,12 @@ jobs:
               run: |
                   kubectl delete secret aura-secrets --ignore-not-found
                   kubectl create secret generic aura-secrets \
-                    --from-literal=telegram-token="${{ secrets.AURA_TELEGRAM_TOKEN }}" \
-                    --from-literal=api-key="${{ secrets.MISTRAL_API_KEY }}" \
-                    --from-literal=openai-key="${{ secrets.OPENAI_API_KEY }}" \
-                    --from-literal=solana-private-key="${{ secrets.SOLANA_PRIVATE_KEY }}" \
-                    --from-literal=frp-client-token="${{ secrets.FRP_CLIENT_TOKEN }}" \
-                    --from-literal=secret-encryption-key="${{ secrets.AURA_SECRET_ENCRYPTION_KEY }}"
+                    --from-literal=api-key="$API_KEY" \
+                    --from-literal=frp-client-token="$FRP_CLIENT_TOKEN" \
+                    --from-literal=openai-key="$OPENAI_API_KEY" \
+                    --from-literal=secret-encryption-key="$SECRET_ENCRYPTION_KEY" \
+                    --from-literal=solana-private-key="$SOLANA_PRIVATE_KEY" \
+                    --from-literal=telegram-token="$TELEGRAM_TOKEN"
 
             - name: Deploy to Cluster
               run: |
