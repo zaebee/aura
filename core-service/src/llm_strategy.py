@@ -1,10 +1,9 @@
 import time
 from typing import Protocol
 
-from logging_config import bind_request_id, get_logger
-
-from db import InventoryItem, SessionLocal
-from proto.aura.negotiation.v1 import negotiation_pb2
+from src.db import InventoryItem, SessionLocal
+from src.logging_config import bind_request_id, get_logger
+from src.proto.aura.negotiation.v1 import negotiation_pb2
 
 logger = get_logger("rule-strategy")
 

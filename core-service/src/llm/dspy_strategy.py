@@ -6,16 +6,16 @@ Implements the PricingStrategy protocol using the self-optimizing DSPy module.
 
 import time
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 import dspy
 import structlog
-from guard.membrane import OutputGuard, SafetyViolation
-from llm.engine import AuraNegotiator
 
-from config import get_settings
-from db import InventoryItem, SessionLocal
-from proto.aura.negotiation.v1 import negotiation_pb2
+from src.config import get_settings
+from src.db import InventoryItem, SessionLocal
+from src.guard.membrane import OutputGuard, SafetyViolation
+from src.llm.engine import AuraNegotiator
+from src.proto.aura.negotiation.v1 import negotiation_pb2
 
 logger = structlog.get_logger(__name__)
 
@@ -88,11 +88,11 @@ class DSPyStrategy:
         """Get fallback strategy (lazy loading)."""
         if self.fallback_strategy is None:
             try:
-                from llm.strategy import LiteLLMStrategy
+                from src.llm.strategy import LiteLLMStrategy
 
                 self.fallback_strategy = LiteLLMStrategy(model=self.settings.llm.model)
             except ImportError:
-                from llm_strategy import RuleBasedStrategy
+                from src.llm_strategy import RuleBasedStrategy
 
                 self.fallback_strategy = RuleBasedStrategy()
         return self.fallback_strategy
@@ -230,15 +230,21 @@ class DSPyStrategy:
             else:
                 # Unknown action - fallback to existing strategy
                 logger.warning("unknown_dspy_action", action=action)
-                return self._get_fallback_strategy().evaluate(
-                    item_id, bid, reputation, request_id
+                return cast(
+                    negotiation_pb2.NegotiateResponse,
+                    self._get_fallback_strategy().evaluate(
+                        item_id, bid, reputation, request_id
+                    ),
                 )
 
-            return result
+            return cast(negotiation_pb2.NegotiateResponse, result)
 
         except Exception as e:
             logger.error("dspy_evaluation_error", error=str(e), exc_info=True)
             # Fallback to existing strategy on error
-            return self._get_fallback_strategy().evaluate(
-                item_id, bid, reputation, request_id
+            return cast(
+                negotiation_pb2.NegotiateResponse,
+                self._get_fallback_strategy().evaluate(
+                    item_id, bid, reputation, request_id
+                ),
             )

@@ -12,7 +12,7 @@ lint:
 	# Python Lint (Ruff)
 	uv run ruff check .
 	# Python Type Check (Mypy)
-	MYPYPATH=core-service/src uv run mypy core-service/src
+	MYPYPATH=core-service uv run mypy core-service/src
 	MYPYPATH=api-gateway uv run mypy api-gateway/src
 	MYPYPATH=adapters/telegram-bot:core-service/src/proto uv run mypy adapters/telegram-bot/src
 	# Security Audit (Bandit)
@@ -27,17 +27,17 @@ setup-hooks:
 # Run tests
 test:
 	# Run core-service tests
-	uv run pytest core-service/tests/ -v
+	PYTHONPATH=core-service uv run pytest core-service/tests/ -v
 	# Run telegram-bot tests with isolated path to avoid 'src' collision
 	PYTHONPATH=adapters/telegram-bot:core-service/src/proto uv run pytest adapters/telegram-bot/tests/ -v
 
 # Run tests with coverage report
 test-cov:
-	uv run pytest core-service/tests/ -v --cov=core-service/src --cov-report=term-missing
+	PYTHONPATH=core-service uv run pytest core-service/tests/ -v --cov=core-service/src --cov-report=term-missing
 
 # Run tests with verbose output
 test-verbose:
-	uv run pytest core-service/tests/ -vv -s
+	PYTHONPATH=core-service uv run pytest core-service/tests/ -vv -s
 
 # Test health endpoints
 test-health:

@@ -3,10 +3,10 @@ from pathlib import Path
 
 import dspy
 import structlog
-from hive.dna import Decision, HiveContext
-from llm.engine import AuraNegotiator
 
-from config import get_settings
+from src.config import get_settings
+from src.hive.dna import Decision, HiveContext
+from src.llm.engine import AuraNegotiator
 
 logger = structlog.get_logger(__name__)
 
@@ -35,7 +35,7 @@ class HiveTransformer:
 
             if program_path.exists():
                 logger.info("loading_compiled_dspy_program", path=str(program_path))
-                return dspy.load(str(program_path))
+                return dspy.load(str(program_path))  # type: ignore
             else:
                 logger.warning(
                     "compiled_program_not_found_using_untrained", path=str(program_path)

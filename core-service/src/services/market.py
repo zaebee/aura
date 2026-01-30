@@ -8,13 +8,13 @@ import secrets
 import uuid
 from datetime import datetime, timedelta
 
-from crypto.encryption import SecretEncryption
-from crypto.interfaces import CryptoProvider
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from db import DealStatus, LockedDeal
-from proto.aura.negotiation.v1 import negotiation_pb2
+from src.crypto.encryption import SecretEncryption
+from src.crypto.interfaces import CryptoProvider
+from src.db import DealStatus, LockedDeal
+from src.proto.aura.negotiation.v1 import negotiation_pb2
 
 logger = logging.getLogger(__name__)
 

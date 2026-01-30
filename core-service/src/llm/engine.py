@@ -12,9 +12,10 @@ from typing import Any
 import dspy
 import litellm
 import structlog
-from llm.prepare.clean import clean_and_parse_json
-from llm.signatures import Negotiate
 from pydantic import BaseModel
+
+from src.llm.prepare.clean import clean_and_parse_json
+from src.llm.signatures import Negotiate
 
 logger = structlog.get_logger(__name__)
 
@@ -185,7 +186,7 @@ class LLMEngine:
                     model=self.model,
                     structured=True,
                 )
-                return content
+                return content  # type: ignore
             else:
                 logger.info(
                     "llm_call_completed",
@@ -193,7 +194,7 @@ class LLMEngine:
                     structured=False,
                     response_length=len(content),
                 )
-                return content
+                return content  # type: ignore
 
         except litellm.AuthenticationError as e:
             logger.error(

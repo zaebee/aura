@@ -49,7 +49,7 @@ class SecretEncryption:
             ValueError: If encryption fails
         """
         try:
-            return self.fernet.encrypt(plaintext.encode())
+            return self.fernet.encrypt(plaintext.encode())  # type: ignore
         except (ValueError, TypeError, AttributeError) as e:
             logger.error("Encryption failed", extra={"error": str(e)})
             raise ValueError(f"Encryption failed: {e}") from e
@@ -68,7 +68,7 @@ class SecretEncryption:
             ValueError: If decryption fails (wrong key, tampered data)
         """
         try:
-            return self.fernet.decrypt(ciphertext).decode()
+            return self.fernet.decrypt(ciphertext).decode()  # type: ignore
         except InvalidToken as e:
             logger.error("Decryption failed: invalid token or wrong key")
             raise ValueError("Decryption failed: invalid token or wrong key") from e
@@ -90,4 +90,4 @@ def generate_encryption_key() -> str:
         >>> key = generate_encryption_key()
         >>> print(f"SECRET_ENCRYPTION_KEY={key}")
     """
-    return Fernet.generate_key().decode()
+    return Fernet.generate_key().decode()  # type: ignore

@@ -3,7 +3,7 @@
 from unittest.mock import MagicMock, patch
 
 import pytest
-from llm.strategy import AI_Decision, LiteLLMStrategy
+from src.llm.strategy import AI_Decision, LiteLLMStrategy
 
 
 class TestLiteLLMStrategy:

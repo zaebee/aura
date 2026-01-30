@@ -1,8 +1,9 @@
 from typing import Any
 
 import structlog
-from hive.dna import Aggregator, Connector, Generator, Membrane, Transformer
 from opentelemetry import trace
+
+from src.hive.dna import Aggregator, Connector, Generator, Membrane, Transformer
 
 logger = structlog.get_logger(__name__)
 tracer = trace.get_tracer(__name__)

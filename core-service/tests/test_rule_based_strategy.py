@@ -1,6 +1,6 @@
 """Unit tests for RuleBasedStrategy."""
 
-from llm_strategy import RuleBasedStrategy
+from src.llm_strategy import RuleBasedStrategy
 
 
 class TestRuleBasedStrategy:

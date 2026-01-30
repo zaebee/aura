@@ -227,7 +227,7 @@ class SolanaProvider:
             )
             return []
 
-        return data.get("result", [])
+        return data.get("result", [])  # type: ignore
 
     async def _get_transaction(self, signature: str) -> dict[str, Any] | None:
         """
@@ -260,7 +260,7 @@ class SolanaProvider:
         if "error" in data or not data.get("result"):
             return None
 
-        return data["result"]
+        return data["result"]  # type: ignore
 
     def _is_matching_payment(
         self,

@@ -7,31 +7,31 @@ import grpc
 import grpc.aio
 import nats
 from grpc_health.v1 import health_pb2, health_pb2_grpc
-from hive.aggregator import HiveAggregator
-from hive.connector import HiveConnector
-from hive.generator import HiveGenerator
-from hive.membrane import HiveMembrane
-from hive.metabolism import MetabolicLoop
-from hive.transformer import HiveTransformer
-from logging_config import (
-    bind_request_id,
-    clear_request_context,
-    configure_logging,
-    get_logger,
-)
 from opentelemetry import trace
 from opentelemetry.instrumentation.grpc import GrpcInstrumentorServer
 from opentelemetry.instrumentation.langchain import LangchainInstrumentor
 from opentelemetry.instrumentation.sqlalchemy import SQLAlchemyInstrumentor
 from prometheus_client import start_http_server
 from sqlalchemy import text
-from telemetry import init_telemetry
 
-from config import settings
-from config.llm import get_raw_key
-from db import InventoryItem, SessionLocal, engine
-from embeddings import generate_embedding
-from proto.aura.negotiation.v1 import negotiation_pb2, negotiation_pb2_grpc
+from src.config import settings
+from src.config.llm import get_raw_key
+from src.db import InventoryItem, SessionLocal, engine
+from src.embeddings import generate_embedding
+from src.hive.aggregator import HiveAggregator
+from src.hive.connector import HiveConnector
+from src.hive.generator import HiveGenerator
+from src.hive.membrane import HiveMembrane
+from src.hive.metabolism import MetabolicLoop
+from src.hive.transformer import HiveTransformer
+from src.logging_config import (
+    bind_request_id,
+    clear_request_context,
+    configure_logging,
+    get_logger,
+)
+from src.proto.aura.negotiation.v1 import negotiation_pb2, negotiation_pb2_grpc
+from src.telemetry import init_telemetry
 
 # Configure structured logging on startup
 configure_logging(log_level=settings.server.log_level)
@@ -286,19 +286,19 @@ def create_strategy() -> Any:
     """
     if settings.llm.model == "rule":
         logger.info("strategy_selected", type="RuleBasedStrategy", llm_required=False)
-        from llm_strategy import RuleBasedStrategy
+        from src.llm_strategy import RuleBasedStrategy
 
         return RuleBasedStrategy()
     elif settings.llm.model == "dspy":
         logger.info("strategy_selected", type="DSPyStrategy", model="self-optimizing")
-        from llm.dspy_strategy import DSPyStrategy
+        from src.llm.dspy_strategy import DSPyStrategy
 
         return DSPyStrategy()
     else:
         logger.info(
             "strategy_selected", type="LiteLLMStrategy", model=settings.llm.model
         )
-        from llm.strategy import LiteLLMStrategy
+        from src.llm.strategy import LiteLLMStrategy
 
         # Select appropriate API key based on model provider
         api_key = None
@@ -331,7 +331,7 @@ def create_crypto_provider() -> Any:
             network=settings.crypto.solana_network,
             currency=settings.crypto.currency,
         )
-        from crypto.solana_provider import SolanaProvider
+        from src.crypto.solana_provider import SolanaProvider
 
         return SolanaProvider(
             private_key_base58=get_raw_key(settings.crypto.solana_private_key),
@@ -404,8 +404,8 @@ async def serve() -> None:
     crypto_provider = create_crypto_provider()
     market_service = None
     if crypto_provider:
-        from crypto.encryption import SecretEncryption
-        from services.market import MarketService
+        from src.crypto.encryption import SecretEncryption
+        from src.services.market import MarketService
 
         encryption = SecretEncryption(
             get_raw_key(settings.crypto.secret_encryption_key)

@@ -4,9 +4,9 @@ from typing import Any
 
 import nats.errors
 import structlog
-from hive.dna import Event, Observation
 
-from config import get_settings
+from src.config import get_settings
+from src.hive.dna import Event, Observation
 
 logger = structlog.get_logger(__name__)
 

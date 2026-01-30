@@ -9,12 +9,12 @@ from pathlib import Path
 
 import structlog
 from jinja2 import Template
-from llm.engine import LLMEngine
-from logging_config import bind_request_id
 from pydantic import BaseModel, Field
 
-from db import InventoryItem, SessionLocal
-from proto.aura.negotiation.v1 import negotiation_pb2
+from src.db import InventoryItem, SessionLocal
+from src.llm.engine import LLMEngine
+from src.logging_config import bind_request_id
+from src.proto.aura.negotiation.v1 import negotiation_pb2
 
 logger = structlog.get_logger(__name__)
 

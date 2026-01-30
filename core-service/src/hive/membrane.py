@@ -1,9 +1,9 @@
 from typing import Any
 
 import structlog
-from hive.dna import Decision, HiveContext
 
-from config import get_settings
+from src.config import get_settings
+from src.hive.dna import Decision, HiveContext
 
 logger = structlog.get_logger(__name__)
 
