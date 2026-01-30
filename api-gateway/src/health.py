@@ -17,8 +17,9 @@ from enum import Enum
 import grpc
 from fastapi import FastAPI, HTTPException
 from grpc_health.v1 import health_pb2, health_pb2_grpc
-from logging_config import get_logger
 from pydantic import BaseModel, Field
+
+from src.logging_config import get_logger
 
 logger = get_logger("health")
 

@@ -87,8 +87,10 @@ jobs:
                   github_token: ${{ github.token }}
             - name: Install Python Dependencies
               run: make install-dev
-            - name: Run Linters & Tests
-              run: make lint test
+            - name: Run Linters
+              run: make lint
+            - name: Run Tests
+              run: make test
 
     # === STAGE 2: THE FAN-OUT (PARALLEL BUILD) ===
     build-and-push:

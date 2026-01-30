@@ -40,7 +40,7 @@ class MetricsCache:
 class HiveAggregator:
     """A - Aggregator: Consolidates database and system health signals."""
 
-    def __init__(self):
+    def __init__(self) -> None:
         self.settings = get_settings()
         self._metrics_cache = MetricsCache(ttl_seconds=30)
 
@@ -56,11 +56,13 @@ class HiveAggregator:
             search_paths.append(Path(self.settings.llm.compiled_program_path))
 
         # Priority 2: Standard expected locations
-        search_paths.extend([
-            Path("/app/src/aura_brain.json"),
-            Path("./src/aura_brain.json"),
-            Path(__file__).parent.parent / "aura_brain.json",
-        ])
+        search_paths.extend(
+            [
+                Path("/app/src/aura_brain.json"),
+                Path("./src/aura_brain.json"),
+                Path(__file__).parent.parent / "aura_brain.json",
+            ]
+        )
 
         for path in search_paths:
             try:
@@ -74,7 +76,7 @@ class HiveAggregator:
 
     def _process_metric_response(
         self,
-        response: httpx.Response | Exception,
+        response: httpx.Response | BaseException,
         metric_name: str,
         errors: list[str],
     ) -> tuple[float, bool]:
@@ -116,7 +118,9 @@ class HiveAggregator:
 
         # 2. Query Prometheus
         cpu_query = 'avg(rate(container_cpu_usage_seconds_total{namespace="default"}[5m])) * 100'
-        mem_query = 'avg(container_memory_working_set_bytes{namespace="default"}) / 1024 / 1024'
+        mem_query = (
+            'avg(container_memory_working_set_bytes{namespace="default"}) / 1024 / 1024'
+        )
 
         try:
             async with httpx.AsyncClient(timeout=5.0) as client:
@@ -132,7 +136,7 @@ class HiveAggregator:
                     cpu_task, mem_task, return_exceptions=True
                 )
 
-                errors = []
+                errors: list[str] = []
 
                 # Process Responses
                 cpu_usage, cpu_success = self._process_metric_response(
@@ -212,7 +216,7 @@ class HiveAggregator:
         )
 
         # 1. Fetch item data
-        def fetch_item_sync():
+        def fetch_item_sync() -> InventoryItem | None:
             with SessionLocal() as session:
                 return session.query(InventoryItem).filter_by(id=item_id).first()
 

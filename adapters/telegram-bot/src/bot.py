@@ -19,7 +19,7 @@ class NegotiationStates(StatesGroup):
 
 
 @router.message(Command("start"))
-async def cmd_start(message: Message):
+async def cmd_start(message: Message) -> None:
     await message.answer(
         "Welcome to Aura! 🤖\n"
         "I can help you find hotels and negotiate the best prices.\n"
@@ -30,7 +30,7 @@ async def cmd_start(message: Message):
 @router.message(Command("search"))
 async def cmd_search(
     message: Message, command: CommandObject, client: NegotiationProvider
-):
+) -> None:
     if not command.args:
         await message.answer("Usage: /search <query>")
         return
@@ -60,7 +60,9 @@ async def cmd_search(
 
 
 @router.callback_query(F.data.startswith("select:"))
-async def process_select_hotel(callback: CallbackQuery, state: FSMContext):
+async def process_select_hotel(callback: CallbackQuery, state: FSMContext) -> None:
+    if not callback.data:
+        return
     item_id = callback.data.split(":", 1)[1]
 
     # We don't have the item name/price here easily unless we fetch or store it.
@@ -68,17 +70,20 @@ async def process_select_hotel(callback: CallbackQuery, state: FSMContext):
     await state.update_data(item_id=item_id)
     await state.set_state(NegotiationStates.WaitingForBid)
 
-    await callback.message.answer(f"Enter your bid for this item (ID: {item_id}):")
+    if callback.message:
+        await callback.message.answer(f"Enter your bid for this item (ID: {item_id}):")
     await callback.answer()
 
 
 @router.message(NegotiationStates.WaitingForBid, F.text.regexp(r"^\d+(\.\d+)?$"))
-async def process_bid(message: Message, state: FSMContext, client: NegotiationProvider):
+async def process_bid(
+    message: Message, state: FSMContext, client: NegotiationProvider
+) -> None:
     data = await state.get_data()
-    item_id = data.get("item_id")
+    item_id = str(data.get("item_id", ""))
 
     try:
-        bid_amount = float(message.text)
+        bid_amount = float(message.text) if message.text else 0.0
     except ValueError:
         await message.answer("Please enter a valid number.")
         return
@@ -86,10 +91,10 @@ async def process_bid(message: Message, state: FSMContext, client: NegotiationPr
     response = await client.negotiate(item_id, bid_amount)
 
     if "error" in response:
-        await message.answer(response["error"])
+        await message.answer(str(response.get("error", "Unknown error")))
         return
 
-    if "accepted" in response:
+    if "accepted" in response and response["accepted"] is not None:
         acc = response["accepted"]
         final_price = acc.get("finalPrice", acc.get("final_price"))
         code = acc.get("reservationCode", acc.get("reservation_code"))
@@ -105,7 +110,7 @@ async def process_bid(message: Message, state: FSMContext, client: NegotiationPr
             parse_mode="Markdown",
         )
         await state.clear()
-    elif "countered" in response:
+    elif "countered" in response and response["countered"] is not None:
         cnt = response["countered"]
         price = cnt.get("proposedPrice", cnt.get("proposed_price"))
         msg = cnt.get("humanMessage", cnt.get("human_message", ""))
@@ -127,5 +132,5 @@ async def process_bid(message: Message, state: FSMContext, client: NegotiationPr
 
 
 @router.callback_query(F.data == "pay_stub")
-async def process_pay_stub(callback: CallbackQuery):
+async def process_pay_stub(callback: CallbackQuery) -> None:
     await callback.answer("Payment functionality coming soon!", show_alert=True)

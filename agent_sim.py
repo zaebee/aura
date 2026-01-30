@@ -55,7 +55,7 @@ def run_agent_scenario(scenario_name, item_id, bid, wallet=None):
         }
 
         response = requests.post(
-            f"{GATEWAY_URL}{method}", json=payload, headers=headers
+            f"{GATEWAY_URL}{method}", json=payload, headers=headers, timeout=30
         )
         latency = (time.time() - start_ts) * 1000
 

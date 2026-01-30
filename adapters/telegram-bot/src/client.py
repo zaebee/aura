@@ -11,7 +11,7 @@ logger = structlog.get_logger()
 
 
 class GRPCNegotiationClient(NegotiationProvider):
-    def __init__(self, grpc_url: str):
+    def __init__(self, grpc_url: str) -> None:
         self.channel = grpc.aio.insecure_channel(grpc_url)
         self.stub = negotiation_pb2_grpc.NegotiationServiceStub(self.channel)
 
@@ -21,7 +21,7 @@ class GRPCNegotiationClient(NegotiationProvider):
             response = await self.stub.Search(request, timeout=5.0)
             # Use preserving_proto_field_name=True to get snake_case as per SearchResult TypedDict
             return [
-                MessageToDict(item, preserving_proto_field_name=True)
+                dict(MessageToDict(item, preserving_proto_field_name=True))  # type: ignore
                 for item in response.results
             ]
         except grpc.RpcError as e:
@@ -40,7 +40,7 @@ class GRPCNegotiationClient(NegotiationProvider):
                 ),
             )
             response = await self.stub.Negotiate(request, timeout=5.0)
-            return MessageToDict(response, preserving_proto_field_name=True)
+            return dict(MessageToDict(response, preserving_proto_field_name=True))  # type: ignore
         except grpc.RpcError as e:
             logger.error("gRPC Negotiate failed", code=e.code(), details=e.details())
             if e.code() == grpc.StatusCode.UNAVAILABLE:
@@ -51,5 +51,5 @@ class GRPCNegotiationClient(NegotiationProvider):
                 return {"error": "Request timed out. Please try again."}
             return {"error": f"An error occurred: {e.details()}"}
 
-    async def close(self):
+    async def close(self) -> None:
         await self.channel.close()

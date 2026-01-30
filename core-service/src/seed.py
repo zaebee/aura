@@ -8,7 +8,7 @@ configure_logging()
 logger = get_logger("seed")
 
 
-def seed():
+def seed() -> None:
     session = SessionLocal()
 
     # List of hotels to add
@@ -39,7 +39,7 @@ def seed():
 
         # Generate vector embedding
         logger.info("embedding_generation_started", item_id=raw["id"])
-        vector = generate_embedding(raw["desc"])
+        vector = generate_embedding(str(raw["desc"]))
 
         if existing:
             logger.info("item_updated", item_id=raw["id"])

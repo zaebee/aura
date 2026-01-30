@@ -18,7 +18,7 @@ structlog.configure(
 logger = structlog.get_logger()
 
 
-async def main():
+async def main() -> None:
     # Initialize gRPC client
     client = GRPCNegotiationClient(settings.core_url)
 

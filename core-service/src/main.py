@@ -1,7 +1,7 @@
 import asyncio
 import uuid
 from concurrent import futures
-from typing import Protocol
+from typing import Any, Protocol
 
 import grpc
 import grpc.aio
@@ -59,7 +59,7 @@ LangchainInstrumentor().instrument()
 REQUEST_ID_METADATA_KEY = "x-request-id"
 
 
-def extract_request_id(context) -> str | None:
+def extract_request_id(context: Any) -> str | None:
     """Extract request_id from gRPC metadata."""
     metadata = dict(context.invocation_metadata())
     return metadata.get(REQUEST_ID_METADATA_KEY)
@@ -80,12 +80,14 @@ class NegotiationService(negotiation_pb2_grpc.NegotiationServiceServicer):
     def __init__(
         self,
         metabolism: MetabolicLoop | None = None,
-        market_service=None,
-    ):
+        market_service: Any = None,
+    ) -> None:
         self.metabolism = metabolism
         self.market_service = market_service
 
-    async def Negotiate(self, request, context):
+    async def Negotiate(
+        self, request: Any, context: Any
+    ) -> negotiation_pb2.NegotiateResponse:
         """
         Main metabolic loop for negotiation:
         Signal -> A -> T -> Membrane -> C -> G
@@ -96,14 +98,15 @@ class NegotiationService(negotiation_pb2_grpc.NegotiationServiceServicer):
             context.set_details("Metabolism is still initializing")
             return negotiation_pb2.NegotiateResponse()
 
-        request_id = extract_request_id(context) or getattr(
-            request, "request_id", str(uuid.uuid4())
+        request_id = str(
+            extract_request_id(context)
+            or getattr(request, "request_id", str(uuid.uuid4()))
         )
         bind_request_id(request_id)
 
         try:
             observation = await self.metabolism.execute(request)
-            return observation.data
+            return observation.data  # type: ignore
 
         except ValueError as e:
             logger.warning("invalid_argument", error=str(e))
@@ -124,7 +127,7 @@ class NegotiationService(negotiation_pb2_grpc.NegotiationServiceServicer):
         finally:
             clear_request_context()
 
-    def Search(self, request, context):
+    def Search(self, request: Any, context: Any) -> negotiation_pb2.SearchResponse:
         """Semantic search implementation."""
         request_id = extract_request_id(context)
         if request_id:
@@ -189,7 +192,7 @@ class NegotiationService(negotiation_pb2_grpc.NegotiationServiceServicer):
                 clear_request_context()
 
     async def GetSystemStatus(
-        self, request: negotiation_pb2.GetSystemStatusRequest, context
+        self, request: negotiation_pb2.GetSystemStatusRequest, context: Any
     ) -> negotiation_pb2.GetSystemStatusResponse:
         """Return infrastructure metrics from Prometheus."""
         if not self.metabolism:
@@ -213,7 +216,7 @@ class NegotiationService(negotiation_pb2_grpc.NegotiationServiceServicer):
             return negotiation_pb2.GetSystemStatusResponse(status="error")
 
     async def CheckDealStatus(
-        self, request: negotiation_pb2.CheckDealStatusRequest, context
+        self, request: negotiation_pb2.CheckDealStatusRequest, context: Any
     ) -> negotiation_pb2.CheckDealStatusResponse:
         """Check crypto payment status and reveal secret if paid."""
         request_id = extract_request_id(context)
@@ -251,7 +254,7 @@ class NegotiationService(negotiation_pb2_grpc.NegotiationServiceServicer):
                     deal_id=request.deal_id,
                     status=response.status,
                 )
-                return response
+                return response  # type: ignore
             finally:
                 session.close()
 
@@ -270,9 +273,7 @@ class NegotiationService(negotiation_pb2_grpc.NegotiationServiceServicer):
                 clear_request_context()
 
 
-
-
-def create_strategy():
+def create_strategy() -> Any:
     """Create pricing strategy based on LLM_MODEL configuration.
 
     Strategies:
@@ -313,7 +314,7 @@ def create_strategy():
         )
 
 
-def create_crypto_provider():
+def create_crypto_provider() -> Any:
     """Create crypto payment provider if enabled.
 
     Returns:
@@ -343,7 +344,7 @@ def create_crypto_provider():
         return None
 
 
-async def serve():
+async def serve() -> None:
     from grpc_health.v1 import health
 
     # 1. Initialize gRPC Server early

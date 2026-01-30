@@ -46,6 +46,11 @@ dependencies = [
 [dependency-groups]
 dev = [
     "ruff>=0.8.0",
+    "mypy>=1.13.0",
+    "bandit>=1.8.0",
+    "pre-commit>=4.0.0",
+    "types-requests",
+    "types-setuptools",
     "pytest>=8.0.0",
     "pytest-cov>=4.0.0",
     "pytest-asyncio>=1.3.0",
@@ -76,6 +81,43 @@ ignore = [
 
 [tool.ruff.lint.isort]
 known-first-party = ["config", "db", "embeddings", "llm_strategy", "proto"]
+
+[tool.mypy]
+python_version = "3.12"
+explicit_package_bases = true
+disallow_untyped_defs = true
+check_untyped_defs = true
+warn_return_any = false
+warn_unused_configs = true
+plugins = ["pydantic.mypy"]
+exclude = ["proto/.*", "tests/.*"]
+
+[[tool.mypy.overrides]]
+module = [
+    "solana.*",
+    "solders.*",
+    "grpc.*",
+    "google.protobuf.*",
+    "dspy.*",
+    "prometheus_client.*",
+    "nats.*",
+    "aiogram.*",
+    "sqlalchemy.*",
+    "alembic.*",
+    "pgvector.*",
+    "grpc_health.*",
+    "opentelemetry.*",
+    "litellm.*",
+]
+ignore_missing_imports = true
+
+[tool.bandit]
+exclude_dirs = ["tests", "venv", ".venv"]
+skips = ["B101"] # B101 is assert_used, often okay in some contexts but bandit defaults can be strict.
+
+[[tool.mypy.overrides]]
+module = ["proto.*", "aura.*", "src.proto.*"]
+ignore_errors = true
 
 # [[tool.uv.index]]
 # url = "https://buf.build/gen/python"

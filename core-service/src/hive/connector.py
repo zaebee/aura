@@ -1,6 +1,7 @@
 import asyncio
 import time
 import uuid
+from typing import Any
 
 import structlog
 from crypto.pricing import PriceConverter
@@ -17,7 +18,7 @@ logger = structlog.get_logger(__name__)
 class HiveConnector:
     """C - Connector: Maps decisions to gRPC responses and interacts with external systems (Solana)."""
 
-    def __init__(self, market_service=None):
+    def __init__(self, market_service: Any = None) -> None:
         self.market_service = market_service
         self.settings = get_settings()
 
@@ -69,10 +70,10 @@ class HiveConnector:
         response: negotiation_pb2.NegotiateResponse,
         action: Decision,
         context: HiveContext,
-    ):
+    ) -> None:
         """Encrypts the reservation code and creates a locked deal on Solana."""
 
-        def create_offer_sync():
+        def create_offer_sync() -> tuple[float, Any]:
             with SessionLocal() as session:
                 # Use item name from context to avoid redundant query
                 item_name = context.item_data.get("name", "Aura Item")
@@ -84,7 +85,7 @@ class HiveConnector:
                 # Convert USD price to crypto amount
                 crypto_amount = converter.convert_usd_to_crypto(
                     usd_amount=action.price,
-                    crypto_currency=self.settings.crypto.currency,
+                    crypto_currency=self.settings.crypto.currency,  # type: ignore
                 )
 
                 # Create the offer via MarketService

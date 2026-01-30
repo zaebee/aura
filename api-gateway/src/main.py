@@ -1,29 +1,30 @@
 import uuid
 from contextlib import asynccontextmanager
+from typing import Any
 
 import grpc
 from fastapi import Depends, FastAPI, Header, HTTPException, Request
 from grpc_health.v1 import health_pb2_grpc
-from logging_config import (
+from opentelemetry.instrumentation.fastapi import FastAPIInstrumentor
+from opentelemetry.instrumentation.grpc import GrpcInstrumentorClient
+from pydantic import BaseModel
+from starlette.middleware.cors import CORSMiddleware
+
+from src.config import get_settings
+from src.health import register_health_endpoints
+from src.logging_config import (
     bind_request_id,
     clear_request_context,
     configure_logging,
     get_current_request_id,
     get_logger,
 )
-from opentelemetry.instrumentation.fastapi import FastAPIInstrumentor
-from opentelemetry.instrumentation.grpc import GrpcInstrumentorClient
-from pydantic import BaseModel
-from starlette.middleware.cors import CORSMiddleware
-from telemetry import init_telemetry
-
-from config import get_settings
-from proto.aura.negotiation.v1 import (
+from src.proto.aura.negotiation.v1 import (
     negotiation_pb2,  # type: ignore
     negotiation_pb2_grpc,  # type: ignore
 )
-from src.health import register_health_endpoints
 from src.security import verify_signature
+from src.telemetry import init_telemetry
 
 # Configure structured logging on startup
 configure_logging()
@@ -56,7 +57,7 @@ health_stub: health_pb2_grpc.HealthStub
 
 
 @asynccontextmanager
-async def lifespan(app: FastAPI):
+async def lifespan(app: FastAPI) -> Any:
     """Manage gRPC channel lifecycle (startup and shutdown)."""
     global channel, stub, health_stub
 
@@ -107,7 +108,7 @@ REQUEST_ID_METADATA_KEY = "x-request-id"
 
 
 @app.middleware("http")
-async def request_id_middleware(request: Request, call_next):
+async def request_id_middleware(request: Request, call_next: Any) -> Any:
     """Middleware to generate and bind request_id for every HTTP request."""
     request_id = str(uuid.uuid4())
     bind_request_id(request_id)
@@ -145,7 +146,7 @@ async def negotiate(
     request: Request,
     x_agent_token: str | None = Header(None),
     agent_did: str = Depends(verify_signature),
-):
+) -> dict[str, Any]:
     request_id = get_current_request_id() or str(uuid.uuid4())
 
     # Get the parsed body from request.state (stored by verify_signature)
@@ -170,7 +171,7 @@ async def negotiate(
         bid_amount=payload.bid_amount,
         currency_code=payload.currency,
         agent=negotiation_pb2.AgentIdentity(
-            did=agent_did,  # Use the verified agent_did from security headers
+            did=agent_did,  # Use the verified agent_did from src.security headers
             reputation_score=1.0,
         ),
     )
@@ -272,7 +273,9 @@ class SearchRequestHTTP(BaseModel):
 
 
 @app.post("/v1/search")
-async def search_items(request: Request, agent_did: str = Depends(verify_signature)):
+async def search_items(
+    request: Request, agent_did: str = Depends(verify_signature)
+) -> dict[str, Any]:
     request_id = get_current_request_id() or str(uuid.uuid4())
 
     # Get the parsed body from request.state (stored by verify_signature)
@@ -327,7 +330,7 @@ async def search_items(request: Request, agent_did: str = Depends(verify_signatu
 
 
 @app.get("/v1/system/status")
-async def system_status():
+async def system_status() -> dict[str, Any]:
     """
     Expose internal infrastructure metrics.
 
@@ -352,7 +355,9 @@ async def system_status():
 
 
 @app.post("/v1/deals/{deal_id}/status")
-async def check_deal_status(deal_id: str, agent_did: str = Depends(verify_signature)):
+async def check_deal_status(
+    deal_id: str, agent_did: str = Depends(verify_signature)
+) -> dict[str, Any]:
     """
     Check the payment status of a locked deal.
 

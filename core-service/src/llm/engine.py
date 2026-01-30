@@ -26,12 +26,14 @@ class AuraNegotiator(dspy.Module):
     based on economic context and training examples.
     """
 
-    def __init__(self):
+    def __init__(self) -> None:
         super().__init__()
         self.negotiate_chain = dspy.ChainOfThought(Negotiate)
         logger.info("dspy_negotiator_initialized", module="AuraNegotiator")
 
-    def forward(self, input_bid: float, context: Any, history: Any = None) -> dict:
+    def forward(
+        self, input_bid: float, context: Any, history: Any = None
+    ) -> dict[str, Any]:
         """Forward pass for negotiation decision.
 
         Args:

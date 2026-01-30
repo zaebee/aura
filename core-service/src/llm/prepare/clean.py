@@ -1,8 +1,9 @@
 import json
 import re
+from typing import Any
 
 
-def clean_and_parse_json(text: str) -> dict:
+def clean_and_parse_json(text: str) -> dict[str, Any]:
     """Clean response from Markdown and attempt to extract JSON.
 
     Handles various LLM response formats including:

@@ -1,5 +1,7 @@
 import logging
+from collections.abc import MutableMapping
 from contextvars import ContextVar
+from typing import Any
 
 import structlog
 from opentelemetry.trace import get_current_span
@@ -29,7 +31,9 @@ def configure_logging(log_level: str = "info") -> None:
     )
 
 
-def add_otel_context(logger, method_name, event_dict):
+def add_otel_context(
+    logger: Any, method_name: str, event_dict: MutableMapping[str, Any]
+) -> MutableMapping[str, Any]:
     """Add OpenTelemetry context to log records."""
     try:
         span = get_current_span()
@@ -47,7 +51,7 @@ def add_otel_context(logger, method_name, event_dict):
     return event_dict
 
 
-def get_logger(name: str | None = None) -> structlog.BoundLogger:
+def get_logger(name: str | None = None) -> Any:
     """Get a logger instance, optionally with a specific name."""
     logger = structlog.get_logger()
     if name:

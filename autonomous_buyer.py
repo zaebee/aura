@@ -36,7 +36,9 @@ class AutonomousBuyer:
         payload = {"query": query, "limit": 1}
         headers = self._get_security_headers("POST", "/v1/search", payload)
 
-        resp = requests.post(f"{GATEWAY}/search", json=payload, headers=headers)
+        resp = requests.post(
+            f"{GATEWAY}/search", json=payload, headers=headers, timeout=30
+        )
         results = resp.json().get("results", [])
 
         if not results:
@@ -72,7 +74,9 @@ class AutonomousBuyer:
             headers = self._get_security_headers("POST", "/v1/negotiate", payload)
 
             # Если есть сессия, могли бы передавать, но у нас stateless пока
-            resp = requests.post(f"{GATEWAY}/negotiate", json=payload, headers=headers)
+            resp = requests.post(
+                f"{GATEWAY}/negotiate", json=payload, headers=headers, timeout=30
+            )
             data = resp.json()
             status = data.get("status")
 

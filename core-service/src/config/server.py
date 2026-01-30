@@ -1,8 +1,8 @@
-from pydantic import AliasChoices, BaseModel, Field, HttpUrl
+from pydantic import AliasChoices, BaseModel, Field
 
 
 class ServerSettings(BaseModel):
-    host: str = "0.0.0.0"
+    host: str = "0.0.0.0"  # nosec
     port: int = Field(
         50051, validation_alias=AliasChoices("AURA_SERVER__PORT", "GRPC_PORT")
     )
@@ -21,7 +21,7 @@ class ServerSettings(BaseModel):
             "AURA_SERVER__OTEL_SERVICE_NAME", "OTEL_SERVICE_NAME"
         ),
     )
-    otel_exporter_otlp_endpoint: HttpUrl = Field(
+    otel_exporter_otlp_endpoint: str = Field(
         "http://jaeger:4317",
         validation_alias=AliasChoices(
             "AURA_SERVER__OTEL_EXPORTER_OTLP_ENDPOINT", "OTEL_EXPORTER_OTLP_ENDPOINT"
@@ -29,7 +29,7 @@ class ServerSettings(BaseModel):
     )
 
     # Monitoring
-    prometheus_url: HttpUrl = Field(
+    prometheus_url: str = Field(
         "http://prometheus-kube-prometheus-prometheus.monitoring:9090",
         validation_alias=AliasChoices("AURA_SERVER__PROMETHEUS_URL", "PROMETHEUS_URL"),
     )

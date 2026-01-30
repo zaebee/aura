@@ -13,7 +13,7 @@ DEFAULT_MIN_MARGIN = 0.1
 class HiveMembrane:
     """The Immune System: Deterministic Guardrails for Inbound/Outbound signals."""
 
-    def __init__(self):
+    def __init__(self) -> None:
         self.settings = get_settings()
 
     async def inspect_inbound(self, signal: Any) -> Any:
@@ -75,7 +75,9 @@ class HiveMembrane:
 
         # Rule 2: Data Leak Prevention (DLP)
         if "floor_price" in decision.message.lower():
-            logger.warning("membrane_dlp_violation", detail="found 'floor_price' in message")
+            logger.warning(
+                "membrane_dlp_violation", detail="found 'floor_price' in message"
+            )
             decision.message = "I've reviewed the offer, and I've provided my best possible response. I cannot disclose internal pricing details."
             # Optionally override reasoning to note the leak
             decision.reasoning += " [MEMBRANE: DLP block for 'floor_price' leak]"

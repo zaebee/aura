@@ -1,4 +1,4 @@
-from pydantic import BaseModel, HttpUrl, SecretStr, model_validator
+from pydantic import BaseModel, SecretStr, model_validator
 
 
 class CryptoSettings(BaseModel):
@@ -12,8 +12,8 @@ class CryptoSettings(BaseModel):
     currency: str = "SOL"  # "SOL", "USDC", "ETH" (future)
 
     # Solana Configuration
-    solana_private_key: SecretStr = ""  # Base58-encoded private key
-    solana_rpc_url: HttpUrl = "https://api.devnet.solana.com"
+    solana_private_key: SecretStr = ""  # type: ignore # Base58-encoded private key
+    solana_rpc_url: str = "https://api.devnet.solana.com"
     solana_network: str = "devnet"  # "mainnet-beta", "devnet", "testnet"
     solana_usdc_mint: str = (
         "Gh9ZwEmdLJ8DscKNTkTqPbNwLNNBjuSzaG9Vp2KGtKJr"  # Devnet USDC
@@ -23,7 +23,7 @@ class CryptoSettings(BaseModel):
     deal_ttl_seconds: int = 3600  # 1 hour default
 
     # Secret Encryption
-    secret_encryption_key: SecretStr = ""  # Base64-encoded Fernet key (32 bytes)
+    secret_encryption_key: SecretStr = ""  # type: ignore # Base64-encoded Fernet key (32 bytes)
 
     # Pricing Configuration
     use_fixed_rates: bool = True  # Use fixed rates (not oracle)

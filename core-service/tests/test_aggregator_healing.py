@@ -1,7 +1,9 @@
-import pytest
+from unittest.mock import AsyncMock, MagicMock
+
 import httpx
-from unittest.mock import MagicMock, AsyncMock
+import pytest
 from hive.aggregator import HiveAggregator
+
 
 @pytest.mark.asyncio
 async def test_aggregator_healing_on_prometheus_timeout(mocker):
@@ -9,10 +11,13 @@ async def test_aggregator_healing_on_prometheus_timeout(mocker):
     Verify that the Aggregator returns UNKNOWN status when Prometheus times out.
     """
     aggregator = HiveAggregator()
-    mocker.patch("httpx.AsyncClient.get", side_effect=httpx.TimeoutException("Timeout!"))
+    mocker.patch(
+        "httpx.AsyncClient.get", side_effect=httpx.TimeoutException("Timeout!")
+    )
     metrics = await aggregator.get_system_metrics()
     assert metrics["status"] == "UNKNOWN"
     assert "TimeoutException" in metrics["error"]
+
 
 @pytest.mark.asyncio
 async def test_aggregator_healing_on_prometheus_connection_error(mocker):
@@ -20,10 +25,13 @@ async def test_aggregator_healing_on_prometheus_connection_error(mocker):
     Verify that the Aggregator returns UNKNOWN status on connection error.
     """
     aggregator = HiveAggregator()
-    mocker.patch("httpx.AsyncClient.get", side_effect=httpx.ConnectError("Connection refused"))
+    mocker.patch(
+        "httpx.AsyncClient.get", side_effect=httpx.ConnectError("Connection refused")
+    )
     metrics = await aggregator.get_system_metrics()
     assert metrics["status"] == "UNKNOWN"
     assert "ConnectError" in metrics["error"]
+
 
 @pytest.mark.asyncio
 async def test_aggregator_healing_with_cache_fallback(mocker):
@@ -33,14 +41,8 @@ async def test_aggregator_healing_with_cache_fallback(mocker):
     aggregator = HiveAggregator()
 
     # 1. Prime the cache with Mock objects that pass isinstance(..., httpx.Response)
-    cpu_data = {
-        "status": "success",
-        "data": {"result": [{"value": [0, "42.0"]}]}
-    }
-    mem_data = {
-        "status": "success",
-        "data": {"result": [{"value": [0, "84.0"]}]}
-    }
+    cpu_data = {"status": "success", "data": {"result": [{"value": [0, "42.0"]}]}}
+    mem_data = {"status": "success", "data": {"result": [{"value": [0, "84.0"]}]}}
 
     mock_cpu_res = MagicMock(spec=httpx.Response)
     mock_cpu_res.status_code = 200

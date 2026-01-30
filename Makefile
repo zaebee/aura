@@ -9,10 +9,20 @@ PLATFORM ?= linux/amd64
 lint:
 	# Protobuf Lint
 	cd proto && buf lint
-	# Python Lint
-	uv run ruff check core-service/src api-gateway/src adapters/telegram-bot/src
+	# Python Lint (Ruff)
+	uv run ruff check .
+	# Python Type Check (Mypy)
+	MYPYPATH=core-service/src uv run mypy core-service/src
+	MYPYPATH=api-gateway uv run mypy api-gateway/src
+	MYPYPATH=adapters/telegram-bot:core-service/src/proto uv run mypy adapters/telegram-bot/src
+	# Security Audit (Bandit)
+	uv run bandit -r . -c pyproject.toml
 	# Frontend Lint
 	# cd frontend && bun run lint
+
+setup-hooks:
+	# Install pre-commit hooks
+	uv run pre-commit install
 
 # Run tests
 test:
