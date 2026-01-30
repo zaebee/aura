@@ -67,7 +67,7 @@ class HiveAggregator:
                 # Check if it's a file and exists
                 if path.exists() and path.is_file():
                     return str(path.absolute())
-            except Exception:
+            except OSError:
                 continue
 
         return "UNKNOWN"
