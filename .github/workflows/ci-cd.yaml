@@ -91,13 +91,15 @@ jobs:
 
             - name: Sync K8s Secrets
               run: |
+                  kubectl delete secret aura-secrets --ignore-not-found
                   kubectl create secret generic aura-secrets \
                     --from-literal=telegram-token="${{ secrets.AURA_TELEGRAM_TOKEN }}" \
                     --from-literal=mistral-key="${{ secrets.MISTRAL_API_KEY }}" \
                     --from-literal=openai-key="${{ secrets.OPENAI_API_KEY }}" \
                     --from-literal=solana-private-key="${{ secrets.SOLANA_PRIVATE_KEY }}" \
                     --from-literal=frp-client-token="${{ secrets.FRP_CLIENT_TOKEN }}" \
-                    --dry-run=client -o yaml | kubectl apply -f -
+                    --from-literal=secret-encryption-key="${{ secrets.AURA_SECRET_ENCRYPTION_KEY }}"
+
             - name: Deploy to Cluster
               run: |
                   helm dependency update ./deploy/aura
@@ -106,6 +108,7 @@ jobs:
                     --set gateway.image.tag=sha-$(git rev-parse --short HEAD) \
                     --set frontend.image.tag=sha-$(git rev-parse --short HEAD) \
                     --set telegram.image.tag=sha-$(git rev-parse --short HEAD)
+
             - name: Verify Rollout
               run: |
                   kubectl rollout status deployment/aura-core --timeout=60s
