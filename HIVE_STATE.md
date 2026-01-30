@@ -11,7 +11,7 @@
 - Logic: DSPy (Mistral-Large)
 
 ## 🐝 Emergent Issues
-- [Issue #26] Fix: Brain path alignment in Docker.
+- [Issue #26](/issues/26) Fix: Brain path alignment in Docker.
 - [Bug] Telegram Bot session drift.
 
 ## 💰 Economy
