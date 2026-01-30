@@ -5,19 +5,17 @@ FROM oven/bun AS builder
 WORKDIR /app
 
 # Install dependencies
-COPY frontend/package.json ./
-COPY frontend/bun.lock ./
+COPY frontend/package.json frontend/bun.lock ./
 RUN bun install
+
+# Copy configuration files
+COPY frontend/next.config.js frontend/tailwind.config.ts frontend/tsconfig.json ./
+COPY frontend/postcss.config.mjs frontend/eslint.config.mjs frontend/env.d.ts ./
+COPY frontend/.env.production ./
 
 # Copy source files
 COPY frontend/src ./src
 COPY frontend/public ./public
-COPY frontend/next.config.js ./
-COPY frontend/tailwind.config.ts ./
-COPY frontend/tsconfig.json ./
-COPY frontend/postcss.config.mjs ./
-COPY frontend/eslint.config.mjs ./
-COPY frontend/env.d.ts ./
 
 # Build the application
 RUN bun run build
@@ -30,9 +28,10 @@ WORKDIR /app
 # Copy built files from builder
 COPY --from=builder /app/.next ./.next
 COPY --from=builder /app/public ./public
-COPY --from=builder /app/.next/static ./.next/static
 COPY --from=builder /app/package.json ./package.json
 COPY --from=builder /app/bun.lock ./bun.lock
+COPY --from=builder /app/next.config.js ./next.config.js
+COPY --from=builder /app/.env.production ./.env.production
 
 # Install only production dependencies
 RUN bun install --production
