@@ -11,6 +11,7 @@ from hive.aggregator import HiveAggregator
 from hive.connector import HiveConnector
 from hive.generator import HiveGenerator
 from hive.membrane import HiveMembrane
+from hive.metabolism import MetabolicLoop
 from hive.transformer import HiveTransformer
 from logging_config import (
     bind_request_id,
@@ -75,29 +76,21 @@ class PricingStrategy(Protocol):
 class NegotiationService(negotiation_pb2_grpc.NegotiationServiceServicer):
     """
     gRPC Service implementing the Aura Negotiation Protocol.
-    Refactored into a metabolic ATCG loop.
+    Delegates core logic to the MetabolicLoop.
     """
 
     def __init__(
         self,
-        aggregator,
-        transformer,
-        connector,
-        generator,
-        membrane,
+        metabolism: MetabolicLoop,
         market_service=None,
     ):
-        self.aggregator = aggregator
-        self.transformer = transformer
-        self.connector = connector
-        self.generator = generator
-        self.membrane = membrane
-        self.market_service = market_service  # Keep for other methods if needed
+        self.metabolism = metabolism
+        self.market_service = market_service
 
     async def Negotiate(self, request, context):
         """
         Main metabolic loop for negotiation:
-        Signal -> Membrane(In) -> Aggregator -> Transformer -> Membrane(Out) -> Connector -> Generator
+        Signal -> A -> T -> Membrane -> C -> G
         """
         request_id = extract_request_id(context) or getattr(
             request, "request_id", str(uuid.uuid4())
@@ -105,56 +98,8 @@ class NegotiationService(negotiation_pb2_grpc.NegotiationServiceServicer):
         bind_request_id(request_id)
 
         try:
-            with tracer.start_as_current_span("hive_metabolism"):
-                logger.info(
-                    "metabolism_cycle_started",
-                    item_id=request.item_id,
-                    bid_amount=request.bid_amount,
-                )
-
-                # 1. Filter Inbound (Membrane) - Sanitize as early as possible
-                with tracer.start_as_current_span("hive_membrane_inbound"):
-                    request = await self.membrane.inspect_inbound(request)
-
-                # 2. Sense (Aggregator)
-                with tracer.start_as_current_span("hive_aggregator") as a_span:
-                    hive_context = await self.aggregator.perceive(request)
-                    a_span.set_attribute("item_id", hive_context.item_id)
-                    a_span.set_attribute("bid_amount", hive_context.bid_amount)
-
-                # 3. Think (Transformer)
-                with tracer.start_as_current_span("hive_transformer") as t_span:
-                    decision = await self.transformer.think(hive_context)
-                    t_span.set_attribute("action", decision.action)
-                    t_span.set_attribute("price", decision.price)
-
-                # 4. Filter Outbound (Membrane)
-                with tracer.start_as_current_span(
-                    "hive_membrane_outbound"
-                ) as m_out_span:
-                    safe_decision = await self.membrane.inspect_outbound(
-                        decision, hive_context
-                    )
-                    if safe_decision != decision:
-                        m_out_span.set_attribute("overridden", True)
-                        m_out_span.set_attribute("original_price", decision.price)
-                        m_out_span.set_attribute("safe_price", safe_decision.price)
-
-                # 5. Act (Connector)
-                with tracer.start_as_current_span("hive_connector"):
-                    observation = await self.connector.act(safe_decision, hive_context)
-
-                # 6. Pulse (Generator)
-                with tracer.start_as_current_span("hive_generator"):
-                    await self.generator.pulse(observation)
-
-                logger.info(
-                    "metabolism_cycle_completed",
-                    action=safe_decision.action,
-                    price=safe_decision.price,
-                )
-
-                return observation.data
+            observation = await self.metabolism.execute(request)
+            return observation.data
 
         except ValueError as e:
             logger.warning("invalid_argument", error=str(e))
@@ -244,7 +189,7 @@ class NegotiationService(negotiation_pb2_grpc.NegotiationServiceServicer):
     ) -> negotiation_pb2.GetSystemStatusResponse:
         """Return infrastructure metrics from Prometheus."""
         try:
-            metrics = await get_hive_metrics()
+            metrics = await self.metabolism.aggregator.get_system_metrics()
             return negotiation_pb2.GetSystemStatusResponse(
                 status=metrics["status"],
                 cpu_usage_percent=metrics.get("cpu_usage_percent", 0.0),
@@ -488,18 +433,23 @@ async def serve():
     generator = HiveGenerator(nats_client=nc)
     membrane = HiveMembrane()
 
+    # Wire the Loop
+    metabolism = MetabolicLoop(
+        aggregator=aggregator,
+        transformer=transformer,
+        connector=connector,
+        generator=generator,
+        membrane=membrane,
+    )
+
     server = grpc.aio.server(
         futures.ThreadPoolExecutor(max_workers=settings.server.grpc_max_workers)
     )
 
-    # Register negotiation service with Hive components
+    # Register negotiation service with the Metabolic Loop
     negotiation_pb2_grpc.add_NegotiationServiceServicer_to_server(
         NegotiationService(
-            aggregator=aggregator,
-            transformer=transformer,
-            connector=connector,
-            generator=generator,
-            membrane=membrane,
+            metabolism=metabolism,
             market_service=market_service,
         ),
         server,

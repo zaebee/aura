@@ -16,12 +16,12 @@ async def test_aggregator_perceive(mocker):
         name="Item", id="item1", base_price=150.0, floor_price=100.0, meta={}
     )
 
-    mocker.patch(
-        "hive.aggregator.get_hive_metrics",
-        side_effect=AsyncMock(return_value={"cpu_usage_percent": 10.0}),
-    )
-
     aggregator = HiveAggregator()
+    mocker.patch.object(
+        aggregator,
+        "get_system_metrics",
+        side_effect=AsyncMock(return_value={"status": "ok", "cpu_usage_percent": 10.0}),
+    )
     signal = MagicMock()
     signal.item_id = "item1"
     signal.bid_amount = 100.0
@@ -53,7 +53,8 @@ async def test_membrane_outbound_override(mocker):
     decision = Decision(action="accept", price=90.0, message="OK")
     safe_decision = await membrane.inspect_outbound(decision, context)
     assert safe_decision.action == "counter"
-    assert safe_decision.price == 100.0
+    # Rule 1: floor_price * 1.05 = 100 * 1.05 = 105.0
+    assert safe_decision.price == 105.0
     assert safe_decision.metadata["override_reason"] == "FLOOR_PRICE_VIOLATION"
 
     # LLM tries to accept above floor but below margin - should trigger MIN_MARGIN_VIOLATION

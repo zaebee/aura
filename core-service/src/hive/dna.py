@@ -48,28 +48,28 @@ class Event:
 
 @runtime_checkable
 class Aggregator(Protocol):
-    """A - Aggregator: perceive(signal) -> Context"""
+    """A - Aggregator: Consolidates internal state and external metrics."""
 
     async def perceive(self, signal: Any) -> HiveContext: ...
 
 
 @runtime_checkable
 class Transformer(Protocol):
-    """T - Transformer: think(context) -> Decision"""
+    """T - Transformer: Handles the DSPy reasoning."""
 
     async def think(self, context: HiveContext) -> Decision: ...
 
 
 @runtime_checkable
 class Connector(Protocol):
-    """C - Connector: act(action) -> Observation"""
+    """C - Connector: Manages gRPC and External API outputs."""
 
     async def act(self, action: Decision, context: HiveContext) -> Observation: ...
 
 
 @runtime_checkable
 class Generator(Protocol):
-    """G - Generator: pulse(observation) -> list[Event]"""
+    """G - Generator: Emits NATS heartbeats and events."""
 
     async def pulse(self, observation: Observation) -> list[Event]: ...
 
