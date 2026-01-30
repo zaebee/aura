@@ -39,7 +39,7 @@ build: generate build-tg
 	# Build Docker images for all services
 	docker build --platform $(PLATFORM) -t $(REGISTRY)/aura-gateway:$(TAG) -f api-gateway/Dockerfile .
 	docker build --platform $(PLATFORM) -t $(REGISTRY)/aura-core:$(TAG) -f core-service/Dockerfile .
-	docker build --platform $(PLATFORM) -t $(REGISTRY)/aura-frontend:$(TAG) -f frontend/Dockerfile frontend/
+	docker build --platform $(PLATFORM) -t $(REGISTRY)/aura-frontend:$(TAG) -f frontend/Dockerfile .
 
 build-tg:
 	docker build --platform $(PLATFORM) -t $(REGISTRY)/aura-telegram-bot:$(TAG) -f adapters/telegram-bot/Dockerfile .

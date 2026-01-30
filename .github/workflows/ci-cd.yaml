@@ -18,7 +18,6 @@ concurrency:
 
 env:
     REGISTRY: ghcr.io
-    # Use GitHub Container Registry under the current user/org
     IMAGE_NAME: ${{ github.repository }}
 
 jobs:
@@ -44,13 +43,35 @@ jobs:
                       infra:
                       - 'deploy/**'
 
-    # === STAGE 1: QUALITY GATE ===
-    quality:
+    # === STAGE 1: THE SEED (PREPARATION) ===
+    prepare:
         runs-on: ubuntu-latest
         steps:
             - uses: actions/checkout@v4
+            - name: Install Buf
+              uses: bufbuild/buf-setup-action@v1
+              with:
+                  github_token: ${{ github.token }}
+            - name: Generate Protos
+              run: make generate
+            - name: Upload Protos
+              uses: actions/upload-artifact@v4
+              with:
+                  name: proto-stubs
+                  path: |
+                      core-service/src/proto
+                      api-gateway/src/proto
+                      frontend/src/lib/aura
 
-            # Install dependencies for linting and testing
+    quality:
+        needs: prepare
+        runs-on: ubuntu-latest
+        steps:
+            - uses: actions/checkout@v4
+            - name: Download Protos
+              uses: actions/download-artifact@v4
+              with:
+                  name: proto-stubs
             - name: Set up Python
               uses: actions/setup-python@v5
               with:
@@ -64,19 +85,19 @@ jobs:
               uses: bufbuild/buf-setup-action@v1
               with:
                   github_token: ${{ github.token }}
-
             - name: Install Python Dependencies
               run: make install-dev
-
-            # Run linters and tests
             - name: Run Linters & Tests
               run: make lint test
 
-    # === STAGE 2: BUILD & PUBLISH ===
+    # === STAGE 2: THE FAN-OUT (PARALLEL BUILD) ===
     build-and-push:
-        needs: quality
-        # if: needs.check-changes.outputs.code == 'true'
+        needs: [prepare, quality]
         runs-on: ubuntu-latest
+        strategy:
+            fail-fast: false
+            matrix:
+                service: [core-service, api-gateway, frontend, telegram-bot]
         permissions:
             contents: read
             packages: write
@@ -84,7 +105,11 @@ jobs:
         steps:
             - uses: actions/checkout@v4
 
-            # Login to GitHub Container Registry
+            - name: Download Protos
+              uses: actions/download-artifact@v4
+              with:
+                  name: proto-stubs
+
             - name: Log in to the Container registry
               uses: docker/login-action@v3
               with:
@@ -92,34 +117,49 @@ jobs:
                   username: ${{ github.actor }}
                   password: ${{ secrets.GITHUB_TOKEN }}
 
-            # Generate metadata for Docker images
-            - name: Extract metadata (tags, labels)
-              id: meta
-              uses: docker/metadata-action@v5
-              with:
-                  images: |
-                      ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}/gateway
-                      ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}/core
-                      ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}/frontend
-                      ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}/telegram-bot
+            - name: Set service variables
+              id: vars
+              run: |
+                  SERVICE="${{ matrix.service }}"
+                  SHORT_SHA=$(git rev-parse --short HEAD)
+                  echo "short_sha=$SHORT_SHA" >> $GITHUB_OUTPUT
 
-            # Setup Buf
-            - uses: bufbuild/buf-setup-action@v1
-              with:
-                  github_token: ${{ github.token }}
+                  if [ "$SERVICE" = "telegram-bot" ]; then
+                    echo "dir=adapters/telegram-bot" >> $GITHUB_OUTPUT
+                    echo "name=telegram-bot" >> $GITHUB_OUTPUT
+                  elif [ "$SERVICE" = "core-service" ]; then
+                    echo "dir=core-service" >> $GITHUB_OUTPUT
+                    echo "name=core" >> $GITHUB_OUTPUT
+                  elif [ "$SERVICE" = "api-gateway" ]; then
+                    echo "dir=api-gateway" >> $GITHUB_OUTPUT
+                    echo "name=gateway" >> $GITHUB_OUTPUT
+                  else
+                    echo "dir=$SERVICE" >> $GITHUB_OUTPUT
+                    echo "name=$SERVICE" >> $GITHUB_OUTPUT
+                  fi
 
-            # Build and Push Docker images
+                  # Lowercase owner for Docker repo
+                  OWNER_LC=$(echo "${{ github.repository_owner }}" | tr '[:upper:]' '[:lower:]')
+                  echo "owner_lc=$OWNER_LC" >> $GITHUB_OUTPUT
+
             - name: Build and Push
               run: |
-                  make build push TAG=sha-$(git rev-parse --short HEAD) REGISTRY=${{ env.REGISTRY }}/${{ github.repository_owner }}
+                  TAG=sha-${{ steps.vars.outputs.short_sha }}
+                  IMAGE_NAME=aura-${{ steps.vars.outputs.name }}
+                  REPO=ghcr.io/${{ steps.vars.outputs.owner_lc }}/$IMAGE_NAME
 
+                  echo "Building $REPO:$TAG from ${{ steps.vars.outputs.dir }}/Dockerfile"
+
+                  docker build -t $REPO:$TAG -f ${{ steps.vars.outputs.dir }}/Dockerfile .
+                  docker push $REPO:$TAG
+
+    # === STAGE 3: THE HIVE SYNC (DEPLOY) ===
     deploy:
         needs: [build-and-push]
         if: github.ref == 'refs/heads/main'
         runs-on: self-hosted
         env:
             KUBECONFIG: /home/runner/.kube/config
-
             AURA__API_KEY: ${{ secrets.MISTRAL_API_KEY }}
             AURA__FRP_CLIENT_TOKEN: ${{ secrets.FRP_CLIENT_TOKEN }}
             AURA__OPENAI_KEY: ${{ secrets.OPENAI_API_KEY }}
@@ -137,14 +177,7 @@ jobs:
                 SOL_KEY: ${{ secrets.SOLANA_PRIVATE_KEY }}
                 FRP_TOKEN: ${{ secrets.FRP_CLIENT_TOKEN }}
                 ENC_KEY: ${{ secrets.AURA_SECRET_ENCRYPTION_KEY }}
-                TELEGRAM_TOKEN_CHECK: ${{ secrets.AURA_TELEGRAM_TOKEN }}
               run: |
-                  echo "Debug: Telegram Token Length: ${#TELEGRAM_TOKEN_CHECK}"
-                  if [ "${#TELEGRAM_TOKEN_CHECK}" -eq 0 ]; then
-                    echo "❌ ERROR: AURA_TELEGRAM_TOKEN is empty in GitHub Secrets!"
-                    exit 1
-                  fi
-
                   kubectl delete secret aura-secrets --ignore-not-found
                   kubectl create secret generic aura-secrets \
                     --from-literal=telegram-token="$TG_TOKEN" \
@@ -162,7 +195,7 @@ jobs:
 
                   echo "🚀 Deploying Version: $CHART_VERSION (App: $SHORT_SHA)"
                   helm dependency update ./deploy/aura
-                  helm upgrade aura ./deploy/aura --install --atomic --wait --timeout 10m
+                  helm upgrade aura ./deploy/aura --install --atomic --wait --timeout 10m \
                     --version "$CHART_VERSION" \
                     --app-version "$SHORT_SHA" \
                     --set core.image.tag=sha-$SHORT_SHA \
