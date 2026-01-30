@@ -52,21 +52,20 @@ class DSPyStrategy:
         Searches for the compiled brain in both src/ and data/ directories.
         """
         try:
-            # Check multiple locations: src/ and data/
-            # 1. Look in src/ (relative to this file's parent's parent)
-            src_path = Path(__file__).parent.parent / self.compiled_program_path
-            # 2. Look in data/ (relative to app root, which is parent of src)
-            data_path = (
-                Path(__file__).parent.parent.parent / "data" / self.compiled_program_path
-            )
-            # 3. Also allow absolute path if provided in settings
+            # The path from settings can be absolute or relative to the CWD.
             settings_path = Path(self.compiled_program_path)
+            # Use only the filename part for searching in default locations.
+            filename = settings_path.name
 
-            # Search order:
-            # 1. Path specified in settings (explicit or absolute)
-            # 2. data/ directory (new default for trained models)
-            # 3. src/ directory (legacy location)
-            potential_paths = [settings_path, data_path, src_path]
+            # Define paths in search order.
+            # 1. Path specified in settings (as-is).
+            # 2. `data/` directory (new default for trained models).
+            # 3. `src/` directory (legacy location).
+            potential_paths = [
+                settings_path,
+                Path(__file__).parent.parent.parent / "data" / filename,
+                Path(__file__).parent.parent / filename,
+            ]
 
             for program_path in potential_paths:
                 if program_path.exists() and program_path.is_file():
