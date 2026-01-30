@@ -72,6 +72,38 @@ class HiveAggregator:
 
         return "UNKNOWN"
 
+    def _process_metric_response(
+        self,
+        response: httpx.Response | Exception,
+        metric_name: str,
+        errors: list[str],
+    ) -> tuple[float, bool]:
+        """Processes a single metric response from Prometheus."""
+        if isinstance(response, httpx.Response):
+            try:
+                response.raise_for_status()
+                data = response.json()
+                if data.get("status") == "success":
+                    results = data.get("data", {}).get("result", [])
+                    if results and len(results[0].get("value", [])) > 1:
+                        return float(results[0]["value"][1]), True
+                    else:
+                        logger.warning(f"prometheus_{metric_name}_no_data")
+                        errors.append(f"{metric_name}_no_data")
+                else:
+                    logger.warning(
+                        f"prometheus_{metric_name}_api_error", status=data.get("status")
+                    )
+                    errors.append(f"{metric_name}_api_status_{data.get('status')}")
+            except (ValueError, KeyError, IndexError, httpx.HTTPStatusError) as e:
+                logger.error(f"prometheus_{metric_name}_parse_error", error=str(e))
+                errors.append(f"{metric_name}_parse_error_{type(e).__name__}")
+        else:
+            logger.error(f"prometheus_{metric_name}_fetch_failed", error=str(response))
+            errors.append(f"{metric_name}_fetch_error_{type(response).__name__}")
+
+        return 0.0, False
+
     async def get_system_metrics(self) -> dict[str, Any]:
         """
         Refactored monitor.py logic. Queries Prometheus with self-healing.
@@ -89,61 +121,32 @@ class HiveAggregator:
         try:
             async with httpx.AsyncClient(timeout=5.0) as client:
                 base_url = str(self.settings.server.prometheus_url).rstrip("/")
-                cpu_task = client.get(f"{base_url}/api/v1/query", params={"query": cpu_query})
-                mem_task = client.get(f"{base_url}/api/v1/query", params={"query": mem_query})
+                cpu_task = client.get(
+                    f"{base_url}/api/v1/query", params={"query": cpu_query}
+                )
+                mem_task = client.get(
+                    f"{base_url}/api/v1/query", params={"query": mem_query}
+                )
 
-                responses = await asyncio.gather(cpu_task, mem_task, return_exceptions=True)
+                responses = await asyncio.gather(
+                    cpu_task, mem_task, return_exceptions=True
+                )
 
-                cpu_usage = 0.0
-                mem_usage = 0.0
-                any_success = False
                 errors = []
 
-                # Process CPU Response
-                cpu_res = responses[0]
-                if isinstance(cpu_res, httpx.Response):
-                    try:
-                        cpu_res.raise_for_status()
-                        cpu_data = cpu_res.json()
-                        if cpu_data.get("status") == "success":
-                            results = cpu_data.get("data", {}).get("result", [])
-                            if results and len(results[0].get("value", [])) > 1:
-                                cpu_usage = float(results[0]["value"][1])
-                                any_success = True
-                        else:
-                            logger.warning("prometheus_cpu_api_error", status=cpu_data.get("status"))
-                            errors.append(f"cpu_api_status_{cpu_data.get('status')}")
-                    except (ValueError, KeyError, IndexError) as e:
-                        logger.error("prometheus_cpu_parse_error", error=str(e))
-                        errors.append(f"cpu_parse_error_{type(e).__name__}")
-                else:
-                    logger.error("prometheus_cpu_fetch_failed", error=str(cpu_res))
-                    errors.append(f"cpu_fetch_error_{type(cpu_res).__name__}")
-
-                # Process Memory Response
-                mem_res = responses[1]
-                if isinstance(mem_res, httpx.Response):
-                    try:
-                        mem_res.raise_for_status()
-                        mem_data = mem_res.json()
-                        if mem_data.get("status") == "success":
-                            results = mem_data.get("data", {}).get("result", [])
-                            if results and len(results[0].get("value", [])) > 1:
-                                mem_usage = float(results[0]["value"][1])
-                                any_success = True
-                        else:
-                            logger.warning("prometheus_mem_api_error", status=mem_data.get("status"))
-                            errors.append(f"mem_api_status_{mem_data.get('status')}")
-                    except (ValueError, KeyError, IndexError) as e:
-                        logger.error("prometheus_mem_parse_error", error=str(e))
-                        errors.append(f"mem_parse_error_{type(e).__name__}")
-                else:
-                    logger.error("prometheus_mem_fetch_failed", error=str(mem_res))
-                    errors.append(f"mem_fetch_error_{type(mem_res).__name__}")
+                # Process Responses
+                cpu_usage, cpu_success = self._process_metric_response(
+                    responses[0], "cpu", errors
+                )
+                mem_usage, mem_success = self._process_metric_response(
+                    responses[1], "mem", errors
+                )
 
                 # If both failed completely, fallback to exception handler
-                if not any_success:
-                    raise httpx.ConnectError(f"All metric fetches failed: {', '.join(errors)}")
+                if not (cpu_success or mem_success):
+                    raise httpx.ConnectError(
+                        f"All metric fetches failed: {', '.join(errors)}"
+                    )
 
                 metrics = {
                     "status": "ok",
@@ -161,7 +164,12 @@ class HiveAggregator:
                 self._metrics_cache.set(metrics)
                 return metrics
 
-        except (TimeoutError, httpx.HTTPError, httpx.ConnectError, httpx.TimeoutException) as e:
+        except (
+            TimeoutError,
+            httpx.HTTPError,
+            httpx.ConnectError,
+            httpx.TimeoutException,
+        ) as e:
             if isinstance(e, httpx.TimeoutException) or isinstance(e, TimeoutError):
                 logger.error("prometheus_timeout", error=str(e))
             elif isinstance(e, httpx.ConnectError):
@@ -171,14 +179,19 @@ class HiveAggregator:
             # Self-healing: Return cached if available (even if expired), else UNKNOWN
             cached = self._metrics_cache.get(ignore_ttl=True)
             if cached:
-                return {**cached, "cached": True, "warning": "stale_data", "error": str(e)}
+                return {
+                    **cached,
+                    "cached": True,
+                    "warning": "stale_data",
+                    "error": str(e),
+                }
 
             return {
                 "status": "UNKNOWN",
                 "cpu_usage_percent": 0.0,
                 "memory_usage_mb": 0.0,
                 "timestamp": datetime.now(UTC).isoformat(),
-                "error": str(e)
+                "error": str(e),
             }
         except Exception as e:
             logger.error("prometheus_unexpected_error", error=str(e))
@@ -194,7 +207,9 @@ class HiveAggregator:
         reputation = signal.agent.reputation_score
         request_id = getattr(signal, "request_id", "")
 
-        logger.debug("aggregator_perceive_started", item_id=item_id, request_id=request_id)
+        logger.debug(
+            "aggregator_perceive_started", item_id=item_id, request_id=request_id
+        )
 
         # 1. Fetch item data
         def fetch_item_sync():
