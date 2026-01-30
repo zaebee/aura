@@ -29,6 +29,7 @@ from sqlalchemy.exc import SQLAlchemyError
 from telemetry import init_telemetry
 
 from config import settings
+from config.llm import get_raw_key
 from db import InventoryItem, SessionLocal, engine
 from embeddings import generate_embedding
 from proto.aura.negotiation.v1 import negotiation_pb2, negotiation_pb2_grpc
@@ -402,9 +403,9 @@ def create_strategy():
         # Select appropriate API key based on model provider
         api_key = None
         if settings.llm.model.startswith("openai/"):
-            api_key = settings.llm.openai_api_key.get_secret_value()
+            api_key = get_raw_key(settings.llm.openai_api_key)
         elif settings.llm.model.startswith("mistral/"):
-            api_key = settings.llm.mistral_api_key.get_secret_value()
+            api_key = get_raw_key(settings.llm.mistral_api_key)
 
         return LiteLLMStrategy(
             model=settings.llm.model,
@@ -433,7 +434,7 @@ def create_crypto_provider():
         from crypto.solana_provider import SolanaProvider
 
         return SolanaProvider(
-            private_key_base58=settings.crypto.solana_private_key.get_secret_value(),
+            private_key_base58=get_raw_key(settings.crypto.solana_private_key),
             rpc_url=str(settings.crypto.solana_rpc_url),
             network=settings.crypto.solana_network,
             usdc_mint=settings.crypto.solana_usdc_mint,
@@ -470,7 +471,7 @@ async def serve():
 
         # Initialize encryption handler
         encryption = SecretEncryption(
-            settings.crypto.secret_encryption_key.get_secret_value()
+            get_raw_key(settings.crypto.secret_encryption_key)
         )
 
         market_service = MarketService(crypto_provider, encryption)
