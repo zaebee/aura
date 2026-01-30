@@ -49,19 +49,23 @@ class HiveAggregator:
         Ensure aura_brain.json path is resolved relative to the package root,
         looking in both /app/src/ and ./src/.
         """
-        search_paths = [
+        search_paths = []
+
+        # Priority 1: Explicitly configured path
+        if hasattr(self.settings.llm, "compiled_program_path"):
+            search_paths.append(Path(self.settings.llm.compiled_program_path))
+
+        # Priority 2: Standard expected locations
+        search_paths.extend([
             Path("/app/src/aura_brain.json"),
             Path("./src/aura_brain.json"),
             Path(__file__).parent.parent / "aura_brain.json",
-        ]
-
-        # Also check setting path
-        if hasattr(self.settings.llm, "compiled_program_path"):
-            search_paths.insert(0, Path(self.settings.llm.compiled_program_path))
+        ])
 
         for path in search_paths:
             try:
-                if path.exists():
+                # Check if it's a file and exists
+                if path.exists() and path.is_file():
                     return str(path.absolute())
             except Exception:
                 continue
@@ -71,6 +75,7 @@ class HiveAggregator:
     async def get_system_metrics(self) -> dict[str, Any]:
         """
         Refactored monitor.py logic. Queries Prometheus with self-healing.
+        Ensures Partial Context: returns whatever metrics are available.
         """
         # 1. Check Cache
         cached = self._metrics_cache.get()
@@ -89,25 +94,50 @@ class HiveAggregator:
 
                 responses = await asyncio.gather(cpu_task, mem_task, return_exceptions=True)
 
-                # Check for exceptions in gather
-                for resp in responses:
-                    if isinstance(resp, Exception):
-                        raise resp
-
-                cpu_resp, mem_resp = responses
-                cpu_resp.raise_for_status()
-                mem_resp.raise_for_status()
-
-                cpu_data = cpu_resp.json()
-                mem_data = mem_resp.json()
-
                 cpu_usage = 0.0
-                if cpu_data.get("status") == "success" and cpu_data.get("data", {}).get("result"):
-                    cpu_usage = float(cpu_data["data"]["result"][0]["value"][1])
-
                 mem_usage = 0.0
-                if mem_data.get("status") == "success" and mem_data.get("data", {}).get("result"):
-                    mem_usage = float(mem_data["data"]["result"][0]["value"][1])
+                any_success = False
+                errors = []
+
+                # Process CPU Response
+                cpu_res = responses[0]
+                if isinstance(cpu_res, httpx.Response):
+                    try:
+                        cpu_res.raise_for_status()
+                        cpu_data = cpu_res.json()
+                        if cpu_data.get("status") == "success":
+                            results = cpu_data.get("data", {}).get("result", [])
+                            if results and len(results[0].get("value", [])) > 1:
+                                cpu_usage = float(results[0]["value"][1])
+                                any_success = True
+                        else:
+                            errors.append(f"cpu_api_status_{cpu_data.get('status')}")
+                    except Exception as e:
+                        errors.append(f"cpu_parse_error_{type(e).__name__}")
+                else:
+                    errors.append(f"cpu_fetch_error_{type(cpu_res).__name__}")
+
+                # Process Memory Response
+                mem_res = responses[1]
+                if isinstance(mem_res, httpx.Response):
+                    try:
+                        mem_res.raise_for_status()
+                        mem_data = mem_res.json()
+                        if mem_data.get("status") == "success":
+                            results = mem_data.get("data", {}).get("result", [])
+                            if results and len(results[0].get("value", [])) > 1:
+                                mem_usage = float(results[0]["value"][1])
+                                any_success = True
+                        else:
+                            errors.append(f"mem_api_status_{mem_data.get('status')}")
+                    except Exception as e:
+                        errors.append(f"mem_parse_error_{type(e).__name__}")
+                else:
+                    errors.append(f"mem_fetch_error_{type(mem_res).__name__}")
+
+                # If both failed completely, fallback to exception handler
+                if not any_success:
+                    raise httpx.ConnectError(f"All metric fetches failed: {', '.join(errors)}")
 
                 metrics = {
                     "status": "ok",
@@ -116,6 +146,12 @@ class HiveAggregator:
                     "timestamp": datetime.now(UTC).isoformat(),
                     "cached": False,
                 }
+
+                # Include warnings if partial success
+                if errors:
+                    metrics["status"] = "PARTIAL"
+                    metrics["warnings"] = errors
+
                 self._metrics_cache.set(metrics)
                 return metrics
 
@@ -124,7 +160,7 @@ class HiveAggregator:
             # Self-healing: Return cached if available (even if expired), else UNKNOWN
             cached = self._metrics_cache.get(ignore_ttl=True)
             if cached:
-                return {**cached, "cached": True, "warning": "stale_data"}
+                return {**cached, "cached": True, "warning": "stale_data", "error": str(e)}
 
             return {
                 "status": "UNKNOWN",
@@ -135,7 +171,7 @@ class HiveAggregator:
             }
         except Exception as e:
             logger.error("prometheus_unexpected_error", error=str(e))
-            return {"status": "UNKNOWN", "error": "unexpected_error"}
+            return {"status": "UNKNOWN", "error": "unexpected_error", "detail": str(e)}
 
     async def perceive(self, signal: Any) -> HiveContext:
         """
