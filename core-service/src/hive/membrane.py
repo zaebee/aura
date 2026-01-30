@@ -103,6 +103,11 @@ class HiveMembrane:
         # Rule 3: Min Margin Check
         min_margin = getattr(self.settings.logic, "min_margin", DEFAULT_MIN_MARGIN)
         if not (0 <= min_margin < 1.0):
+            logger.error(
+                "invalid_min_margin_config",
+                margin=min_margin,
+                error="Margin must be in the range [0, 1)",
+            )
             min_margin = DEFAULT_MIN_MARGIN
 
         required_min_price = floor_price / (1 - min_margin)

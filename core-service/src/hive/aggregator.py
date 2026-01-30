@@ -111,10 +111,13 @@ class HiveAggregator:
                                 cpu_usage = float(results[0]["value"][1])
                                 any_success = True
                         else:
+                            logger.warning("prometheus_cpu_api_error", status=cpu_data.get("status"))
                             errors.append(f"cpu_api_status_{cpu_data.get('status')}")
-                    except Exception as e:
+                    except (ValueError, KeyError, IndexError) as e:
+                        logger.error("prometheus_cpu_parse_error", error=str(e))
                         errors.append(f"cpu_parse_error_{type(e).__name__}")
                 else:
+                    logger.error("prometheus_cpu_fetch_failed", error=str(cpu_res))
                     errors.append(f"cpu_fetch_error_{type(cpu_res).__name__}")
 
                 # Process Memory Response
@@ -129,10 +132,13 @@ class HiveAggregator:
                                 mem_usage = float(results[0]["value"][1])
                                 any_success = True
                         else:
+                            logger.warning("prometheus_mem_api_error", status=mem_data.get("status"))
                             errors.append(f"mem_api_status_{mem_data.get('status')}")
-                    except Exception as e:
+                    except (ValueError, KeyError, IndexError) as e:
+                        logger.error("prometheus_mem_parse_error", error=str(e))
                         errors.append(f"mem_parse_error_{type(e).__name__}")
                 else:
+                    logger.error("prometheus_mem_fetch_failed", error=str(mem_res))
                     errors.append(f"mem_fetch_error_{type(mem_res).__name__}")
 
                 # If both failed completely, fallback to exception handler
@@ -156,7 +162,12 @@ class HiveAggregator:
                 return metrics
 
         except (TimeoutError, httpx.HTTPError, httpx.ConnectError, httpx.TimeoutException) as e:
-            logger.error("prometheus_unreachable", error=str(e))
+            if isinstance(e, httpx.TimeoutException) or isinstance(e, TimeoutError):
+                logger.error("prometheus_timeout", error=str(e))
+            elif isinstance(e, httpx.ConnectError):
+                logger.error("prometheus_connection_error", error=str(e))
+            else:
+                logger.error("prometheus_http_error", error=str(e))
             # Self-healing: Return cached if available (even if expired), else UNKNOWN
             cached = self._metrics_cache.get(ignore_ttl=True)
             if cached:
