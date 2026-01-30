@@ -12,7 +12,7 @@ class TelegramSettings(BaseSettings):
         extra="ignore",
     )
 
-    token: SecretStr = Field(...)
+    token: SecretStr = Field("")
     core_url: str = "core-service:50051"
     webhook_domain: str | None = None
 
