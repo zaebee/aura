@@ -125,20 +125,30 @@ jobs:
             AURA__OPENAI_KEY: ${{ secrets.OPENAI_API_KEY }}
             AURA__SECRET_ENCRYPTION_KEY: ${{ secrets.AURA_SECRET_ENCRYPTION_KEY }}
             AURA__SOLANA_PRIVATE_KEY: ${{ secrets.SOLANA_PRIVATE_KEY }}
-            AURA_TG__TOKEN: ${{ secrets.AURA_TELEGRAM_TOKEN }}
+            AURA__AURA_TG__TOKEN: ${{ secrets.AURA_TELEGRAM_TOKEN }}
         steps:
             - uses: actions/checkout@v4
 
             - name: Sync K8s Secrets
               run: |
+                  echo "Debug: Telegram Token Length: ${#TELEGRAM_TOKEN_CHECK}"
+                  if [ "${#TELEGRAM_TOKEN_CHECK}" -eq 0 ]; then
+                    echo "❌ ERROR: AURA_TELEGRAM_TOKEN is empty in GitHub Secrets!"
+                    exit 1
+                  fi
+
                   kubectl delete secret aura-secrets --ignore-not-found
                   kubectl create secret generic aura-secrets \
-                    --from-literal=api-key="$AURA__API_KEY" \
-                    --from-literal=frp-client-token="$AURA__FRP_CLIENT_TOKEN" \
-                    --from-literal=openai-key="$AURA__OPENAI_KEY" \
-                    --from-literal=secret-encryption-key="$AURA__SECRET_ENCRYPTION_KEY" \
-                    --from-literal=solana-private-key="$AURA__SOLANA_PRIVATE_KEY" \
-                    --from-literal=telegram-token="$AURA_TG__TOKEN"
+                    --from-literal=telegram-token="${{ secrets.AURA_TELEGRAM_TOKEN }}" \
+                    --from-literal=api-key="${{ secrets.MISTRAL_API_KEY }}" \
+                    --from-literal=openai-key="${{ secrets.OPENAI_API_KEY }}" \
+                    --from-literal=solana-private-key="${{ secrets.SOLANA_PRIVATE_KEY }}" \
+                    --from-literal=secret-encryption-key="${{ secrets.AURA_SECRET_ENCRYPTION_KEY }}" \
+                    --from-literal=frp-client-token="${{ secrets.FRP_CLIENT_TOKEN }}" \
+                    --dry-run=client -o yaml | kubectl apply -f -
+              env:
+                # Передаем только для проверки длины в echo
+                TELEGRAM_TOKEN_CHECK: ${{ secrets.AURA_TELEGRAM_TOKEN }}
 
             - name: Deploy to Cluster
               run: |
