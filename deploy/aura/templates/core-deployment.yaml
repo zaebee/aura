@@ -44,7 +44,6 @@ spec:
                 secretKeyRef:
                   name: "{{ .Release.Name }}-secrets"
                   key: "secret-encryption-key"
-              value: "postgresql://{{ .Values.postgres.auth.username }}:{{ .Values.postgres.auth.password }}@{{ .Release.Name }}-postgres:5432/{{ .Values.postgres.auth.database }}"
             - name: AURA_DATABASE__URL
               value: "postgresql://{{ .Values.postgres.auth.username }}:{{ .Values.postgres.auth.password }}@{{ .Release.Name }}-postgres:5432/{{ .Values.postgres.auth.database }}"
             - name: AURA_DATABASE__REDIS_URL
