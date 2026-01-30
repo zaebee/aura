@@ -125,7 +125,7 @@ jobs:
             AURA__OPENAI_KEY: ${{ secrets.OPENAI_API_KEY }}
             AURA__SECRET_ENCRYPTION_KEY: ${{ secrets.AURA_SECRET_ENCRYPTION_KEY }}
             AURA__SOLANA_PRIVATE_KEY: ${{ secrets.SOLANA_PRIVATE_KEY }}
-            AURA_TG__TOKEN: ${{ secrets.AURA_TELEGRAM_TOKEN }}
+            AURA__AURA_TG__TOKEN: ${{ secrets.AURA_TELEGRAM_TOKEN }}
         steps:
             - uses: actions/checkout@v4
 
