@@ -7,6 +7,7 @@ from .crypto import CryptoSettings
 from .database import DatabaseSettings
 from .llm import LLMSettings
 from .logic import LogicSettings
+from .policy import SafetySettings
 from .server import ServerSettings
 
 
@@ -23,6 +24,7 @@ class Settings(BaseSettings):
     llm: LLMSettings = Field(default_factory=LLMSettings)
     crypto: CryptoSettings = Field(default_factory=CryptoSettings)
     logic: LogicSettings = Field(default_factory=LogicSettings)
+    safety: SafetySettings = Field(default_factory=SafetySettings)
     server: ServerSettings = Field(default_factory=ServerSettings)
 
 

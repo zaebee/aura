@@ -9,6 +9,7 @@ from pathlib import Path
 
 import dspy
 import structlog
+from guard.membrane import OutputGuard, SafetyViolation
 from llm.engine import AuraNegotiator
 
 from config import get_settings
@@ -34,6 +35,7 @@ class DSPyStrategy:
         self.compiled_program_path = compiled_program_path
         self.settings = get_settings()
         self.negotiator = self._load_compiled_program()
+        self.guard = OutputGuard()
         self.fallback_strategy = None
 
         # Configure DSPy with litellm backend
@@ -118,11 +120,25 @@ class DSPyStrategy:
         meta = item.meta or {}
 
         return {
+            "item_id": item.id,
             "base_price": item.base_price,
             "floor_price": item.floor_price,
+            "internal_cost": meta.get("internal_cost", item.floor_price * 0.8),
             "occupancy": meta.get("occupancy", "medium"),
             "value_add_inventory": meta.get("value_add_inventory", default_value_adds),
         }
+
+    def create_safe_counter_offer(
+        self, item: InventoryItem, bid: float
+    ) -> negotiation_pb2.NegotiateResponse:
+        """Create a safe counter-offer at floor price when guardrails are hit."""
+        result = negotiation_pb2.NegotiateResponse()
+        result.countered.proposed_price = item.floor_price
+        result.countered.human_message = (
+            f"I cannot go that low. My best offer is {item.floor_price}."
+        )
+        result.countered.reason_code = "GUARDRAIL_INTERVENTION"
+        return result
 
     def evaluate(
         self,
@@ -170,6 +186,19 @@ class DSPyStrategy:
             )
 
             response_data = result["response"]
+
+            # Validate decision through the Membrane
+            try:
+                self.guard.validate_decision(response_data, context)
+            except SafetyViolation as e:
+                logger.warning(
+                    "safety_guard_triggered",
+                    item_id=item_id,
+                    error=str(e),
+                    llm_price=response_data.get("price"),
+                )
+                return self.create_safe_counter_offer(item, bid)
+
             action = response_data["action"]
             price = response_data["price"]
             message = response_data["message"]

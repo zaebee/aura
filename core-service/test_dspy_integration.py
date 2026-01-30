@@ -23,12 +23,14 @@ def test_signature_creation():
     """Test that DSPy signature is properly defined."""
     print("🧪 Testing DSPy signature creation...")
 
-    # Test that the signature class exists and has the right fields
-    assert hasattr(Negotiate, "input_bid")
-    assert hasattr(Negotiate, "context")
-    assert hasattr(Negotiate, "history")
-    assert hasattr(Negotiate, "reasoning")
-    assert hasattr(Negotiate, "response")
+    # Test that the signature class exists and has fields
+    # In DSPy 2.x, fields might not be directly on the class via hasattr
+    # but we can check the signature definition
+    assert "input_bid" in Negotiate.fields
+    assert "context" in Negotiate.fields
+    assert "history" in Negotiate.fields
+    assert "reasoning" in Negotiate.fields
+    assert "response" in Negotiate.fields
 
     # Test that we can create the signature (DSPy signatures don't need instantiation like this)
     # Instead, we test that the class is properly defined
@@ -112,13 +114,17 @@ def test_context_creation():
 
         # Create a mock item
         mock_item = MagicMock()
+        mock_item.id = "test_item"
         mock_item.base_price = 1000.0
         mock_item.floor_price = 800.0
+        mock_item.meta = {}
 
         context = strategy._create_standard_context(mock_item)
 
         assert context["base_price"] == 1000.0
         assert context["floor_price"] == 800.0
+        assert context["item_id"] == "test_item"
+        assert "internal_cost" in context
         assert "value_add_inventory" in context
         assert len(context["value_add_inventory"]) == 3
 
