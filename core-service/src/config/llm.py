@@ -16,7 +16,7 @@ class LLMSettings(BaseModel):
         "mistral-large-latest",
         validation_alias=AliasChoices("AURA_LLM__MODEL", "LLM_MODEL"),
     )
-    api_key: SecretStr = Field("")
-    openai_api_key: SecretStr = Field("")
+    api_key: SecretStr = Field(...)
+    openai_api_key: SecretStr = Field(...)
     temperature: float = 0.7
     compiled_program_path: str = "aura_brain.json"

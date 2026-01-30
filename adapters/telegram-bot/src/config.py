@@ -1,4 +1,5 @@
-from pydantic import SecretStr
+from functools import lru_cache
+from pydantic import Field, SecretStr
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -10,13 +11,14 @@ class TelegramSettings(BaseSettings):
         extra="ignore",
     )
 
-    token: SecretStr
+    token: SecretStr = Field(...)
     core_url: str = "core-service:50051"
     webhook_domain: str | None = None
 
 
+@lru_cache
 def get_settings() -> TelegramSettings:
-    return TelegramSettings()
+    return TelegramSettings()  # type: ignore
 
 
 settings = get_settings()
