@@ -35,7 +35,7 @@ settings = get_settings()
 
 # Initialize OpenTelemetry tracing
 service_name = settings.otel_service_name
-tracer = init_telemetry(service_name, settings.otel_exporter_otlp_endpoint)
+tracer = init_telemetry(service_name, str(settings.otel_exporter_otlp_endpoint))
 logger.info(
     "telemetry_initialized",
     service_name=service_name,

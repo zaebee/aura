@@ -273,7 +273,7 @@ class NegotiationService(negotiation_pb2_grpc.NegotiationServiceServicer):
                 clear_request_context()
 
 
-def create_strategy() -> Any:
+def create_strategy() -> PricingStrategy:
     """Create pricing strategy based on LLM_MODEL configuration.
 
     Strategies:

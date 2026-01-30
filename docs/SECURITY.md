@@ -112,7 +112,7 @@ def validate_timestamp(timestamp_val):
 
 **Implementation**:
 ```python
-from datetime import datetime
+from datetime import UTC, datetime
 from redis import Redis
 
 def check_rate_limit(agent_id):
@@ -126,7 +126,7 @@ def check_rate_limit(agent_id):
         tuple: (is_allowed: bool, message: str)
     """
     redis = Redis()
-    current_minute = datetime.utcnow().strftime("%Y-%m-%d-%H-%M")
+    current_minute = datetime.now(UTC).strftime("%Y-%m-%d-%H-%M")
     key = f"rate_limit:{agent_id}:{current_minute}"
     
     # Increment request count

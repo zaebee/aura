@@ -1,6 +1,6 @@
 from functools import lru_cache
 
-from pydantic import model_validator
+from pydantic import HttpUrl, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -19,7 +19,7 @@ class Settings(BaseSettings):
 
     # OpenTelemetry Configuration
     otel_service_name: str = "aura-gateway"
-    otel_exporter_otlp_endpoint: str = "http://jaeger:4317"
+    otel_exporter_otlp_endpoint: HttpUrl = "http://jaeger:4317"  # type: ignore
 
     # CORS Configuration
     # Comma-separated list of allowed origins (e.g., "https://app1.com,https://app2.com")
@@ -40,7 +40,7 @@ class Settings(BaseSettings):
         if not self.otel_service_name.strip():
             raise ValueError("OTEL_SERVICE_NAME cannot be empty")
 
-        if not self.otel_exporter_otlp_endpoint.startswith(("http://", "https://")):
+        if not str(self.otel_exporter_otlp_endpoint).startswith(("http://", "https://")):
             raise ValueError("OTEL_EXPORTER_OTLP_ENDPOINT must be a valid URL")
 
         return self
