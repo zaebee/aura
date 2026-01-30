@@ -6,7 +6,7 @@ Handles deal creation, payment verification, and secret revelation.
 import logging
 import secrets
 import uuid
-from datetime import datetime, timedelta
+from datetime import UTC, datetime, timedelta
 
 from sqlalchemy import select
 from sqlalchemy.orm import Session
@@ -78,7 +78,7 @@ class MarketService:
         memo = self._generate_unique_memo()
 
         # Calculate expiration time
-        now = datetime.utcnow()
+        now = datetime.now(UTC)
         expires_at = now + timedelta(seconds=ttl_seconds)
 
         # Encrypt secret before storing
@@ -163,7 +163,7 @@ class MarketService:
             return negotiation_pb2.CheckDealStatusResponse(status="NOT_FOUND")
 
         # Check if deal expired
-        now = datetime.utcnow()
+        now = datetime.now(UTC)
         if deal.status == DealStatus.PENDING and now > deal.expires_at:
             deal.status = DealStatus.EXPIRED
             deal.updated_at = now
