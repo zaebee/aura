@@ -5,12 +5,17 @@ FROM oven/bun AS builder
 WORKDIR /app
 
 # Install dependencies
-COPY frontend/package.json frontend/bun.lock ./
+COPY frontend/package.json ./
+COPY frontend/bun.lock ./
 RUN bun install
 
-# Copy configuration files
-COPY frontend/next.config.js frontend/tailwind.config.ts frontend/tsconfig.json ./
-COPY frontend/postcss.config.mjs frontend/eslint.config.mjs frontend/env.d.ts ./
+# Copy configuration files individually to maximize layer caching
+COPY frontend/next.config.js ./
+COPY frontend/tailwind.config.ts ./
+COPY frontend/tsconfig.json ./
+COPY frontend/postcss.config.mjs ./
+COPY frontend/eslint.config.mjs ./
+COPY frontend/env.d.ts ./
 COPY frontend/.env.production ./
 
 # Copy source files
