@@ -25,7 +25,6 @@ from opentelemetry.instrumentation.langchain import LangchainInstrumentor
 from opentelemetry.instrumentation.sqlalchemy import SQLAlchemyInstrumentor
 from prometheus_client import start_http_server
 from sqlalchemy import text
-from sqlalchemy.exc import SQLAlchemyError
 from telemetry import init_telemetry
 
 from config import settings
