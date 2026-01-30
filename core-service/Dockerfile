@@ -26,6 +26,9 @@ COPY core-service/src ./src
 COPY core-service/alembic.ini .
 COPY core-service/migrations ./migrations
 
+COPY core-service/data ./data
+COPY core-service/train_dspy.py .
+
 ENV PYTHONPATH=/app:/app/src:/app/src/proto
 
 EXPOSE 50051

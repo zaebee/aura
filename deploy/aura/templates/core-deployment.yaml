@@ -25,16 +25,16 @@ spec:
           livenessProbe:
             grpc:
               port: 50051
-            initialDelaySeconds: 15
+            initialDelaySeconds: 30
             periodSeconds: 20
-            timeoutSeconds: 5
+            timeoutSeconds: 10
             failureThreshold: 3
           readinessProbe:
             grpc:
               port: 50051
-            initialDelaySeconds: 5
+            initialDelaySeconds: 15
             periodSeconds: 10
-            timeoutSeconds: 3
+            timeoutSeconds: 10
             failureThreshold: 2
           resources: 
             {{ toYaml .Values.core.resources | nindent 12 }}
