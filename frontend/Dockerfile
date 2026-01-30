@@ -10,7 +10,14 @@ COPY frontend/bun.lock ./
 RUN bun install
 
 # Copy source files
-COPY frontend/ .
+COPY frontend/src ./src
+COPY frontend/public ./public
+COPY frontend/next.config.js ./
+COPY frontend/tailwind.config.ts ./
+COPY frontend/tsconfig.json ./
+COPY frontend/postcss.config.mjs ./
+COPY frontend/eslint.config.mjs ./
+COPY frontend/env.d.ts ./
 
 # Build the application
 RUN bun run build
