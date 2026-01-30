@@ -41,6 +41,7 @@ dependencies = [
     # Encryption for secret storage
     "cryptography>=43.0.0",
     "nats-py>=2.9.0",
+    "pygithub>=2.8.1",
 ]
 
 [dependency-groups]

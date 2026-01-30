@@ -1,0 +1,41 @@
+name: bee.Keeper
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+  schedule:
+    - cron: '0 */6 * * *' # Every 6 hours
+
+jobs:
+  audit:
+    name: Hive Audit
+    runs-on: self-hosted
+    steps:
+      - name: Checkout Hive
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install Dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install uv
+          uv sync
+
+      - name: Run bee.Keeper
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          GITHUB_EVENT_PATH: ${{ github.event_path }}
+          GITHUB_EVENT_NAME: ${{ github.event_name }}
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          PROMETHEUS_URL: "http://prometheus-kube-prometheus-prometheus.monitoring:9090"
+        run: |
+          uv run python scripts/bee_keeper.py
