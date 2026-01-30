@@ -405,7 +405,7 @@ def create_strategy():
         if settings.llm.model.startswith("openai/"):
             api_key = get_raw_key(settings.llm.openai_api_key)
         elif settings.llm.model.startswith("mistral/"):
-            api_key = get_raw_key(settings.llm.mistral_api_key)
+            api_key = get_raw_key(settings.llm.api_key)
 
         return LiteLLMStrategy(
             model=settings.llm.model,

@@ -16,19 +16,7 @@ class LLMSettings(BaseModel):
         "mistral-large-latest",
         validation_alias=AliasChoices("AURA_LLM__MODEL", "LLM_MODEL"),
     )
-    api_key: SecretStr = Field(
-        "",
-        validation_alias=AliasChoices("AURA_LLM__API_KEY", "API_KEY"),
-    )
-    mistral_api_key: SecretStr = Field(
-        "",
-        validation_alias=AliasChoices(
-            "AURA_LLM__MISTRAL_API_KEY", "AURA_LLM__API_KEY", "MISTRAL_API_KEY"
-        ),
-    )
-    openai_api_key: SecretStr = Field(
-        "",
-        validation_alias=AliasChoices("AURA_LLM__OPENAI_API_KEY", "OPENAI_API_KEY"),
-    )
+    api_key: SecretStr = Field("")
+    openai_api_key: SecretStr = Field("")
     temperature: float = 0.7
     compiled_program_path: str = "aura_brain.json"

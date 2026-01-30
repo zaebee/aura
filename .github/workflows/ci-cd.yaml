@@ -94,7 +94,7 @@ jobs:
                   kubectl delete secret aura-secrets --ignore-not-found
                   kubectl create secret generic aura-secrets \
                     --from-literal=telegram-token="${{ secrets.AURA_TELEGRAM_TOKEN }}" \
-                    --from-literal=mistral-key="${{ secrets.MISTRAL_API_KEY }}" \
+                    --from-literal=api-key="${{ secrets.MISTRAL_API_KEY }}" \
                     --from-literal=openai-key="${{ secrets.OPENAI_API_KEY }}" \
                     --from-literal=solana-private-key="${{ secrets.SOLANA_PRIVATE_KEY }}" \
                     --from-literal=frp-client-token="${{ secrets.FRP_CLIENT_TOKEN }}" \

@@ -52,12 +52,7 @@ spec:
               valueFrom:
                 secretKeyRef:
                   name: "{{ .Release.Name }}-secrets"
-                  key: "mistral-key"
-            - name: AURA_LLM__MISTRAL_API_KEY
-              valueFrom:
-                secretKeyRef:
-                  name: "{{ .Release.Name }}-secrets"
-                  key: "mistral-key"
+                  key: "api-key"
             - name: AURA_LLM__MODEL
               value: "{{ .Values.core.env.AURA_LLM__MODEL }}"
             - name: AURA_LLM__OPENAI_API_KEY

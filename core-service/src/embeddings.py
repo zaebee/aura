@@ -4,10 +4,10 @@ from config import settings
 from config.llm import get_raw_key
 
 
-def get_embeddings_model():
+def get_embeddings_model(model: str = "mistral-embed"):
     return MistralAIEmbeddings(
-        model="mistral-embed",
-        mistral_api_key=get_raw_key(settings.llm.mistral_api_key),
+        model=model,
+        mistral_api_key=get_raw_key(settings.llm.api_key),
     )
 
 
