@@ -2,8 +2,9 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 from src.hive.aggregator import HiveAggregator
-from src.hive.dna import Decision, HiveContext
 from src.hive.membrane import HiveMembrane
+
+from src.hive.dna import Decision, HiveContext
 
 
 @pytest.mark.asyncio

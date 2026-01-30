@@ -1,6 +1,7 @@
 import pytest
-from src.hive.dna import Decision, HiveContext
 from src.hive.membrane import HiveMembrane
+
+from src.hive.dna import Decision, HiveContext
 
 
 @pytest.mark.asyncio
