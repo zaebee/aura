@@ -1,23 +1,25 @@
 import asyncio
 import json
-import os
 from typing import Any
 
 import nats
 import structlog
 from github import Github
 
+from scripts.bee_keeper.config import KeeperSettings
 from src.hive.dna import BeeContext, BeeObservation, PurityReport
 
 logger = structlog.get_logger(__name__)
 
+
 class BeeConnector:
     """C - Connector: Interacts with GitHub and NATS."""
 
-    def __init__(self) -> None:
-        self.github_token = os.getenv("GITHUB_TOKEN")
-        self.repo_name = os.getenv("GITHUB_REPOSITORY")
-        self.nats_url = os.getenv("NATS_URL", "nats://nats:4222")
+    def __init__(self, settings: KeeperSettings) -> None:
+        self.settings = settings
+        self.github_token = settings.github_token
+        self.repo_name = settings.github_repository
+        self.nats_url = settings.nats_url
 
         self.gh = None
         if self.github_token and self.github_token != "mock":  # nosec

@@ -1,20 +1,27 @@
-import os
 from pathlib import Path
 
 import litellm
 import structlog
 
+from scripts.bee_keeper.config import KeeperSettings
 from src.hive.dna import BeeContext, PurityReport
 
 logger = structlog.get_logger(__name__)
 
+
 class BeeGenerator:
     """G - Generator: Updates documentation and chronicles."""
 
-    def __init__(self) -> None:
-        self.model = os.getenv("BEE_KEEPER_MODEL", "gpt-4o")
+    def __init__(self, settings: KeeperSettings) -> None:
+        self.settings = settings
+        self.model = settings.llm__model
+        litellm.api_key = settings.llm__api_key
         prompt_path = Path("src/prompts/bee_keeper.md")
-        self.persona = prompt_path.read_text() if prompt_path.exists() else "You are bee.Keeper, guardian of the Aura Hive."
+        self.persona = (
+            prompt_path.read_text()
+            if prompt_path.exists()
+            else "You are bee.Keeper, guardian of the Aura Hive."
+        )
 
     async def generate(self, report: PurityReport, context: BeeContext) -> None:
         logger.info("bee_generator_generate_started")

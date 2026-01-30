@@ -4,6 +4,7 @@ import sys
 import structlog
 
 from scripts.bee_keeper.aggregator import BeeAggregator
+from scripts.bee_keeper.config import KeeperSettings
 from scripts.bee_keeper.connector import BeeConnector
 from scripts.bee_keeper.generator import BeeGenerator
 from scripts.bee_keeper.metabolism import BeeMetabolism
@@ -22,11 +23,14 @@ logger = structlog.get_logger(__name__)
 async def main() -> None:
     logger.info("bee_keeper_agent_starting")
 
+    # 0. Load Settings
+    settings = KeeperSettings()
+
     # 1. Initialize Nucleotides
-    aggregator = BeeAggregator()
-    transformer = BeeTransformer()
-    connector = BeeConnector()
-    generator = BeeGenerator()
+    aggregator = BeeAggregator(settings=settings)
+    transformer = BeeTransformer(settings=settings)
+    connector = BeeConnector(settings=settings)
+    generator = BeeGenerator(settings=settings)
 
     # 2. Initialize Metabolism
     metabolism = BeeMetabolism(

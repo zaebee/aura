@@ -1,4 +1,3 @@
-import os
 from pathlib import Path
 from typing import Any
 
@@ -6,17 +5,26 @@ import litellm
 import structlog
 import yaml
 
+from scripts.bee_keeper.config import KeeperSettings
 from src.hive.dna import BeeContext, PurityReport
 
 logger = structlog.get_logger(__name__)
 
+
 class BeeTransformer:
     """T - Transformer: Analyzes purity and generates reports."""
 
-    def __init__(self) -> None:
-        self.model = os.getenv("BEE_KEEPER_MODEL", "gpt-4o")
+    def __init__(self, settings: KeeperSettings) -> None:
+        self.settings = settings
+        self.model = settings.llm__model
+        litellm.api_key = settings.llm__api_key
+
         prompt_path = Path("src/prompts/bee_keeper.md")
-        self.persona = prompt_path.read_text() if prompt_path.exists() else "You are bee.Keeper, guardian of the Aura Hive."
+        self.persona = (
+            prompt_path.read_text()
+            if prompt_path.exists()
+            else "You are bee.Keeper, guardian of the Aura Hive."
+        )
 
         # Load manifest
         manifest_path = Path("hive-manifest.yaml")
@@ -51,14 +59,28 @@ class BeeTransformer:
         core_path = self.manifest.get("hive", {}).get("core_path", "core-service/src/hive")
         allowed_files = self.manifest.get("hive", {}).get("allowed_files", [])
 
-        if not allowed_files:
-            return []
-
+        # 1. Structural Check
         for file_path in context.filesystem_map:
             p = Path(file_path)
             if str(p.parent) == core_path:
-                if p.name not in allowed_files:
-                    heresies.append(f"Structural Heresy: '{p.name}' is an unauthorized growth in the core nucleotides.")
+                if allowed_files and p.name not in allowed_files:
+                    heresies.append(
+                        f"Structural Heresy: '{p.name}' is an unauthorized growth in the core nucleotides."
+                    )
+
+        # 2. Pattern Enforcement (No raw print or os.getenv in diff)
+        diff_lines = context.git_diff.splitlines()
+        for line in diff_lines:
+            if line.startswith("+") and not line.startswith("+++"):
+                added_code = line[1:].strip()
+                if "print(" in added_code and "logger" not in added_code:
+                    heresies.append(
+                        f"Pattern Heresy: Raw 'print()' detected in diff: `{added_code}`. Use `structlog` instead."
+                    )
+                if "os.getenv(" in added_code and "settings" not in added_code:
+                    heresies.append(
+                        f"Pattern Heresy: Raw 'os.getenv()' detected in diff: `{added_code}`. Use `settings` instead."
+                    )
 
         return heresies
 

@@ -7,17 +7,20 @@ from typing import Any
 import httpx
 import structlog
 
+from scripts.bee_keeper.config import KeeperSettings
 from src.hive.dna import BeeContext
 
 logger = structlog.get_logger(__name__)
 
+
 class BeeAggregator:
     """A - Aggregator: Gathers signals from Git, Prometheus, and Filesystem."""
 
-    def __init__(self) -> None:
-        self.prometheus_url = os.getenv("PROMETHEUS_URL", "http://prometheus-kube-prometheus-prometheus.monitoring:9090")
-        self.repo_name = os.getenv("GITHUB_REPOSITORY", "aura/platform")
-        self.event_path = os.getenv("GITHUB_EVENT_PATH")
+    def __init__(self, settings: KeeperSettings) -> None:
+        self.settings = settings
+        self.prometheus_url = settings.prometheus_url
+        self.repo_name = settings.github_repository
+        self.event_path = settings.github_event_path
 
     async def perceive(self) -> BeeContext:
         logger.info("bee_aggregator_perceive_started")

@@ -34,7 +34,9 @@ jobs:
           GITHUB_REPOSITORY: ${{ github.repository }}
           GITHUB_EVENT_PATH: ${{ github.event_path }}
           GITHUB_EVENT_NAME: ${{ github.event_name }}
-          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
-          PROMETHEUS_URL: "http://prometheus-kube-prometheus-prometheus.monitoring:9090"
+          AURA_LLM__API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          AURA_LLM__MODEL: "gpt-4o-mini"
+          AURA_PROMETHEUS_URL: "http://prometheus-kube-prometheus-prometheus.monitoring:9090"
+          AURA_NATS_URL: "nats://nats:4222"
         run: |
           PYTHONPATH=. uv run python scripts/bee_keeper_agent.py
