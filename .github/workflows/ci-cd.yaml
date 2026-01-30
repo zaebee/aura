@@ -114,10 +114,8 @@ jobs:
                   make build push TAG=sha-$(git rev-parse --short HEAD) REGISTRY=${{ env.REGISTRY }}/${{ github.repository_owner }}
 
     deploy:
-        needs: [check-changes, build-and-push]
-        if: |
-            always() && 
-            (needs.build-and-push.result == 'success' || needs.check-changes.outputs.infra == 'true')
+        needs: [build-and-push]
+        if: github.ref == 'refs/heads/main'
         runs-on: self-hosted
         env:
             KUBECONFIG: /home/runner/.kube/config
