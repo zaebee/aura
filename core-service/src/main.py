@@ -380,8 +380,8 @@ async def serve():
         health_servicer.set("", health_pb2.HealthCheckResponse.SERVING)
         logger.info("db_verified_health_serving")
     except Exception as e:
-    except SQLAlchemyError as e:
-        logger.error("db_verification_failed", error=str(e), exc_info=True)
+        logger.error("db_verification_failed", error=str(e))
+        # Keep status as UNKNOWN/NOT_SERVING if DB is not reachable
 
     # 6. Start Prometheus metrics server
     try:
