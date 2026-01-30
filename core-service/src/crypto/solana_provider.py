@@ -4,7 +4,7 @@ Verifies SOL and USDC (SPL token) payments on Solana blockchain.
 """
 
 import logging
-from datetime import datetime
+from datetime import UTC, datetime
 from typing import Any
 
 import httpx
@@ -469,9 +469,9 @@ class SolanaProvider:
             transaction_hash=signature,
             block_number=str(slot),
             from_address=from_address or "unknown",
-            confirmed_at=datetime.fromtimestamp(block_time)
+            confirmed_at=datetime.fromtimestamp(block_time, UTC)
             if block_time
-            else datetime.now(),
+            else datetime.now(UTC),
         )
 
     async def close(self) -> None:

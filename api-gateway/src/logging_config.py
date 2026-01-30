@@ -50,12 +50,12 @@ def add_otel_context(
     return event_dict
 
 
-def get_logger(name: str | None = None) -> Any:
+def get_logger(name: str | None = None) -> structlog.BoundLogger:
     """Get a logger instance, optionally with a specific name."""
     logger = structlog.get_logger()
     if name:
         logger = logger.bind(logger_name=name)
-    return logger
+    return logger  # type: ignore
 
 
 def bind_request_id(request_id: str) -> None:
