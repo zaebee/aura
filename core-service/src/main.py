@@ -80,7 +80,7 @@ class NegotiationService(negotiation_pb2_grpc.NegotiationServiceServicer):
 
     def __init__(
         self,
-        metabolism: MetabolicLoop,
+        metabolism: MetabolicLoop | None = None,
         market_service=None,
     ):
         self.metabolism = metabolism
@@ -91,6 +91,12 @@ class NegotiationService(negotiation_pb2_grpc.NegotiationServiceServicer):
         Main metabolic loop for negotiation:
         Signal -> A -> T -> Membrane -> C -> G
         """
+        if not self.metabolism:
+            logger.warning("negotiate_called_before_initialization")
+            context.set_code(grpc.StatusCode.UNAVAILABLE)
+            context.set_details("Metabolism is still initializing")
+            return negotiation_pb2.NegotiateResponse()
+
         request_id = extract_request_id(context) or getattr(
             request, "request_id", str(uuid.uuid4())
         )
@@ -187,6 +193,11 @@ class NegotiationService(negotiation_pb2_grpc.NegotiationServiceServicer):
         self, request: negotiation_pb2.GetSystemStatusRequest, context
     ) -> negotiation_pb2.GetSystemStatusResponse:
         """Return infrastructure metrics from Prometheus."""
+        if not self.metabolism:
+            context.set_code(grpc.StatusCode.UNAVAILABLE)
+            context.set_details("Metabolism is still initializing")
+            return negotiation_pb2.GetSystemStatusResponse(status="initializing")
+
         try:
             metrics = await self.metabolism.aggregator.get_system_metrics()
             return negotiation_pb2.GetSystemStatusResponse(
@@ -260,61 +271,6 @@ class NegotiationService(negotiation_pb2_grpc.NegotiationServiceServicer):
                 clear_request_context()
 
 
-class HealthServicer(health_pb2_grpc.HealthServicer):
-    """gRPC Health Checking Protocol implementation for Core Service.
-
-    Implements the standard grpc.health.v1.Health service to allow clients
-    (including load balancers and orchestrators) to verify service health.
-
-    The health check verifies database connectivity by executing a simple
-    query. This ensures the service can handle actual requests.
-    """
-
-    def Check(self, request, context):
-        """Performs synchronous health check.
-
-        Verifies that the Core Service can connect to and query the database.
-        Returns SERVING if healthy, NOT_SERVING if database is unreachable.
-
-        Args:
-            request: HealthCheckRequest (service name, typically empty)
-            context: gRPC context
-
-        Returns:
-            HealthCheckResponse with status SERVING or NOT_SERVING
-        """
-        try:
-            session = SessionLocal()
-            try:
-                session.execute(text("SELECT 1"))
-                logger.debug("health_check_passed", component="database")
-                return health_pb2.HealthCheckResponse(
-                    status=health_pb2.HealthCheckResponse.SERVING
-                )
-            finally:
-                session.close()
-        except SQLAlchemyError as e:
-            logger.error("health_check_failed", error=str(e), exc_info=True)
-            return health_pb2.HealthCheckResponse(
-                status=health_pb2.HealthCheckResponse.NOT_SERVING
-            )
-
-    def Watch(self, request, context):
-        """Health status streaming (not implemented).
-
-        The Watch method allows clients to stream health status changes.
-        This is not currently implemented as we use polling-based checks.
-
-        Args:
-            request: HealthCheckRequest
-            context: gRPC context
-
-        Returns:
-            HealthCheckResponse (never called, raises UNIMPLEMENTED)
-        """
-        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
-        context.set_details("Health status streaming not implemented")
-        return health_pb2.HealthCheckResponse()
 
 
 def create_strategy():
@@ -389,14 +345,53 @@ def create_crypto_provider():
 
 
 async def serve():
-    # Start Prometheus metrics server on port 9091
+    from grpc_health.v1 import health
+
+    # 1. Initialize gRPC Server early
+    server = grpc.aio.server(
+        futures.ThreadPoolExecutor(max_workers=settings.server.grpc_max_workers)
+    )
+
+    # 2. Register Health Service immediately
+    health_servicer = health.HealthServicer()
+    health_pb2_grpc.add_HealthServicer_to_server(health_servicer, server)
+
+    # 3. Register Negotiation Service with placeholder components
+    # This allows the server to start even while heavy LLM components are loading.
+    negotiation_service = NegotiationService(metabolism=None, market_service=None)
+    negotiation_pb2_grpc.add_NegotiationServiceServicer_to_server(
+        negotiation_service, server
+    )
+
+    # 4. Bind and Start the server
+    server.add_insecure_port(f"[::]:{settings.server.port}")
+    await server.start()
+    logger.info(
+        "server_started_early",
+        port=settings.server.port,
+        status="INITIALIZING",
+        note="Health checks active, main logic loading...",
+    )
+
+    # 5. Verify Database Connection (Shallow check for initial Serving status)
+    try:
+        # Use a new session for the health check
+        with SessionLocal() as session:
+            await asyncio.to_thread(session.execute, text("SELECT 1"))
+        health_servicer.set("", health_pb2.HealthCheckResponse.SERVING)
+        logger.info("db_verified_health_serving")
+    except Exception as e:
+        logger.error("db_verification_failed", error=str(e))
+        # Keep status as UNKNOWN/NOT_SERVING if DB is not reachable
+
+    # 6. Start Prometheus metrics server
     try:
         start_http_server(9091)
         logger.info("metrics_server_started", port=9091)
     except Exception as e:
         logger.error("metrics_server_failed", error=str(e))
 
-    # Initialize NATS for the Generator
+    # 7. Initialize Heavy Components (NATS, AI Models, Crypto)
     nc = None
     try:
         nc = await nats.connect(settings.server.nats_url)
@@ -406,33 +401,25 @@ async def serve():
             "nats_connection_failed", url=settings.server.nats_url, error=str(e)
         )
 
-    # Initialize crypto provider and market service if enabled
     crypto_provider = create_crypto_provider()
     market_service = None
     if crypto_provider:
         from crypto.encryption import SecretEncryption
         from services.market import MarketService
 
-        # Initialize encryption handler
         encryption = SecretEncryption(
             get_raw_key(settings.crypto.secret_encryption_key)
         )
-
         market_service = MarketService(crypto_provider, encryption)
-        logger.info(
-            "market_service_initialized",
-            provider=settings.crypto.provider,
-            currency=settings.crypto.currency,
-        )
+        logger.info("market_service_initialized")
 
-    # Initialize Hive Metabolic Components
+    # Initialize Hive components (Aggregator, Transformer/LLM, etc.)
     aggregator = HiveAggregator()
-    transformer = HiveTransformer()
+    transformer = HiveTransformer()  # Heavy: Loads DSPy/LLM
     connector = HiveConnector(market_service=market_service)
     generator = HiveGenerator(nats_client=nc)
     membrane = HiveMembrane()
 
-    # Wire the Loop
     metabolism = MetabolicLoop(
         aggregator=aggregator,
         transformer=transformer,
@@ -441,33 +428,17 @@ async def serve():
         membrane=membrane,
     )
 
-    server = grpc.aio.server(
-        futures.ThreadPoolExecutor(max_workers=settings.server.grpc_max_workers)
-    )
+    # 8. Wire fully initialized components into the NegotiationService
+    negotiation_service.metabolism = metabolism
+    negotiation_service.market_service = market_service
 
-    # Register negotiation service with the Metabolic Loop
-    negotiation_pb2_grpc.add_NegotiationServiceServicer_to_server(
-        NegotiationService(
-            metabolism=metabolism,
-            market_service=market_service,
-        ),
-        server,
-    )
-
-    # Register health service
-    health_servicer = HealthServicer()
-    health_pb2_grpc.add_HealthServicer_to_server(health_servicer, server)
-
-    server.add_insecure_port(f"[::]:{settings.server.port}")
     logger.info(
-        "server_started",
-        port=settings.server.port,
-        database="postgres",
+        "initialization_complete",
         services=["NegotiationService", "Health"],
         crypto_enabled=settings.crypto.enabled,
         metabolism="ATCG",
     )
-    await server.start()
+
     try:
         await server.wait_for_termination()
     finally:

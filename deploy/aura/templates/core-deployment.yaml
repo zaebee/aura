@@ -25,17 +25,24 @@ spec:
           livenessProbe:
             grpc:
               port: 50051
-            initialDelaySeconds: 30
-            periodSeconds: 20
-            timeoutSeconds: 10
-            failureThreshold: 3
+            initialDelaySeconds: {{ .Values.core.livenessProbe.initialDelaySeconds }}
+            periodSeconds: {{ .Values.core.livenessProbe.periodSeconds }}
+            timeoutSeconds: {{ .Values.core.livenessProbe.timeoutSeconds }}
+            failureThreshold: {{ .Values.core.livenessProbe.failureThreshold }}
           readinessProbe:
             grpc:
               port: 50051
-            initialDelaySeconds: 15
-            periodSeconds: 10
-            timeoutSeconds: 10
-            failureThreshold: 2
+            initialDelaySeconds: {{ .Values.core.readinessProbe.initialDelaySeconds }}
+            periodSeconds: {{ .Values.core.readinessProbe.periodSeconds }}
+            timeoutSeconds: {{ .Values.core.readinessProbe.timeoutSeconds }}
+            failureThreshold: {{ .Values.core.readinessProbe.failureThreshold }}
+          startupProbe:
+            grpc:
+              port: 50051
+            initialDelaySeconds: 0
+            periodSeconds: 2
+            timeoutSeconds: 5
+            failureThreshold: 60
           resources: 
             {{ toYaml .Values.core.resources | nindent 12 }}
           env:

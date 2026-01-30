@@ -12,13 +12,16 @@ tunnel:
 gateway:
   livenessProbe:
     path: /healthz
-    initialDelaySeconds: 15
+    initialDelaySeconds: 5
     periodSeconds: 10
-    timeoutSeconds: 5
+    timeoutSeconds: 2
+    failureThreshold: 3
   readinessProbe:
     path: /readyz
-    initialDelaySeconds: 20
+    initialDelaySeconds: 5
     periodSeconds: 10
+    timeoutSeconds: 2
+    failureThreshold: 3
   image:
     repository: ghcr.io/zaebee/aura-gateway # Docker image repository for the API Gateway
     tag: latest
@@ -39,10 +42,15 @@ gateway:
 # Core Service Configuration
 core:
   livenessProbe:
-    initialDelaySeconds: 30
-    periodSeconds: 15
+    initialDelaySeconds: 5
+    periodSeconds: 10
+    timeoutSeconds: 5
+    failureThreshold: 3
   readinessProbe:
-    initialDelaySeconds: 30
+    initialDelaySeconds: 10
+    periodSeconds: 10
+    timeoutSeconds: 5
+    failureThreshold: 3
   image:
     repository: ghcr.io/zaebee/aura-core
     tag: latest

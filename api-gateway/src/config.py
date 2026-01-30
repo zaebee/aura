@@ -28,7 +28,7 @@ class Settings(BaseSettings):
 
     # Health Check Configuration
     health_check_timeout: float = (
-        5.0  # Timeout for core service health checks (seconds)
+        0.5  # Timeout for core service health checks (seconds)
     )
     health_check_slow_threshold_ms: float = (
         100.0  # Log warning if health check exceeds this duration (milliseconds)

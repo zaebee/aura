@@ -87,10 +87,6 @@ async def check_core_service_health(
         which verifies database connectivity on the Core Service side.
     """
     start_time = time.perf_counter()
-    latency_ms = (time.perf_counter() - start_time) * 1000
-    return HealthCheckResult(
-        status=HealthStatus.OK, latency_ms=round(latency_ms, 2)
-    )
 
     try:
         request = health_pb2.HealthCheckRequest(service="")
