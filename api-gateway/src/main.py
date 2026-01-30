@@ -1,6 +1,7 @@
 import uuid
+from collections.abc import AsyncGenerator, Awaitable, Callable
 from contextlib import asynccontextmanager
-from typing import Any, AsyncGenerator, Awaitable, Callable
+from typing import Any
 
 import grpc
 from fastapi import Depends, FastAPI, Header, HTTPException, Request, Response
@@ -57,7 +58,7 @@ health_stub: health_pb2_grpc.HealthStub
 
 
 @asynccontextmanager
-async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
+async def lifespan(app: FastAPI) -> AsyncGenerator[None]:
     """Manage gRPC channel lifecycle (startup and shutdown)."""
     global channel, stub, health_stub
 
