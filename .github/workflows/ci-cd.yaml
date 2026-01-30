@@ -157,12 +157,18 @@ jobs:
 
             - name: Deploy to Cluster
               run: |
+                  SHORT_SHA=$(git rev-parse --short HEAD)
+                  CHART_VERSION="0.1.${{ github.run_number }}"
+
+                  echo "🚀 Deploying Version: $CHART_VERSION (App: $SHORT_SHA)"
                   helm dependency update ./deploy/aura
                   helm upgrade aura ./deploy/aura --install --atomic --wait --timeout 10m
-                    --set core.image.tag=sha-$(git rev-parse --short HEAD) \
-                    --set gateway.image.tag=sha-$(git rev-parse --short HEAD) \
-                    --set frontend.image.tag=sha-$(git rev-parse --short HEAD) \
-                    --set telegram.image.tag=sha-$(git rev-parse --short HEAD)
+                    --version "$CHART_VERSION" \
+                    --app-version "$SHORT_SHA" \
+                    --set core.image.tag=sha-$SHORT_SHA \
+                    --set gateway.image.tag=sha-$SHORT_SHA \
+                    --set frontend.image.tag=sha-$SHORT_SHA \
+                    --set telegram.image.tag=sha-$SHORT_SHA
 
             - name: Verify Rollout
               run: |
