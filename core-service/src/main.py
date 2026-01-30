@@ -19,7 +19,6 @@ from logging_config import (
     configure_logging,
     get_logger,
 )
-from monitor import get_hive_metrics
 from opentelemetry import trace
 from opentelemetry.instrumentation.grpc import GrpcInstrumentorServer
 from opentelemetry.instrumentation.langchain import LangchainInstrumentor

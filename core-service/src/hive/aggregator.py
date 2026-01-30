@@ -1,6 +1,6 @@
 import asyncio
 import time
-from datetime import datetime
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
@@ -113,13 +113,13 @@ class HiveAggregator:
                     "status": "ok",
                     "cpu_usage_percent": round(cpu_usage, 2),
                     "memory_usage_mb": round(mem_usage, 2),
-                    "timestamp": datetime.utcnow().isoformat(),
+                    "timestamp": datetime.now(UTC).isoformat(),
                     "cached": False,
                 }
                 self._metrics_cache.set(metrics)
                 return metrics
 
-        except (httpx.HTTPError, httpx.ConnectError, httpx.TimeoutException, asyncio.TimeoutError) as e:
+        except (TimeoutError, httpx.HTTPError, httpx.ConnectError, httpx.TimeoutException) as e:
             logger.error("prometheus_unreachable", error=str(e))
             # Self-healing: Return cached if available (even if expired), else UNKNOWN
             cached = self._metrics_cache.get(ignore_ttl=True)
@@ -130,7 +130,7 @@ class HiveAggregator:
                 "status": "UNKNOWN",
                 "cpu_usage_percent": 0.0,
                 "memory_usage_mb": 0.0,
-                "timestamp": datetime.utcnow().isoformat(),
+                "timestamp": datetime.now(UTC).isoformat(),
                 "error": str(e)
             }
         except Exception as e:

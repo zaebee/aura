@@ -52,6 +52,8 @@ class Aggregator(Protocol):
 
     async def perceive(self, signal: Any) -> HiveContext: ...
 
+    async def get_system_metrics(self) -> dict[str, Any]: ...
+
 
 @runtime_checkable
 class Transformer(Protocol):
