@@ -22,7 +22,8 @@ depends_on: str | Sequence[str] | None = None
 def upgrade() -> None:
     """Create locked_deals table with indexes."""
     # Create enum type for deal status
-    sa.Enum("PENDING", "PAID", "EXPIRED", name="dealstatus").create(op.get_bind())
+    deal_status_enum = postgresql.ENUM("PENDING", "PAID", "EXPIRED", name="dealstatus")
+    deal_status_enum.create(op.get_bind(), checkfirst=True)
 
     # Create locked_deals table
     op.create_table(
@@ -34,11 +35,7 @@ def upgrade() -> None:
         sa.Column("currency", sa.String(), nullable=False),
         sa.Column("payment_memo", sa.String(), nullable=False),
         sa.Column("secret_content", sa.LargeBinary(), nullable=False),
-        sa.Column(
-            "status",
-            sa.Enum("PENDING", "PAID", "EXPIRED", name="dealstatus"),
-            nullable=False,
-        ),
+        sa.Column("status", deal_status_enum, nullable=False),
         sa.Column("buyer_did", sa.String(), nullable=True),
         sa.Column("transaction_hash", sa.String(), nullable=True),
         sa.Column("block_number", sa.String(), nullable=True),
