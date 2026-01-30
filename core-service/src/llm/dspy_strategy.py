@@ -47,18 +47,37 @@ class DSPyStrategy:
         )
 
     def _load_compiled_program(self):
-        """Load compiled DSPy program with fallback to untrained module."""
+        """Load compiled DSPy program with fallback to untrained module.
+
+        Searches for the compiled brain in both src/ and data/ directories.
+        """
         try:
-            program_path = Path(__file__).parent.parent / self.compiled_program_path
-            if program_path.exists():
-                logger.info("Loading compiled DSPy program", path=str(program_path))
-                return dspy.load(str(program_path))
-            else:
-                logger.warning(
-                    "Compiled program not found, using untrained module",
-                    path=str(program_path),
-                )
-                return AuraNegotiator()
+            # Check multiple locations: src/ and data/
+            # 1. Look in src/ (relative to this file's parent's parent)
+            src_path = Path(__file__).parent.parent / self.compiled_program_path
+            # 2. Look in data/ (relative to app root, which is parent of src)
+            data_path = (
+                Path(__file__).parent.parent.parent / "data" / self.compiled_program_path
+            )
+            # 3. Also allow absolute path if provided in settings
+            settings_path = Path(self.compiled_program_path)
+
+            # Search order:
+            # 1. Path specified in settings (explicit or absolute)
+            # 2. data/ directory (new default for trained models)
+            # 3. src/ directory (legacy location)
+            potential_paths = [settings_path, data_path, src_path]
+
+            for program_path in potential_paths:
+                if program_path.exists() and program_path.is_file():
+                    logger.info("Loading compiled DSPy program", path=str(program_path))
+                    return dspy.load(str(program_path))
+
+            logger.warning(
+                "Compiled program not found in any search location, using untrained module",
+                search_paths=[str(p) for p in potential_paths],
+            )
+            return AuraNegotiator()
         except Exception as e:
             logger.error("Failed to load compiled program", error=str(e))
             return AuraNegotiator()

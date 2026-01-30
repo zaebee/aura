@@ -26,6 +26,7 @@ COPY core-service/src ./src
 COPY core-service/alembic.ini .
 COPY core-service/migrations ./migrations
 
+# Copy the compiled brain (aura_brain.json) and training data
 COPY core-service/data ./data
 COPY core-service/train_dspy.py .
 

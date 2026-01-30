@@ -163,7 +163,7 @@ def train_negotiator():
         compiled_negotiator = negotiator
 
     # Save compiled program
-    output_path = Path(__file__).parent / "src" / "aura_brain.json"
+    output_path = Path(__file__).parent / "data" / "aura_brain.json"
     compiled_negotiator.save(str(output_path))
 
     print("✅ Training/Generation complete!")
