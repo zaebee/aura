@@ -193,11 +193,13 @@ jobs:
                   SHORT_SHA=$(git rev-parse --short HEAD)
                   CHART_VERSION="0.1.${{ github.run_number }}"
 
-                  echo "🚀 Deploying Version: $CHART_VERSION (App: $SHORT_SHA)"
+                  echo "🚀 Updating Chart.yaml to $CHART_VERSION (App: $SHORT_SHA)"
+                  sed -i "s/^version: .*/version: $CHART_VERSION/" deploy/aura/Chart.yaml
+                  sed -i "s/^appVersion: .*/appVersion: \"$SHORT_SHA\"/" deploy/aura/Chart.yaml
+
+                  echo "🚀 Deploying to Cluster..."
                   helm dependency update ./deploy/aura
                   helm upgrade aura ./deploy/aura --install --atomic --wait --timeout 10m \
-                    --version "$CHART_VERSION" \
-                    --app-version "$SHORT_SHA" \
                     --set core.image.tag=sha-$SHORT_SHA \
                     --set gateway.image.tag=sha-$SHORT_SHA \
                     --set frontend.image.tag=sha-$SHORT_SHA \
