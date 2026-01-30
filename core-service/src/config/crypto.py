@@ -1,4 +1,4 @@
-from pydantic import BaseModel, SecretStr, model_validator
+from pydantic import BaseModel, HttpUrl, SecretStr, model_validator
 
 
 class CryptoSettings(BaseModel):
@@ -13,7 +13,7 @@ class CryptoSettings(BaseModel):
 
     # Solana Configuration
     solana_private_key: SecretStr = ""  # type: ignore # Base58-encoded private key
-    solana_rpc_url: str = "https://api.devnet.solana.com"
+    solana_rpc_url: HttpUrl = "https://api.devnet.solana.com"  # type: ignore
     solana_network: str = "devnet"  # "mainnet-beta", "devnet", "testnet"
     solana_usdc_mint: str = (
         "Gh9ZwEmdLJ8DscKNTkTqPbNwLNNBjuSzaG9Vp2KGtKJr"  # Devnet USDC

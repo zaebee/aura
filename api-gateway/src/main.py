@@ -1,9 +1,9 @@
 import uuid
 from contextlib import asynccontextmanager
-from typing import Any
+from typing import Any, AsyncGenerator, Awaitable, Callable
 
 import grpc
-from fastapi import Depends, FastAPI, Header, HTTPException, Request
+from fastapi import Depends, FastAPI, Header, HTTPException, Request, Response
 from grpc_health.v1 import health_pb2_grpc
 from opentelemetry.instrumentation.fastapi import FastAPIInstrumentor
 from opentelemetry.instrumentation.grpc import GrpcInstrumentorClient
@@ -57,7 +57,7 @@ health_stub: health_pb2_grpc.HealthStub
 
 
 @asynccontextmanager
-async def lifespan(app: FastAPI) -> Any:
+async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     """Manage gRPC channel lifecycle (startup and shutdown)."""
     global channel, stub, health_stub
 
@@ -108,7 +108,9 @@ REQUEST_ID_METADATA_KEY = "x-request-id"
 
 
 @app.middleware("http")
-async def request_id_middleware(request: Request, call_next: Any) -> Any:
+async def request_id_middleware(
+    request: Request, call_next: Callable[[Request], Awaitable[Response]]
+) -> Response:
     """Middleware to generate and bind request_id for every HTTP request."""
     request_id = str(uuid.uuid4())
     bind_request_id(request_id)

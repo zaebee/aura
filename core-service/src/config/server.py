@@ -1,4 +1,4 @@
-from pydantic import AliasChoices, BaseModel, Field
+from pydantic import AliasChoices, BaseModel, Field, HttpUrl
 
 
 class ServerSettings(BaseModel):
@@ -21,16 +21,16 @@ class ServerSettings(BaseModel):
             "AURA_SERVER__OTEL_SERVICE_NAME", "OTEL_SERVICE_NAME"
         ),
     )
-    otel_exporter_otlp_endpoint: str = Field(
-        "http://jaeger:4317",
+    otel_exporter_otlp_endpoint: HttpUrl = Field(
+        "http://jaeger:4317",  # type: ignore
         validation_alias=AliasChoices(
             "AURA_SERVER__OTEL_EXPORTER_OTLP_ENDPOINT", "OTEL_EXPORTER_OTLP_ENDPOINT"
         ),
     )
 
     # Monitoring
-    prometheus_url: str = Field(
-        "http://prometheus-kube-prometheus-prometheus.monitoring:9090",
+    prometheus_url: HttpUrl = Field(
+        "http://prometheus-kube-prometheus-prometheus.monitoring:9090",  # type: ignore
         validation_alias=AliasChoices("AURA_SERVER__PROMETHEUS_URL", "PROMETHEUS_URL"),
     )
 
