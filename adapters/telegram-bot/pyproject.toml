@@ -6,6 +6,7 @@ requires-python = ">=3.11"
 dependencies = [
     "aiogram>=3.17.0",
     "grpcio>=1.70.0",
+    "protobuf>=6.33.5",
     "pydantic-settings>=2.7.1",
     "structlog>=25.1.0",
 ]
