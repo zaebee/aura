@@ -135,7 +135,8 @@ class BeeConnector:
 
     async def _emit_nats_event(self, report: PurityReport, context: BeeContext, injuries: list[str]) -> bool:
         try:
-            nc = await nats.connect(self.nats_url)
+            # Use connect_timeout to prevent hanging if NATS is unreachable
+            nc = await nats.connect(self.nats_url, connect_timeout=5.0)
             payload = {
                 "agent": "bee.Keeper",
                 "is_pure": report.is_pure,
