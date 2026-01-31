@@ -91,19 +91,12 @@ class BeeTransformer:
         dna_path = Path("../../") / dna_path_str
 
         if dna_path.exists():
-            # 1. Parse dna.py
-            content = dna_path.read_text()
-            names = re.findall(r"class\s+([A-Za-z0-9_]+)", content)
-            for name in names:
-                proteins.add(f"{name.lower()}.py")
-
-            # 2. Parse types.py in same directory
-            types_path = dna_path.parent / "types.py"
-            if types_path.exists():
-                content = types_path.read_text()
-                names = re.findall(r"class\s+([A-Za-z0-9_]+)", content)
-                for name in names:
-                    proteins.add(f"{name.lower()}.py")
+            for file_to_parse in [dna_path, dna_path.parent / "types.py"]:
+                if file_to_parse.exists():
+                    content = file_to_parse.read_text()
+                    names = re.findall(r"class\s+([A-Za-z0-9_]+)", content)
+                    for name in names:
+                        proteins.add(f"{name.lower()}.py")
 
         return proteins
 
