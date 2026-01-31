@@ -3,6 +3,7 @@ from unittest.mock import AsyncMock, MagicMock
 import pytest
 from aiogram import types
 from src.interfaces import NegotiationProvider, NegotiationResult, SearchResult
+from src.hive.dna import Observation
 
 
 class MockNegotiationProvider(NegotiationProvider):
@@ -20,6 +21,16 @@ class MockNegotiationProvider(NegotiationProvider):
 @pytest.fixture
 def mock_client():
     return MockNegotiationProvider()
+
+
+@pytest.fixture
+def mock_metabolism(mock_client):
+    metabolism = AsyncMock()
+    metabolism.connector = MagicMock()
+    metabolism.connector.search_core = mock_client.search
+    metabolism.execute_negotiation = AsyncMock()
+    metabolism.execute_search = AsyncMock()
+    return metabolism
 
 
 @pytest.fixture
