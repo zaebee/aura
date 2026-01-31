@@ -7,8 +7,8 @@ from typing import Any
 import httpx
 import structlog
 
-from scripts.bee_keeper.config import KeeperSettings
-from src.hive.dna import BeeContext
+from src.config import KeeperSettings
+from src.dna import BeeContext
 
 logger = structlog.get_logger(__name__)
 
@@ -82,9 +82,13 @@ class BeeAggregator:
 
     def _scan_filesystem(self) -> list[str]:
         filesystem_map = []
-        for path in Path(".").rglob("*.py"):
+        # Scan from repository root
+        root_path = Path("../../")
+        for path in root_path.rglob("*.py"):
             if ".venv" not in path.parts and "proto" not in path.parts:
-                filesystem_map.append(str(path))
+                # Store path relative to root
+                rel_path = path.relative_to(root_path)
+                filesystem_map.append(str(rel_path))
         return filesystem_map
 
     def _load_event_data(self) -> dict[str, Any]:

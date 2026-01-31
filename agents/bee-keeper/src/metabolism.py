@@ -1,6 +1,6 @@
 import structlog
 
-from src.hive.dna import (
+from src.dna import (
     BeeAggregator,
     BeeConnector,
     BeeGenerator,

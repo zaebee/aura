@@ -6,8 +6,8 @@ import nats
 import structlog
 from github import Github
 
-from scripts.bee_keeper.config import KeeperSettings
-from src.hive.dna import BeeContext, BeeObservation, PurityReport
+from src.config import KeeperSettings
+from src.dna import BeeContext, BeeObservation, PurityReport
 
 logger = structlog.get_logger(__name__)
 

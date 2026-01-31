@@ -5,8 +5,8 @@ import litellm
 import structlog
 import yaml
 
-from scripts.bee_keeper.config import KeeperSettings
-from src.hive.dna import BeeContext, PurityReport
+from src.config import KeeperSettings
+from src.dna import BeeContext, PurityReport
 
 logger = structlog.get_logger(__name__)
 
@@ -19,7 +19,7 @@ class BeeTransformer:
         self.model = settings.llm__model
         litellm.api_key = settings.llm__api_key
 
-        prompt_path = Path("src/prompts/bee_keeper.md")
+        prompt_path = Path("prompts/bee_keeper.md")
         self.persona = (
             prompt_path.read_text()
             if prompt_path.exists()
@@ -112,21 +112,34 @@ class BeeTransformer:
         """
 
         try:
-            response = await litellm.acompletion(
-                model=self.model,
-                messages=[{"role": "user", "content": prompt}],
-                response_format={"type": "json_object"}
-            )
-            content = response.choices[0].message.content
-            import json
-
-            data: dict[str, Any] = json.loads(content)
-            return data
+            return await self._call_llm(prompt)
         except Exception as e:
-            logger.error("llm_audit_failed", error=str(e))
-            return {
-                "is_pure": False,
-                "heresies": [f"Blight: The Keeper's mind is clouded ({str(e)})"],
-                "narrative": "A strange mist descends upon the Hive...",
-                "reasoning": str(e)
-            }
+            logger.warning("primary_llm_failed_trying_fallback", error=str(e))
+            try:
+                return await self._call_llm(prompt, use_fallback=True)
+            except Exception as fe:
+                logger.error("llm_audit_failed_completely", error=str(fe))
+                return {
+                    "is_pure": False,
+                    "heresies": [f"Blight: The Keeper's mind is clouded ({str(fe)})"],
+                    "narrative": "A strange mist descends upon the Hive...",
+                    "reasoning": f"Primary error: {e}. Fallback error: {fe}",
+                }
+
+    async def _call_llm(self, prompt: str, use_fallback: bool = False) -> dict[str, Any]:
+        model = self.settings.llm__fallback_model if use_fallback else self.model
+        kwargs: dict[str, Any] = {
+            "model": model,
+            "messages": [{"role": "user", "content": prompt}],
+            "response_format": {"type": "json_object"},
+        }
+
+        if use_fallback and "ollama" in model:
+            kwargs["api_base"] = self.settings.llm__ollama_base_url
+
+        response = await litellm.acompletion(**kwargs)
+        content = response.choices[0].message.content
+        import json
+
+        data: dict[str, Any] = json.loads(content)
+        return data

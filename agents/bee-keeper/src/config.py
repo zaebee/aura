@@ -9,6 +9,10 @@ class KeeperSettings(BaseSettings):
 
     llm__api_key: str = Field(..., alias="AURA_LLM__API_KEY")
     llm__model: str = Field("gpt-4o-mini", alias="AURA_LLM__MODEL")
+    llm__fallback_model: str = Field("ollama/llama3", alias="AURA_LLM__FALLBACK_MODEL")
+    llm__ollama_base_url: str = Field(
+        "http://localhost:11434", alias="AURA_LLM__OLLAMA_BASE_URL"
+    )
 
     prometheus_url: str = Field(
         "http://prometheus-kube-prometheus-prometheus.monitoring:9090",

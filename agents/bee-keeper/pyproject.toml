@@ -1,0 +1,35 @@
+[project]
+name = "aura-keeper"
+version = "0.1.0"
+description = "BeeKeeper: The guardian of the Aura Hive"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "litellm>=1.63.0",
+    "pygithub>=2.8.1",
+    "pydantic-settings>=2.12.0",
+    "httpx>=0.28.1",
+    "nats-py>=2.12.0",
+    "structlog>=25.5.0",
+    "pyyaml>=6.0.3",
+]
+
+[project.scripts]
+aura-keeper = "main:main"
+
+[tool.uv]
+managed = true
+
+[tool.ruff]
+line-length = 88
+target-version = "py312"
+
+[tool.mypy]
+python_version = "3.12"
+strict = true
+ignore_missing_imports = true
+
+[dependency-groups]
+dev = [
+    "types-pyyaml>=6.0.12.20250915",
+]

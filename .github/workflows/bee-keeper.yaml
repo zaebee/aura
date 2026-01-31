@@ -39,4 +39,4 @@ jobs:
           AURA_PROMETHEUS_URL: "http://prometheus-kube-prometheus-prometheus.monitoring:9090"
           AURA_NATS_URL: "nats://nats:4222"
         run: |
-          PYTHONPATH=. uv run python scripts/bee_keeper_agent.py
+          uv run --directory agents/bee-keeper python main.py

@@ -3,8 +3,8 @@ from pathlib import Path
 import litellm
 import structlog
 
-from scripts.bee_keeper.config import KeeperSettings
-from src.hive.dna import BeeContext, PurityReport
+from src.config import KeeperSettings
+from src.dna import BeeContext, PurityReport
 
 logger = structlog.get_logger(__name__)
 
@@ -16,7 +16,7 @@ class BeeGenerator:
         self.settings = settings
         self.model = settings.llm__model
         litellm.api_key = settings.llm__api_key
-        prompt_path = Path("src/prompts/bee_keeper.md")
+        prompt_path = Path("prompts/bee_keeper.md")
         self.persona = (
             prompt_path.read_text()
             if prompt_path.exists()
@@ -35,10 +35,10 @@ class BeeGenerator:
         await self._update_chronicles(report)
 
     async def _update_llms_txt(self, context: BeeContext) -> None:
-        llms_txt_path = Path("llms.txt")
+        llms_txt_path = Path("../../llms.txt")
         current_llms_txt = llms_txt_path.read_text() if llms_txt_path.exists() else ""
 
-        proto_files = list(Path("proto").rglob("*.proto"))
+        proto_files = list(Path("../../proto").rglob("*.proto"))
         proto_contents = ""
         for p in proto_files:
             proto_contents += f"\n--- {p} ---\n{p.read_text()}\n"
@@ -74,7 +74,7 @@ class BeeGenerator:
             logger.error("llms_txt_sync_failed", error=str(e))
 
     async def _update_chronicles(self, report: PurityReport) -> None:
-        chronicles_path = Path("CHRONICLES.md")
+        chronicles_path = Path("../../CHRONICLES.md")
 
         # Create if not exists
         if not chronicles_path.exists():
