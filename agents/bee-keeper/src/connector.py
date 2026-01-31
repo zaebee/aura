@@ -2,6 +2,7 @@ import asyncio
 import json
 
 import nats
+import nats.errors
 import structlog
 
 from src.config import KeeperSettings
@@ -156,6 +157,8 @@ class BeeConnector:
 
             await nc.close()
             return True
-        except Exception as e:
-            logger.warning("nats_publish_failed", error=str(e))
+        except (nats.errors.NoServersError, nats.errors.TimeoutError, Exception) as e:
+            # Log warning and return False to allow metabolic cycle to complete.
+            # We avoid logging the URL to prevent potential credential leakage.
+            logger.warning("nats_connection_failed", error=str(e))
             return False

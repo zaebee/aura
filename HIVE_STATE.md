@@ -1,10 +1,31 @@
 # Aura Hive State
 
-**Last Pulse:** 2026-01-31 19:59:44
+**Last Pulse:** 2026-01-31 20:42:36
 **Current Success Rate:** 0.00
-**Governance Cost (Last):** 0 tokens / 5.17s
+**Governance Cost (Last):** 0 tokens / 2.42s
 
 ## Audit Log
+
+## Audit: 2026-01-31 20:42:36
+
+**Status:** IMPURE
+**Negotiation Success Rate:** 0.00
+
+> A strange mist descends upon the Hive...
+
+**Heresies Detected:**
+- Blight: The Keeper's mind is clouded (litellm.APIConnectionError: OllamaException - Cannot connect to host localhost:11434 ssl:default [Multiple exceptions: [Errno 111] Connect call failed ('::1', 11434, 0, 0), [Errno 111] Connect call failed ('127.0.0.1', 11434)])
+
+**🤕 Injuries (Failures):**
+- GitHub: Failed to post purity report comment.
+
+<!-- metadata
+execution_time: 2.42s
+token_usage: 0
+event: manual
+-->
+
+---
 
 ## Audit: 2026-01-31 19:59:44
 
@@ -74,7 +95,4 @@ event: manual
 - Pattern Heresy: Raw 'print()' detected in diff: `- Pattern Heresy: Raw 'print()' detected in diff: `print(f"❌ Error {response.status_code}: {response.text}")`. Use `structlog` instead.`. Use `structlog` instead.
 - Pattern Heresy: Raw 'print()' detected in diff: `- Pattern Heresy: Raw 'print()' detected in diff: `print("✅ OFFER ACCEPTED!")`. Use `structlog` instead.`. Use `structlog` instead.
 - Pattern Heresy: Raw 'print()' detected in diff: `- Pattern Heresy: Raw 'print()' detected in diff: `print(f"   Final Price: ${data['data']['final_price']}")`. Use `structlog` instead.`. Use `structlog` instead.
-- Pattern Heresy: Raw 'print()' detected in diff: `- Pattern Heresy: Raw 'print()' detected in diff: `print(f"   Reservation: {data['data']['reservation_code']}")`. Use `structlog` instead.`. Use `structlog` instead.
-- Pattern Heresy: Raw 'print()' detected in diff: `- Pattern Heresy: Raw 'print()' detected in diff: `print("⚠️  OFFER COUNTERED")`. Use `structlog` instead.`. Use `structlog` instead.
-- Pattern Heresy: Raw 'print()' detected in diff: `- Pattern Heresy: Raw 'print()' detected in diff: `print(f"   Server proposed: ${data['data']['proposed_price']}")`. Use `structlog` instead.`. Use `structlog` instead.
-- Pattern Heresy: Raw 'print()' detected in diff: `-
+- Pattern Heresy: Raw 'print()' detected in diff: `- Pattern Heresy: Raw 'print()' detected in diff:

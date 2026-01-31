@@ -28,9 +28,10 @@ class LLMSettings(BaseSettings):
     temperature: float = 0.7
     compiled_program_path: str = "aura_brain.json"
 
-    @field_validator("model")
+    @field_validator("model", mode="before")
     @classmethod
-    def validate_model_prefix(cls, v: str) -> str:
-        if "/" not in v:
+    def ensure_provider_prefix(cls, v: str) -> str:
+        """Ensure model name always includes a provider prefix."""
+        if isinstance(v, str) and "/" not in v:
             return f"mistral/{v}"
         return v
