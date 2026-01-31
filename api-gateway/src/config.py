@@ -30,6 +30,7 @@ class Settings(BaseSettings):
     health_check_timeout: float = (
         0.5  # Timeout for core service health checks (seconds)
     )
+    negotiation_timeout: float = 30.0  # Timeout for core service negotiation (seconds)
     health_check_slow_threshold_ms: float = (
         100.0  # Log warning if health check exceeds this duration (milliseconds)
     )

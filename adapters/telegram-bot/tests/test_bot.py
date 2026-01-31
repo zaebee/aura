@@ -9,7 +9,6 @@ from src.bot import (
     process_bid,
     process_select_hotel,
 )
-from src.hive.dna import Observation
 
 
 @pytest.mark.asyncio
@@ -20,13 +19,26 @@ async def test_cmd_start(message):
 
 
 @pytest.mark.asyncio
-async def test_cmd_search_results(message, mock_metabolism):
+async def test_cmd_search_results(message, mock_client):
     command = MagicMock(spec=CommandObject)
     command.args = "Paris"
 
-    await cmd_search(message, command, mock_metabolism)
+    mock_client.search_results = [
+        {"item_id": "hotel_1", "name": "Hotel Alpha", "base_price": 100.0}
+    ]
 
-    mock_metabolism.execute_search.assert_called_with("Paris", message)
+    await cmd_search(message, command, mock_client)
+
+    message.answer.assert_called()
+    args, kwargs = message.answer.call_args
+    assert "Choose a hotel" in args[0]
+    assert "reply_markup" in kwargs
+
+    # Check if keyboard has the hotel
+    keyboard = kwargs["reply_markup"].inline_keyboard
+    assert len(keyboard) == 1
+    assert keyboard[0][0].text == "Hotel Alpha ($100.0)"
+    assert keyboard[0][0].callback_data == "select:hotel_1"
 
 
 @pytest.mark.asyncio
@@ -43,16 +55,19 @@ async def test_process_select_hotel(callback_query):
 
 
 @pytest.mark.asyncio
-async def test_process_bid_accepted(message, mock_metabolism):
+async def test_process_bid_accepted(message, mock_client):
     state = AsyncMock()
     state.get_data.return_value = {"item_id": "hotel_1"}
     message.text = "90"
 
-    mock_metabolism.execute_negotiation.return_value = Observation(
-        success=True, event_type="deal_accepted"
-    )
+    mock_client.negotiation_result = {
+        "accepted": {"final_price": 90.0, "reservation_code": "SUCCESS123"}
+    }
 
-    await process_bid(message, state, mock_metabolism)
+    await process_bid(message, state, mock_client)
 
-    mock_metabolism.execute_negotiation.assert_called()
+    message.answer.assert_called()
+    args, kwargs = message.answer.call_args
+    assert "Deal!" in args[0]
+    assert "SUCCESS123" in args[0]
     state.clear.assert_called()
