@@ -291,10 +291,9 @@ def create_strategy() -> PricingStrategy:
         return RuleBasedStrategy()
     elif settings.llm.model == "dspy":
         logger.info("strategy_selected", type="DSPyStrategy", model="self-optimizing")
-        from src.guard.membrane import OutputGuard
         from src.llm.dspy_strategy import DSPyStrategy
 
-        return DSPyStrategy(guard=OutputGuard())
+        return DSPyStrategy()
     else:
         logger.info(
             "strategy_selected", type="LiteLLMStrategy", model=settings.llm.model
