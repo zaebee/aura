@@ -3,6 +3,7 @@ import json
 from typing import Any
 
 import nats
+import nats.errors
 import structlog
 from github import Github
 
@@ -151,7 +152,8 @@ class BeeConnector:
             await nc.publish("aura.hive.audit", json.dumps(payload).encode())
             await nc.close()
             return True
-        except Exception as e:
-            # Log warning and return False to allow metabolic cycle to complete
-            logger.warning("nats_connection_failed", error=str(e), url=self.nats_url)
+        except (nats.errors.NoServersError, nats.errors.TimeoutError, Exception) as e:
+            # Log warning and return False to allow metabolic cycle to complete.
+            # We avoid logging the URL to prevent potential credential leakage.
+            logger.warning("nats_connection_failed", error=str(e))
             return False
