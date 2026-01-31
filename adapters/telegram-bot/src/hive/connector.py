@@ -1,14 +1,14 @@
-from typing import Any
-
 import structlog
 from aiogram import Bot
 from opentelemetry import trace
 from src.client import GRPCNegotiationClient
+from src.interfaces import NegotiationResult, SearchResult
 
 from .dna import Observation, TelegramContext, UIAction
 
 logger = structlog.get_logger(__name__)
 tracer = trace.get_tracer(__name__)
+
 
 class TelegramConnector:
     """C - Connector: Executes UI actions and gRPC calls."""
@@ -26,20 +26,25 @@ class TelegramConnector:
                         chat_id=context.chat_id,
                         text=action.text,
                         reply_markup=action.reply_markup,
-                        parse_mode=action.parse_mode
+                        parse_mode=action.parse_mode,
                     )
                     span.set_attribute("message_id", msg.message_id)
                     return Observation(success=True, message_id=msg.message_id)
                 else:
                     # Support other action types if needed
-                    logger.warning("unsupported_action_type", action_type=action.action_type)
-                    return Observation(success=False, error=f"Unsupported action type: {action.action_type}")
+                    logger.warning(
+                        "unsupported_action_type", action_type=action.action_type
+                    )
+                    return Observation(
+                        success=False,
+                        error=f"Unsupported action type: {action.action_type}",
+                    )
             except Exception as e:
                 logger.error("failed_to_execute_action", error=str(e))
                 span.record_exception(e)
                 return Observation(success=False, error=str(e))
 
-    async def call_core(self, context: TelegramContext) -> dict[str, Any]:
+    async def call_core(self, context: TelegramContext) -> NegotiationResult:
         with tracer.start_as_current_span("connector_call_core") as span:
             if not context.hive_context:
                 return {"error": "No hive context"}
@@ -53,7 +58,7 @@ class TelegramConnector:
             response = await self.client.negotiate(item_id, bid_amount)
             return response
 
-    async def search_core(self, query: str) -> list[dict[str, Any]]:
+    async def search_core(self, query: str) -> list[SearchResult]:
         with tracer.start_as_current_span("connector_search_core") as span:
             span.set_attribute("query", query)
             results = await self.client.search(query)

@@ -49,8 +49,7 @@ async def test_process_bid_accepted(message, mock_metabolism):
     message.text = "90"
 
     mock_metabolism.execute_negotiation.return_value = Observation(
-        success=True,
-        event_type="deal_accepted"
+        success=True, event_type="deal_accepted"
     )
 
     await process_bid(message, state, mock_metabolism)

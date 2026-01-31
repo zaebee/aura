@@ -12,6 +12,7 @@ from .transformer import TelegramTransformer
 logger = structlog.get_logger(__name__)
 tracer = trace.get_tracer(__name__)
 
+
 class TelegramMetabolism:
     """Orchestrates the ATCG flow for the Telegram Bot."""
 
@@ -20,14 +21,16 @@ class TelegramMetabolism:
         aggregator: TelegramAggregator,
         transformer: TelegramTransformer,
         connector: TelegramConnector,
-        generator: TelegramGenerator
+        generator: TelegramGenerator,
     ):
         self.aggregator = aggregator
         self.transformer = transformer
         self.connector = connector
         self.generator = generator
 
-    async def execute_negotiation(self, signal: Any, state_data: dict[str, Any]) -> Observation:
+    async def execute_negotiation(
+        self, signal: Any, state_data: dict[str, Any]
+    ) -> Observation:
         with tracer.start_as_current_span("metabolism_negotiate"):
             logger.info("negotiation_cycle_started")
 
@@ -42,7 +45,9 @@ class TelegramMetabolism:
             core_response = await self.connector.call_core(context)
 
             # T - Transformer (Final UI)
-            final_ui = await self.transformer.think(context, core_response=core_response)
+            final_ui = await self.transformer.think(
+                context, core_response=core_response
+            )
 
             # C - Connector (Execute Final UI)
             observation = await self.connector.act(final_ui, context)
@@ -51,13 +56,18 @@ class TelegramMetabolism:
             if "accepted" in core_response and core_response["accepted"]:
                 observation.event_type = "deal_accepted"
                 observation.metadata = {
-                    "item_id": context.hive_context.item_id if context.hive_context else "",
+                    "item_id": context.hive_context.item_id
+                    if context.hive_context
+                    else "",
                     "price": core_response["accepted"].get("final_price", 0),
-                    "user_id": context.user_id
+                    "user_id": context.user_id,
                 }
             elif "error" in core_response:
                 observation.event_type = "error"
-                observation.metadata = {"error": core_response["error"], "user_id": context.user_id}
+                observation.metadata = {
+                    "error": core_response["error"],
+                    "user_id": context.user_id,
+                }
 
             # G - Generator
             await self.generator.pulse(observation)
@@ -86,7 +96,7 @@ class TelegramMetabolism:
             observation.metadata = {
                 "query": query,
                 "results_count": len(results),
-                "user_id": context.user_id
+                "user_id": context.user_id,
             }
 
             await self.generator.pulse(observation)

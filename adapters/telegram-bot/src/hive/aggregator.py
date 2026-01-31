@@ -9,10 +9,13 @@ from .dna import HiveContext, NegotiationOffer, TelegramContext
 logger = structlog.get_logger(__name__)
 tracer = trace.get_tracer(__name__)
 
+
 class TelegramAggregator:
     """A - Aggregator: Extracts Telegram signals into context."""
 
-    async def perceive(self, signal: Any, state_data: dict[str, Any]) -> TelegramContext:
+    async def perceive(
+        self, signal: Any, state_data: dict[str, Any]
+    ) -> TelegramContext:
         with tracer.start_as_current_span("aggregator_perceive") as span:
             user_id = 0
             chat_id = 0
@@ -32,7 +35,7 @@ class TelegramAggregator:
 
             item_id = str(state_data.get("item_id", ""))
             bid_amount = 0.0
-            if text and text.replace('.', '', 1).isdigit():
+            if text and text.replace(".", "", 1).isdigit():
                 bid_amount = float(text)
 
             # Negotiation history could be added to metadata if we had it in state_data
@@ -41,7 +44,7 @@ class TelegramAggregator:
             hive_context = HiveContext(
                 item_id=item_id,
                 offer=NegotiationOffer(bid_amount=bid_amount),
-                metadata={"history": history}
+                metadata={"history": history},
             )
 
             context = TelegramContext(
@@ -50,12 +53,17 @@ class TelegramAggregator:
                 hive_context=hive_context,
                 message_text=text,
                 callback_data=callback_data,
-                fsm_data=state_data
+                fsm_data=state_data,
             )
 
             span.set_attribute("user_id", user_id)
             span.set_attribute("item_id", item_id)
             span.set_attribute("bid_amount", bid_amount)
 
-            logger.info("signal_perceived", user_id=user_id, item_id=item_id, bid_amount=bid_amount)
+            logger.info(
+                "signal_perceived",
+                user_id=user_id,
+                item_id=item_id,
+                bid_amount=bid_amount,
+            )
             return context

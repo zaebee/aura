@@ -10,6 +10,7 @@ from .dna import Event, Observation
 logger = structlog.get_logger(__name__)
 tracer = trace.get_tracer(__name__)
 
+
 class TelegramGenerator:
     """G - Generator: Emits events to NATS blood stream."""
 
@@ -32,13 +33,9 @@ class TelegramGenerator:
                 payload = {
                     "success": observation.success,
                     "error": observation.error,
-                    **observation.metadata
+                    **observation.metadata,
                 }
-                event = Event(
-                    topic=topic,
-                    payload=payload,
-                    timestamp=time.time()
-                )
+                event = Event(topic=topic, payload=payload, timestamp=time.time())
                 events.append(event)
 
                 span.set_attribute("event_topic", topic)

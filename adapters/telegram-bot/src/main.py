@@ -29,16 +29,18 @@ structlog.configure(
 )
 logger = structlog.get_logger()
 
+
 def setup_tracing() -> None:
-    resource = Resource(attributes={
-        SERVICE_NAME: "telegram-bot"
-    })
+    resource = Resource(attributes={SERVICE_NAME: "telegram-bot"})
     provider = TracerProvider(resource=resource)
 
     otlp_endpoint = os.getenv("OTEL_EXPORTER_OTLP_ENDPOINT", "http://jaeger:4317")
-    processor = BatchSpanProcessor(OTLPSpanExporter(endpoint=otlp_endpoint, insecure=True))
+    processor = BatchSpanProcessor(
+        OTLPSpanExporter(endpoint=otlp_endpoint, insecure=True)
+    )
     provider.add_span_processor(processor)
     trace.set_tracer_provider(provider)
+
 
 async def main() -> None:
     # Setup OpenTelemetry
