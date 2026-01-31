@@ -47,5 +47,7 @@ class TelegramGenerator:
                         logger.info("event_published", topic=topic)
                     except Exception as e:
                         logger.error("failed_to_publish_event", error=str(e))
+                        span.record_exception(e)
+                        span.set_status(trace.Status(trace.StatusCode.ERROR, str(e)))
 
             return events

@@ -42,6 +42,7 @@ class TelegramConnector:
             except Exception as e:
                 logger.error("failed_to_execute_action", error=str(e))
                 span.record_exception(e)
+                span.set_status(trace.Status(trace.StatusCode.ERROR, str(e)))
                 return Observation(success=False, error=str(e))
 
     async def call_core(self, context: TelegramContext) -> NegotiationResult:

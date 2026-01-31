@@ -50,10 +50,17 @@ async def main() -> None:
     nc = None
     try:
         nats_url = os.getenv("NATS_URL", "nats://nats:4222")
-        nc = await nats.connect(nats_url)
+        nc = await nats.connect(
+            nats_url,
+            connect_timeout=5,
+            reconnect_time_wait=2,
+            max_reconnect_attempts=3,
+        )
         logger.info("Connected to NATS", url=nats_url)
+    except (nats.errors.NoServersError, nats.errors.TimeoutError) as e:
+        logger.error("Failed to connect to NATS (service might be down)", error=str(e))
     except Exception as e:
-        logger.error("Failed to connect to NATS", error=str(e))
+        logger.error("Unexpected error connecting to NATS", error=str(e))
 
     # Initialize gRPC client
     client = GRPCNegotiationClient(settings.core_url)
@@ -82,8 +89,10 @@ async def main() -> None:
     try:
         # Pass metabolism as dependency to handlers
         await dp.start_polling(bot, metabolism=metabolism)
+    except asyncio.CancelledError:
+        logger.info("Bot stopped by user")
     except Exception as e:
-        logger.error("Bot crashed", error=str(e))
+        logger.error("Bot crashed unexpectedly", error=str(e), exc_info=True)
     finally:
         await client.close()
         await bot.session.close()
