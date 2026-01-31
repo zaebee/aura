@@ -4,7 +4,7 @@ import litellm
 import structlog
 
 from src.config import KeeperSettings
-from src.dna import BeeContext, PurityReport
+from src.dna import BeeContext, BeeObservation, PurityReport
 
 logger = structlog.get_logger(__name__)
 
@@ -23,7 +23,7 @@ class BeeGenerator:
             else "You are bee.Keeper, guardian of the Aura Hive."
         )
 
-    async def generate(self, report: PurityReport, context: BeeContext) -> None:
+    async def generate(self, report: PurityReport, context: BeeContext, observation: BeeObservation) -> None:
         logger.info("bee_generator_generate_started")
 
         # 1. Update llms.txt if needed
@@ -32,7 +32,7 @@ class BeeGenerator:
             await self._update_llms_txt(context)
 
         # 2. Update HIVE_STATE.md
-        await self._update_hive_state(report, context)
+        await self._update_hive_state(report, context, observation)
 
     async def _update_llms_txt(self, context: BeeContext) -> None:
         llms_txt_path = Path("../../llms.txt")
@@ -73,7 +73,7 @@ class BeeGenerator:
         except Exception as e:
             logger.error("llms_txt_sync_failed", error=str(e))
 
-    async def _update_hive_state(self, report: PurityReport, context: BeeContext) -> None:
+    async def _update_hive_state(self, report: PurityReport, context: BeeContext, observation: BeeObservation) -> None:
         state_path = Path("../../HIVE_STATE.md")
         current_content = state_path.read_text() if state_path.exists() else ""
 
@@ -93,6 +93,11 @@ class BeeGenerator:
             new_entry += "**Heresies Detected:**\n"
             for h in report.heresies:
                 new_entry += f"- {h}\n"
+
+        if observation.injuries:
+            new_entry += "\n**🤕 Injuries (Failures):**\n"
+            for injury in observation.injuries:
+                new_entry += f"- {injury}\n"
 
         # Hidden metadata for "Cost of Governance"
         new_entry += f"\n<!-- metadata\nexecution_time: {report.execution_time:.2f}s\ntoken_usage: {report.token_usage}\nevent: {context.event_name}\n-->\n"

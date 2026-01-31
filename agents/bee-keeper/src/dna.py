@@ -32,6 +32,7 @@ class BeeObservation:
     success: bool
     github_comment_url: str = ""
     nats_event_sent: bool = False
+    injuries: list[str] = field(default_factory=list)
     metadata: dict[str, Any] = field(default_factory=dict)
 
 
