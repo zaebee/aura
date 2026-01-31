@@ -11,14 +11,15 @@ logger = structlog.get_logger()
 
 
 class GRPCNegotiationClient(NegotiationProvider):
-    def __init__(self, grpc_url: str) -> None:
+    def __init__(self, grpc_url: str, timeout: float = 30.0) -> None:
         self.channel = grpc.aio.insecure_channel(grpc_url)
         self.stub = negotiation_pb2_grpc.NegotiationServiceStub(self.channel)
+        self.timeout = timeout
 
     async def search(self, query: str, limit: int = 5) -> list[SearchResult]:
         try:
             request = negotiation_pb2.SearchRequest(query=query, limit=limit)
-            response = await self.stub.Search(request, timeout=5.0)
+            response = await self.stub.Search(request, timeout=self.timeout)
             # Use preserving_proto_field_name=True to get snake_case as per SearchResult TypedDict
             return [
                 dict(MessageToDict(item, preserving_proto_field_name=True))  # type: ignore
@@ -39,7 +40,7 @@ class GRPCNegotiationClient(NegotiationProvider):
                     did="did:aura:telegram-bot", reputation_score=1.0
                 ),
             )
-            response = await self.stub.Negotiate(request, timeout=5.0)
+            response = await self.stub.Negotiate(request, timeout=self.timeout)
             return dict(MessageToDict(response, preserving_proto_field_name=True))  # type: ignore
         except grpc.RpcError as e:
             logger.error("gRPC Negotiate failed", code=e.code(), details=e.details())

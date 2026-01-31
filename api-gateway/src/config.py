@@ -13,6 +13,7 @@ class Settings(BaseSettings):
 
     # gRPC Core Service Connection
     core_service_host: str = "localhost:50051"
+    negotiation_timeout: float = 30.0
 
     # HTTP Server
     http_port: int = 8000
