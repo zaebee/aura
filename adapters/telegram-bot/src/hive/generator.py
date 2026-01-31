@@ -45,7 +45,7 @@ class TelegramGenerator:
                     try:
                         await self.nc.publish(topic, json.dumps(payload).encode())
                         logger.info("event_published", topic=topic)
-                    except nats.errors.NatsError as e:
+                    except Exception as e:
                         logger.error("failed_to_publish_event", error=str(e))
                         span.record_exception(e)
                         span.set_status(trace.Status(trace.StatusCode.ERROR, str(e)))
