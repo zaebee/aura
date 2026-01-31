@@ -8,6 +8,7 @@
 - [ ] Task 21: bee.Keeper (GitHub Resident)
 - [ ] Task 22: Propolis (Mypy/Bandit/Hardening)
 - [ ] Task 20: ATCG Metabolism Loop integration
+- [ ] Task 26: Purification of T (Transformer Refactor) - Assigned to bee.Jules`
 
 ## 🔋 Resource Status
 - CPU: Stable (0.27% idle)
