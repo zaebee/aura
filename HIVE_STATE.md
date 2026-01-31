@@ -1,10 +1,31 @@
 # Aura Hive State
 
-**Last Pulse:** 2026-01-31 19:43:09
+**Last Pulse:** 2026-01-31 19:59:44
 **Current Success Rate:** 0.00
-**Governance Cost (Last):** 0 tokens / 1.44s
+**Governance Cost (Last):** 0 tokens / 5.17s
 
 ## Audit Log
+
+## Audit: 2026-01-31 19:59:44
+
+**Status:** IMPURE
+**Negotiation Success Rate:** 0.00
+
+> A strange mist descends upon the Hive...
+
+**Heresies Detected:**
+- Blight: The Keeper's mind is clouded (litellm.APIConnectionError: OllamaException - Cannot connect to host localhost:11434 ssl:default [Multiple exceptions: [Errno 111] Connect call failed ('::1', 11434, 0, 0), [Errno 111] Connect call failed ('127.0.0.1', 11434)])
+
+**🤕 Injuries (Failures):**
+- GitHub: Failed to post purity report comment.
+
+<!-- metadata
+execution_time: 5.17s
+token_usage: 0
+event: manual
+-->
+
+---
 
 ## Audit: 2026-01-31 19:43:09
 
@@ -56,7 +77,4 @@ event: manual
 - Pattern Heresy: Raw 'print()' detected in diff: `- Pattern Heresy: Raw 'print()' detected in diff: `print(f"   Reservation: {data['data']['reservation_code']}")`. Use `structlog` instead.`. Use `structlog` instead.
 - Pattern Heresy: Raw 'print()' detected in diff: `- Pattern Heresy: Raw 'print()' detected in diff: `print("⚠️  OFFER COUNTERED")`. Use `structlog` instead.`. Use `structlog` instead.
 - Pattern Heresy: Raw 'print()' detected in diff: `- Pattern Heresy: Raw 'print()' detected in diff: `print(f"   Server proposed: ${data['data']['proposed_price']}")`. Use `structlog` instead.`. Use `structlog` instead.
-- Pattern Heresy: Raw 'print()' detected in diff: `- Pattern Heresy: Raw 'print()' detected in diff: `print(f"   Message: '{data['data']['message']}'")`. Use `structlog` instead.`. Use `structlog` instead.
-- Pattern Heresy: Raw 'print()' detected in diff: `- Pattern Heresy: Raw 'print()' detected in diff: `print("👮 UI REQUIRED (Human Loop)")`. Use `structlog` instead.`. Use `structlog` instead.
-- Pattern Heresy: Raw 'print()' detected in diff: `- Pattern Heresy: Raw 'print()' detected in diff: `print(f"   Template: {data['action_required']['template']}")`. Use `structlog` instead.`. Use `structlog` instead.
-- Pattern
+- Pattern Heresy: Raw 'print()' detected in diff: `-
