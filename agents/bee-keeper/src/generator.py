@@ -84,9 +84,20 @@ class BeeGenerator:
         metrics = context.hive_metrics
         success_rate = metrics.get("negotiation_success_rate", 0.0)
 
+        # Calculate Heresy Density
+        changed_files = {
+            line[6:]
+            for line in context.git_diff.splitlines()
+            if line.startswith("+++ b/")
+        }
+        files_changed_count = len(changed_files) or 1
+        total_heresies = report.metadata.get("total_heresies", len(report.heresies))
+        heresy_density = total_heresies / files_changed_count
+
         new_entry = f"## Audit: {now}\n\n"
         new_entry += f"**Status:** {'PURE' if report.is_pure else 'IMPURE'}\n"
-        new_entry += f"**Negotiation Success Rate:** {success_rate:.2f}\n\n"
+        new_entry += f"**Negotiation Success Rate:** {success_rate:.2f}\n"
+        new_entry += f"**Heresy Density:** {heresy_density:.2f}\n\n"
         new_entry += f"> {report.narrative}\n\n"
 
         if report.heresies:
@@ -95,7 +106,14 @@ class BeeGenerator:
                 new_entry += f"- {h}\n"
 
         # Hidden metadata for "Cost of Governance"
-        new_entry += f"\n<!-- metadata\nexecution_time: {report.execution_time:.2f}s\ntoken_usage: {report.token_usage}\nevent: {context.event_name}\n-->\n"
+        new_entry += (
+            f"\n<!-- metadata\n"
+            f"execution_time: {report.execution_time:.2f}s\n"
+            f"token_usage: {report.token_usage}\n"
+            f"heresy_density: {heresy_density:.2f}\n"
+            f"event: {context.event_name}\n"
+            f"-->\n"
+        )
         new_entry += "\n---\n\n"
 
         # Idempotency check (compare narrative and heresies)

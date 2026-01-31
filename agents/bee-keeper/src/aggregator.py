@@ -85,11 +85,12 @@ class BeeAggregator:
         filesystem_map = []
         # Scan from repository root
         root_path = Path("../../")
-        for path in root_path.rglob("*.py"):
-            if ".venv" not in path.parts and "proto" not in path.parts:
-                # Store path relative to root
-                rel_path = path.relative_to(root_path)
-                filesystem_map.append(str(rel_path))
+        for path in root_path.rglob("*"):
+            if path.is_file() and path.suffix in [".py", ".md"]:
+                if ".venv" not in path.parts and "proto" not in path.parts:
+                    # Store path relative to root
+                    rel_path = path.relative_to(root_path)
+                    filesystem_map.append(str(rel_path))
         return filesystem_map
 
     def _load_event_data(self) -> dict[str, Any]:
