@@ -3,7 +3,8 @@ from typing import Any
 import structlog
 
 from src.config import get_settings
-from src.hive.dna import Decision, HiveContext
+
+from .types import FailureIntent, HiveContext, IntentAction
 
 logger = structlog.get_logger(__name__)
 
@@ -63,32 +64,37 @@ class HiveMembrane:
         return signal
 
     async def inspect_outbound(
-        self, decision: Decision, context: HiveContext
-    ) -> Decision:
+        self, decision: IntentAction, context: HiveContext
+    ) -> IntentAction:
         """
         Enforce hard economic rules and data leak prevention on outbound decisions.
-
-        Rule 1: If price < floor_price, override to counter-offer at floor_price + 5%.
-        Rule 2: Block any response containing "floor_price" in the human message.
+        Handles FailureIntent by providing a safe default counter-offer.
         """
         floor_price = context.item_data.get("floor_price", 0.0)
 
-        # Rule 2: Data Leak Prevention (DLP)
+        # Rule 0: Handle FailureIntent (Self-Healing)
+        if isinstance(decision, FailureIntent) or decision.action == "error":
+            logger.warning(
+                "membrane_handling_failure_intent",
+                error=getattr(decision, "error", "Unknown error"),
+            )
+            return self._override_with_safe_offer(
+                decision, floor_price * 1.05, "FAILURE_RECOVERY"
+            )
+
+        # Rule 1: Data Leak Prevention (DLP)
         if "floor_price" in decision.message.lower():
             logger.warning(
                 "membrane_dlp_violation", detail="found 'floor_price' in message"
             )
             decision.message = "I've reviewed the offer, and I've provided my best possible response. I cannot disclose internal pricing details."
-            # Optionally override reasoning to note the leak
-            decision.reasoning += " [MEMBRANE: DLP block for 'floor_price' leak]"
+            decision.thought += " [MEMBRANE: DLP block for 'floor_price' leak]"
 
-        # If LLM didn't return a price (e.g. reject), just pass through
+        # If action doesn't involve a price, just pass through
         if decision.action not in ["accept", "counter"]:
             return decision
 
-        # Rule 1: Floor Price Check
-        # If the LLM proposes an accepted status but the price < floor_price,
-        # the Membrane MUST override the result to a counter-offer at floor_price + 5%.
+        # Rule 2: Floor Price Check
         if decision.price < floor_price:
             logger.warning(
                 "membrane_rule_violation",
@@ -96,20 +102,13 @@ class HiveMembrane:
                 proposed=decision.price,
                 floor=floor_price,
             )
-            # Override to a counter-offer at floor_price + 5%
-            safe_price = floor_price * 1.05
             return self._override_with_safe_offer(
-                decision, safe_price, "FLOOR_PRICE_VIOLATION"
+                decision, floor_price * 1.05, "FLOOR_PRICE_VIOLATION"
             )
 
         # Rule 3: Min Margin Check
         min_margin = getattr(self.settings.logic, "min_margin", DEFAULT_MIN_MARGIN)
         if not (0 <= min_margin < 1.0):
-            logger.error(
-                "invalid_min_margin_config",
-                margin=min_margin,
-                error="Margin must be in the range [0, 1)",
-            )
             min_margin = DEFAULT_MIN_MARGIN
 
         required_min_price = floor_price / (1 - min_margin)
@@ -127,19 +126,19 @@ class HiveMembrane:
         return decision
 
     def _override_with_safe_offer(
-        self, original: Decision, safe_price: float, reason: str
-    ) -> Decision:
+        self, original: IntentAction, safe_price: float, reason: str
+    ) -> IntentAction:
         """Override an unsafe decision with a safe counter-offer."""
         rounded_price = round(safe_price, 2)
-        new_reasoning = f"Membrane Override: {reason}. LLM suggested {original.action} at {original.price}."
-        if original.reasoning:
-            new_reasoning = f"{original.reasoning} | {new_reasoning}"
+        new_thought = f"Membrane Override: {reason}. LLM suggested {original.action} at {original.price}."
+        if original.thought:
+            new_thought = f"{original.thought} | {new_thought}"
 
-        return Decision(
+        return IntentAction(
             action="counter",
             price=rounded_price,
             message=f"I've reached my final limit for this item. My best offer is ${rounded_price:.2f}.",
-            reasoning=new_reasoning,
+            thought=new_thought,
             metadata={
                 "original_decision": original.action,
                 "original_price": original.price,

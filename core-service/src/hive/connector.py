@@ -9,40 +9,35 @@ from sqlalchemy.exc import SQLAlchemyError
 from src.config import get_settings
 from src.crypto.pricing import PriceConverter
 from src.db import SessionLocal
-from src.hive.dna import Decision, HiveContext, Observation
 from src.proto.aura.negotiation.v1 import negotiation_pb2
+
+from .types import HiveContext, IntentAction, Observation
 
 logger = structlog.get_logger(__name__)
 
 
 class HiveConnector:
-    """C - Connector: Maps decisions to gRPC responses and interacts with external systems (Solana)."""
+    """C - Connector: Maps internal IntentAction to gRPC responses and external systems."""
 
     def __init__(self, market_service: Any = None) -> None:
         self.market_service = market_service
         self.settings = get_settings()
 
-    async def act(self, action: Decision, context: HiveContext) -> Observation:
+    async def act(self, action: IntentAction, context: HiveContext) -> Observation:
         """
         Execute the decision and produce an observation (the gRPC response).
-
-        Args:
-            action: The decision from the Transformer.
-            context: The Hive context.
         """
         logger.debug("connector_act_started", action=action.action)
 
-        # 1. Map Decision to Protobuf NegotiateResponse
+        # 1. Map IntentAction to Protobuf NegotiateResponse
         response = negotiation_pb2.NegotiateResponse()
         response.session_token = "sess_" + (context.request_id or str(uuid.uuid4()))
         response.valid_until_timestamp = int(time.time() + 600)
 
         if action.action == "accept":
             response.accepted.final_price = action.price
-            # Default reservation code if crypto not used
             response.accepted.reservation_code = f"HIVE-{uuid.uuid4()}"
 
-            # 2. Handle Solana logic if enabled and MarketService is provided
             if self.settings.crypto.enabled and self.market_service:
                 await self._handle_crypto_lock(response, action, context)
 
@@ -53,6 +48,10 @@ class HiveConnector:
 
         elif action.action == "reject":
             response.rejected.reason_code = "OFFER_TOO_LOW"
+
+        elif action.action == "ui_required":
+            # Policy violation or complex deal requiring human intervention
+            response.rejected.reason_code = "UI_REQUIRED"
 
         else:
             logger.error("unknown_action_type", action=action.action)
@@ -68,27 +67,21 @@ class HiveConnector:
     async def _handle_crypto_lock(
         self,
         response: negotiation_pb2.NegotiateResponse,
-        action: Decision,
+        action: IntentAction,
         context: HiveContext,
     ) -> None:
         """Encrypts the reservation code and creates a locked deal on Solana."""
 
         def create_offer_sync() -> tuple[float, Any]:
             with SessionLocal() as session:
-                # Use item name from context to avoid redundant query
                 item_name = context.item_data.get("name", "Aura Item")
-
                 converter = PriceConverter(
                     use_fixed_rates=self.settings.crypto.use_fixed_rates
                 )
-
-                # Convert USD price to crypto amount
                 crypto_amount = converter.convert_usd_to_crypto(
                     usd_amount=action.price,
                     crypto_currency=self.settings.crypto.currency,  # type: ignore
                 )
-
-                # Create the offer via MarketService
                 return crypto_amount, self.market_service.create_offer(
                     db=session,
                     item_id=context.item_id,
@@ -96,7 +89,7 @@ class HiveConnector:
                     secret=response.accepted.reservation_code,
                     price=crypto_amount,
                     currency=self.settings.crypto.currency,
-                    buyer_did=context.agent_did,
+                    buyer_did=context.offer.agent_did,
                     ttl_seconds=self.settings.crypto.deal_ttl_seconds,
                 )
 
@@ -104,8 +97,6 @@ class HiveConnector:
             crypto_amount, payment_instructions = await asyncio.to_thread(
                 create_offer_sync
             )
-
-            # Update the response: clear plain reservation_code, set crypto_payment
             response.accepted.ClearField("reservation_code")
             response.accepted.crypto_payment.CopyFrom(payment_instructions)
 
@@ -113,10 +104,7 @@ class HiveConnector:
                 "crypto_offer_created",
                 deal_id=payment_instructions.deal_id,
                 amount=crypto_amount,
-                currency=self.settings.crypto.currency,
             )
 
         except (ValueError, SQLAlchemyError) as e:
             logger.error("crypto_lock_failed", error=str(e), exc_info=True)
-            # Fallback: keep the plain reservation_code if crypto fails
-            # (or we could decide to fail the whole request)

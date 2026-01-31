@@ -179,14 +179,14 @@ class DSPyStrategy:
 
         # Get prediction from DSPy module
         try:
-            # AuraNegotiator.forward now returns a clean dictionary with 'reasoning' and 'response'
+            # AuraNegotiator.forward now returns a clean dictionary with 'thought' and 'action'
             result = self.negotiator(
                 input_bid=bid,
                 context=context,
                 history=[],  # Would include previous turns in multi-turn negotiation
             )
 
-            response_data = result["response"]
+            response_data = result["action"]
 
             # Validate decision through the Membrane
             try:
@@ -209,7 +209,7 @@ class DSPyStrategy:
                 action=action,
                 price=price,
                 item_id=item_id,
-                reasoning_length=len(result.get("reasoning", "")),
+                thought_length=len(result.get("thought", "")),
             )
 
             # Map to protobuf response

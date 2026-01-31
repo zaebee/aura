@@ -10,7 +10,8 @@ from sqlalchemy.exc import SQLAlchemyError
 
 from src.config import get_settings
 from src.db import InventoryItem, SessionLocal
-from src.hive.dna import HiveContext
+
+from .types import HiveContext, NegotiationOffer
 
 logger = structlog.get_logger(__name__)
 
@@ -46,16 +47,12 @@ class HiveAggregator:
 
     def _resolve_brain_path(self) -> str:
         """
-        Ensure aura_brain.json path is resolved relative to the package root,
-        looking in both /app/src/ and ./src/.
+        Ensure aura_brain.json path is resolved relative to the package root.
         """
         search_paths = []
-
-        # Priority 1: Explicitly configured path
         if hasattr(self.settings.llm, "compiled_program_path"):
             search_paths.append(Path(self.settings.llm.compiled_program_path))
 
-        # Priority 2: Standard expected locations
         search_paths.extend(
             [
                 Path("/app/src/aura_brain.json"),
@@ -66,7 +63,6 @@ class HiveAggregator:
 
         for path in search_paths:
             try:
-                # Check if it's a file and exists
                 if path.exists() and path.is_file():
                     return str(path.absolute())
             except OSError:
@@ -90,33 +86,22 @@ class HiveAggregator:
                     if results and len(results[0].get("value", [])) > 1:
                         return float(results[0]["value"][1]), True
                     else:
-                        logger.warning(f"prometheus_{metric_name}_no_data")
                         errors.append(f"{metric_name}_no_data")
                 else:
-                    logger.warning(
-                        f"prometheus_{metric_name}_api_error", status=data.get("status")
-                    )
                     errors.append(f"{metric_name}_api_status_{data.get('status')}")
-            except (ValueError, KeyError, IndexError, httpx.HTTPStatusError) as e:
-                logger.error(f"prometheus_{metric_name}_parse_error", error=str(e))
+            except Exception as e:
                 errors.append(f"{metric_name}_parse_error_{type(e).__name__}")
         else:
-            logger.error(f"prometheus_{metric_name}_fetch_failed", error=str(response))
             errors.append(f"{metric_name}_fetch_error_{type(response).__name__}")
 
         return 0.0, False
 
     async def get_system_metrics(self) -> dict[str, Any]:
-        """
-        Refactored monitor.py logic. Queries Prometheus with self-healing.
-        Ensures Partial Context: returns whatever metrics are available.
-        """
-        # 1. Check Cache
+        """Queries Prometheus with self-healing."""
         cached = self._metrics_cache.get()
         if cached:
             return {**cached, "cached": True}
 
-        # 2. Query Prometheus
         cpu_query = 'avg(rate(container_cpu_usage_seconds_total{namespace="default"}[5m])) * 100'
         mem_query = (
             'avg(container_memory_working_set_bytes{namespace="default"}) / 1024 / 1024'
@@ -137,8 +122,6 @@ class HiveAggregator:
                 )
 
                 errors: list[str] = []
-
-                # Process Responses
                 cpu_usage, cpu_success = self._process_metric_response(
                     responses[0], "cpu", errors
                 )
@@ -146,11 +129,8 @@ class HiveAggregator:
                     responses[1], "mem", errors
                 )
 
-                # If both failed completely, fallback to exception handler
                 if not (cpu_success or mem_success):
-                    raise httpx.ConnectError(
-                        f"All metric fetches failed: {', '.join(errors)}"
-                    )
+                    raise httpx.ConnectError(f"All metric fetches failed: {', '.join(errors)}")
 
                 metrics = {
                     "status": "ok",
@@ -160,7 +140,6 @@ class HiveAggregator:
                     "cached": False,
                 }
 
-                # Include warnings if partial success
                 if errors:
                     metrics["status"] = "PARTIAL"
                     metrics["warnings"] = errors
@@ -168,19 +147,8 @@ class HiveAggregator:
                 self._metrics_cache.set(metrics)
                 return metrics
 
-        except (
-            TimeoutError,
-            httpx.HTTPError,
-            httpx.ConnectError,
-            httpx.TimeoutException,
-        ) as e:
-            if isinstance(e, httpx.TimeoutException) or isinstance(e, TimeoutError):
-                logger.error("prometheus_timeout", error=str(e))
-            elif isinstance(e, httpx.ConnectError):
-                logger.error("prometheus_connection_error", error=str(e))
-            else:
-                logger.error("prometheus_http_error", error=str(e))
-            # Self-healing: Return cached if available (even if expired), else UNKNOWN
+        except Exception as e:
+            logger.error("prometheus_fetch_error", error=str(e))
             cached = self._metrics_cache.get(ignore_ttl=True)
             if cached:
                 return {
@@ -189,7 +157,6 @@ class HiveAggregator:
                     "warning": "stale_data",
                     "error": str(e),
                 }
-
             return {
                 "status": "UNKNOWN",
                 "cpu_usage_percent": 0.0,
@@ -197,25 +164,27 @@ class HiveAggregator:
                 "timestamp": datetime.now(UTC).isoformat(),
                 "error": str(e),
             }
-        except Exception as e:
-            logger.error("prometheus_unexpected_error", error=str(e))
-            return {"status": "UNKNOWN", "error": "unexpected_error", "detail": str(e)}
 
     async def perceive(self, signal: Any) -> HiveContext:
         """
         Extract data from the inbound signal and enrich it with system state.
+        Converts external signal into pure internal HiveContext.
         """
         item_id = signal.item_id
-        bid_amount = signal.bid_amount
-        agent_did = signal.agent.did
-        reputation = signal.agent.reputation_score
         request_id = getattr(signal, "request_id", "")
 
         logger.debug(
             "aggregator_perceive_started", item_id=item_id, request_id=request_id
         )
 
-        # 1. Fetch item data
+        # 1. Map to internal NegotiationOffer
+        offer = NegotiationOffer(
+            bid_amount=signal.bid_amount,
+            reputation=signal.agent.reputation_score,
+            agent_did=signal.agent.did,
+        )
+
+        # 2. Fetch item data
         def fetch_item_sync() -> InventoryItem | None:
             with SessionLocal() as session:
                 return session.query(InventoryItem).filter_by(id=item_id).first()
@@ -235,17 +204,15 @@ class HiveAggregator:
         except SQLAlchemyError as e:
             logger.error("aggregator_db_error", error=str(e))
 
-        # 2. Fetch system health (Self-healing logic integrated)
+        # 3. Fetch system health
         system_health = await self.get_system_metrics()
 
-        # 3. Resolve Brain Path
+        # 4. Resolve Brain Path
         brain_path = self._resolve_brain_path()
 
         return HiveContext(
             item_id=item_id,
-            bid_amount=bid_amount,
-            agent_did=agent_did,
-            reputation=reputation,
+            offer=offer,
             item_data=item_data,
             system_health=system_health,
             request_id=request_id,

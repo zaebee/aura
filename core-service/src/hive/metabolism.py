@@ -3,7 +3,7 @@ from typing import Any
 import structlog
 from opentelemetry import trace
 
-from src.hive.dna import Aggregator, Connector, Generator, Membrane, Transformer
+from .dna import Aggregator, Connector, Generator, Membrane, Transformer
 
 logger = structlog.get_logger(__name__)
 tracer = trace.get_tracer(__name__)
@@ -44,7 +44,7 @@ class MetabolicLoop:
             with tracer.start_as_current_span("nucleotide_aggregator") as a_span:
                 context = await self.aggregator.perceive(signal)
                 a_span.set_attribute("item_id", context.item_id)
-                a_span.set_attribute("bid_amount", context.bid_amount)
+                a_span.set_attribute("bid_amount", context.offer.bid_amount)
                 span.set_attribute("item_id", context.item_id)
 
             # 3. Transformer (T) - Think/Reason
