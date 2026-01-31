@@ -57,7 +57,7 @@ class BeeMetabolism:
         observation = await self.connector.act(report, context)
 
         # 4. Generator (G) - Generate/Chronicle
-        await self.generator.generate(report, context)
+        await self.generator.generate(report, context, observation)
 
         logger.info(
             "bee_metabolism_completed",

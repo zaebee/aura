@@ -1,13 +1,12 @@
 import asyncio
 import json
-from typing import Any
 
 import nats
 import structlog
-from github import Github
 
 from src.config import KeeperSettings
 from src.dna import BeeContext, BeeObservation, PurityReport
+from src.hive.proteins.gh_client import GitHubClient
 
 logger = structlog.get_logger(__name__)
 
@@ -23,26 +22,30 @@ class BeeConnector:
 
         self.gh = None
         if self.github_token and self.github_token != "mock":  # nosec
-            self.gh = Github(self.github_token)
+            self.gh = GitHubClient(self.github_token)
 
     async def act(self, report: PurityReport, context: BeeContext) -> BeeObservation:
         logger.info("bee_connector_act_started")
 
         # 1. Post to GitHub (if not a heartbeat)
         comment_url = ""
+        injuries = []
         if context.event_name != "schedule":
             comment_url = await self._post_to_github(report, context)
+            if not comment_url and self.gh:
+                injuries.append("GitHub: Failed to post purity report comment.")
 
         # 2. Commit Hive State (idempotency handled by Generator writing the file)
         await self._commit_changes()
 
         # 3. Emit NATS Event
-        nats_sent = await self._emit_nats_event(report, context)
+        nats_sent = await self._emit_nats_event(report, context, injuries)
 
         return BeeObservation(
-            success=True,
+            success=len(injuries) == 0,
             github_comment_url=comment_url,
-            nats_event_sent=nats_sent
+            nats_event_sent=nats_sent,
+            injuries=injuries
         )
 
     async def _commit_changes(self) -> None:
@@ -86,38 +89,25 @@ class BeeConnector:
             logger.warning("github_client_not_initialized_skipping_post")
             return ""
 
-        # Capture repo_name and gh for the closure
-        repo_name: str = self.repo_name
-        gh = self.gh
+        message = self._format_github_message(report)
+        event_data = context.event_data
 
-        def post() -> str:
-            try:
-                repo = gh.get_repo(repo_name)
-                message = self._format_github_message(report)
+        pr_num = None
+        if "pull_request" in event_data:
+            pr_num = event_data["pull_request"].get("number")
 
-                event_data = context.event_data
-                if "pull_request" in event_data:
-                    pr_num = event_data["pull_request"]["number"]
-                    comment: Any = repo.get_pull(pr_num).create_issue_comment(message)
-                    return str(comment.html_url)
-                else:
-                    sha = event_data.get("after")
-                    if not sha and "head_commit" in event_data:
-                        sha = event_data["head_commit"].get("id")
+        sha = event_data.get("after")
+        if not sha and "head_commit" in event_data:
+            sha = event_data["head_commit"].get("id")
 
-                    if sha:
-                        comment = repo.get_commit(sha).create_comment(message)
-                        return str(comment.html_url)
-
-                # Fallback
-                branch = repo.get_branch("main")
-                comment = branch.commit.create_comment(message)
-                return str(comment.html_url)
-            except Exception as e:
-                logger.error("github_post_failed", error=str(e))
-                return ""
-
-        return await asyncio.to_thread(post)
+        # Use the GitHubClient protein
+        url = await self.gh.post_comment(
+            repo=self.repo_name,
+            issue_number=pr_num,
+            commit_sha=sha,
+            body=message
+        )
+        return url
 
     def _format_github_message(self, report: PurityReport) -> str:
         status_emoji = "🍯" if report.is_pure else "⚠️"
@@ -138,16 +128,26 @@ class BeeConnector:
 
         return msg
 
-    async def _emit_nats_event(self, report: PurityReport, context: BeeContext) -> bool:
+    async def _emit_nats_event(self, report: PurityReport, context: BeeContext, injuries: list[str]) -> bool:
         try:
             nc = await nats.connect(self.nats_url)
             payload = {
                 "agent": "bee.Keeper",
                 "is_pure": report.is_pure,
                 "heresies_count": len(report.heresies),
-                "timestamp": asyncio.get_event_loop().time()
+                "timestamp": asyncio.get_event_loop().time(),
+                "injuries": injuries
             }
             await nc.publish("aura.hive.audit", json.dumps(payload).encode())
+
+            if injuries:
+                injury_payload = {
+                    "agent": "bee.Keeper",
+                    "injuries": injuries,
+                    "timestamp": asyncio.get_event_loop().time()
+                }
+                await nc.publish("aura.hive.injury", json.dumps(injury_payload).encode())
+
             await nc.close()
             return True
         except Exception as e:

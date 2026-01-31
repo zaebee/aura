@@ -20,6 +20,10 @@ jobs:
   audit:
     name: Hive Audit
     runs-on: self-hosted
+    permissions:
+      contents: write
+      pull-requests: write
+      issues: write
     steps:
       - name: Checkout Hive
         uses: actions/checkout@v4
