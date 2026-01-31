@@ -27,16 +27,21 @@ class DSPyStrategy:
     with fallback to existing strategies for reliability.
     """
 
-    def __init__(self, compiled_program_path: str = "aura_brain.json") -> None:
+    def __init__(
+        self,
+        compiled_program_path: str = "aura_brain.json",
+        guard: OutputGuard | None = None,
+    ) -> None:
         """Initialize DSPy strategy with compiled program.
 
         Args:
             compiled_program_path: Path to compiled DSPy program
+            guard: Optional safety guard instance (injected)
         """
         self.compiled_program_path = compiled_program_path
         self.settings = get_settings()
         self.negotiator: Any = self._load_compiled_program()
-        self.guard = OutputGuard()
+        self.guard = guard or OutputGuard()
         self.fallback_strategy: Any = None
 
         # Configure DSPy with litellm backend
@@ -132,11 +137,12 @@ class DSPyStrategy:
     def create_safe_counter_offer(
         self, item: InventoryItem, bid: float
     ) -> negotiation_pb2.NegotiateResponse:
-        """Create a safe counter-offer at floor price when guardrails are hit."""
+        """Fallback: Create a safe counter-offer at floor price when guardrails are hit."""
         result = negotiation_pb2.NegotiateResponse()
+        # Enforce floor price from item database
         result.countered.proposed_price = item.floor_price
         result.countered.human_message = (
-            f"I cannot go that low. My best offer is {item.floor_price}."
+            f"I've reached my limit on this item. My best offer is {item.floor_price}."
         )
         result.countered.reason_code = "GUARDRAIL_INTERVENTION"
         return result
@@ -148,7 +154,7 @@ class DSPyStrategy:
         reputation: float,
         request_id: str | None = None,
     ) -> negotiation_pb2.NegotiateResponse:
-        """Evaluate negotiation using DSPy module.
+        """Evaluate negotiation using DSPy module with safety guardrails.
 
         Args:
             item_id: Item identifier
@@ -179,37 +185,38 @@ class DSPyStrategy:
 
         # Get prediction from DSPy module
         try:
-            # AuraNegotiator.forward now returns a clean dictionary with 'reasoning' and 'response'
-            result = self.negotiator(
+            # AuraNegotiator.forward returns a dict with 'reasoning' and 'response'
+            prediction = self.negotiator(
                 input_bid=bid,
                 context=context,
-                history=[],  # Would include previous turns in multi-turn negotiation
+                history=[],
             )
 
-            response_data = result["response"]
+            response = prediction["response"]
 
-            # Validate decision through the Membrane
+            # Task 3: Integrate Membrane (OutputGuard)
+            # Wrap the DSPy call with deterministic safety layer
             try:
-                self.guard.validate_decision(response_data, context)
+                self.guard.validate_decision(response, context)
             except SafetyViolation as e:
                 logger.warning(
-                    "safety_guard_triggered",
+                    "safety_violation_intercepted",
                     item_id=item_id,
                     error=str(e),
-                    llm_price=response_data.get("price"),
+                    proposed_price=response.get("price"),
                 )
+                # Fallback strategy: Force a safe counter-offer
                 return self.create_safe_counter_offer(item, bid)
 
-            action = response_data["action"]
-            price = response_data["price"]
-            message = response_data["message"]
+            action = response["action"]
+            price = response["price"]
+            message = response["message"]
 
             logger.info(
-                "dspy_decision_made",
+                "dspy_decision_validated",
                 action=action,
                 price=price,
                 item_id=item_id,
-                reasoning_length=len(result.get("reasoning", "")),
             )
 
             # Map to protobuf response
@@ -218,18 +225,13 @@ class DSPyStrategy:
             if action == "accept":
                 result.accepted.final_price = price
                 result.accepted.reservation_code = f"DSPY-{int(time.time())}"
-
             elif action == "counter":
                 result.countered.proposed_price = price
                 result.countered.human_message = message
                 result.countered.reason_code = "NEGOTIATION_ONGOING"
-
             elif action == "reject":
                 result.rejected.reason_code = "OFFER_TOO_LOW"
-
             else:
-                # Unknown action - fallback to existing strategy
-                logger.warning("unknown_dspy_action", action=action)
                 return cast(
                     negotiation_pb2.NegotiateResponse,
                     self._get_fallback_strategy().evaluate(
@@ -240,8 +242,7 @@ class DSPyStrategy:
             return cast(negotiation_pb2.NegotiateResponse, result)
 
         except Exception as e:
-            logger.error("dspy_evaluation_error", error=str(e), exc_info=True)
-            # Fallback to existing strategy on error
+            logger.error("dspy_evaluation_failed", error=str(e), exc_info=True)
             return cast(
                 negotiation_pb2.NegotiateResponse,
                 self._get_fallback_strategy().evaluate(
