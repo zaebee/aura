@@ -18,7 +18,7 @@
 - **Connector (C):** 🔴 Injured. GitHub API access returning 403.
 - **Generator (G):** 🟢 Pulsing. NATS heartbeats detected.
 
-## 📜 Architectural Debt (Backlog)
+## 🧱 Architectural Debt (Backlog)
 - [ ] **Task 16: The Membrane.** (Deterministic economic guards).
 - [ ] **Task 17: External Oracles.** (Amadeus/SerpAPI integration).
 - [ ] **Task 18: Metabolic Cleanup.** (Docker/K8s auto-prune).
