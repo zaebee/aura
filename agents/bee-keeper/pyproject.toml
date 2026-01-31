@@ -19,6 +19,7 @@ aura-keeper = "main:main"
 
 [tool.uv]
 managed = true
+package = true
 
 [tool.ruff]
 line-length = 88
@@ -31,5 +32,6 @@ ignore_missing_imports = true
 
 [dependency-groups]
 dev = [
+    "pydantic-settings>=2.12.0",
     "types-pyyaml>=6.0.12.20250915",
 ]

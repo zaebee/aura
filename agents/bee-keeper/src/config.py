@@ -2,7 +2,7 @@ from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
-class KeeperSettings(BaseSettings):
+class KeeperSettings(BaseSettings):  # type: ignore
     model_config = SettingsConfigDict(
         env_prefix="AURA_", env_nested_delimiter="__", extra="ignore"
     )

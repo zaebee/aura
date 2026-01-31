@@ -143,7 +143,7 @@ wheels = [
 [[package]]
 name = "aura-keeper"
 version = "0.1.0"
-source = { virtual = "." }
+source = { editable = "." }
 dependencies = [
     { name = "httpx" },
     { name = "litellm" },
@@ -156,6 +156,7 @@ dependencies = [
 
 [package.dev-dependencies]
 dev = [
+    { name = "pydantic-settings" },
     { name = "types-pyyaml" },
 ]
 
@@ -171,7 +172,10 @@ requires-dist = [
 ]
 
 [package.metadata.requires-dev]
-dev = [{ name = "types-pyyaml", specifier = ">=6.0.12.20250915" }]
+dev = [
+    { name = "pydantic-settings", specifier = ">=2.12.0" },
+    { name = "types-pyyaml", specifier = ">=6.0.12.20250915" },
+]
 
 [[package]]
 name = "certifi"

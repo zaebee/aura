@@ -3,7 +3,7 @@ from typing import Any
 
 import litellm
 import structlog
-import yaml
+import yaml  # type: ignore
 
 from src.config import KeeperSettings
 from src.dna import BeeContext, PurityReport
