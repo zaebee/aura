@@ -138,11 +138,12 @@ class BeeConnector:
         try:
             # Use connect_timeout to prevent hanging if NATS is unreachable
             nc = await nats.connect(self.nats_url, connect_timeout=5.0)
+            now = asyncio.get_running_loop().time()
             payload = {
                 "agent": "bee.Keeper",
                 "is_pure": report.is_pure,
                 "heresies_count": len(report.heresies),
-                "timestamp": asyncio.get_event_loop().time(),
+                "timestamp": now,
                 "injuries": injuries
             }
             await nc.publish("aura.hive.audit", json.dumps(payload).encode())
@@ -151,7 +152,7 @@ class BeeConnector:
                 injury_payload = {
                     "agent": "bee.Keeper",
                     "injuries": injuries,
-                    "timestamp": asyncio.get_event_loop().time()
+                    "timestamp": now
                 }
                 await nc.publish("aura.hive.injury", json.dumps(injury_payload).encode())
 

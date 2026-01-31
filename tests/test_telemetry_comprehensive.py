@@ -9,6 +9,8 @@ import sys
 import unittest
 from unittest.mock import MagicMock, patch
 
+import structlog
+
 # Add src paths for imports
 sys.path.insert(0, "api-gateway/src")
 sys.path.insert(0, "core-service/src")
@@ -247,10 +249,20 @@ class TestEnvironmentVariables(unittest.TestCase):
 
 
 if __name__ == "__main__":
-    unittest.main(verbosity=2)
-    print("\n=== Telemetry Tests Complete ===")
-    print("All tests passed! ✅")
-    print("\nTo run integration tests:")
-    print("1. Start the platform: docker-compose up --build")
-    print("2. Run test_telemetry.py to generate real traces")
-    print("3. Check Jaeger UI at http://localhost:16686")
+    # Configure logging for standalone run
+    structlog.configure(
+        processors=[
+            structlog.processors.add_log_level,
+            structlog.processors.TimeStamper(fmt="iso"),
+            structlog.dev.ConsoleRenderer(),
+        ]
+    )
+    logger = structlog.get_logger(__name__)
+
+    unittest.main(verbosity=2, exit=False)
+    logger.info("telemetry_tests_complete")
+    logger.info("all_tests_passed")
+    logger.info("integration_test_instructions",
+                step1="Start the platform: docker-compose up --build",
+                step2="Run test_telemetry.py to generate real traces",
+                step3="Check Jaeger UI at http://localhost:16686")

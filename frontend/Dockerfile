@@ -1,7 +1,6 @@
 # Dockerfile for Aura Frontend
 # Build stage
-# Pinning to 1.3.7 to avoid SIGILL crash in 1.3.8 during Next.js 16 build
-FROM oven/bun:1.3.7 AS builder
+FROM oven/bun:1.2 AS builder
 
 WORKDIR /app
 
@@ -27,7 +26,7 @@ COPY frontend/public ./public
 RUN bun run build
 
 # Production stage
-FROM oven/bun:1.3.7 AS runner
+FROM oven/bun:1.2 AS runner
 
 WORKDIR /app
 

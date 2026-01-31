@@ -1,7 +1,6 @@
 from pathlib import Path
 from typing import Any
 
-import re
 import litellm
 import structlog
 import yaml  # type: ignore
@@ -39,7 +38,7 @@ class BeeTransformer:
         logger.info("bee_transformer_think_started")
 
         # 1. Structural Check (Deterministic)
-        heresies, audit_metadata = self._deterministic_audit(context)
+        heresies = self._deterministic_audit(context)
 
         # 2. LLM Audit (Reflective)
         # Handle large diffs
@@ -53,150 +52,48 @@ class BeeTransformer:
         all_heresies = heresies + purity_analysis.get("heresies", [])
         is_pure = len(all_heresies) == 0
 
-        # Aggregate total heresies for density calculation
-        total_heresies = audit_metadata.get("total_heresy_count", 0) + len(
-            purity_analysis.get("heresies", [])
-        )
-
         return PurityReport(
             is_pure=is_pure,
             heresies=all_heresies,
             narrative=purity_analysis.get("narrative", "The Hive remains silent."),
             reasoning=purity_analysis.get("reasoning", ""),
             token_usage=purity_analysis.get("token_usage", 0),
-            metadata={
-                "llm_response": purity_analysis,
-                "total_heresies": total_heresies,
-                "audit_metadata": audit_metadata,
-            },
+            metadata={"llm_response": purity_analysis},
         )
 
-    def _get_allowed_proteins(self) -> set[str]:
-        """Dynamically determine allowed files based on Aura DNA."""
-        proteins = {
-            "types.py",
-            "README.md",
-            "metaphor.md",
-            "__init__.py",
-            "dna.py",
-            "metabolism.py",
-            "membrane.py",
-        }
-
-        # Add names from manifest if any
-        manifest_allowed = self.manifest.get("hive", {}).get("allowed_files", [])
-        proteins.update(manifest_allowed)
-
-        dna_path_str = self.manifest.get("hive", {}).get("dna_path", "core-service/src/hive/dna.py")
-        dna_path = Path("../../") / dna_path_str
-
-        if dna_path.exists():
-            for file_to_parse in [dna_path, dna_path.parent / "types.py"]:
-                if file_to_parse.exists():
-                    content = file_to_parse.read_text()
-                    names = re.findall(r"class\s+([A-Za-z0-9_]+)", content)
-                    for name in names:
-                        proteins.add(f"{name.lower()}.py")
-
-        return proteins
-
-    def _deterministic_audit(self, context: BeeContext) -> tuple[list[str], dict[str, Any]]:
-        heresy_groups: dict[str, list[str]] = {
-            "structural": [],
-            "print": [],
-            "os.getenv": [],
-        }
-        pattern_files: dict[str, set[str]] = {"print": set(), "os.getenv": set()}
-        structural_files: set[str] = set()
-
+    def _deterministic_audit(self, context: BeeContext) -> list[str]:
+        heresies = []
         core_path = self.manifest.get("hive", {}).get("core_path", "core-service/src/hive")
-        core_path_obj = Path(core_path)
-        allowed_proteins = self._get_allowed_proteins()
+        allowed_files = self.manifest.get("hive", {}).get("allowed_files", [])
 
         # 1. Structural Check
         for file_path in context.filesystem_map:
             p = Path(file_path)
-            try:
-                # Ensure we only check files actually within the core hive path or its subdirectories
-                p.relative_to(core_path_obj)
-                if p.name not in allowed_proteins:
-                    heresy_groups["structural"].append(
-                        f"Structural Heresy: '{p.name}' is a foreign sprout needing pruning in the core nucleotides."
+            if str(p.parent) == core_path:
+                if allowed_files and p.name not in allowed_files:
+                    heresies.append(
+                        f"Structural Heresy: '{p.name}' is an unauthorized growth in the core nucleotides."
                     )
-                    structural_files.add(str(p.parent))
-            except ValueError:
-                continue
 
-        # 2. Pattern Enforcement
+        # 2. Pattern Enforcement (No raw print or os.getenv in diff)
         diff_lines = context.git_diff.splitlines()
-        current_file = "unknown"
         for line in diff_lines:
-            if line.startswith("+++ b/"):
-                current_file = line[6:]
             if line.startswith("+") and not line.startswith("+++"):
-                added_code = line[1:]
-                # Defensive pattern check: ignore if it's a comment or part of a docstring on the same line
-                is_comment = re.search(r"^\s*#", added_code)
-                is_docstring = re.search(r"^\s*(\"\"\"|''')", added_code)
+                added_code = line[1:].strip()
+                # Ignore comments
+                if added_code.startswith("#") or added_code.startswith('"""') or added_code.startswith("'''"):
+                    continue
 
-                if not is_comment and not is_docstring:
-                    # Remove trailing comments for the check
-                    code_to_check = re.sub(r"#.*", "", added_code)
+                if "print(" in added_code and "logger" not in added_code:
+                    heresies.append(
+                        f"Pattern Heresy: Raw 'print()' detected in diff: `{added_code}`. Use `structlog` instead."
+                    )
+                if "os.getenv(" in added_code and "settings" not in added_code:
+                    heresies.append(
+                        f"Pattern Heresy: Raw 'os.getenv()' detected in diff: `{added_code}`. Use `settings` instead."
+                    )
 
-                    if (
-                        re.search(r"\bprint\(", code_to_check)
-                        and "logger" not in added_code
-                    ):
-                        heresy_groups["print"].append(added_code.strip())
-                        pattern_files["print"].add(current_file)
-                    if (
-                        re.search(r"\bos\.getenv\(", code_to_check)
-                        and "settings" not in added_code
-                    ):
-                        heresy_groups["os.getenv"].append(added_code.strip())
-                        pattern_files["os.getenv"].add(current_file)
-
-        # Aggregate results
-        final_heresies = []
-        total_count = sum(len(v) for v in heresy_groups.values())
-
-        # Structural
-        count = len(heresy_groups["structural"])
-        if count > 5:
-            dirs_count = len(structural_files)
-            final_heresies.append(
-                f"🚨 **Structural Heresy:** Detected {count} foreign sprouts needing pruning across {dirs_count} core nucleotides. Please clean the Hive."
-            )
-        else:
-            final_heresies.extend(heresy_groups["structural"])
-
-        # Print
-        count = len(heresy_groups["print"])
-        if count > 5:
-            files_count = len(pattern_files["print"])
-            final_heresies.append(
-                f"🚨 **Pattern Heresy:** Detected {count} instances of raw `print()` across {files_count} files. This clutters the Hive's blood. Please switch to `structlog`."
-            )
-        else:
-            for code in heresy_groups["print"]:
-                final_heresies.append(
-                    f"Pattern Heresy: Raw 'print()' detected in diff: `{code}`. Use `structlog` instead."
-                )
-
-        # os.getenv
-        count = len(heresy_groups["os.getenv"])
-        if count > 5:
-            files_count = len(pattern_files["os.getenv"])
-            final_heresies.append(
-                f"🚨 **Pattern Heresy:** Detected {count} instances of raw `os.getenv()` across {files_count} files. This clutters the Hive's blood. Please switch to `settings`."
-            )
-        else:
-            for code in heresy_groups["os.getenv"]:
-                final_heresies.append(
-                    f"Pattern Heresy: Raw 'os.getenv()' detected in diff: `{code}`. Use `settings` instead."
-                )
-
-        return final_heresies, {"total_heresy_count": total_count}
+        return heresies
 
     async def _llm_audit(self, context: BeeContext) -> dict[str, Any]:
         prompt = f"""

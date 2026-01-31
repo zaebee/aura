@@ -11,6 +11,8 @@ import tempfile
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
+import structlog
+
 # Add src to path
 sys.path.append(str(Path(__file__).parent / "src"))
 
@@ -18,10 +20,20 @@ from llm.dspy_strategy import DSPyStrategy
 from llm.engine import AuraNegotiator
 from llm.signatures import Negotiate
 
+# Configure logging
+structlog.configure(
+    processors=[
+        structlog.processors.add_log_level,
+        structlog.processors.TimeStamper(fmt="iso"),
+        structlog.dev.ConsoleRenderer(),
+    ]
+)
+logger = structlog.get_logger(__name__)
+
 
 def test_signature_creation():
     """Test that DSPy signature is properly defined."""
-    print("🧪 Testing DSPy signature creation...")
+    logger.info("testing_dspy_signature_creation")
 
     # Test that the signature class exists and has fields
     # In DSPy 2.x, fields might not be directly on the class via hasattr
@@ -36,20 +48,20 @@ def test_signature_creation():
     # Instead, we test that the class is properly defined
     # Note: We can't test issubclass without importing dspy, but we've verified the fields above
 
-    print("✅ DSPy signature defined correctly")
+    logger.info("dspy_signature_defined_correctly")
 
 
 def test_negotiator_module():
     """Test that AuraNegotiator module can be instantiated."""
-    print("🧪 Testing AuraNegotiator module...")
+    logger.info("testing_aura_negotiator_module")
 
     try:
         negotiator = AuraNegotiator()
         assert negotiator is not None
         assert hasattr(negotiator, "negotiate_chain")
-        print("✅ AuraNegotiator module created successfully")
+        logger.info("aura_negotiator_module_created_successfully")
     except Exception as e:
-        print(f"❌ AuraNegotiator creation failed: {e}")
+        logger.error("aura_negotiator_creation_failed", error=str(e))
         return False
 
     return True
@@ -57,7 +69,7 @@ def test_negotiator_module():
 
 def test_dspy_strategy_initialization():
     """Test DSPy strategy initialization."""
-    print("🧪 Testing DSPy strategy initialization...")
+    logger.info("testing_dspy_strategy_initialization")
 
     try:
         # Create a temporary compiled program for testing
@@ -73,13 +85,13 @@ def test_dspy_strategy_initialization():
             assert strategy is not None
             assert strategy.negotiator is not None
 
-        print("✅ DSPy strategy initialized successfully")
+        logger.info("dspy_strategy_initialized_successfully")
 
         # Clean up
         Path(tmp_path).unlink()
 
     except Exception as e:
-        print(f"❌ DSPy strategy initialization failed: {e}")
+        logger.error("dspy_strategy_initialization_failed", error=str(e))
         return False
 
     return True
@@ -87,7 +99,7 @@ def test_dspy_strategy_initialization():
 
 def test_strategy_fallback():
     """Test fallback mechanism."""
-    print("🧪 Testing fallback mechanism...")
+    logger.info("testing_fallback_mechanism")
 
     try:
         strategy = DSPyStrategy()
@@ -96,10 +108,10 @@ def test_strategy_fallback():
         fallback = strategy._get_fallback_strategy()
         assert fallback is not None
 
-        print("✅ Fallback mechanism works correctly")
+        logger.info("fallback_mechanism_works_correctly")
 
     except Exception as e:
-        print(f"❌ Fallback mechanism test failed: {e}")
+        logger.error("fallback_mechanism_test_failed", error=str(e))
         return False
 
     return True
@@ -107,7 +119,7 @@ def test_strategy_fallback():
 
 def test_context_creation():
     """Test context creation for DSPy module."""
-    print("🧪 Testing context creation...")
+    logger.info("testing_context_creation")
 
     try:
         strategy = DSPyStrategy()
@@ -128,10 +140,10 @@ def test_context_creation():
         assert "value_add_inventory" in context
         assert len(context["value_add_inventory"]) == 3
 
-        print("✅ Context creation works correctly")
+        logger.info("context_creation_works_correctly")
 
     except Exception as e:
-        print(f"❌ Context creation test failed: {e}")
+        logger.error("context_creation_test_failed", error=str(e))
         return False
 
     return True
@@ -139,7 +151,7 @@ def test_context_creation():
 
 def run_all_tests():
     """Run all integration tests."""
-    print("🚀 Running DSPy integration tests...\n")
+    logger.info("running_dspy_integration_tests")
 
     tests = [
         test_signature_creation,
@@ -160,17 +172,16 @@ def run_all_tests():
             else:
                 passed += 1
         except Exception as e:
-            print(f"❌ Test {test.__name__} failed with exception: {e}")
+            logger.error("test_failed_with_exception", test=test.__name__, error=str(e))
             failed += 1
-        print()  # Add spacing between tests
 
-    print(f"📊 Test Results: {passed} passed, {failed} failed")
+    logger.info("test_results", passed=passed, failed=failed)
 
     if failed == 0:
-        print("🎉 All tests passed! DSPy integration is working correctly.")
+        logger.info("all_tests_passed")
         return True
     else:
-        print("⚠️  Some tests failed. Check the output above for details.")
+        logger.error("some_tests_failed")
         return False
 
 
