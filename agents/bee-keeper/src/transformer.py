@@ -114,18 +114,25 @@ class BeeTransformer:
             "os.getenv": [],
         }
         pattern_files: dict[str, set[str]] = {"print": set(), "os.getenv": set()}
+        structural_files: set[str] = set()
 
         core_path = self.manifest.get("hive", {}).get("core_path", "core-service/src/hive")
+        core_path_obj = Path(core_path)
         allowed_proteins = self._get_allowed_proteins()
 
         # 1. Structural Check
         for file_path in context.filesystem_map:
             p = Path(file_path)
-            if str(p).startswith(core_path):
+            try:
+                # Ensure we only check files actually within the core hive path or its subdirectories
+                p.relative_to(core_path_obj)
                 if p.name not in allowed_proteins:
                     heresy_groups["structural"].append(
                         f"Structural Heresy: '{p.name}' is a foreign sprout needing pruning in the core nucleotides."
                     )
+                    structural_files.add(str(p.parent))
+            except ValueError:
+                continue
 
         # 2. Pattern Enforcement
         diff_lines = context.git_diff.splitlines()
@@ -135,27 +142,37 @@ class BeeTransformer:
                 current_file = line[6:]
             if line.startswith("+") and not line.startswith("+++"):
                 added_code = line[1:]
-                if (
-                    re.search(r"^(?!\s*#).*print\(", added_code)
-                    and "logger" not in added_code
-                ):
-                    heresy_groups["print"].append(added_code.strip())
-                    pattern_files["print"].add(current_file)
-                if (
-                    re.search(r"^(?!\s*#).*os\.getenv\(", added_code)
-                    and "settings" not in added_code
-                ):
-                    heresy_groups["os.getenv"].append(added_code.strip())
-                    pattern_files["os.getenv"].add(current_file)
+                # Defensive pattern check: ignore if it's a comment or part of a docstring on the same line
+                is_comment = re.search(r"^\s*#", added_code)
+                is_docstring = re.search(r"^\s*(\"\"\"|''')", added_code)
+
+                if not is_comment and not is_docstring:
+                    # Remove trailing comments for the check
+                    code_to_check = re.sub(r"#.*", "", added_code)
+
+                    if (
+                        re.search(r"\bprint\(", code_to_check)
+                        and "logger" not in added_code
+                    ):
+                        heresy_groups["print"].append(added_code.strip())
+                        pattern_files["print"].add(current_file)
+                    if (
+                        re.search(r"\bos\.getenv\(", code_to_check)
+                        and "settings" not in added_code
+                    ):
+                        heresy_groups["os.getenv"].append(added_code.strip())
+                        pattern_files["os.getenv"].add(current_file)
 
         # Aggregate results
         final_heresies = []
         total_count = sum(len(v) for v in heresy_groups.values())
 
         # Structural
-        if len(heresy_groups["structural"]) > 5:
+        count = len(heresy_groups["structural"])
+        if count > 5:
+            dirs_count = len(structural_files)
             final_heresies.append(
-                f"🚨 **Structural Heresy:** Detected {len(heresy_groups['structural'])} foreign sprouts needing pruning in the core nucleotides. Please clean the Hive."
+                f"🚨 **Structural Heresy:** Detected {count} foreign sprouts needing pruning across {dirs_count} core nucleotides. Please clean the Hive."
             )
         else:
             final_heresies.extend(heresy_groups["structural"])
