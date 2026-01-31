@@ -1,4 +1,4 @@
-from pydantic import AliasChoices, BaseModel, Field, SecretStr, field_validator
+from pydantic import AliasChoices, Field, SecretStr, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
