@@ -16,7 +16,6 @@ class TelegramSettings(BaseSettings):
     core_url: str = "core-service:50051"
     negotiation_timeout: float = 30.0
     webhook_domain: str | None = None
-    negotiation_timeout: float = 30.0
 
 
 @lru_cache
