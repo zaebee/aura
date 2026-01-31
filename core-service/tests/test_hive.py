@@ -2,8 +2,8 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 from src.hive.aggregator import HiveAggregator
-from src.hive.dna import Decision, HiveContext
 from src.hive.membrane import HiveMembrane
+from src.hive.types import HiveContext, IntentAction, NegotiationOffer
 
 
 @pytest.mark.asyncio
@@ -30,7 +30,7 @@ async def test_aggregator_perceive(mocker):
 
     context = await aggregator.perceive(signal)
     assert context.item_id == "item1"
-    assert context.bid_amount == 100.0
+    assert context.offer.bid_amount == 100.0
     assert context.system_health["cpu_usage_percent"] == 10.0
     assert context.item_data["floor_price"] == 100.0
 
@@ -43,14 +43,12 @@ async def test_membrane_outbound_override(mocker):
 
     context = HiveContext(
         item_id="item1",
-        bid_amount=50.0,
-        agent_did="did1",
-        reputation=0.9,
+        offer=NegotiationOffer(bid_amount=50.0, agent_did="did1", reputation=0.9),
         item_data={"floor_price": 100.0},
     )
 
     # LLM tries to accept below floor - should trigger FLOOR_PRICE_VIOLATION
-    decision = Decision(action="accept", price=90.0, message="OK")
+    decision = IntentAction(action="accept", price=90.0, message="OK")
     safe_decision = await membrane.inspect_outbound(decision, context)
     assert safe_decision.action == "counter"
     # Rule 1: floor_price * 1.05 = 100 * 1.05 = 105.0
@@ -58,13 +56,13 @@ async def test_membrane_outbound_override(mocker):
     assert safe_decision.metadata["override_reason"] == "FLOOR_PRICE_VIOLATION"
 
     # LLM tries to accept above floor but below margin - should trigger MIN_MARGIN_VIOLATION
-    decision2 = Decision(action="accept", price=105.0, message="OK")
+    decision2 = IntentAction(action="accept", price=105.0, message="OK")
     safe_decision2 = await membrane.inspect_outbound(decision2, context)
     assert safe_decision2.action == "counter"
     # min_price = 100 / (1 - 0.1) = 111.111... -> 111.11
     assert safe_decision2.price == 111.11
     assert safe_decision2.metadata["override_reason"] == "MIN_MARGIN_VIOLATION"
-    assert "Membrane Override" in safe_decision2.reasoning
+    assert "Membrane Override" in safe_decision2.thought
 
 
 @pytest.mark.asyncio
@@ -100,14 +98,12 @@ async def test_membrane_invalid_min_margin(mocker):
 
     context = HiveContext(
         item_id="item1",
-        bid_amount=50.0,
-        agent_did="did1",
-        reputation=0.9,
+        offer=NegotiationOffer(bid_amount=50.0, agent_did="did1", reputation=0.9),
         item_data={"floor_price": 100.0},
     )
 
-    decision = Decision(action="accept", price=200.0, message="OK")
-    # Should fallback to DEFAULT_MIN_MARGIN (0.1)
+    decision = IntentAction(action="accept", price=200.0, message="OK")
+    # Should fallback to DEFAULT_MIN_MARGIN (0.1) and log a warning
     safe_decision = await membrane.inspect_outbound(decision, context)
     # required = 100 / (1 - 0.1) = 111.11. 200 > 111.11 so it's fine.
     assert safe_decision.price == 200.0

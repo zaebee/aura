@@ -23,7 +23,7 @@ from src.hive.connector import HiveConnector
 from src.hive.generator import HiveGenerator
 from src.hive.membrane import HiveMembrane
 from src.hive.metabolism import MetabolicLoop
-from src.hive.transformer import HiveTransformer
+from src.hive.transformer import AuraTransformer
 from src.logging_config import (
     bind_request_id,
     clear_request_context,
@@ -291,10 +291,9 @@ def create_strategy() -> PricingStrategy:
         return RuleBasedStrategy()
     elif settings.llm.model == "dspy":
         logger.info("strategy_selected", type="DSPyStrategy", model="self-optimizing")
-        from src.guard.membrane import OutputGuard
         from src.llm.dspy_strategy import DSPyStrategy
 
-        return DSPyStrategy(guard=OutputGuard())
+        return DSPyStrategy()
     else:
         logger.info(
             "strategy_selected", type="LiteLLMStrategy", model=settings.llm.model
@@ -416,7 +415,7 @@ async def serve() -> None:
 
     # Initialize Hive components (Aggregator, Transformer/LLM, etc.)
     aggregator = HiveAggregator()
-    transformer = HiveTransformer()  # Heavy: Loads DSPy/LLM
+    transformer = AuraTransformer()  # Heavy: Loads DSPy/LLM
     connector = HiveConnector(market_service=market_service)
     generator = HiveGenerator(nats_client=nc)
     membrane = HiveMembrane()

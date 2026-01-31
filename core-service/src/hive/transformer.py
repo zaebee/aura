@@ -5,14 +5,15 @@ import dspy
 import structlog
 
 from src.config import get_settings
-from src.hive.dna import Decision, HiveContext
 from src.llm.engine import AuraNegotiator
+
+from .types import FailureIntent, HiveContext, IntentAction
 
 logger = structlog.get_logger(__name__)
 
 
-class HiveTransformer:
-    """T - Transformer: Wraps DSPy for self-reflective reasoning."""
+class AuraTransformer:
+    """T - Transformer: Pure reasoning engine using DSPy."""
 
     def __init__(self, compiled_program_path: str | None = None):
         self.settings = get_settings()
@@ -20,17 +21,14 @@ class HiveTransformer:
             compiled_program_path or self.settings.llm.compiled_program_path
         )
 
-        # Configure DSPy
+        # Default configuration
         dspy.configure(lm=dspy.LM(self.settings.llm.model))
-
         self.negotiator = self._load_negotiator()
 
     def _load_negotiator(self) -> AuraNegotiator:
         try:
-            # Use absolute path if provided, otherwise resolve relative to project root (src/)
             program_path = Path(self.compiled_program_path)
             if not program_path.is_absolute():
-                # Resolve relative to the src/ directory (parent of hive/)
                 program_path = Path(__file__).parent.parent / self.compiled_program_path
 
             if program_path.exists():
@@ -45,61 +43,73 @@ class HiveTransformer:
             logger.error("failed_to_load_dspy_program", error=str(e))
             return AuraNegotiator()
 
-    async def think(self, context: HiveContext) -> Decision:
-        """
-        Think about the context and make a decision.
-        Includes self-reflection on system health.
-        """
-        # Self-reflection: check CPU load
+    def _build_economic_context(self, context: HiveContext) -> dict:
+        """Construct pure economic context without infrastructure leakage."""
         cpu_load = context.system_health.get("cpu_usage_percent", 0.0)
         constraints = []
         if cpu_load > 80.0:
-            constraints.append(
-                "SYSTEM_LOAD_HIGH: Be extremely concise and prioritize finishing the deal quickly."
-            )
-            logger.warning("high_cpu_reflection", cpu_load=cpu_load)
+            constraints.append("SYSTEM_LOAD_HIGH: Be extremely concise.")
 
-        # Build economic context for DSPy
-        economic_context = {
+        return {
             "base_price": context.item_data.get("base_price", 0.0),
             "floor_price": context.item_data.get("floor_price", 0.0),
-            "reputation": context.reputation,
+            "reputation": context.offer.reputation,
             "system_constraints": constraints,
             "meta": context.item_data.get("meta", {}),
         }
 
-        try:
-            # AuraNegotiator returns a dict with 'reasoning' and 'response'
-            # dspy modules are called synchronously, so we run in a thread
-            result = await asyncio.to_thread(
-                self.negotiator,
-                input_bid=context.bid_amount,
-                context=economic_context,
-                history=[],  # History tracking to be implemented later if needed
+    async def think(self, context: HiveContext) -> IntentAction:
+        """
+        Reason about the negotiation using self-reflective tuning.
+        Returns a strictly typed IntentAction.
+        """
+        cpu_load = context.system_health.get("cpu_usage_percent", 0.0)
+
+        # Self-reflective tuning: adjust model and temperature based on system health
+        model = self.settings.llm.model
+        temperature = self.settings.llm.temperature
+
+        if cpu_load > 80.0:
+            # Switch to a faster model and lower temperature for speed/determinism
+            model = "mistral-small-latest"
+            temperature = 0.1
+            logger.warning(
+                "reflective_tuning_applied",
+                reason="high_cpu",
+                cpu_load=cpu_load,
+                model=model,
             )
 
-            response_data = result["response"]
+        try:
+            # Use dspy.context for request-scoped model configuration
+            with dspy.context(lm=dspy.LM(model, temperature=temperature)):
+                result = await asyncio.to_thread(
+                    self.negotiator,
+                    input_bid=context.offer.bid_amount,
+                    context=self._build_economic_context(context),
+                    history=[],  # History tracking planned for future iterations
+                )
+
+            action_data = result["action"]
 
             logger.info(
                 "transformer_thought_complete",
-                action=response_data.get("action"),
-                price=response_data.get("price"),
+                action=action_data.get("action"),
+                price=action_data.get("price"),
             )
 
-            return Decision(
-                action=response_data["action"],
-                price=response_data["price"],
-                message=response_data["message"],
-                reasoning=result.get("reasoning", ""),
-                metadata={"dspy_result": result},
+            return IntentAction(
+                action=action_data["action"],
+                price=action_data["price"],
+                message=action_data["message"],
+                thought=result.get("thought", ""),
+                metadata={"dspy_result": result, "model_used": model},
             )
 
-        except (ValueError, KeyError, RuntimeError) as e:
+        except (ValueError, KeyError, TypeError, RuntimeError) as e:
             logger.error("transformer_error", error=str(e), exc_info=True)
-            # Safe default on error
-            return Decision(
-                action="reject",
-                price=0.0,
-                message="Service temporarily unavailable. Please try again later.",
-                reasoning=f"Error in Transformer: {e}",
+            # Return FailureIntent which the Membrane will handle
+            return FailureIntent(
+                error=str(e),
+                metadata={"context": str(context)},
             )

@@ -21,24 +21,23 @@ class Negotiate(dspy.Signature):
             base_price: float,        # Standard listing price
             floor_price: float,       # Minimum acceptable price (hidden)
             occupancy: str,           # Current occupancy level (high/medium/low)
-            value_add_inventory: List[Dict[str, Any]]  # Available perks with cost/value
+            value_add_inventory: List[Dict[str, Any]], # Available perks
+            system_constraints: List[str] # Real-time system constraints (e.g. HIGH_LOAD)
         }"""
     )
     history = dspy.InputField(
         desc="Previous negotiation turns as JSON list of {bid, response} pairs"
     )
-    reasoning = dspy.OutputField(
-        desc="""Strategic reasoning about the decision, including:
-        - Margin analysis
-        - Occupancy considerations
-        - Value-add utilization strategy
-        - Competitive positioning"""
+    thought = dspy.OutputField(
+        desc="""Ona's internal strategic analysis (monologue).
+        Analyzes margin, occupancy, and system constraints to derive the best strategy.
+        This is NOT shown to the user."""
     )
-    response = dspy.OutputField(
-        desc="""JSON-formatted action response containing:
+    action = dspy.OutputField(
+        desc="""Jules' external action. MUST be a JSON-formatted string:
         {
-            action: str,              # One of: 'accept', 'counter', 'reject'
-            price: float,             # Final price (accept) or counter offer (counter)
-            message: str              # Professional message to buyer agent
+            "action": str,              # One of: 'accept', 'counter', 'reject', 'ui_required'
+            "price": float,             # Final price or counter offer
+            "message": str              # Professional message to buyer agent
         }"""
     )
