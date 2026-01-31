@@ -1,6 +1,6 @@
 import pytest
-from src.hive.dna import Decision, HiveContext
 from src.hive.membrane import HiveMembrane
+from src.hive.types import HiveContext, IntentAction, NegotiationOffer
 
 
 @pytest.mark.asyncio
@@ -11,19 +11,17 @@ async def test_membrane_rule1_floor_price_override():
     membrane = HiveMembrane()
     context = HiveContext(
         item_id="item1",
-        bid_amount=50.0,
-        agent_did="did1",
-        reputation=0.9,
+        offer=NegotiationOffer(bid_amount=50.0, agent_did="did1", reputation=0.9),
         item_data={"floor_price": 100.0},
     )
 
     # Proposing price below floor
-    decision = Decision(action="accept", price=95.0, message="I accept your low bid.")
+    decision = IntentAction(action="accept", price=95.0, message="I accept your low bid.")
     safe_decision = await membrane.inspect_outbound(decision, context)
 
     assert safe_decision.action == "counter"
     assert safe_decision.price == 105.0  # 100 * 1.05
-    assert "FLOOR_PRICE_VIOLATION" in safe_decision.reasoning
+    assert "FLOOR_PRICE_VIOLATION" in safe_decision.thought
     assert safe_decision.metadata["original_price"] == 95.0
 
 
@@ -35,14 +33,12 @@ async def test_membrane_rule2_data_leak_prevention():
     membrane = HiveMembrane()
     context = HiveContext(
         item_id="item1",
-        bid_amount=150.0,
-        agent_did="did1",
-        reputation=0.9,
+        offer=NegotiationOffer(bid_amount=150.0, agent_did="did1", reputation=0.9),
         item_data={"floor_price": 100.0},
     )
 
     # Message containing sensitive info
-    decision = Decision(
+    decision = IntentAction(
         action="counter",
         price=120.0,
         message="My floor_price is 100, so I can't go lower.",
@@ -51,7 +47,7 @@ async def test_membrane_rule2_data_leak_prevention():
 
     assert "floor_price" not in safe_decision.message.lower()
     assert "cannot disclose internal pricing" in safe_decision.message
-    assert "DLP block" in safe_decision.reasoning
+    assert "DLP block" in safe_decision.thought
 
 
 @pytest.mark.asyncio
@@ -62,14 +58,12 @@ async def test_membrane_combined_violations():
     membrane = HiveMembrane()
     context = HiveContext(
         item_id="item1",
-        bid_amount=50.0,
-        agent_did="did1",
-        reputation=0.9,
+        offer=NegotiationOffer(bid_amount=50.0, agent_did="did1", reputation=0.9),
         item_data={"floor_price": 100.0},
     )
 
     # Proposing price below floor AND leaking floor_price
-    decision = Decision(
+    decision = IntentAction(
         action="accept",
         price=80.0,
         message="I'll give it for 80 even if my floor_price is 100.",
@@ -79,8 +73,8 @@ async def test_membrane_combined_violations():
     assert safe_decision.action == "counter"
     assert safe_decision.price == 105.0
     assert "floor_price" not in safe_decision.message.lower()
-    assert "FLOOR_PRICE_VIOLATION" in safe_decision.reasoning
-    assert "DLP block" in safe_decision.reasoning
+    assert "FLOOR_PRICE_VIOLATION" in safe_decision.thought
+    assert "DLP block" in safe_decision.thought
 
 
 @pytest.mark.asyncio
