@@ -1,7 +1,9 @@
-from typing import Any, Optional, List
+from typing import Any
+
 import structlog
-from opentelemetry import trace
 from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup
+from opentelemetry import trace
+
 from .dna import TelegramContext, UIAction
 
 logger = structlog.get_logger(__name__)
@@ -10,7 +12,7 @@ tracer = trace.get_tracer(__name__)
 class TelegramTransformer:
     """T - Transformer: Decides on UI actions."""
 
-    async def think(self, context: TelegramContext, core_response: Optional[dict[str, Any]] = None, search_results: Optional[List[dict[str, Any]]] = None) -> UIAction:
+    async def think(self, context: TelegramContext, core_response: dict[str, Any] | None = None, search_results: list[dict[str, Any]] | None = None) -> UIAction:
         with tracer.start_as_current_span("transformer_think") as span:
             # Handle Search results
             if search_results is not None:

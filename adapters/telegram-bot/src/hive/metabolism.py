@@ -1,11 +1,13 @@
 from typing import Any
+
 import structlog
 from opentelemetry import trace
+
 from .aggregator import TelegramAggregator
-from .transformer import TelegramTransformer
 from .connector import TelegramConnector
-from .generator import TelegramGenerator
 from .dna import Observation
+from .generator import TelegramGenerator
+from .transformer import TelegramTransformer
 
 logger = structlog.get_logger(__name__)
 tracer = trace.get_tracer(__name__)
@@ -26,7 +28,7 @@ class TelegramMetabolism:
         self.generator = generator
 
     async def execute_negotiation(self, signal: Any, state_data: dict[str, Any]) -> Observation:
-        with tracer.start_as_current_span("metabolism_negotiate") as span:
+        with tracer.start_as_current_span("metabolism_negotiate"):
             logger.info("negotiation_cycle_started")
 
             # A - Aggregator
@@ -64,7 +66,7 @@ class TelegramMetabolism:
             return observation
 
     async def execute_search(self, query: str, signal: Any) -> Observation:
-        with tracer.start_as_current_span("metabolism_search") as span:
+        with tracer.start_as_current_span("metabolism_search"):
             logger.info("search_cycle_started", query=query)
 
             # A - Aggregator (perceive the search signal)

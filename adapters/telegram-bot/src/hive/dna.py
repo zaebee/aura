@@ -1,5 +1,6 @@
 from dataclasses import dataclass, field
-from typing import Any, Protocol, runtime_checkable, Optional, List
+from typing import Any, Protocol, runtime_checkable
+
 from aiogram.types import InlineKeyboardMarkup
 
 
@@ -27,10 +28,10 @@ class TelegramContext:
     """Context specific to Telegram interactions."""
     user_id: int
     chat_id: int
-    hive_context: Optional[HiveContext] = None
-    message_text: Optional[str] = None
-    callback_data: Optional[str] = None
-    fsm_state: Optional[str] = None
+    hive_context: HiveContext | None = None
+    message_text: str | None = None
+    callback_data: str | None = None
+    fsm_state: str | None = None
     fsm_data: dict[str, Any] = field(default_factory=dict)
 
 
@@ -38,8 +39,8 @@ class TelegramContext:
 class UIAction:
     """Structured action for the Telegram UI."""
     text: str
-    reply_markup: Optional[InlineKeyboardMarkup] = None
-    parse_mode: Optional[str] = "Markdown"
+    reply_markup: InlineKeyboardMarkup | None = None
+    parse_mode: str | None = "Markdown"
     action_type: str = "send_message"  # e.g., "send_message", "answer_callback", "edit_message"
     show_thinking: bool = False
     metadata: dict[str, Any] = field(default_factory=dict)
@@ -49,8 +50,8 @@ class UIAction:
 class Observation:
     """Observation resulting from an action."""
     success: bool
-    message_id: Optional[int] = None
-    error: Optional[str] = None
+    message_id: int | None = None
+    error: str | None = None
     event_type: str = ""
     metadata: dict[str, Any] = field(default_factory=dict)
 
@@ -79,7 +80,7 @@ class Aggregator(Protocol):
 @runtime_checkable
 class Transformer(Protocol):
     """T - Transformer: Decides on UI actions."""
-    async def think(self, context: TelegramContext, core_response: Optional[dict[str, Any]] = None, search_results: Optional[List[dict[str, Any]]] = None) -> UIAction:
+    async def think(self, context: TelegramContext, core_response: dict[str, Any] | None = None, search_results: list[dict[str, Any]] | None = None) -> UIAction:
         ...
 
 

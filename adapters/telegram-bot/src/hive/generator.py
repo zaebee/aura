@@ -1,9 +1,11 @@
-import time
 import json
-from typing import Any, List
+import time
+from typing import Any
+
 import structlog
 from opentelemetry import trace
-from .dna import Observation, Event
+
+from .dna import Event, Observation
 
 logger = structlog.get_logger(__name__)
 tracer = trace.get_tracer(__name__)
@@ -14,7 +16,7 @@ class TelegramGenerator:
     def __init__(self, nats_client: Any = None):
         self.nc = nats_client
 
-    async def pulse(self, observation: Observation) -> List[Event]:
+    async def pulse(self, observation: Observation) -> list[Event]:
         with tracer.start_as_current_span("generator_pulse") as span:
             events = []
 

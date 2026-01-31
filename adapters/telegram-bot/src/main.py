@@ -1,24 +1,23 @@
 import asyncio
 import os
 
-import structlog
 import nats
+import structlog
 from aiogram import Bot, Dispatcher
-
 from opentelemetry import trace
-from opentelemetry.sdk.trace import TracerProvider
-from opentelemetry.sdk.trace.export import BatchSpanProcessor
 from opentelemetry.exporter.otlp.proto.grpc.trace_exporter import OTLPSpanExporter
 from opentelemetry.sdk.resources import SERVICE_NAME, Resource
+from opentelemetry.sdk.trace import TracerProvider
+from opentelemetry.sdk.trace.export import BatchSpanProcessor
 
 from src.bot import router
 from src.client import GRPCNegotiationClient
 from src.config import settings
 from src.hive.aggregator import TelegramAggregator
-from src.hive.transformer import TelegramTransformer
 from src.hive.connector import TelegramConnector
 from src.hive.generator import TelegramGenerator
 from src.hive.metabolism import TelegramMetabolism
+from src.hive.transformer import TelegramTransformer
 
 # Setup logging
 structlog.configure(

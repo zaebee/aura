@@ -3,7 +3,6 @@ from unittest.mock import AsyncMock, MagicMock
 import pytest
 from aiogram import types
 from src.interfaces import NegotiationProvider, NegotiationResult, SearchResult
-from src.hive.dna import Observation
 
 
 class MockNegotiationProvider(NegotiationProvider):

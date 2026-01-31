@@ -1,4 +1,3 @@
-from typing import Any
 from aiogram import F, Router
 from aiogram.filters import Command, CommandObject
 from aiogram.fsm.context import FSMContext

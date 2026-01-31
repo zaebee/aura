@@ -1,9 +1,11 @@
 from typing import Any
+
 import structlog
-from opentelemetry import trace
 from aiogram import Bot
+from opentelemetry import trace
 from src.client import GRPCNegotiationClient
-from .dna import UIAction, TelegramContext, Observation
+
+from .dna import Observation, TelegramContext, UIAction
 
 logger = structlog.get_logger(__name__)
 tracer = trace.get_tracer(__name__)
