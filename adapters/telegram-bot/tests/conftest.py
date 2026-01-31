@@ -23,6 +23,16 @@ def mock_client():
 
 
 @pytest.fixture
+def mock_metabolism(mock_client):
+    metabolism = AsyncMock()
+    metabolism.connector = MagicMock()
+    metabolism.connector.search_core = mock_client.search
+    metabolism.execute_negotiation = AsyncMock()
+    metabolism.execute_search = AsyncMock()
+    return metabolism
+
+
+@pytest.fixture
 def bot():
     return AsyncMock()
 
