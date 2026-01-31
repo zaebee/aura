@@ -23,3 +23,6 @@ class KeeperSettings(BaseSettings):
     github_token: str = Field(..., alias="GITHUB_TOKEN")
     github_repository: str = Field(..., alias="GITHUB_REPOSITORY")
     github_event_path: str | None = Field(None, alias="GITHUB_EVENT_PATH")
+    github_event_name: str = Field("manual", alias="GITHUB_EVENT_NAME")
+
+    max_tokens: int = Field(1000, alias="AURA_BEE_KEEPER__MAX_TOKENS")

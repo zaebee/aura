@@ -41,6 +41,12 @@ class BeeTransformer:
         heresies = self._deterministic_audit(context)
 
         # 2. LLM Audit (Reflective)
+        # Handle large diffs
+        if len(context.git_diff) > 4000:
+            logger.info("large_diff_detected_summarizing_first")
+            summary = await self._summarize_diff(context.git_diff)
+            context.git_diff = f"SUMMARY OF CHANGES:\n{summary}"
+
         purity_analysis = await self._llm_audit(context)
 
         all_heresies = heresies + purity_analysis.get("heresies", [])
@@ -51,7 +57,8 @@ class BeeTransformer:
             heresies=all_heresies,
             narrative=purity_analysis.get("narrative", "The Hive remains silent."),
             reasoning=purity_analysis.get("reasoning", ""),
-            metadata={"llm_response": purity_analysis}
+            token_usage=purity_analysis.get("token_usage", 0),
+            metadata={"llm_response": purity_analysis},
         )
 
     def _deterministic_audit(self, context: BeeContext) -> list[str]:
@@ -126,12 +133,33 @@ class BeeTransformer:
                     "reasoning": f"Primary error: {e}. Fallback error: {fe}",
                 }
 
+    async def _summarize_diff(self, diff: str) -> str:
+        prompt = f"""
+        {self.persona}
+        Summarize the key architectural changes in this Git diff.
+        Focus on which nucleotides were touched and if any new logic was added outside the ATCG pattern.
+
+        DIFF:
+        {diff[:10000]}  # Truncate to avoid context overflow
+        """
+        try:
+            response = await litellm.acompletion(
+                model=self.model,
+                messages=[{"role": "user", "content": prompt}],
+                max_tokens=200,
+            )
+            return str(response.choices[0].message.content)
+        except Exception as e:
+            logger.warning("diff_summarization_failed", error=str(e))
+            return "Large diff (could not summarize)."
+
     async def _call_llm(self, prompt: str, use_fallback: bool = False) -> dict[str, Any]:
         model = self.settings.llm__fallback_model if use_fallback else self.model
         kwargs: dict[str, Any] = {
             "model": model,
             "messages": [{"role": "user", "content": prompt}],
             "response_format": {"type": "json_object"},
+            "max_tokens": self.settings.max_tokens,
         }
 
         if use_fallback and "ollama" in model:
@@ -142,4 +170,8 @@ class BeeTransformer:
         import json
 
         data: dict[str, Any] = json.loads(content)
+        # Capture token usage if available
+        if hasattr(response, "usage") and response.usage:
+            data["token_usage"] = getattr(response.usage, "total_tokens", 0)
+
         return data

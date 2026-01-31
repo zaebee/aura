@@ -28,10 +28,15 @@ class BeeConnector:
     async def act(self, report: PurityReport, context: BeeContext) -> BeeObservation:
         logger.info("bee_connector_act_started")
 
-        # 1. Post to GitHub
-        comment_url = await self._post_to_github(report, context)
+        # 1. Post to GitHub (if not a heartbeat)
+        comment_url = ""
+        if context.event_name != "schedule":
+            comment_url = await self._post_to_github(report, context)
 
-        # 2. Emit NATS Event
+        # 2. Commit Hive State (idempotency handled by Generator writing the file)
+        await self._commit_changes()
+
+        # 3. Emit NATS Event
         nats_sent = await self._emit_nats_event(report, context)
 
         return BeeObservation(
@@ -39,6 +44,42 @@ class BeeConnector:
             github_comment_url=comment_url,
             nats_event_sent=nats_sent
         )
+
+    async def _commit_changes(self) -> None:
+        import subprocess  # nosec
+
+        def git_commit() -> None:
+            try:
+                # Check for changes
+                status = subprocess.run(
+                    ["git", "status", "--porcelain"],
+                    capture_output=True,
+                    text=True,
+                    check=False,
+                )  # nosec
+                if not status.stdout:
+                    logger.info("no_changes_to_commit")
+                    return
+
+                logger.info("committing_changes", files=status.stdout.splitlines())
+                subprocess.run(
+                    ["git", "add", "../../HIVE_STATE.md", "../../llms.txt"], check=False
+                )  # nosec
+                subprocess.run(
+                    [
+                        "git",
+                        "commit",
+                        "-m",
+                        "chore(hive): auto-update hive state [skip ci]",
+                    ],
+                    check=False,
+                )  # nosec
+                subprocess.run(["git", "push"], check=False)  # nosec
+                logger.info("changes_pushed_successfully")
+            except Exception as e:
+                logger.warning("git_commit_failed", error=str(e))
+
+        await asyncio.to_thread(git_commit)
 
     async def _post_to_github(self, report: PurityReport, context: BeeContext) -> str:
         if not self.gh or not self.repo_name:

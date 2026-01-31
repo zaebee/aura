@@ -6,6 +6,7 @@ from src.dna import (
     BeeGenerator,
     BeeObservation,
     BeeTransformer,
+    PurityReport,
 )
 
 logger = structlog.get_logger(__name__)
@@ -30,13 +31,27 @@ class BeeMetabolism:
 
     async def execute(self) -> BeeObservation:
         """Execute one full metabolic cycle of the BeeKeeper."""
+        import time
+
         logger.info("bee_metabolism_started")
+        start_time = time.time()
 
         # 1. Aggregator (A) - Perceive/Sense
         context = await self.aggregator.perceive()
 
         # 2. Transformer (T) - Think/Reason
-        report = await self.transformer.think(context)
+        if context.event_name == "schedule":
+            logger.info("scheduled_heartbeat_detected_skipping_llm_audit")
+            report = PurityReport(
+                is_pure=True,
+                narrative="The Keeper performs a routine inspection. The Hive's pulse is steady.",
+                reasoning="Scheduled heartbeat run. LLM audit skipped to save honey.",
+                metadata={"heartbeat": True},
+            )
+        else:
+            report = await self.transformer.think(context)
+
+        report.execution_time = time.time() - start_time
 
         # 3. Connector (C) - Act/Output
         observation = await self.connector.act(report, context)

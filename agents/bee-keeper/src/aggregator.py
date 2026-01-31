@@ -35,7 +35,8 @@ class BeeAggregator:
             hive_metrics=hive_metrics,
             filesystem_map=filesystem_map,
             repo_name=self.repo_name,
-            event_data=event_data
+            event_name=self.settings.github_event_name,
+            event_data=event_data,
         )
 
     async def _get_git_diff(self) -> str:

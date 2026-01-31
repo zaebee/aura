@@ -2,9 +2,17 @@ name: bee.Keeper
 
 on:
   pull_request:
+    paths-ignore:
+      - 'HIVE_STATE.md'
+      - 'CHRONICLES.md'
+      - 'llms.txt'
   push:
     branches:
       - main
+    paths-ignore:
+      - 'HIVE_STATE.md'
+      - 'CHRONICLES.md'
+      - 'llms.txt'
   schedule:
     - cron: '0 */6 * * *' # Every 6 hours
 
@@ -36,7 +44,14 @@ jobs:
           GITHUB_EVENT_NAME: ${{ github.event_name }}
           AURA_LLM__API_KEY: ${{ secrets.OPENAI_API_KEY }}
           AURA_LLM__MODEL: "gpt-4o-mini"
+          AURA_LLM__FALLBACK_MODEL: "ollama/llama3"
+          AURA_LLM__OLLAMA_BASE_URL: "http://localhost:11434"
           AURA_PROMETHEUS_URL: "http://prometheus-kube-prometheus-prometheus.monitoring:9090"
           AURA_NATS_URL: "nats://nats:4222"
+          AURA_BEE_KEEPER__MAX_TOKENS: 1000
         run: |
+          # Configure git for auto-commits
+          git config --global user.name "bee.Keeper"
+          git config --global user.email "keeper@aura.hive"
+
           uv run --directory agents/bee-keeper python main.py

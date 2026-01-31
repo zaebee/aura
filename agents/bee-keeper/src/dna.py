@@ -9,6 +9,7 @@ class BeeContext:
     hive_metrics: dict[str, Any]
     filesystem_map: list[str]
     repo_name: str
+    event_name: str = "manual"
     event_data: dict[str, Any] = field(default_factory=dict)
     metadata: dict[str, Any] = field(default_factory=dict)
 
@@ -20,6 +21,8 @@ class PurityReport:
     heresies: list[str] = field(default_factory=list)
     narrative: str = ""
     reasoning: str = ""
+    execution_time: float = 0.0
+    token_usage: int = 0
     metadata: dict[str, Any] = field(default_factory=dict)
 
 
