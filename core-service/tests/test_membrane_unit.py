@@ -5,10 +5,10 @@ from src.guard.membrane import OutputGuard, SafetyViolation
 def test_margin_violation():
     guard = OutputGuard()
     context = {"floor_price": 800.0, "internal_cost": 750.0}
-    # Margin = (offered - cost) / cost
-    # 0.10 margin requires offered >= 750 * 1.1 = 825.0
+    # Margin = (offered - cost) / offered
+    # 0.10 margin requires offered >= 750 / 0.9 = 833.33
 
-    # 800 is below required (800-750)/750 = 0.066 < 0.10
+    # 800 is below required (800-750)/800 = 0.0625 < 0.10
     decision = {"action": "counter", "price": 800.0}
     with pytest.raises(SafetyViolation, match="Economic suicide attempt"):
         guard.validate_decision(decision, context)
@@ -17,7 +17,7 @@ def test_margin_violation():
 def test_floor_price_violation_on_accept():
     guard = OutputGuard()
     context = {"floor_price": 850.0, "internal_cost": 500.0}
-    # Margin is (840 - 500) / 500 = 0.68 (Good)
+    # Margin is (840 - 500) / 840 = 0.40 (Good)
     # But price < floor_price
 
     decision = {"action": "accept", "price": 840.0}
@@ -25,19 +25,20 @@ def test_floor_price_violation_on_accept():
         guard.validate_decision(decision, context)
 
 
-def test_floor_price_no_violation_on_counter():
+def test_floor_price_violation_on_counter():
     guard = OutputGuard()
     context = {"floor_price": 850.0, "internal_cost": 500.0}
-    # Counter offer is NOT checked against floor price in the new logic
+    # Counter offer SHOULD also respect floor price for maximum security
     decision = {"action": "counter", "price": 840.0}
-    assert guard.validate_decision(decision, context) is True
+    with pytest.raises(SafetyViolation, match="Floor price breach"):
+        guard.validate_decision(decision, context)
 
 
 def test_safe_decision():
     guard = OutputGuard()
     context = {"floor_price": 800.0, "internal_cost": 700.0}
     # min_margin is 0.10.
-    # (850 - 700) / 700 = 0.214 > 0.10 (Good)
+    # (850 - 700) / 850 = 0.176 > 0.10 (Good)
     # 850 > 800 (Good)
 
     decision = {"action": "accept", "price": 850.0}
@@ -53,7 +54,7 @@ def test_discount_violation():
         guard.validate_decision(decision, context)
 
 
-def test_addon_violation():
+def test_addon_violation(monkeypatch):
     guard = OutputGuard()
     # default allowed_addons: ["Breakfast", "Late checkout", "Room upgrade"]
     context = {
@@ -65,17 +66,14 @@ def test_addon_violation():
         ]
     }
 
-    # Let's mock settings to remove Breakfast from allowed list
+    # Use monkeypatch to mock settings for the duration of the test
     from src.config import settings
-    original_addons = settings.safety.allowed_addons
-    settings.safety.allowed_addons = ["Late checkout"]
-    try:
-        # LLM offers Breakfast, which is in inventory but NOT in allowed_addons
-        decision = {"action": "counter", "price": 600.0, "message": "I can offer Breakfast."}
-        with pytest.raises(SafetyViolation, match="Unauthorized addon mentioned: breakfast"):
-            guard.validate_decision(decision, context)
-    finally:
-        settings.safety.allowed_addons = original_addons
+    monkeypatch.setattr(settings.safety, "allowed_addons", ["Late checkout"])
+
+    # LLM offers Breakfast, which is in inventory but NOT in allowed_addons
+    decision = {"action": "counter", "price": 600.0, "message": "I can offer Breakfast."}
+    with pytest.raises(SafetyViolation, match="Unauthorized addon mentioned: breakfast"):
+        guard.validate_decision(decision, context)
 
 
 def test_invalid_price():
