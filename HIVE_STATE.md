@@ -1,27 +1,39 @@
-# Current Hive State: Phase 3 (Hardening)
+# 🕸️ Hive State: Phase 3 (Fractal Metabolism)
 
-**Last Pulse:** 2026-01-31 00:12:28
-**Current Success Rate:** 0.00
-**Governance Cost (Last):** 0 tokens / 0.68s
+**Current Status:** Transfication of Core & Adapters
+**Last Synchronization:** 2026-01-31 22:15 UTC
+**Global Health:** 🟡 STABILIZING (Inbound Senses Active, Outbound Actions Restricted)
 
-## 🧬 Active Mutations (In Progress)
-- [ ] Task 21: bee.Keeper (GitHub Resident)
-- [ ] Task 22: Propolis (Mypy/Bandit/Hardening)
-- [ ] Task 20: ATCG Metabolism Loop integration
-- [ ] Task 26: Purification of T (Transformer Refactor) - Assigned to bee.Jules
+## 🧬 Active Mutations (In-Flight)
+- [ ] **Task 26: Purification of T** (Assignee: bee.Jules)
+  - *Goal:* Isolate reasoning from infra. Implement `<think>` tag.
+- [ ] **Task 29: Telegram Fractalization** (Assignee: bee.Jules)
+  - *Goal:* Refactor Bot into an ATCG HiveCell.
+- [ ] **Task 30: GitHub Protein (403 Fix)** (Assignee: bee.Keeper/Jules)
+  - *Goal:* Build a resilient, async VCS connector. Fix permissions.
 
-## 🔋 Resource Status
-- CPU: Stable (0.27% idle)
-- Storage: 85% full (Pending Task 18 cleanup)
-- Logic: DSPy (Mistral-Large)
+## 🔋 System Vitals (Senses)
+- **Aggregator (A):** 🟢 Active. Prometheus metrics flowing (0.27% CPU).
+- **Transformer (T):** 🟡 Transitioning. Moving from LiteLLMStrategy to ATCG-T.
+- **Connector (C):** 🔴 Injured. GitHub API access returning 403.
+- **Generator (G):** 🟢 Pulsing. NATS heartbeats detected.
 
-## 🐝 Emergent Issues
-- [Issue #26](/issues/26) Fix: Brain path alignment in Docker.
-- [Bug] Telegram Bot session drift.
+## 📜 Architectural Debt (Backlog)
+- [ ] **Task 16: The Membrane.** (Deterministic economic guards).
+- [ ] **Task 17: External Oracles.** (Amadeus/SerpAPI integration).
+- [ ] **Task 18: Metabolic Cleanup.** (Docker/K8s auto-prune).
+- [ ] **Task 24: bee.Chronicler.** (Narrative folklore engine).
 
 ## 💰 Economy
-- Total SOL in Wallet: 0.0
-- Deals in Pipeline: 0
+- **Honey Level:** Mistral-Large API (Stable)
+- **Currency:** Solana Devnet (Agent Wallet Ready)
+- **Success Rate:** 0.00 (Pending first live Telegram deal)
+
+<!-- metadata
+hive_complexity_index: 0.65
+active_bees: [bee.Jules, bee.Keeper, bee.Chronicler(dormant)]
+metaphor_sync: true
+-->
 
 ## 📜 Audit Log
 
