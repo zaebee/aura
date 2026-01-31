@@ -11,6 +11,7 @@ from typing import Any
 
 import nacl.encoding
 import nacl.signing
+import structlog
 
 
 class AgentWallet:
@@ -158,7 +159,8 @@ def generate_test_wallet() -> AgentWallet:
     """
     # This is a test wallet - in production, each agent should generate their own
     wallet = AgentWallet()
-    print("🔑 Generated test wallet:")
-    print(f"   DID: {wallet.did}")
-    print(f"   Public Key: {wallet.public_key_hex}")
+    logger = structlog.get_logger(__name__)
+    logger.info("generated_test_wallet",
+                did=wallet.did,
+                public_key=wallet.public_key_hex)
     return wallet
