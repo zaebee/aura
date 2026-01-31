@@ -89,7 +89,7 @@ class HiveAggregator:
                         errors.append(f"{metric_name}_no_data")
                 else:
                     errors.append(f"{metric_name}_api_status_{data.get('status')}")
-            except Exception as e:
+            except (ValueError, KeyError, IndexError, httpx.HTTPStatusError) as e:
                 errors.append(f"{metric_name}_parse_error_{type(e).__name__}")
         else:
             errors.append(f"{metric_name}_fetch_error_{type(response).__name__}")
@@ -147,8 +147,20 @@ class HiveAggregator:
                 self._metrics_cache.set(metrics)
                 return metrics
 
-        except Exception as e:
-            logger.error("prometheus_fetch_error", error=str(e))
+        except (
+            TimeoutError,
+            httpx.HTTPError,
+            httpx.ConnectError,
+            httpx.TimeoutException,
+        ) as e:
+            if isinstance(e, httpx.TimeoutException) or isinstance(e, TimeoutError):
+                logger.error("prometheus_timeout", error=str(e))
+            elif isinstance(e, httpx.ConnectError):
+                logger.error("prometheus_connection_error", error=str(e))
+            else:
+                logger.error("prometheus_http_error", error=str(e))
+
+            # Self-healing: Return cached if available (even if expired), else UNKNOWN
             cached = self._metrics_cache.get(ignore_ttl=True)
             if cached:
                 return {
@@ -164,6 +176,9 @@ class HiveAggregator:
                 "timestamp": datetime.now(UTC).isoformat(),
                 "error": str(e),
             }
+        except Exception as e:
+            logger.error("prometheus_unexpected_error", error=str(e))
+            return {"status": "UNKNOWN", "error": "unexpected_error", "detail": str(e)}
 
     async def perceive(self, signal: Any) -> HiveContext:
         """

@@ -104,6 +104,7 @@ class HiveConnector:
                 "crypto_offer_created",
                 deal_id=payment_instructions.deal_id,
                 amount=crypto_amount,
+                currency=self.settings.crypto.currency,
             )
 
         except (ValueError, SQLAlchemyError) as e:

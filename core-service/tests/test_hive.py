@@ -88,3 +88,22 @@ async def test_membrane_inbound_invalid_bid():
 
     with pytest.raises(ValueError, match="Bid amount must be positive"):
         await membrane.inspect_inbound(signal)
+
+
+@pytest.mark.asyncio
+async def test_membrane_invalid_min_margin(mocker):
+    membrane = HiveMembrane()
+    # Mock settings with invalid margin
+    mocker.patch.object(membrane.settings.logic, "min_margin", 1.5)
+
+    context = HiveContext(
+        item_id="item1",
+        offer=NegotiationOffer(bid_amount=50.0, agent_did="did1", reputation=0.9),
+        item_data={"floor_price": 100.0},
+    )
+
+    decision = IntentAction(action="accept", price=200.0, message="OK")
+    # Should fallback to DEFAULT_MIN_MARGIN (0.1) and log a warning
+    safe_decision = await membrane.inspect_outbound(decision, context)
+    # required = 100 / (1 - 0.1) = 111.11. 200 > 111.11 so it's fine.
+    assert safe_decision.price == 200.0

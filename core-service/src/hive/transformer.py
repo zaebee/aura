@@ -106,7 +106,7 @@ class AuraTransformer:
                 metadata={"dspy_result": result, "model_used": model},
             )
 
-        except Exception as e:
+        except (ValueError, KeyError, TypeError, RuntimeError) as e:
             logger.error("transformer_error", error=str(e), exc_info=True)
             # Return FailureIntent which the Membrane will handle
             return FailureIntent(
