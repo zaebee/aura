@@ -86,10 +86,16 @@ class OutputGuard:
         # This is a heuristic check for the "Membrane" pattern.
         if action in ["accept", "counter"] and decision.get("message"):
             msg = decision["message"].lower()
-            for addon in ["breakfast", "late checkout", "room upgrade"]:
-                if addon in msg and addon not in [
-                    a.lower() for a in settings.safety.allowed_addons
-                ]:
+            # Derive the list of potential addons to look for from context and settings
+            inventory = context.get("value_add_inventory", [])
+            inventory_addons = [item.get("item", "").lower() for item in inventory if item.get("item")]
+            configured_addons = [a.lower() for a in settings.safety.allowed_addons]
+
+            # We check both what's in inventory and what's explicitly allowed in settings
+            potential_addons = set(inventory_addons + configured_addons)
+
+            for addon in potential_addons:
+                if addon and addon in msg and addon not in configured_addons:
                     logger.warning("safety_addon_violation", addon=addon)
                     raise SafetyViolation(f"Unauthorized addon mentioned: {addon}")
 

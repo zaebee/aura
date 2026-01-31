@@ -55,16 +55,22 @@ def test_discount_violation():
 
 def test_addon_violation():
     guard = OutputGuard()
-    context = {"floor_price": 500.0, "internal_cost": 400.0}
     # default allowed_addons: ["Breakfast", "Late checkout", "Room upgrade"]
-    # If we mention "Spa" (not in list), it might not trigger because our list in code is hardcoded for demo.
-    # But if we mention "Breakfast" and it WASN'T in the list...
+    context = {
+        "floor_price": 500.0,
+        "internal_cost": 400.0,
+        "value_add_inventory": [
+            {"item": "Breakfast", "internal_cost": 10},
+            {"item": "Late checkout", "internal_cost": 0}
+        ]
+    }
 
-    # Let's mock settings to remove Breakfast
+    # Let's mock settings to remove Breakfast from allowed list
     from src.config import settings
     original_addons = settings.safety.allowed_addons
     settings.safety.allowed_addons = ["Late checkout"]
     try:
+        # LLM offers Breakfast, which is in inventory but NOT in allowed_addons
         decision = {"action": "counter", "price": 600.0, "message": "I can offer Breakfast."}
         with pytest.raises(SafetyViolation, match="Unauthorized addon mentioned: breakfast"):
             guard.validate_decision(decision, context)
