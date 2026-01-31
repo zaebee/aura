@@ -63,7 +63,9 @@ async def main() -> None:
         logger.error("Unexpected error connecting to NATS", error=str(e))
 
     # Initialize gRPC client
-    client = GRPCNegotiationClient(settings.core_url)
+    client = GRPCNegotiationClient(
+        settings.core_url, timeout=settings.negotiation_timeout
+    )
 
     # Initialize Bot
     bot = Bot(token=settings.token.get_secret_value())
