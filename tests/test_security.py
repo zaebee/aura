@@ -8,26 +8,29 @@ import hashlib
 import json
 
 import pytest
+import structlog
 
 from agent_identity import AgentWallet
+
+logger = structlog.get_logger(__name__)
 
 
 def test_agent_wallet():
     """Test AgentWallet functionality."""
-    print("🧪 Testing AgentWallet...")
+    logger.info("testing_agent_wallet")
 
     # Test 1: Generate new wallet
     wallet = AgentWallet()
-    print(f"✅ Generated wallet: {wallet.did}")
+    logger.info("generated_wallet", did=wallet.did)
 
     # Test 2: Verify DID format
     assert wallet.did.startswith("did:key:"), "DID should start with did:key:"
-    print(f"✅ DID format valid: {wallet.did}")
+    logger.info("did_format_valid", did=wallet.did)
 
     # Test 3: Verify key properties
     assert len(wallet.private_key_hex) > 0, "Private key should not be empty"
     assert len(wallet.public_key_hex) > 0, "Public key should not be empty"
-    print("✅ Keys generated successfully")
+    logger.info("keys_generated_successfully")
 
     # Test 4: Test signing and verification
     test_payload = {
@@ -41,10 +44,10 @@ def test_agent_wallet():
     x_agent_id, x_timestamp, x_signature = wallet.sign_request(
         "POST", "/v1/negotiate", test_payload
     )
-    print("✅ Request signed successfully")
-    print(f"   Agent ID: {x_agent_id}")
-    print(f"   Timestamp: {x_timestamp}")
-    print(f"   Signature: {x_signature[:50]}...")
+    logger.info("request_signed_successfully",
+                agent_id=x_agent_id,
+                timestamp=x_timestamp,
+                signature_snippet=x_signature[:50])
 
     # Verify the signature
     body_json = json.dumps(test_payload, sort_keys=True, separators=(",", ":"))
@@ -54,31 +57,31 @@ def test_agent_wallet():
 
     is_valid = wallet.verify_signature(message, x_signature)
     assert is_valid, "Signature verification should succeed"
-    print("✅ Signature verification successful")
+    logger.info("signature_verification_successful")
 
     # Test 5: Test tampering detection
     tampered_message = f"POST/v1/negotiate{str(int(x_timestamp) + 100)}{body_hash}"
     is_tampered_valid = wallet.verify_signature(tampered_message, x_signature)
     assert not is_tampered_valid, "Tampered message should fail verification"
-    print("✅ Tampering detection working")
+    logger.info("tampering_detection_working")
 
     # Test 6: Test view-only wallet
     view_only_wallet = AgentWallet.from_did(wallet.did)
     assert view_only_wallet.did == wallet.did, "View-only wallet should have same DID"
-    print("✅ View-only wallet creation successful")
+    logger.info("view_only_wallet_creation_successful")
 
     # Test 7: Test view-only wallet verification
     is_view_only_valid = view_only_wallet.verify_signature(message, x_signature)
     assert is_view_only_valid, "View-only wallet should verify signatures"
-    print("✅ View-only wallet verification successful")
+    logger.info("view_only_wallet_verification_successful")
 
-    print("🎉 All AgentWallet tests passed!")
+    logger.info("all_agent_wallet_tests_passed")
     return wallet
 
 
 def test_signature_verification_flow():
     """Test the complete signature verification flow."""
-    print("\n🧪 Testing signature verification flow...")
+    logger.info("testing_signature_verification_flow")
 
     wallet = AgentWallet()
 
@@ -97,7 +100,7 @@ def test_signature_verification_flow():
         method, path, test_payload
     )
 
-    print(f"✅ Signed request with DID: {x_agent_id}")
+    logger.info("signed_request", did=x_agent_id)
 
     # Verify the signature manually (simulating what the API gateway does)
     body_json = json.dumps(test_payload, sort_keys=True, separators=(",", ":"))
@@ -108,23 +111,23 @@ def test_signature_verification_flow():
     # Test with correct message
     is_valid = wallet.verify_signature(message, x_signature)
     assert is_valid, "Valid signature should pass verification"
-    print("✅ Valid signature verified successfully")
+    logger.info("valid_signature_verified")
 
     # Test with incorrect message (tampered)
     tampered_message = f"{method}{path}{str(int(x_timestamp) + 100)}{body_hash}"
     is_tampered_valid = wallet.verify_signature(tampered_message, x_signature)
     assert not is_tampered_valid, "Tampered message should fail verification"
-    print("✅ Tampered message correctly rejected")
+    logger.info("tampered_message_rejected")
 
 
 def test_error_cases():
     """Test error cases and edge conditions."""
-    print("\n🧪 Testing error cases...")
+    logger.info("testing_error_cases")
 
     # Test 1: Invalid DID format
     with pytest.raises(ValueError, match="Invalid DID format"):
         AgentWallet.from_did("invalid-did-format")
-    print("✅ Invalid DID correctly rejected")
+    logger.info("invalid_did_rejected")
 
     # Test 2: View-only wallet signing attempt
     view_only_wallet = AgentWallet.from_did(
@@ -134,21 +137,28 @@ def test_error_cases():
         view_only_wallet.sign_request("POST", "/test", {})
         raise AssertionError("View-only wallet should not be able to sign")
     except ValueError as e:
-        print(f"✅ View-only wallet signing correctly prevented: {e}")
+        logger.info("view_only_signing_prevented", error=str(e))
 
     # Test 3: Invalid signature verification
     wallet = AgentWallet()
     is_valid = wallet.verify_signature("test message", "invalid_signature_hex")
     assert not is_valid, "Invalid signature should fail verification"
-    print("✅ Invalid signature correctly rejected")
+    logger.info("invalid_signature_rejected")
 
-    print("🎉 Error case tests passed!")
+    logger.info("error_case_tests_passed")
 
 
 def main():
     """Run all security tests."""
-    print("🚀 Starting Aura Platform Security Tests")
-    print("=" * 50)
+    # Configure logging for standalone run
+    structlog.configure(
+        processors=[
+            structlog.processors.add_log_level,
+            structlog.processors.TimeStamper(fmt="iso"),
+            structlog.dev.ConsoleRenderer(),
+        ]
+    )
+    logger.info("starting_security_tests")
 
     try:
         # Run all tests
@@ -156,29 +166,19 @@ def main():
         test_signature_verification_flow()
         test_error_cases()
 
-        print("\n" + "=" * 50)
-        print("🎉 ALL SECURITY TESTS PASSED!")
-        print("=" * 50)
+        logger.info("all_security_tests_passed")
+        logger.info("test_summary",
+                    agent_wallet=True,
+                    signature_flow=True,
+                    tampering_detection=True,
+                    view_only_support=True,
+                    error_handling=True)
 
-        print("\n📋 Test Summary:")
-        print("   ✅ AgentWallet functionality")
-        print("   ✅ Signature generation and verification")
-        print("   ✅ Tampering detection")
-        print("   ✅ View-only wallet support")
-        print("   ✅ Timestamp validation")
-        print("   ✅ Error handling")
-
-        print("\n🔑 Test Wallet Information:")
-        print(f"   DID: {wallet.did}")
-        print(f"   Public Key: {wallet.public_key_hex}")
-
-        print("\n💡 You can use this wallet for testing the API gateway:")
-        print("   Export these keys and use them in your agent applications.")
+        logger.info("test_wallet_info", did=wallet.did, public_key=wallet.public_key_hex)
 
     except Exception as e:
-        print(f"\n❌ Test failed: {e}")
+        logger.error("test_failed", error=str(e))
         import traceback
-
         traceback.print_exc()
         return 1
 

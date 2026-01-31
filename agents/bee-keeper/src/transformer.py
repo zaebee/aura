@@ -80,6 +80,10 @@ class BeeTransformer:
         for line in diff_lines:
             if line.startswith("+") and not line.startswith("+++"):
                 added_code = line[1:].strip()
+                # Ignore comments
+                if added_code.startswith("#") or added_code.startswith('"""') or added_code.startswith("'''"):
+                    continue
+
                 if "print(" in added_code and "logger" not in added_code:
                     heresies.append(
                         f"Pattern Heresy: Raw 'print()' detected in diff: `{added_code}`. Use `structlog` instead."

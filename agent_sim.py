@@ -1,14 +1,32 @@
-import os
 import time
 
 import requests
+import structlog
 from dotenv import load_dotenv
+from pydantic_settings import BaseSettings
 
 from agent_identity import AgentWallet
 
 load_dotenv()
 
-GATEWAY_URL = os.getenv("AURA_GATEWAY_URL", "http://localhost:8000")
+
+class SimSettings(BaseSettings):
+    gateway_url: str = "http://localhost:8000"
+
+
+settings = SimSettings(_env_prefix="AURA_")
+
+# Configure logging
+structlog.configure(
+    processors=[
+        structlog.processors.add_log_level,
+        structlog.processors.TimeStamper(fmt="iso"),
+        structlog.dev.ConsoleRenderer(),
+    ]
+)
+logger = structlog.get_logger(__name__)
+
+GATEWAY_URL = settings.gateway_url
 
 
 def run_agent_scenario(scenario_name, item_id, bid, wallet=None):
@@ -24,11 +42,10 @@ def run_agent_scenario(scenario_name, item_id, bid, wallet=None):
     # If no wallet provided, create a new one
     if wallet is None:
         wallet = AgentWallet()
-        print(f"Generated new agent wallet: {wallet.did}")
+        logger.info("generated_new_agent_wallet", did=wallet.did)
 
-    print(f"\n--- 🤖 SCENARIO: {scenario_name} ---")
-    print(f"Target: {item_id} | Bid: ${bid}")
-    print(f"Agent: {wallet.did}")
+    logger.info("running_scenario", scenario=scenario_name)
+    logger.info("scenario_details", target=item_id, bid=bid, agent=wallet.did)
 
     payload = {
         "item_id": item_id,
@@ -59,47 +76,43 @@ def run_agent_scenario(scenario_name, item_id, bid, wallet=None):
         )
         latency = (time.time() - start_ts) * 1000
 
-        print(f"⏱️  Latency[{GATEWAY_URL}]: {latency:.2f}ms")
+        logger.info("request_completed", gateway=GATEWAY_URL, latency_ms=f"{latency:.2f}")
 
         if response.status_code != 200:
-            print(f"❌ Error {response.status_code}: {response.text}")
+            logger.error("api_error", status_code=response.status_code, text=response.text)
             return
 
         data = response.json()
         status = data.get("status")
 
         if status == "accepted":
-            print("✅ OFFER ACCEPTED!")
-            print(f"   Final Price: ${data['data']['final_price']}")
-            print(f"   Reservation: {data['data']['reservation_code']}")
+            logger.info("offer_accepted",
+                        final_price=data['data']['final_price'],
+                        reservation=data['data']['reservation_code'])
 
         elif status == "countered":
-            print("⚠️  OFFER COUNTERED")
-            print(f"   Server proposed: ${data['data']['proposed_price']}")
-            print(f"   Message: '{data['data']['message']}'")
+            logger.info("offer_countered",
+                        proposed_price=data['data']['proposed_price'],
+                        message=data['data']['message'])
 
         elif status == "ui_required":
-            print("👮 UI REQUIRED (Human Loop)")
-            print(f"   Template: {data['action_required']['template']}")
-            print(f"   Context: {data['action_required']['context']}")
+            logger.info("ui_required",
+                        template=data['action_required']['template'],
+                        context=data['action_required']['context'])
 
         elif status == "rejected":
-            print("⛔ REJECTED", data)
-            # Добавляем вывод причины, если она есть
-            if "data" in data and "message" in data["data"]:
-                print(f"   Reason: {data['data']['message']}")
-            elif "data" in data and "reason_code" in data["data"]:
-                print(f"   Code: {data['data']['reason_code']}")
+            reason = data.get("data", {}).get("message", "No reason provided")
+            code = data.get("data", {}).get("reason_code", "N/A")
+            logger.warning("offer_rejected", reason=reason, code=code)
 
     except Exception as e:
-        print(f"🔥 System Error: {e}")
+        logger.error("system_error", error=str(e))
 
 
 if __name__ == "__main__":
     # Create a wallet for all scenarios
     wallet = AgentWallet()
-    print(f"🔑 Using agent wallet: {wallet.did}")
-    print(f"🔑 Public key: {wallet.public_key_hex}")
+    logger.info("agent_initialized", did=wallet.did, public_key=wallet.public_key_hex)
 
     # 1. Жадный агент (слишком дешево)
     # floor_price у hotel_alpha = 800

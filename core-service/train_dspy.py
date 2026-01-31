@@ -11,6 +11,7 @@ import sys
 from pathlib import Path
 
 import dspy
+import structlog
 from dspy.teleprompt import BootstrapFewShot
 
 # Add src to path for imports
@@ -18,6 +19,16 @@ sys.path.append(str(Path(__file__).parent / "src"))
 
 from llm.engine import AuraNegotiator
 from llm.prepare.clean import clean_and_parse_json
+
+# Configure logging
+structlog.configure(
+    processors=[
+        structlog.processors.add_log_level,
+        structlog.processors.TimeStamper(fmt="iso"),
+        structlog.dev.ConsoleRenderer(),
+    ]
+)
+logger = structlog.get_logger(__name__)
 
 
 def load_training_data() -> list[dict]:
@@ -114,12 +125,12 @@ def economic_metric(gold, pred, trace=None):
 
 def train_negotiator():
     """Train and save the DSPy negotiator."""
-    print("🚀 Starting DSPy Negotiation Engine Training...")
+    logger.info("starting_dspy_training")
 
     # Load and prepare training data
-    print("📖 Loading training data...")
+    logger.info("loading_training_data")
     training_examples = load_training_data()
-    print(f"📊 Found {len(training_examples)} training examples")
+    logger.info("training_data_loaded", count=len(training_examples))
 
     # Create DSPy examples
     # Note: inputs and response are passed as dicts/lists to ensure clean saved JSON
@@ -137,28 +148,28 @@ def train_negotiator():
 
     # Configure DSPy with litellm backend
     litellm_model = "mistral/mistral-large-latest"
-    print(f"🤖 Configuring DSPy with LLM: {litellm_model}")
+    logger.info("configuring_dspy", model=litellm_model)
 
     try:
         dspy.configure(lm=dspy.LM(model=litellm_model))
     except Exception as e:
-        print(f"⚠️  Failed to configure with LM object: {e}")
+        logger.warning("dspy_configure_failed", error=str(e))
 
     # Initialize negotiator
-    print("🔧 Initializing AuraNegotiator...")
+    logger.info("initializing_negotiator")
     negotiator = AuraNegotiator()
 
     # Set up teleprompter with our economic metric
-    print("🎯 Setting up BootstrapFewShot optimizer...")
+    logger.info("setting_up_optimizer")
     teleprompter = BootstrapFewShot(metric=economic_metric)
 
     # Compile the module
-    print("🏗️  Compiling negotiator (this may take a few minutes)...")
+    logger.info("compiling_negotiator", note="this may take a few minutes")
     try:
         compiled_negotiator = teleprompter.compile(negotiator, trainset=dspy_examples)
     except Exception as e:
-        print(f"⚠️  Compilation failed (likely due to missing API keys): {e}")
-        print("🏗️  Falling back to manual demo assignment for clean file generation...")
+        logger.warning("compilation_failed", error=str(e))
+        logger.info("falling_back_to_manual_demos")
         negotiator.negotiate_chain.predict.demos = dspy_examples
         compiled_negotiator = negotiator
 
@@ -166,12 +177,11 @@ def train_negotiator():
     output_path = Path(__file__).parent / "data" / "aura_brain.json"
     compiled_negotiator.save(str(output_path))
 
-    print("✅ Training/Generation complete!")
-    print(f"💾 Compiled negotiator saved to: {output_path}")
+    logger.info("training_complete", saved_to=str(output_path))
 
     # Test the compiled negotiator if LM is available
     try:
-        print("\n🧪 Testing compiled negotiator...")
+        logger.info("testing_compiled_negotiator")
         test_example = dspy_examples[0]
         prediction = compiled_negotiator(
             input_bid=test_example.input_bid,
@@ -179,11 +189,12 @@ def train_negotiator():
             history=test_example.history,
         )
 
-        print(f"Input bid: {test_example.input_bid}")
-        print(f"Predicted action: {prediction['response']}")
-        print(f"Reasoning: {prediction['reasoning'][:100]}...")
+        logger.info("test_prediction",
+                    input_bid=test_example.input_bid,
+                    response=prediction['response'],
+                    reasoning=prediction['reasoning'][:100])
     except Exception as e:
-        print(f"⏭️  Skipping test: {e}")
+        logger.info("skipping_test", error=str(e))
 
     return compiled_negotiator
 
@@ -191,7 +202,7 @@ def train_negotiator():
 if __name__ == "__main__":
     try:
         train_negotiator()
-        print("\n🎉 DSPy Negotiation Engine training completed successfully!")
+        logger.info("training_success")
     except Exception as e:
-        print(f"\n❌ Training failed: {e}")
+        logger.error("training_failed", error=str(e))
         sys.exit(1)

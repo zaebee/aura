@@ -11,12 +11,23 @@ from pathlib import Path
 sys.path.append(str(Path(__file__).parent / "src"))
 
 import dspy
+import structlog
 from llm.engine import AuraNegotiator
+
+# Configure logging
+structlog.configure(
+    processors=[
+        structlog.processors.add_log_level,
+        structlog.processors.TimeStamper(fmt="iso"),
+        structlog.dev.ConsoleRenderer(),
+    ]
+)
+logger = structlog.get_logger(__name__)
 
 
 def test_minimal_dspy():
     """Test minimal DSPy functionality."""
-    print("🧪 Testing minimal DSPy functionality...")
+    logger.info("testing_minimal_dspy")
 
     # Configure DSPy with proper LM object
     dspy.configure(lm=dspy.LM(model="mistral/mistral-large-latest"))
@@ -51,17 +62,16 @@ def test_minimal_dspy():
             history=[],
         )
 
-        print("✅ Prediction successful")
-        print(f"Response type: {type(prediction['response'])}")
-        print(f"Response value: {prediction['response']}")
-        print(f"Reasoning: {prediction['reasoning'][:50]}...")
+        logger.info("prediction_successful",
+                    response_type=str(type(prediction['response'])),
+                    response_value=prediction['response'],
+                    reasoning=prediction['reasoning'][:50])
 
         return True
 
     except Exception as e:
-        print(f"❌ Prediction failed: {e}")
+        logger.error("prediction_failed", error=str(e))
         import traceback
-
         traceback.print_exc()
         return False
 

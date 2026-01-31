@@ -2,7 +2,6 @@ import asyncio
 import json
 
 import nats
-import nats.errors
 import structlog
 
 from src.config import KeeperSettings
@@ -24,6 +23,11 @@ class BeeConnector:
         self.gh = None
         if self.github_token and self.github_token != "mock":  # nosec
             self.gh = GitHubClient(self.github_token)
+
+    async def close(self) -> None:
+        """Cleanup resources."""
+        if self.gh:
+            await self.gh.close()
 
     async def act(self, report: PurityReport, context: BeeContext) -> BeeObservation:
         logger.info("bee_connector_act_started")
@@ -131,8 +135,7 @@ class BeeConnector:
 
     async def _emit_nats_event(self, report: PurityReport, context: BeeContext, injuries: list[str]) -> bool:
         try:
-            # Use connect_timeout to prevent hanging if NATS is unreachable
-            nc = await nats.connect(self.nats_url, connect_timeout=5.0)
+            nc = await nats.connect(self.nats_url)
             payload = {
                 "agent": "bee.Keeper",
                 "is_pure": report.is_pure,
@@ -152,8 +155,6 @@ class BeeConnector:
 
             await nc.close()
             return True
-        except (nats.errors.NoServersError, nats.errors.TimeoutError, Exception) as e:
-            # Log warning and return False to allow metabolic cycle to complete.
-            # We avoid logging the URL to prevent potential credential leakage.
-            logger.warning("nats_connection_failed", error=str(e))
+        except Exception as e:
+            logger.warning("nats_publish_failed", error=str(e))
             return False

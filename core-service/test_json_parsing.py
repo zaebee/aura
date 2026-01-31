@@ -9,12 +9,23 @@ from pathlib import Path
 # Add src to path
 sys.path.append(str(Path(__file__).parent / "src"))
 
+import structlog
 from llm.prepare.clean import clean_and_parse_json
+
+# Configure logging
+structlog.configure(
+    processors=[
+        structlog.processors.add_log_level,
+        structlog.processors.TimeStamper(fmt="iso"),
+        structlog.dev.ConsoleRenderer(),
+    ]
+)
+logger = structlog.get_logger(__name__)
 
 
 def test_json_parsing():
     """Test various JSON response formats."""
-    print("🧪 Testing robust JSON parsing...")
+    logger.info("testing_robust_json_parsing")
 
     # Test cases: (input, expected_output)
     test_cases = [
@@ -71,17 +82,17 @@ def test_json_parsing():
         try:
             result = clean_and_parse_json(input_text)
             if result == expected:
-                print(f"✅ Test {i}: PASSED")
+                logger.info("test_case_pass", index=i)
                 passed += 1
             else:
-                print(f"❌ Test {i}: FAILED - Expected {expected}, got {result}")
+                logger.error("test_case_fail", index=i, expected=expected, got=result)
                 failed += 1
         except Exception as e:
-            print(f"❌ Test {i}: FAILED with exception: {e}")
+            logger.error("test_case_exception", index=i, error=str(e))
             failed += 1
 
     # Test error cases
-    print("\n🧪 Testing error cases...")
+    logger.info("testing_error_cases")
 
     error_cases = [
         None,
@@ -94,16 +105,16 @@ def test_json_parsing():
     for i, bad_input in enumerate(error_cases, 1):
         try:
             clean_and_parse_json(bad_input)
-            print(f"❌ Error test {i}: Should have failed but didn't")
+            logger.error("error_test_fail", index=i, note="Should have failed")
             failed += 1
         except ValueError:
-            print(f"✅ Error test {i}: Correctly raised ValueError")
+            logger.info("error_test_pass", index=i, note="Correctly raised ValueError")
             passed += 1
         except Exception as e:
-            print(f"❌ Error test {i}: Wrong exception type: {e}")
+            logger.error("error_test_wrong_exception", index=i, error=str(e))
             failed += 1
 
-    print(f"\n📊 Results: {passed} passed, {failed} failed")
+    logger.info("test_summary", passed=passed, failed=failed)
     return failed == 0
 
 

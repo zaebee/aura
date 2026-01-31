@@ -20,9 +20,7 @@ logger = structlog.get_logger()
 
 async def main() -> None:
     # Initialize gRPC client
-    client = GRPCNegotiationClient(
-        settings.core_url, timeout=settings.negotiation_timeout
-    )
+    client = GRPCNegotiationClient(settings.core_url)
 
     # Initialize Bot and Dispatcher
     bot = Bot(token=settings.token.get_secret_value())

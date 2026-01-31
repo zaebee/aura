@@ -5,26 +5,37 @@ This server acts as a proxy between AI models (via MCP) and the Aura Gateway,
 providing search and negotiation capabilities to LLMs like Claude 3.5 Sonnet.
 """
 
-import logging
-import os
 
 import httpx
+import structlog
 from dotenv import load_dotenv
+from pydantic_settings import BaseSettings
 
 # Import AgentWallet from parent directory
 from aura_mcp.wallet import AgentWallet
 
 # Configure logging
-logging.basicConfig(
-    level=os.getenv("LOG_LEVEL", "INFO"),
-    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+structlog.configure(
+    processors=[
+        structlog.processors.add_log_level,
+        structlog.processors.TimeStamper(fmt="iso"),
+        structlog.dev.ConsoleRenderer(),
+    ]
 )
-logger = logging.getLogger("aura-mcp-server")
+logger = structlog.get_logger("aura-mcp-server")
 
 # Load environment variables
 load_dotenv()
 
-GATEWAY_URL = os.getenv("AURA_GATEWAY_URL", "http://localhost:8000")
+
+class MCPSettings(BaseSettings):
+    gateway_url: str = "http://localhost:8000"
+    log_level: str = "INFO"
+
+
+settings = MCPSettings(_env_prefix="AURA_")
+
+GATEWAY_URL = settings.gateway_url
 
 
 class AuraMCPServer:

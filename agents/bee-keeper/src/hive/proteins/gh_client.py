@@ -18,40 +18,42 @@ class GitHubClient:
             "Accept": "application/vnd.github.v3+json",
             "User-Agent": "Aura-BeeKeeper",
         }
+        self._client = httpx.AsyncClient(timeout=30.0, headers=self.headers)
+
+    async def close(self) -> None:
+        """Close the underlying HTTP client."""
+        await self._client.aclose()
 
     async def _request(self, method: str, path: str, **kwargs: Any) -> httpx.Response:
         """Internal helper for making async requests with rate limit handling."""
-        async with httpx.AsyncClient(timeout=30.0) as client:
-            url = f"{self.base_url}/{path.lstrip('/')}"
-            while True:
-                response = await client.request(
-                    method, url, headers=self.headers, **kwargs
+        url = f"{self.base_url}/{path.lstrip('/')}"
+        while True:
+            response = await self._client.request(method, url, **kwargs)
+
+            # Handle rate limiting (Metabolic slowing)
+            remaining = response.headers.get("X-RateLimit-Remaining")
+            if response.status_code == 403 and remaining == "0":
+                reset_time = int(
+                    response.headers.get("X-RateLimit-Reset", time.time() + 60)
+                )
+                wait_time = max(reset_time - int(time.time()), 1)
+                logger.warning(
+                    "github_rate_limit_hit_metabolic_slowing",
+                    wait_time=wait_time,
+                    path=path
+                )
+                await asyncio.sleep(wait_time)
+                continue
+
+            if response.status_code >= 400:
+                logger.error(
+                    "github_api_error",
+                    status_code=response.status_code,
+                    path=path,
+                    # No logging of headers or sensitive repository metadata beyond the path
                 )
 
-                # Handle rate limiting (Metabolic slowing)
-                remaining = response.headers.get("X-RateLimit-Remaining")
-                if response.status_code == 403 and remaining == "0":
-                    reset_time = int(
-                        response.headers.get("X-RateLimit-Reset", time.time() + 60)
-                    )
-                    wait_time = max(reset_time - int(time.time()), 1)
-                    logger.warning(
-                        "github_rate_limit_hit_metabolic_slowing",
-                        wait_time=wait_time,
-                        path=path
-                    )
-                    await asyncio.sleep(wait_time)
-                    continue
-
-                if response.status_code >= 400:
-                    logger.error(
-                        "github_api_error",
-                        status_code=response.status_code,
-                        path=path,
-                        # No logging of headers or sensitive repository metadata beyond the path
-                    )
-
-                return response
+            return response
 
     async def post_comment(
         self,

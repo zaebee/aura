@@ -16,3 +16,4 @@ hive:
     - "membrane.py"
     - "metabolism.py"
     - "dna.py"
+    - "types.py"

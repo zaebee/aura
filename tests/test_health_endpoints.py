@@ -8,6 +8,9 @@ import sys
 import time
 
 import requests
+import structlog
+
+logger = structlog.get_logger(__name__)
 
 
 def test_gateway_health_endpoints():
@@ -20,7 +23,7 @@ def test_gateway_health_endpoints():
     }
     all_passed = True
 
-    print("Testing API Gateway Health Endpoints\n" + "=" * 50)
+    logger.info("testing_api_gateway_health")
 
     for endpoint, description in endpoints.items():
         url = f"{base_url}{endpoint}"
@@ -28,22 +31,25 @@ def test_gateway_health_endpoints():
             response = requests.get(url, timeout=5)
             # We expect all endpoints to be healthy and return 200 for this test
             if response.status_code == 200:
-                status = "✓ PASS"
+                logger.info("endpoint_pass", endpoint=endpoint, description=description)
             else:
-                status = "✗ FAIL"
+                logger.error("endpoint_fail",
+                             endpoint=endpoint,
+                             description=description,
+                             status_code=response.status_code)
                 all_passed = False
 
-            print(f"{status} [{endpoint}] ({description})")
-            print(f"  Status: {response.status_code}")
             try:
-                print(f"  Response: {response.json()}")
+                resp_data = response.json()
             except requests.exceptions.JSONDecodeError:
-                print(f"  Response: {response.text}")
-            print()
+                resp_data = response.text
+
+            logger.info("endpoint_response", endpoint=endpoint, response=resp_data)
         except requests.exceptions.RequestException as e:
-            print(f"✗ FAIL [{endpoint}] ({description})")
-            print(f"  Error: {e}")
-            print()
+            logger.error("endpoint_request_error",
+                         endpoint=endpoint,
+                         description=description,
+                         error=str(e))
             all_passed = False
 
     return all_passed
@@ -51,7 +57,7 @@ def test_gateway_health_endpoints():
 
 def test_core_service_grpc_health():
     """Test Core Service gRPC health using grpc_health_probe if available"""
-    print("\nTesting Core Service gRPC Health\n" + "=" * 50)
+    logger.info("testing_core_service_grpc_health")
 
     try:
         import subprocess
@@ -64,52 +70,51 @@ def test_core_service_grpc_health():
         )
 
         if result.returncode == 0:
-            print("✓ PASS Core Service gRPC Health")
-            print(f"  {result.stdout.strip()}")
+            logger.info("grpc_health_pass", output=result.stdout.strip())
             return True
         else:
-            print("✗ FAIL Core Service gRPC Health")
-            print(f"  {result.stderr.strip()}")
+            logger.error("grpc_health_fail", output=result.stderr.strip())
             return False
     except FileNotFoundError:
-        print("⚠ SKIP grpc_health_probe not installed")
-        print(
-            "  Install: go install github.com/grpc-ecosystem/grpc-health-probe@latest"
-        )
+        logger.warning("grpc_health_skipped",
+                       reason="grpc_health_probe not installed")
         return None
     except Exception as e:
-        print(f"✗ ERROR: {e}")
+        logger.error("grpc_health_error", error=str(e))
         return False
 
 
 def test_readiness_when_core_unavailable():
     """Test that readiness endpoint returns 503 when core service is down"""
-    print("\nTesting Readiness Failure Scenario\n" + "=" * 50)
-    print("(This test requires core service to be stopped)")
+    logger.info("testing_readiness_failure_scenario",
+                note="requires core service to be stopped")
 
     url = "http://localhost:8000/readyz"
     try:
         response = requests.get(url, timeout=5)
         if response.status_code == 503:
-            print("✓ PASS Readiness returns 503 when core unavailable")
-            print(f"  Response: {response.json()}")
+            logger.info("readiness_fail_scenario_pass", response=response.json())
         elif response.status_code == 200:
-            print("⚠ INFO Readiness returns 200 (core service is running)")
-            print("  To test failure scenario, stop core-service first")
+            logger.info("readiness_core_running_info",
+                        note="To test failure scenario, stop core-service first")
         else:
-            print(f"✗ FAIL Unexpected status code: {response.status_code}")
-        print()
+            logger.error("readiness_unexpected_status", status_code=response.status_code)
     except requests.exceptions.RequestException as e:
-        print(f"✗ ERROR: {e}")
-        print()
+        logger.error("readiness_request_error", error=str(e))
 
 
 def main():
-    print("\n" + "=" * 50)
-    print("Health Endpoints Test Suite")
-    print("=" * 50 + "\n")
+    # Configure logging
+    structlog.configure(
+        processors=[
+            structlog.processors.add_log_level,
+            structlog.processors.TimeStamper(fmt="iso"),
+            structlog.dev.ConsoleRenderer(),
+        ]
+    )
+    logger.info("starting_health_endpoint_tests")
 
-    print("Waiting for services to be ready...")
+    logger.info("waiting_for_services")
     time.sleep(2)
 
     results = []
@@ -125,21 +130,16 @@ def main():
     # Test failure scenario info
     test_readiness_when_core_unavailable()
 
-    print("\n" + "=" * 50)
-    print("Test Summary")
-    print("=" * 50)
-
     passed = sum(1 for r in results if r is True)
     failed = sum(1 for r in results if r is False)
 
-    print(f"Passed: {passed}")
-    print(f"Failed: {failed}")
+    logger.info("test_summary", passed=passed, failed=failed)
 
     if failed > 0:
-        print("\n❌ Some tests failed")
+        logger.error("tests_failed")
         sys.exit(1)
     else:
-        print("\n✅ All tests passed!")
+        logger.info("all_tests_passed")
         sys.exit(0)
 
 

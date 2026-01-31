@@ -51,6 +51,10 @@ async def main() -> None:
     except Exception as e:
         logger.error("bee_keeper_agent_critical_error", error=str(e), exc_info=True)
         sys.exit(1)
+    finally:
+        # Cleanup
+        if hasattr(connector, "close"):
+            await connector.close()
 
 if __name__ == "__main__":
     asyncio.run(main())

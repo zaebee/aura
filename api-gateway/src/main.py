@@ -185,9 +185,7 @@ async def negotiate(
         logger.info(
             "grpc_call_started", service="NegotiationService", method="Negotiate"
         )
-        response = await stub.Negotiate(
-            grpc_request, metadata=metadata, timeout=settings.negotiation_timeout
-        )
+        response = await stub.Negotiate(grpc_request, metadata=metadata)
         logger.info(
             "grpc_call_completed", service="NegotiationService", method="Negotiate"
         )
