@@ -1,6 +1,6 @@
 # Dockerfile for Aura Frontend
 # Build stage
-FROM oven/bun AS builder
+FROM oven/bun:1.2 AS builder
 
 WORKDIR /app
 
@@ -26,7 +26,7 @@ COPY frontend/public ./public
 RUN bun run build
 
 # Production stage
-FROM oven/bun AS runner
+FROM oven/bun:1.2 AS runner
 
 WORKDIR /app
 
