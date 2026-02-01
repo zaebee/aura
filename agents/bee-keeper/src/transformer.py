@@ -92,11 +92,18 @@ class BeeTransformer:
                     break
 
             # If it's not in core, not a known chamber, and not a dotfile/metafile, flag it
-            if not is_sanctified and not p.name.startswith(".") and "/" in str(p):
-                 # We only flag top-level unknown directories or files that should be tools
+            if not is_sanctified and not p.name.startswith("."):
+                 # Check for unauthorized top-level growth
                  parent_dir = p.parts[0]
-                 if parent_dir not in ["deploy", "proto", "docs", "tools", "tests", "agents", "adapters", "api-gateway", "core-service", "frontend"]:
-                     heresies.append(f"Foreign Body: '{p}' has taken root outside sanctioned chambers.")
+                 allowed_top_levels = set(chamber.split("/")[0] for chamber in ALLOWED_CHAMBERS.keys())
+                 allowed_root_files = ["pyproject.toml", "uv.lock", "README.md", "HIVE_STATE.md", "CHRONICLES.md", "Makefile", "compose.yml", "buf.yaml", "buf.gen.yaml", ".python-version", "CLAUDE.md", "CRYPTO_QUICKSTART.md", "CRYPTO_INTEGRATION_SUMMARY.md", "llms.txt"]
+
+                 if len(p.parts) == 1:
+                     # Root file check
+                     if p.name not in allowed_root_files:
+                         heresies.append(f"Foreign Sprout: '{p.name}' has taken root in the Hive's fertile soil. Prune it or relocate to the ToolShed.")
+                 elif parent_dir not in allowed_top_levels:
+                     heresies.append(f"Unauthorized Growth: '{p}' has expanded outside sanctioned chambers. The Inquisitor demands its removal.")
 
         # 2. Metric Verification
         success_rate = context.hive_metrics.get("negotiation_success_rate", 1.0)

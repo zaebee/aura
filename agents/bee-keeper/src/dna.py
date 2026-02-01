@@ -43,6 +43,18 @@ ALLOWED_CHAMBERS = {
     "api-gateway": "HiveGate",
     "core-service/src/config": "SacredCodex",
     "core-service/src/services": "WorkerDirectives",
+    "core-service/src/llm": "ReasoningNucleus",
+    "core-service/src/crypto": "SecurityCitadel",
+    "core-service/src/prompts": "EchoChamber",
+    "core-service/src/guard": "HiveMembrane",
+    "deploy": "HiveArmor",
+    "proto": "SacredScrolls",
+    "docs": "ChroniclersArchive",
+    "agents": "WorkerCells",
+    "adapters": "HiveExtensions",
+    "frontend": "HiveWindow",
+    "tools": "ToolShed",
+    "tests": "OuterValidationPollen",
 }
 
 

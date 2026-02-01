@@ -435,20 +435,6 @@ async def serve() -> None:
     # 9. Start Heartbeat Deal (Honey Stimulus)
     async def heartbeat_deal_loop() -> None:
         """Trigger a mock successful negotiation every 12 hours."""
-        from dataclasses import dataclass
-
-        @dataclass
-        class MockAgent:
-            did: str
-            reputation_score: float
-
-        @dataclass
-        class MockSignal:
-            item_id: str
-            bid_amount: float
-            agent: MockAgent
-            request_id: str
-
         while True:
             try:
                 # Wait 12 hours between stimulations
@@ -460,11 +446,15 @@ async def serve() -> None:
                     item = session.query(InventoryItem).first()
 
                 if item:
-                    mock_signal = MockSignal(
+                    # Use real protobuf types for the heartbeat signal
+                    mock_signal = negotiation_pb2.NegotiateRequest(
                         item_id=item.id,
-                        bid_amount=item.base_price * 1.1, # High bid to ensure acceptance
-                        agent=MockAgent(did="did:aura:heartbeat", reputation_score=1.0),
-                        request_id=f"heartbeat-{uuid.uuid4()}"
+                        bid_amount=item.base_price * 1.1,  # High bid to ensure acceptance
+                        currency="USD",
+                        agent=negotiation_pb2.AgentInfo(
+                            did="did:aura:heartbeat", reputation_score=1.0
+                        ),
+                        request_id=f"heartbeat-{uuid.uuid4()}",
                     )
                     await metabolism.execute(mock_signal)
                     logger.info("heartbeat_deal_successful")
