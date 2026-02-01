@@ -11,6 +11,7 @@ from src.hive.dna import (
 
 logger = structlog.get_logger(__name__)
 
+
 class BeeMetabolism:
     """
     Orchestrates the ATCG flow for the BeeKeeper agent:
@@ -62,7 +63,7 @@ class BeeMetabolism:
         logger.info(
             "bee_metabolism_completed",
             is_pure=report.is_pure,
-            heresies_count=len(report.heresies)
+            heresies_count=len(report.heresies),
         )
 
         return observation

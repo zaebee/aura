@@ -68,7 +68,9 @@ class BeeTransformer:
 
     def _deterministic_audit(self, context: BeeContext) -> list[str]:
         heresies = []
-        core_path = self.manifest.get("hive", {}).get("core_path", "core-service/src/hive")
+        core_path = self.manifest.get("hive", {}).get(
+            "core_path", "core-service/src/hive"
+        )
         allowed_files = self.manifest.get("hive", {}).get("allowed_files", [])
 
         # 1. Macro-ATCG (Root) Check
@@ -78,7 +80,12 @@ class BeeTransformer:
             if p.parent == Path("."):
                 name = p.name
                 # Ignore hidden files and standard directories
-                if name.startswith(".") or name in [".git", ".github", ".venv", ".vscode"]:
+                if name.startswith(".") or name in [
+                    ".git",
+                    ".github",
+                    ".venv",
+                    ".vscode",
+                ]:
                     continue
 
                 is_macro_folder = name in MACRO_ATCG_FOLDERS
@@ -109,7 +116,11 @@ class BeeTransformer:
             if line.startswith("+") and not line.startswith("+++"):
                 added_code = line[1:].strip()
                 # Ignore comments
-                if added_code.startswith("#") or added_code.startswith('"""') or added_code.startswith("'''"):
+                if (
+                    added_code.startswith("#")
+                    or added_code.startswith('"""')
+                    or added_code.startswith("'''")
+                ):
                     continue
 
                 # Skip pattern check for the transformer itself to avoid false positives on rule definitions
@@ -189,7 +200,9 @@ class BeeTransformer:
             logger.warning("diff_summarization_failed", error=str(e))
             return "Large diff (could not summarize)."
 
-    async def _call_llm(self, prompt: str, use_fallback: bool = False) -> dict[str, Any]:
+    async def _call_llm(
+        self, prompt: str, use_fallback: bool = False
+    ) -> dict[str, Any]:
         model = self.settings.llm__fallback_model if use_fallback else self.model
         kwargs: dict[str, Any] = {
             "model": model,

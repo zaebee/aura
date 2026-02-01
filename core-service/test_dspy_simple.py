@@ -71,5 +71,6 @@ if __name__ == "__main__":
     except Exception as e:
         logger.error("test_failed", error=str(e))
         import traceback
+
         traceback.print_exc()
         sys.exit(1)

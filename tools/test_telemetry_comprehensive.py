@@ -262,7 +262,9 @@ if __name__ == "__main__":
     unittest.main(verbosity=2, exit=False)
     logger.info("telemetry_tests_complete")
     logger.info("all_tests_passed")
-    logger.info("integration_test_instructions",
-                step1="Start the platform: docker-compose up --build",
-                step2="Run test_telemetry.py to generate real traces",
-                step3="Check Jaeger UI at http://localhost:16686")
+    logger.info(
+        "integration_test_instructions",
+        step1="Start the platform: docker-compose up --build",
+        step2="Run test_telemetry.py to generate real traces",
+        step3="Check Jaeger UI at http://localhost:16686",
+    )

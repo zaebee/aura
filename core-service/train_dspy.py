@@ -189,10 +189,12 @@ def train_negotiator():
             history=test_example.history,
         )
 
-        logger.info("test_prediction",
-                    input_bid=test_example.input_bid,
-                    response=prediction['response'],
-                    reasoning=prediction['reasoning'][:100])
+        logger.info(
+            "test_prediction",
+            input_bid=test_example.input_bid,
+            response=prediction["response"],
+            reasoning=prediction["reasoning"][:100],
+        )
     except Exception as e:
         logger.info("skipping_test", error=str(e))
 

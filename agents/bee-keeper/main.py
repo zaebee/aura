@@ -20,6 +20,7 @@ structlog.configure(
 )
 logger = structlog.get_logger(__name__)
 
+
 async def main() -> None:
     logger.info("bee_keeper_agent_starting")
 
@@ -37,14 +38,17 @@ async def main() -> None:
         aggregator=aggregator,
         transformer=transformer,
         connector=connector,
-        generator=generator
+        generator=generator,
     )
 
     # 3. Execute Metabolic Cycle
     try:
         observation = await metabolism.execute()
         if observation.success:
-            logger.info("bee_keeper_agent_finished_successfully", comment_url=observation.github_comment_url)
+            logger.info(
+                "bee_keeper_agent_finished_successfully",
+                comment_url=observation.github_comment_url,
+            )
         else:
             logger.error("bee_keeper_agent_failed")
             sys.exit(1)
@@ -55,6 +59,7 @@ async def main() -> None:
         # Cleanup
         if hasattr(connector, "close"):
             await connector.close()
+
 
 if __name__ == "__main__":
     asyncio.run(main())

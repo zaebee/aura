@@ -41,7 +41,9 @@ class Settings(BaseSettings):
         if not self.otel_service_name.strip():
             raise ValueError("OTEL_SERVICE_NAME cannot be empty")
 
-        if not str(self.otel_exporter_otlp_endpoint).startswith(("http://", "https://")):
+        if not str(self.otel_exporter_otlp_endpoint).startswith(
+            ("http://", "https://")
+        ):
             raise ValueError("OTEL_EXPORTER_OTLP_ENDPOINT must be a valid URL")
 
         return self

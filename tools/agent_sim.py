@@ -2,10 +2,9 @@ import time
 
 import requests
 import structlog
+from agent_identity import AgentWallet
 from dotenv import load_dotenv
 from pydantic_settings import BaseSettings
-
-from agent_identity import AgentWallet
 
 load_dotenv()
 
@@ -76,29 +75,39 @@ def run_agent_scenario(scenario_name, item_id, bid, wallet=None):
         )
         latency = (time.time() - start_ts) * 1000
 
-        logger.info("request_completed", gateway=GATEWAY_URL, latency_ms=f"{latency:.2f}")
+        logger.info(
+            "request_completed", gateway=GATEWAY_URL, latency_ms=f"{latency:.2f}"
+        )
 
         if response.status_code != 200:
-            logger.error("api_error", status_code=response.status_code, text=response.text)
+            logger.error(
+                "api_error", status_code=response.status_code, text=response.text
+            )
             return
 
         data = response.json()
         status = data.get("status")
 
         if status == "accepted":
-            logger.info("offer_accepted",
-                        final_price=data['data']['final_price'],
-                        reservation=data['data']['reservation_code'])
+            logger.info(
+                "offer_accepted",
+                final_price=data["data"]["final_price"],
+                reservation=data["data"]["reservation_code"],
+            )
 
         elif status == "countered":
-            logger.info("offer_countered",
-                        proposed_price=data['data']['proposed_price'],
-                        message=data['data']['message'])
+            logger.info(
+                "offer_countered",
+                proposed_price=data["data"]["proposed_price"],
+                message=data["data"]["message"],
+            )
 
         elif status == "ui_required":
-            logger.info("ui_required",
-                        template=data['action_required']['template'],
-                        context=data['action_required']['context'])
+            logger.info(
+                "ui_required",
+                template=data["action_required"]["template"],
+                context=data["action_required"]["context"],
+            )
 
         elif status == "rejected":
             reason = data.get("data", {}).get("message", "No reason provided")

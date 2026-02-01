@@ -2,10 +2,9 @@ import time
 
 import requests
 import structlog
+from agent_identity import AgentWallet
 from dotenv import load_dotenv
 from pydantic_settings import BaseSettings
-
-from agent_identity import AgentWallet
 
 load_dotenv()
 
@@ -64,14 +63,16 @@ class AutonomousBuyer:
             return None
 
         best_match = results[0]
-        logger.info("target_found",
-                    name=best_match['name'],
-                    price=best_match['price'],
-                    relevance=f"{best_match['score']:.2f}")
+        logger.info(
+            "target_found",
+            name=best_match["name"],
+            price=best_match["price"],
+            relevance=f"{best_match['score']:.2f}",
+        )
         return best_match
 
     def negotiate_loop(self, item):
-        logger.info("starting_negotiation", item=item['name'])
+        logger.info("starting_negotiation", item=item["name"])
 
         # Стратегия: Начинаем с 20% скидки от бюджета (жадничаем)
         current_bid = min(item["price"], self.budget) * 0.8
@@ -102,36 +103,48 @@ class AutonomousBuyer:
             # Анализ ответа сервера
             if status == "accepted":
                 final_price = data["data"]["final_price"]
-                logger.info("negotiation_success",
-                            final_price=final_price,
-                            reservation=data['data']['reservation_code'])
+                logger.info(
+                    "negotiation_success",
+                    final_price=final_price,
+                    reservation=data["data"]["reservation_code"],
+                )
                 return True
 
             elif status == "countered":
                 server_offer = data["data"]["proposed_price"]
                 server_msg = data["data"]["message"]
-                logger.info("server_counter_offer", amount=server_offer, message=server_msg)
+                logger.info(
+                    "server_counter_offer", amount=server_offer, message=server_msg
+                )
 
                 # Принимаем решение (Reasoning)
                 if server_offer <= self.budget:
-                    logger.info("decision_accept_counter",
-                                reasoning="Counter-offer is within budget.")
+                    logger.info(
+                        "decision_accept_counter",
+                        reasoning="Counter-offer is within budget.",
+                    )
                     current_bid = server_offer
                 else:
                     # Пытаемся встретиться посередине
                     new_bid = (current_bid + server_offer) / 2
                     if new_bid > self.budget:
-                        logger.warning("decision_walk_away",
-                                       reasoning=f"Too expensive. Budget is ${self.budget}.")
+                        logger.warning(
+                            "decision_walk_away",
+                            reasoning=f"Too expensive. Budget is ${self.budget}.",
+                        )
                         return False
-                    logger.info("decision_new_counter",
-                                amount=f"{new_bid:.2f}",
-                                reasoning="Splitting the difference.")
+                    logger.info(
+                        "decision_new_counter",
+                        amount=f"{new_bid:.2f}",
+                        reasoning="Splitting the difference.",
+                    )
                     current_bid = new_bid
 
             elif status == "ui_required":
-                logger.info("ui_intervention_required",
-                            template=data['action_required']['template'])
+                logger.info(
+                    "ui_intervention_required",
+                    template=data["action_required"]["template"],
+                )
                 return True  # Считаем успехом, так как передали человеку
 
             elif status == "rejected":
@@ -148,8 +161,7 @@ class AutonomousBuyer:
         if target:
             # Проверка, стоит ли вообще начинать
             if target["price"] > self.budget * 1.5:
-                logger.info("skipping_item",
-                            reasoning="Way too expensive for budget.")
+                logger.info("skipping_item", reasoning="Way too expensive for budget.")
                 return
 
             self.negotiate_loop(target)

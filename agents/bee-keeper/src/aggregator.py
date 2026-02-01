@@ -85,12 +85,11 @@ class BeeAggregator:
             return ""
 
     async def _get_hive_metrics(self) -> dict[str, Any]:
-        query = 'sum(rate(negotiation_accepted_total[5m])) / sum(rate(negotiation_total[5m]))'
+        query = "sum(rate(negotiation_accepted_total[5m])) / sum(rate(negotiation_total[5m]))"
         try:
             async with httpx.AsyncClient(timeout=10.0) as client:
                 response = await client.get(
-                    f"{self.prometheus_url}/api/v1/query",
-                    params={"query": query}
+                    f"{self.prometheus_url}/api/v1/query", params={"query": query}
                 )
                 response.raise_for_status()
                 data = response.json()
@@ -103,10 +102,11 @@ class BeeAggregator:
         return {"negotiation_success_rate": 0.0, "status": "UNKNOWN"}
 
     def _find_root(self) -> Path:
-        """Find the repository root by looking for pyproject.toml."""
+        """Find the repository root by looking for monorepo markers."""
         current = Path(__file__).resolve()
         for parent in current.parents:
-            if (parent / "pyproject.toml").exists():
+            # The monorepo root has these specific folders
+            if (parent / "core-service").exists() and (parent / "api-gateway").exists():
                 return parent
         return Path(".")
 

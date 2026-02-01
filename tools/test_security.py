@@ -9,7 +9,6 @@ import json
 
 import pytest
 import structlog
-
 from agent_identity import AgentWallet
 
 logger = structlog.get_logger(__name__)
@@ -44,10 +43,12 @@ def test_agent_wallet():
     x_agent_id, x_timestamp, x_signature = wallet.sign_request(
         "POST", "/v1/negotiate", test_payload
     )
-    logger.info("request_signed_successfully",
-                agent_id=x_agent_id,
-                timestamp=x_timestamp,
-                signature_snippet=x_signature[:50])
+    logger.info(
+        "request_signed_successfully",
+        agent_id=x_agent_id,
+        timestamp=x_timestamp,
+        signature_snippet=x_signature[:50],
+    )
 
     # Verify the signature
     body_json = json.dumps(test_payload, sort_keys=True, separators=(",", ":"))
@@ -167,18 +168,23 @@ def main():
         test_error_cases()
 
         logger.info("all_security_tests_passed")
-        logger.info("test_summary",
-                    agent_wallet=True,
-                    signature_flow=True,
-                    tampering_detection=True,
-                    view_only_support=True,
-                    error_handling=True)
+        logger.info(
+            "test_summary",
+            agent_wallet=True,
+            signature_flow=True,
+            tampering_detection=True,
+            view_only_support=True,
+            error_handling=True,
+        )
 
-        logger.info("test_wallet_info", did=wallet.did, public_key=wallet.public_key_hex)
+        logger.info(
+            "test_wallet_info", did=wallet.did, public_key=wallet.public_key_hex
+        )
 
     except Exception as e:
         logger.error("test_failed", error=str(e))
         import traceback
+
         traceback.print_exc()
         return 1
 

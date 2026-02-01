@@ -23,7 +23,17 @@ class BeeGenerator:
             else "You are bee.Keeper, guardian of the Aura Hive."
         )
 
-    async def generate(self, report: PurityReport, context: BeeContext, observation: BeeObservation) -> None:
+    def _find_root(self) -> Path:
+        """Find the repository root by looking for monorepo markers."""
+        current = Path(__file__).resolve()
+        for parent in current.parents:
+            if (parent / "core-service").exists() and (parent / "api-gateway").exists():
+                return parent
+        return Path(".")
+
+    async def generate(
+        self, report: PurityReport, context: BeeContext, observation: BeeObservation
+    ) -> None:
         logger.info("bee_generator_generate_started")
 
         # 1. Update llms.txt if needed
@@ -35,10 +45,11 @@ class BeeGenerator:
         await self._update_hive_state(report, context, observation)
 
     async def _update_llms_txt(self, context: BeeContext) -> None:
-        llms_txt_path = Path("../../llms.txt")
+        root = self._find_root()
+        llms_txt_path = root / "llms.txt"
         current_llms_txt = llms_txt_path.read_text() if llms_txt_path.exists() else ""
 
-        proto_files = list(Path("../../proto").rglob("*.proto"))
+        proto_files = list((root / "proto").rglob("*.proto"))
         proto_contents = ""
         for p in proto_files:
             proto_contents += f"\n--- {p} ---\n{p.read_text()}\n"
@@ -60,8 +71,7 @@ class BeeGenerator:
 
         try:
             response = await litellm.acompletion(
-                model=self.model,
-                messages=[{"role": "user", "content": prompt}]
+                model=self.model, messages=[{"role": "user", "content": prompt}]
             )
             updated_content = response.choices[0].message.content
             # Strip markdown
@@ -73,11 +83,15 @@ class BeeGenerator:
         except Exception as e:
             logger.error("llms_txt_sync_failed", error=str(e))
 
-    async def _update_hive_state(self, report: PurityReport, context: BeeContext, observation: BeeObservation) -> None:
-        state_path = Path("../../HIVE_STATE.md")
+    async def _update_hive_state(
+        self, report: PurityReport, context: BeeContext, observation: BeeObservation
+    ) -> None:
+        root = self._find_root()
+        state_path = root / "HIVE_STATE.md"
         current_content = state_path.read_text() if state_path.exists() else ""
 
         from datetime import datetime
+
         now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
         # Resource stats (pure Python)
@@ -104,12 +118,14 @@ class BeeGenerator:
         new_entry += "\n---\n\n"
 
         # Idempotency check (compare narrative and heresies)
-        if report.narrative in current_content and all(h in current_content for h in report.heresies):
-             # Also check if metrics changed significantly?
-             # For now, let's just check if the last entry is basically the same.
-             # Actually, just appending for now as chronicles should be a log.
-             # User said: "The Generator (G) must only produce a new version of HIVE_STATE.md if the actual metrics or task statuses have changed."
-             pass
+        if report.narrative in current_content and all(
+            h in current_content for h in report.heresies
+        ):
+            # Also check if metrics changed significantly?
+            # For now, let's just check if the last entry is basically the same.
+            # Actually, just appending for now as chronicles should be a log.
+            # User said: "The Generator (G) must only produce a new version of HIVE_STATE.md if the actual metrics or task statuses have changed."
+            pass
 
         # To keep it simple and fulfill the log nature, we append, but we could replace the whole file
         # if we want a "current state" view. User said "update resource stats in HIVE_STATE.md".
@@ -126,8 +142,8 @@ class BeeGenerator:
         if current_content:
             log_start = current_content.find("## Audit Log")
             if log_start != -1:
-                old_log = current_content[log_start + len("## Audit Log"):].strip()
-                full_content += old_log[:5000] # Truncate old log
+                old_log = current_content[log_start + len("## Audit Log") :].strip()
+                full_content += old_log[:5000]  # Truncate old log
 
         if full_content.strip() != current_content.strip():
             try:
