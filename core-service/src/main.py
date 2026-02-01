@@ -450,8 +450,8 @@ async def serve() -> None:
                     mock_signal = negotiation_pb2.NegotiateRequest(
                         item_id=item.id,
                         bid_amount=item.base_price * 1.1,  # High bid to ensure acceptance
-                        currency="USD",
-                        agent=negotiation_pb2.AgentInfo(
+                        currency_code="USD",
+                        agent=negotiation_pb2.AgentIdentity(
                             did="did:aura:heartbeat", reputation_score=1.0
                         ),
                         request_id=f"heartbeat-{uuid.uuid4()}",
