@@ -68,7 +68,7 @@ core:
   env:
     AURA_SERVER__LOG_LEVEL: info
     AURA_LLM__MODEL: "mistral/mistral-large-latest"  # Can override: openai/gpt-4o, ollama/mistral, rule
-    AURA_SERVER__PROMETHEUS_URL: "http://monitoring-kube-prometheus-prometheus.monitoring:9090"
+    AURA_SERVER__PROMETHEUS_URL: "http://monitoring-kube-prometheus-prometheus.monitoring.svc.cluster.local:9090"
 
 # PostgreSQL Database Configuration
 postgres:

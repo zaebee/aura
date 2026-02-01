@@ -2,6 +2,10 @@ from typing import Any, Protocol, runtime_checkable
 
 from .types import Event, HiveContext, IntentAction, Observation
 
+# HIVE DNA: CONFIGURATION PROTOCOLS
+# 1. Cross-namespace service discovery MUST use full FQDN paths (e.g., service.namespace.svc.cluster.local).
+# 2. Monitoring (Technical Layer) and Aura Core (Business Layer) integration must be deterministic and traceable.
+
 
 @runtime_checkable
 class Aggregator(Protocol):

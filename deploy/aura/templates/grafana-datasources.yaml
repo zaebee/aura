@@ -13,18 +13,18 @@ data:
       - name: Prometheus
         uid: Prometheus
         type: prometheus
-        url: "http://monitoring-kube-prometheus-prometheus.monitoring:9090"
+        url: "http://monitoring-kube-prometheus-prometheus.monitoring.svc.cluster.local:9090"
         access: proxy
         isDefault: true
       - name: Jaeger
         uid: Jaeger
         type: jaeger
-        url: "http://aura-jaeger.monitoring:16686"
+        url: "http://aura-jaeger.monitoring.svc.cluster.local:16686"
         access: proxy
       - name: Loki
         uid: Loki
         type: loki
-        url: "http://loki.monitoring:3100"
+        url: "http://loki.monitoring.svc.cluster.local:3100"
         access: proxy
         jsonData:
           derivedFields:

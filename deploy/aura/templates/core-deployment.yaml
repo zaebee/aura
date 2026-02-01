@@ -73,6 +73,6 @@ spec:
             - name: AURA_SERVER__PROMETHEUS_URL
               value: "{{ .Values.core.env.AURA_SERVER__PROMETHEUS_URL }}"
             - name: AURA_SERVER__OTEL_EXPORTER_OTLP_ENDPOINT
-              value: "http://aura-jaeger.monitoring:4317"
+              value: "http://aura-jaeger.monitoring.svc.cluster.local:4317"
             - name: AURA_SERVER__OTEL_SERVICE_NAME
               value: "{{ .Release.Name }}-core"
