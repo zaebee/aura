@@ -1,14 +1,11 @@
 import asyncio
+import os
 import sys
 
 import structlog
 
-from src.aggregator import BeeAggregator
 from src.config import KeeperSettings
-from src.connector import BeeConnector
-from src.generator import BeeGenerator
-from src.metabolism import BeeMetabolism
-from src.transformer import BeeTransformer
+from src.hive.metabolism import MetabolicLoop
 
 # Configure logging
 structlog.configure(
@@ -20,44 +17,31 @@ structlog.configure(
 )
 logger = structlog.get_logger(__name__)
 
+
 async def main() -> None:
     logger.info("bee_keeper_agent_starting")
 
     # 0. Load Settings
     settings = KeeperSettings()
 
-    # 1. Initialize Nucleotides
-    aggregator = BeeAggregator(settings=settings)
-    transformer = BeeTransformer(settings=settings)
-    connector = BeeConnector(settings=settings)
-    generator = BeeGenerator(settings=settings)
+    # 1. Initialize Metabolism
+    loop = MetabolicLoop(settings)
 
     # 1.5 Sanity Check: Test Brain Connectivity
-    await aggregator.test_brain_connectivity()
+    await loop.aggregator.test_brain_connectivity()
 
-    # 2. Initialize Metabolism
-    metabolism = BeeMetabolism(
-        aggregator=aggregator,
-        transformer=transformer,
-        connector=connector,
-        generator=generator
-    )
-
-    # 3. Execute Metabolic Cycle
+    # 2. Execute Metabolic Pulse
+    event_name = os.getenv("GITHUB_EVENT_NAME", "manual")
     try:
-        observation = await metabolism.execute()
-        if observation.success:
-            logger.info("bee_keeper_agent_finished_successfully", comment_url=observation.github_comment_url)
-        else:
-            logger.error("bee_keeper_agent_failed")
-            sys.exit(1)
+        await loop.pulse(event_name=event_name)
+        logger.info("bee_keeper_agent_finished_successfully")
     except Exception as e:
         logger.error("bee_keeper_agent_critical_error", error=str(e), exc_info=True)
         sys.exit(1)
     finally:
         # Cleanup
-        if hasattr(connector, "close"):
-            await connector.close()
+        await loop.connector.close()
+
 
 if __name__ == "__main__":
     asyncio.run(main())

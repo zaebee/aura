@@ -134,6 +134,10 @@ make test-cov
 python -m tools.simulators.agent_sim
 ```
 
+**Autonomous Buyer (Continuous Loop):**
+```bash
+python -m tools.simulators.autonomous_buyer
+```
 
 ## 📂 Project Structure
 
@@ -280,7 +284,7 @@ The platform now includes **cryptographic signature verification** using Ed25519
 
 4. **Test security**:
    ```bash
-   python tests/test_security.py
+   python tools/test_security.py
    ```
 
 ### Security Implementation Details

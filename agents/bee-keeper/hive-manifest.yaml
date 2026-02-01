@@ -2,10 +2,10 @@ hive:
   version: "1.2"
   description: "The Sacred Architecture of the Aura Hive - Sanctified"
   nucleotides:
-    A: "aggregator.py"
-    T: "transformer.py"
-    C: "connector.py"
-    G: "generator.py"
+    A: "src/hive/core/aggregator.py"
+    T: "src/hive/core/transformer.py"
+    C: "src/hive/gateway/connector.py"
+    G: "src/hive/scribe/generator.py"
   core_path: "core-service/src/hive"
   dna_path: "core-service/src/hive/dna.py"
   allowed_files:
@@ -31,7 +31,10 @@ hive:
     core-service/src/crypto: "SecurityCitadel"
     core-service/src/prompts: "EchoChamber"
     core-service/src/guard: "HiveMembrane"
-
-  # Peripheral Tooling
-  tools_shed:
-    - "tools/simulators"
+    deploy: "HiveArmor"
+    proto: "SacredScrolls"
+    docs: "ChroniclersArchive"
+    agents: "WorkerCells"
+    adapters: "HiveExtensions"
+    frontend: "HiveWindow"
+    tools: "ToolShed"

@@ -93,10 +93,10 @@ docker-compose exec db psql -U user -d aura_db
 ### Simulators and Testing Tools
 ```bash
 # Agent negotiation simulator
-python agent_sim.py
+python tools/agent_sim.py
 
 # Search functionality simulator
-python search_sim.py
+python tools/search_sim.py
 
 # Comprehensive telemetry test
 python test_telemetry_comprehensive.py
