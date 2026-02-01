@@ -5,6 +5,7 @@ This server acts as a proxy between AI models (via MCP) and the Aura Gateway,
 providing search and negotiation capabilities to LLMs like Claude 3.5 Sonnet.
 """
 
+
 import httpx
 import structlog
 from dotenv import load_dotenv

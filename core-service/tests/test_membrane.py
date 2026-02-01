@@ -1,6 +1,6 @@
 import pytest
-from src.hive.membrane import HiveMembrane
 from aura_core.types import HiveContext, IntentAction, NegotiationOffer
+from src.hive.membrane import HiveMembrane
 
 
 @pytest.mark.asyncio
@@ -16,9 +16,7 @@ async def test_membrane_rule1_floor_price_override():
     )
 
     # Proposing price below floor
-    decision = IntentAction(
-        action="accept", price=95.0, message="I accept your low bid."
-    )
+    decision = IntentAction(action="accept", price=95.0, message="I accept your low bid.")
     safe_decision = await membrane.inspect_outbound(decision, context)
 
     assert safe_decision.action == "counter"

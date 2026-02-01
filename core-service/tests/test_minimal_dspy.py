@@ -5,10 +5,8 @@ Minimal DSPy test to isolate the issue.
 
 import json
 import sys
-from pathlib import Path
 
 # Add src to path
-
 import dspy
 import structlog
 from llm.engine import AuraNegotiator

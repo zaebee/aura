@@ -11,9 +11,9 @@ from typing import Any, cast
 import dspy
 import structlog
 
-from src.hive.metabolism.config import get_settings
 from src.db import InventoryItem, SessionLocal
 from src.guard.membrane import OutputGuard, SafetyViolation
+from src.hive.metabolism.config import get_settings
 from src.llm.engine import AuraNegotiator
 from src.proto.aura.negotiation.v1 import negotiation_pb2
 

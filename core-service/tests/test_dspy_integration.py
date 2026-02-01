@@ -12,12 +12,11 @@ from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 import structlog
-
-# Add src to path
-
-from src.hive.transformer.dspy_strategy import DSPyStrategy
 from llm.engine import AuraNegotiator
 from llm.signatures import Negotiate
+
+# Add src to path
+from src.hive.transformer.dspy_strategy import DSPyStrategy
 
 # Configure logging
 structlog.configure(

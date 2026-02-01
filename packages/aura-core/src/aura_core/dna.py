@@ -1,13 +1,12 @@
+from pathlib import Path
 from typing import Any, Protocol, runtime_checkable
 
-from pathlib import Path
 from .types import (
     BeeContext,
     BeeObservation,
     Event,
     HiveContext,
     IntentAction,
-    NegotiationOffer,
     Observation,
     PurityReport,
     TelegramContext,

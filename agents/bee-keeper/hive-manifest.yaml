@@ -2,10 +2,10 @@ hive:
   version: "1.2"
   description: "The Sacred Architecture of the Aura Hive - Sanctified"
   nucleotides:
-    A: "src/hive/core/aggregator.py"
-    T: "src/hive/core/transformer.py"
-    C: "src/hive/gateway/connector.py"
-    G: "src/hive/scribe/generator.py"
+    A: "hive/core/aggregator.py"
+    T: "hive/core/transformer.py"
+    C: "hive/gateway/connector.py"
+    G: "hive/scribe/generator.py"
   core_path: "core-service/src/hive"
   dna_path: "packages/aura-core/src/aura_core/dna.py"
   allowed_files:

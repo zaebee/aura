@@ -190,10 +190,10 @@ buf lint
 
 ```bash
 # Agent negotiation simulator
-python tools/agent_sim.py
+python agent_sim.py
 
 # Search functionality simulator
-python tools/search_sim.py
+python search_sim.py
 ```
 
 ## 📦 Database Setup

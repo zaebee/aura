@@ -4,15 +4,13 @@ Simple test for DSPy integration - tests basic functionality.
 """
 
 import sys
-from pathlib import Path
 
 import structlog
-
-# Add src to path
-
-from src.hive.transformer.dspy_strategy import DSPyStrategy
 from llm.engine import AuraNegotiator
 from llm.signatures import Negotiate
+
+# Add src to path
+from src.hive.transformer.dspy_strategy import DSPyStrategy
 
 # Configure logging
 structlog.configure(

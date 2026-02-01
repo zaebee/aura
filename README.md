@@ -284,7 +284,7 @@ The platform now includes **cryptographic signature verification** using Ed25519
 
 4. **Test security**:
    ```bash
-   python tools/test_security.py
+   python tests/test_security.py
    ```
 
 ### Security Implementation Details

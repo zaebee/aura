@@ -14,8 +14,6 @@ from opentelemetry.instrumentation.sqlalchemy import SQLAlchemyInstrumentor
 from prometheus_client import start_http_server
 from sqlalchemy import text
 
-from src.hive.metabolism.config import settings
-from src.hive.metabolism.config.llm import get_raw_key
 from src.db import InventoryItem, SessionLocal, engine
 from src.embeddings import generate_embedding
 from src.hive.aggregator import HiveAggregator
@@ -23,6 +21,8 @@ from src.hive.connector import HiveConnector
 from src.hive.generator import HiveGenerator
 from src.hive.membrane import HiveMembrane
 from src.hive.metabolism import MetabolicLoop
+from src.hive.metabolism.config import settings
+from src.hive.metabolism.config.llm import get_raw_key
 from src.hive.transformer import AuraTransformer
 from src.logging_config import (
     bind_request_id,

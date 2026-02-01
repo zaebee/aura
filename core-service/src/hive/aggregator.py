@@ -6,12 +6,11 @@ from typing import Any
 
 import httpx
 import structlog
+from aura_core.types import HiveContext, NegotiationOffer
 from sqlalchemy.exc import SQLAlchemyError
 
-from src.hive.metabolism.config import get_settings
 from src.db import InventoryItem, SessionLocal
-
-from aura_core.types import HiveContext, NegotiationOffer
+from src.hive.metabolism.config import get_settings
 
 logger = structlog.get_logger(__name__)
 
@@ -130,9 +129,7 @@ class HiveAggregator:
                 )
 
                 if not (cpu_success or mem_success):
-                    raise httpx.ConnectError(
-                        f"All metric fetches failed: {', '.join(errors)}"
-                    )
+                    raise httpx.ConnectError(f"All metric fetches failed: {', '.join(errors)}")
 
                 metrics = {
                     "status": "ok",
