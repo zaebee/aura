@@ -1,3 +1,4 @@
+import re
 import litellm
 import structlog
 
@@ -104,9 +105,15 @@ class BeeGenerator:
         # Formatting Blight vs Heresy
         # If all LLMs failed, it's a Blight
         llm_unavailable = report.metadata.get("llm_unavailable", False)
+        brain_status = context.metadata.get("brain_status", {})
         status_label = "PURE" if report.is_pure else "IMPURE"
-        if llm_unavailable and not report.is_pure:
+
+        if llm_unavailable or (brain_status and not any(brain_status.values())):
             status_label = "BLIGHTED"
+        elif brain_status and not all(brain_status.values()):
+            # Only set DEGRADED if it's not already IMPURE
+            if status_label == "PURE":
+                status_label = "DEGRADED"
 
         new_entry = f"## Audit: {now}\n\n"
         new_entry += f"**Status:** {status_label}\n"
@@ -155,6 +162,28 @@ class BeeGenerator:
             if log_start != -1:
                 old_log = current_content[log_start + len("## Audit Log") :].strip()
                 full_content += old_log[:5000]  # Truncate old log
+
+        # 3. Update System Vitals (Transformer status)
+        if brain_status:
+            primary_ok = brain_status.get("primary", False)
+            fallback_ok = brain_status.get("fallback", False)
+
+            p_model = self.settings.llm__model
+            f_model = self.settings.llm__fallback_model
+
+            if primary_ok and fallback_ok:
+                vitals_text = f"🟢 ACTIVE. Primary ({p_model}) and Fallback ({f_model}) are both healthy."
+            elif any(brain_status.values()):
+                failed_role = "Fallback" if primary_ok else "Primary"
+                failed_model = f_model if primary_ok else p_model
+                ok_model = p_model if primary_ok else f_model
+                vitals_text = f"🟡 DEGRADED. {ok_model} is OK, but {failed_role} ({failed_model}) failed."
+            else:
+                vitals_text = f"🔴 OFFLINE. Both Primary ({p_model}) and Fallback ({f_model}) are unreachable."
+
+            # Regex to find and replace the Transformer line in the System Vitals section
+            transformer_pattern = r"(- \*\*Transformer \(T\):\*\*) .*"
+            full_content = re.sub(transformer_pattern, rf"\1 {vitals_text}", full_content)
 
         if full_content.strip() != current_content.strip():
             try:
