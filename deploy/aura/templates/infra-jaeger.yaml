@@ -1,18 +1,18 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: aura-jaeger
+  name: {{ .Release.Name }}-jaeger
   labels:
-    app: aura-jaeger
+    app: jaeger
 spec:
   replicas: 1
   selector:
     matchLabels:
-      app: aura-jaeger
+      app: jaeger
   template:
     metadata:
       labels:
-        app: aura-jaeger
+        app: jaeger
     spec:
       containers:
       - name: jaeger
@@ -45,11 +45,11 @@ spec:
 apiVersion: v1
 kind: Service
 metadata:
-  name: aura-jaeger
+  name: {{ .Release.Name }}-jaeger
 spec:
   type: {{ .Values.monitoring.jaeger.service.type }}
   selector:
-    app: aura-jaeger
+    app: jaeger
   ports:
   - name: ui
     port: 16686
