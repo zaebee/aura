@@ -150,7 +150,7 @@ class BeeAggregator:
                 logger.warning("llm_ping_transient_error", model=model, error=str(e))
                 all_ok = False
             except Exception as e:
-                logger.error("llm_ping_unexpected_error", model=model, error=str(e), exc_info=True)
+                logger.error("llm_ping_unexpected_error", model=model, error=str(e))
                 all_ok = False
 
         return all_ok

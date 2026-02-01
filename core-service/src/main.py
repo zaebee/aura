@@ -435,10 +435,10 @@ async def serve() -> None:
     # 9. Start Heartbeat Deal (Honey Stimulus)
     async def heartbeat_deal_loop() -> None:
         """Trigger a mock successful negotiation every 12 hours."""
+        # Initial wait to allow system to warm up
+        await asyncio.sleep(60)
         while True:
             try:
-                # Wait 12 hours between stimulations
-                await asyncio.sleep(12 * 3600)
                 logger.info("triggering_heartbeat_deal")
 
                 # Fetch a valid item for the mock deal
@@ -462,6 +462,9 @@ async def serve() -> None:
                     logger.warning("heartbeat_deal_failed_no_items")
             except Exception as e:
                 logger.error("heartbeat_deal_error", error=str(e))
+
+            # Wait 12 hours between stimulations
+            await asyncio.sleep(12 * 3600)
 
     asyncio.create_task(heartbeat_deal_loop())
 

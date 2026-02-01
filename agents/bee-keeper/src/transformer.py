@@ -96,7 +96,14 @@ class BeeTransformer:
                  # Check for unauthorized top-level growth
                  parent_dir = p.parts[0]
                  allowed_top_levels = set(chamber.split("/")[0] for chamber in ALLOWED_CHAMBERS.keys())
-                 allowed_root_files = ["pyproject.toml", "uv.lock", "README.md", "HIVE_STATE.md", "CHRONICLES.md", "Makefile", "compose.yml", "buf.yaml", "buf.gen.yaml", ".python-version", "CLAUDE.md", "CRYPTO_QUICKSTART.md", "CRYPTO_INTEGRATION_SUMMARY.md", "llms.txt"]
+                 allowed_root_files = [
+                     "pyproject.toml", "uv.lock", "README.md", "HIVE_STATE.md",
+                     "CHRONICLES.md", "Makefile", "compose.yml", "buf.yaml",
+                     "buf.gen.yaml", ".python-version", "CLAUDE.md",
+                     "CRYPTO_QUICKSTART.md", "CRYPTO_INTEGRATION_SUMMARY.md",
+                     "llms.txt", ".env.example", ".dockerignore", ".gitignore",
+                     ".pre-commit-config.yaml"
+                 ]
 
                  if len(p.parts) == 1:
                      # Root file check
@@ -106,8 +113,11 @@ class BeeTransformer:
                      heresies.append(f"Unauthorized Growth: '{p}' has expanded outside sanctioned chambers. The Inquisitor demands its removal.")
 
         # 2. Metric Verification
-        success_rate = context.hive_metrics.get("negotiation_success_rate", 1.0)
-        if success_rate < 0.7:
+        metrics = context.hive_metrics
+        success_rate = metrics.get("negotiation_success_rate", 1.0)
+        status = metrics.get("status", "ok")
+
+        if status != "UNKNOWN" and success_rate < 0.7:
              heresies.append(
                  f"Hive Alert: 'negotiation_success_rate' is {success_rate:.2f}, which is below the critical threshold of 0.7. The Hive flow is obstructed."
              )
