@@ -40,6 +40,9 @@ ALLOWED_ROOT_FILES = [
     ".env.example",
     "compose.yml",
     ".pre-commit-config.yaml",
+    "CLAUDE.md",
+    "CRYPTO_INTEGRATION_SUMMARY.md",
+    "CRYPTO_QUICKSTART.md",
 ]
 
 

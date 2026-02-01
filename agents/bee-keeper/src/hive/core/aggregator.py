@@ -22,8 +22,8 @@ class BeeAggregator:
         self.repo_name = settings.github_repository
         self.event_path = settings.github_event_path
 
-    async def perceive(self) -> BeeContext:
-        logger.info("bee_aggregator_perceive_started")
+    async def sense(self, event_name: str = "manual") -> BeeContext:
+        logger.info("bee_aggregator_sense_started", trigger_event=event_name)
 
         git_diff = await self._get_git_diff()
         hive_metrics = await self._get_hive_metrics()
@@ -35,7 +35,7 @@ class BeeAggregator:
             hive_metrics=hive_metrics,
             filesystem_map=filesystem_map,
             repo_name=self.repo_name,
-            event_name=self.settings.github_event_name,
+            event_name=event_name,
             event_data=event_data,
         )
 
