@@ -442,7 +442,7 @@ async def serve() -> None:
                 logger.info("triggering_heartbeat_deal")
 
                 # Fetch a valid item for the mock deal
-                def get_item():
+                def get_item() -> InventoryItem | None:
                     with SessionLocal() as session:
                         return session.query(InventoryItem).first()
 
