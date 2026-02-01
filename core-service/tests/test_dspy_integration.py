@@ -14,7 +14,6 @@ from unittest.mock import MagicMock, patch
 import structlog
 
 # Add src to path
-sys.path.append(str(Path(__file__).parent.parent / "src"))
 
 from src.hive.transformer.dspy_strategy import DSPyStrategy
 from llm.engine import AuraNegotiator
