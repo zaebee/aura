@@ -4,7 +4,7 @@ import litellm
 import structlog
 
 from src.config import KeeperSettings
-from src.hive.dna import BeeContext, BeeObservation, PurityReport
+from src.hive.dna import BeeContext, BeeObservation, PurityReport, find_hive_root
 
 logger = structlog.get_logger(__name__)
 
@@ -16,21 +16,13 @@ class BeeGenerator:
         self.settings = settings
         self.model = settings.llm__model
         litellm.api_key = settings.llm__api_key
-        prompt_path = Path("prompts/bee_keeper.md")
+        root = find_hive_root()
+        prompt_path = root / "agents/bee-keeper/prompts/bee_keeper.md"
         self.persona = (
             prompt_path.read_text()
             if prompt_path.exists()
             else "You are bee.Keeper, guardian of the Aura Hive."
         )
-
-    def _find_root(self) -> Path:
-        """Find the repository root by searching upwards for markers."""
-        p = Path(__file__).resolve()
-        for parent in [p] + list(p.parents):
-            # Monorepo markers
-            if (parent / "core-service").exists() and (parent / "api-gateway").exists():
-                return parent
-        return Path.cwd()
 
     async def generate(
         self, report: PurityReport, context: BeeContext, observation: BeeObservation
@@ -46,7 +38,7 @@ class BeeGenerator:
         await self._update_hive_state(report, context, observation)
 
     async def _update_llms_txt(self, context: BeeContext) -> None:
-        root = self._find_root()
+        root = find_hive_root()
         llms_txt_path = root / "llms.txt"
         current_llms_txt = llms_txt_path.read_text() if llms_txt_path.exists() else ""
 
@@ -87,7 +79,7 @@ class BeeGenerator:
     async def _update_hive_state(
         self, report: PurityReport, context: BeeContext, observation: BeeObservation
     ) -> None:
-        root = self._find_root()
+        root = find_hive_root()
         state_path = root / "HIVE_STATE.md"
         current_content = state_path.read_text() if state_path.exists() else ""
 

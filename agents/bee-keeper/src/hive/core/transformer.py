@@ -11,6 +11,7 @@ from src.hive.dna import (
     MACRO_ATCG_FOLDERS,
     BeeContext,
     PurityReport,
+    find_hive_root,
 )
 
 logger = structlog.get_logger(__name__)
@@ -23,8 +24,9 @@ class BeeTransformer:
         self.settings = settings
         self.model = settings.llm__model
         litellm.api_key = settings.llm__api_key
+        root = find_hive_root()
 
-        prompt_path = Path("prompts/bee_keeper.md")
+        prompt_path = root / "agents/bee-keeper/prompts/bee_keeper.md"
         self.persona = (
             prompt_path.read_text()
             if prompt_path.exists()
@@ -32,7 +34,7 @@ class BeeTransformer:
         )
 
         # Load manifest
-        manifest_path = Path("hive-manifest.yaml")
+        manifest_path = root / "agents/bee-keeper/hive-manifest.yaml"
         if manifest_path.exists():
             with open(manifest_path) as f:
                 self.manifest = yaml.safe_load(f)

@@ -1,5 +1,16 @@
 from dataclasses import dataclass, field
+from pathlib import Path
 from typing import Any, Protocol, runtime_checkable
+
+
+def find_hive_root() -> Path:
+    """Find the repository root by searching upwards for markers."""
+    p = Path(__file__).resolve()
+    for parent in [p] + list(p.parents):
+        # Monorepo markers
+        if (parent / "core-service").exists() and (parent / "api-gateway").exists():
+            return parent
+    return Path.cwd()
 
 
 MACRO_ATCG_FOLDERS = [

@@ -8,7 +8,7 @@ import httpx
 import structlog
 
 from src.config import KeeperSettings
-from src.hive.dna import BeeContext
+from src.hive.dna import BeeContext, find_hive_root
 
 logger = structlog.get_logger(__name__)
 
@@ -101,19 +101,10 @@ class BeeAggregator:
 
         return {"negotiation_success_rate": 0.0, "status": "UNKNOWN"}
 
-    def _find_root(self) -> Path:
-        """Find the repository root by searching upwards for markers."""
-        p = Path(__file__).resolve()
-        for parent in [p] + list(p.parents):
-            # Monorepo markers
-            if (parent / "core-service").exists() and (parent / "api-gateway").exists():
-                return parent
-        return Path.cwd()
-
     def _scan_filesystem(self) -> list[str]:
         filesystem_map = []
         # Scan from repository root
-        root_path = self._find_root()
+        root_path = find_hive_root()
 
         # 1. Capture Root Structure (Top-level only) for Macro-ATCG check
         for path in root_path.iterdir():

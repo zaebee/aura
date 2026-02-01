@@ -7,7 +7,7 @@ import nats.errors
 import structlog
 
 from src.config import KeeperSettings
-from src.hive.dna import BeeContext, BeeObservation, PurityReport
+from src.hive.dna import BeeContext, BeeObservation, PurityReport, find_hive_root
 from src.hive.proteins.gh_client import GitHubClient
 
 logger = structlog.get_logger(__name__)
@@ -55,19 +55,10 @@ class BeeConnector:
             injuries=injuries,
         )
 
-    def _find_root(self) -> Path:
-        """Find the repository root by searching upwards for markers."""
-        p = Path(__file__).resolve()
-        for parent in [p] + list(p.parents):
-            # Monorepo markers
-            if (parent / "core-service").exists() and (parent / "api-gateway").exists():
-                return parent
-        return Path.cwd()
-
     async def _commit_changes(self) -> None:
         import subprocess  # nosec
 
-        root = self._find_root()
+        root = find_hive_root()
 
         def git_commit() -> None:
             try:
