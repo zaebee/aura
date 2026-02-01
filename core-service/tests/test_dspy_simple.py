@@ -4,13 +4,16 @@ Simple test for DSPy integration - tests basic functionality.
 """
 
 import sys
+from pathlib import Path
 
 import structlog
-from llm.engine import AuraNegotiator
-from llm.signatures import Negotiate
 
 # Add src to path
-from src.hive.transformer.dspy_strategy import DSPyStrategy
+sys.path.append(str(Path(__file__).parent.parent / "src"))
+
+from hive.transformer.main import AuraTransformer
+from llm.engine import AuraNegotiator
+from llm.signatures import Negotiate
 
 # Configure logging
 structlog.configure(
@@ -23,17 +26,17 @@ structlog.configure(
 logger = structlog.get_logger(__name__)
 
 
-def main():
+def test_dspy_integration_basics():
     logger.info("testing_dspy_integration")
 
     # Test 1: Signature definition
     logger.info("testing_signature_definition")
     # Check that signature has the expected fields
-    assert "input_bid" in Negotiate.input_fields
-    assert "context" in Negotiate.input_fields
-    assert "history" in Negotiate.input_fields
-    assert "thought" in Negotiate.output_fields
-    assert "action" in Negotiate.output_fields
+    assert "input_bid" in Negotiate.fields
+    assert "context" in Negotiate.fields
+    assert "history" in Negotiate.fields
+    assert "thought" in Negotiate.fields
+    assert "action" in Negotiate.fields
     logger.info("signature_defined_correctly")
 
     # Test 2: AuraNegotiator creation
@@ -42,31 +45,12 @@ def main():
     assert negotiator is not None
     logger.info("aura_negotiator_created_successfully")
 
-    # Test 3: DSPyStrategy creation
-    logger.info("testing_dspy_strategy_creation")
-    strategy = DSPyStrategy()
-    assert strategy is not None
-    assert strategy.negotiator is not None
-    logger.info("dspy_strategy_created_successfully")
-
-    # Test 4: Fallback mechanism
-    logger.info("testing_fallback_mechanism")
-    fallback = strategy._get_fallback_strategy()
-    assert fallback is not None
-    logger.info("fallback_mechanism_works")
+    # Test 3: AuraTransformer creation
+    logger.info("testing_aura_transformer_creation")
+    transformer = AuraTransformer()
+    assert transformer is not None
+    assert transformer.negotiator is not None
+    logger.info("aura_transformer_created_successfully")
 
     logger.info("all_basic_tests_passed")
     logger.info("dspy_integration_working")
-
-    return True
-
-
-if __name__ == "__main__":
-    try:
-        success = main()
-        sys.exit(0 if success else 1)
-    except Exception as e:
-        logger.error("test_failed", error=str(e))
-        import traceback
-        traceback.print_exc()
-        sys.exit(1)

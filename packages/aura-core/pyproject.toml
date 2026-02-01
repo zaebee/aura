@@ -5,6 +5,9 @@ description = "Shared DNA for the Aura Hive"
 requires-python = ">=3.12"
 dependencies = []
 
+[tool.setuptools.package-data]
+aura_core = ["py.typed"]
+
 [build-system]
 requires = ["setuptools>=61.0"]
 build-backend = "setuptools.build_meta"
