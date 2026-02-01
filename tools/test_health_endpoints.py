@@ -64,10 +64,17 @@ def test_core_service_grpc_health():
     logger.info("testing_core_service_grpc_health")
 
     try:
+        import shutil
         import subprocess  # nosec B404
 
-        result = subprocess.run(  # nosec B603, B607
-            ["grpc_health_probe", "-addr=localhost:50051"],
+        probe_path = shutil.which("grpc_health_probe")
+        if not probe_path:
+            logger.warning("grpc_health_skipped",
+                           reason="grpc_health_probe not found in PATH")
+            return None
+
+        result = subprocess.run(  # nosec B603
+            [probe_path, "-addr=localhost:50051"],
             capture_output=True,
             text=True,
             timeout=5,
