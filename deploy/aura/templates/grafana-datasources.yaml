@@ -13,13 +13,13 @@ data:
       - name: Prometheus
         uid: Prometheus
         type: prometheus
-        url: "http://monitoring-kube-prometheus-prometheus.monitoring.svc.cluster.local:9090"
+        url: "http://prometheus-kube-prometheus-prometheus.monitoring.svc.cluster.local:9090"
         access: proxy
         isDefault: true
       - name: Jaeger
         uid: Jaeger
         type: jaeger
-        url: "http://aura-jaeger.monitoring.svc.cluster.local:16686"
+        url: "http://jaeger-query.monitoring.svc.cluster.local:16686"
         access: proxy
       - name: Loki
         uid: Loki
