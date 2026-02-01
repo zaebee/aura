@@ -141,17 +141,25 @@ class BeeAggregator:
             "fallback": self.settings.llm__fallback_model,
         }
         self.brain_status = {}
+        litellm.api_key = self.settings.llm__api_key
 
         for role, model in models.items():
             try:
                 logger.info("pinging_llm", role=role, model=model)
+
+                kwargs = {
+                    "model": model,
+                    "messages": [{"role": "user", "content": "ping"}],
+                    "max_tokens": 5,
+                    "timeout": 10.0,
+                }
+
+                if "ollama" in model:
+                    kwargs["api_base"] = self.settings.llm__ollama_base_url
+
                 # Simple completion to test connectivity
-                await litellm.acompletion(
-                    model=model,
-                    messages=[{"role": "user", "content": "ping"}],
-                    max_tokens=5,
-                    timeout=10.0,
-                )
+                await litellm.acompletion(**kwargs)
+
                 logger.info("llm_ping_success", role=role, model=model)
                 self.brain_status[role] = True
             except (
@@ -165,7 +173,8 @@ class BeeAggregator:
                 )
                 self.brain_status[role] = False
             except Exception as e:
-                logger.error(
+                # Still log as warning to satisfy "log a WARNING but don't exit" spirit for single model failures
+                logger.warning(
                     "llm_ping_unexpected_error", role=role, model=model, error=str(e)
                 )
                 self.brain_status[role] = False

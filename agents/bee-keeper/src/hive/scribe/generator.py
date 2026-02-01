@@ -183,7 +183,11 @@ class BeeGenerator:
 
             # Regex to find and replace the Transformer line in the System Vitals section
             transformer_pattern = r"(- \*\*Transformer \(T\):\*\*) .*"
-            full_content = re.sub(transformer_pattern, rf"\1 {vitals_text}", full_content)
+            full_content = re.sub(
+                transformer_pattern,
+                lambda m: f"{m.group(1)} {vitals_text}",
+                full_content,
+            )
 
         if full_content.strip() != current_content.strip():
             try:
