@@ -56,6 +56,6 @@ spec:
             - name: OTEL_SERVICE_NAME
               value: "{{ .Release.Name }}-gateway"
             - name: OTEL_EXPORTER_OTLP_ENDPOINT
-              value: "http://{{ .Release.Name }}-jaeger:4317"
+              value: "{{ .Values.monitoring.jaeger.collectorUrl }}"
             - name: CORS_ORIGINS
               value: "{{ .Values.gateway.corsOrigins }}"

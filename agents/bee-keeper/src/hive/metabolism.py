@@ -1,5 +1,7 @@
+import time
 import structlog
 
+from src.config import KeeperSettings
 from aura_core.dna import (
     BeeAggregator,
     BeeConnector,
@@ -13,10 +15,7 @@ logger = structlog.get_logger(__name__)
 
 
 class BeeMetabolism:
-    """
-    Orchestrates the ATCG flow for the BeeKeeper agent:
-    A (Aggregator) -> T (Transformer) -> C (Connector) -> G (Generator)
-    """
+    """Orchestrates the ATCG flow for the bee.Keeper agent."""
 
     def __init__(
         self,
@@ -31,16 +30,14 @@ class BeeMetabolism:
         self.generator = generator
 
     async def execute(self) -> BeeObservation:
-        """Execute one full metabolic cycle of the BeeKeeper."""
-        import time
-
+        """Execute one complete metabolic cycle."""
         logger.info("bee_metabolism_started")
         start_time = time.time()
 
-        # 1. Aggregator (A) - Perceive/Sense
+        # 1. Aggregator (A) - Senses the environment
         context = await self.aggregator.perceive()
 
-        # 2. Transformer (T) - Think/Reason
+        # 2. Transformer (T) - Reasons and audits
         if context.event_name == "schedule":
             logger.info("scheduled_heartbeat_detected_skipping_llm_audit")
             report = PurityReport(
@@ -50,20 +47,21 @@ class BeeMetabolism:
                 metadata={"heartbeat": True},
             )
         else:
+            # T now performs deterministic regex audit + reflective LLM analysis
             report = await self.transformer.think(context)
 
         report.execution_time = time.time() - start_time
 
-        # 3. Connector (C) - Act/Output
+        # 3. Connector (C) - Interacts with the outer world (GitHub)
         observation = await self.connector.act(report, context)
 
-        # 4. Generator (G) - Generate/Chronicle
+        # 4. Generator (G) - Updates records and chronicles
         await self.generator.generate(report, context, observation)
 
         logger.info(
             "bee_metabolism_completed",
-            is_pure=report.is_pure,
-            heresies_count=len(report.heresies),
+            pure=report.is_pure,
+            heresies=len(report.heresies),
+            execution_time=f"{report.execution_time:.2f}s",
         )
-
         return observation

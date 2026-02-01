@@ -134,6 +134,10 @@ make test-cov
 python -m tools.simulators.agent_sim
 ```
 
+**Autonomous Buyer (Continuous Loop):**
+```bash
+python -m tools.simulators.autonomous_buyer
+```
 
 ## 📂 Project Structure
 

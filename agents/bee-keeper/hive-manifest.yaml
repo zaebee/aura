@@ -2,10 +2,10 @@ hive:
   version: "1.2"
   description: "The Sacred Architecture of the Aura Hive - Sanctified"
   nucleotides:
-    A: "aggregator.py"
-    T: "transformer/main.py"
-    C: "connector/main.py"
-    G: "generator.py"
+    A: "hive/core/aggregator.py"
+    T: "hive/core/transformer.py"
+    C: "hive/gateway/connector.py"
+    G: "hive/scribe/generator.py"
   core_path: "core-service/src/hive"
   dna_path: "packages/aura-core/src/aura_core/dna.py"
   allowed_files:
@@ -32,6 +32,7 @@ hive:
     core-service/src/prompts: "EchoChamber"
     core-service/src/guard: "HiveMembrane"
     packages: "HiveNucleotides"
+    tests: "OuterValidationPollen"
 
   # Peripheral Tooling
   tools_shed:

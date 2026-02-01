@@ -46,7 +46,7 @@ test-health:
 
 simulate:
 	# Run agent negotiation simulation
-	uv run python tools/agent_sim.py
+	uv run python tools/simulators/agent_sim.py
 
 # --- 2. BUILD ---
 build: generate build-tg

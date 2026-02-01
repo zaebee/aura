@@ -434,7 +434,7 @@ async def serve() -> None:
 
     # 9. Start Heartbeat Deal (Honey Stimulus)
     async def heartbeat_deal_loop() -> None:
-        """Trigger a mock successful negotiation every 12 hours."""
+        """Trigger a mock successful negotiation periodically."""
         # Initial wait to allow system to warm up
         await asyncio.sleep(60)
         while True:
@@ -442,17 +442,21 @@ async def serve() -> None:
                 logger.info("triggering_heartbeat_deal")
 
                 # Fetch a valid item for the mock deal
-                with SessionLocal() as session:
-                    item = session.query(InventoryItem).first()
+                def get_item() -> InventoryItem | None:
+                    with SessionLocal() as session:
+                        return session.query(InventoryItem).first()
+
+                item = await asyncio.to_thread(get_item)
 
                 if item:
                     # Use real protobuf types for the heartbeat signal
                     mock_signal = negotiation_pb2.NegotiateRequest(
                         item_id=item.id,
-                        bid_amount=item.base_price * 1.1,  # High bid to ensure acceptance
+                        bid_amount=item.base_price * settings.heartbeat.bid_multiplier,
                         currency_code="USD",
                         agent=negotiation_pb2.AgentIdentity(
-                            did="did:aura:heartbeat", reputation_score=1.0
+                            did=settings.heartbeat.agent_did,
+                            reputation_score=settings.heartbeat.agent_reputation,
                         ),
                         request_id=f"heartbeat-{uuid.uuid4()}",
                     )
@@ -463,8 +467,7 @@ async def serve() -> None:
             except Exception as e:
                 logger.error("heartbeat_deal_error", error=str(e))
 
-            # Wait 12 hours between stimulations
-            await asyncio.sleep(12 * 3600)
+            await asyncio.sleep(settings.heartbeat.interval_seconds)
 
     asyncio.create_task(heartbeat_deal_loop())
 
