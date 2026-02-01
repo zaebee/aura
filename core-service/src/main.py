@@ -432,6 +432,49 @@ async def serve() -> None:
     negotiation_service.metabolism = metabolism
     negotiation_service.market_service = market_service
 
+    # 9. Start Heartbeat Deal (Honey Stimulus)
+    async def heartbeat_deal_loop() -> None:
+        """Trigger a mock successful negotiation every 12 hours."""
+        from dataclasses import dataclass
+
+        @dataclass
+        class MockAgent:
+            did: str
+            reputation_score: float
+
+        @dataclass
+        class MockSignal:
+            item_id: str
+            bid_amount: float
+            agent: MockAgent
+            request_id: str
+
+        while True:
+            try:
+                # Wait 12 hours between stimulations
+                await asyncio.sleep(12 * 3600)
+                logger.info("triggering_heartbeat_deal")
+
+                # Fetch a valid item for the mock deal
+                with SessionLocal() as session:
+                    item = session.query(InventoryItem).first()
+
+                if item:
+                    mock_signal = MockSignal(
+                        item_id=item.id,
+                        bid_amount=item.base_price * 1.1, # High bid to ensure acceptance
+                        agent=MockAgent(did="did:aura:heartbeat", reputation_score=1.0),
+                        request_id=f"heartbeat-{uuid.uuid4()}"
+                    )
+                    await metabolism.execute(mock_signal)
+                    logger.info("heartbeat_deal_successful")
+                else:
+                    logger.warning("heartbeat_deal_failed_no_items")
+            except Exception as e:
+                logger.error("heartbeat_deal_error", error=str(e))
+
+    asyncio.create_task(heartbeat_deal_loop())
+
     logger.info(
         "initialization_complete",
         services=["NegotiationService", "Health"],

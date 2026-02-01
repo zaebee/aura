@@ -7,13 +7,13 @@ import structlog
 import yaml  # type: ignore
 
 from src.config import KeeperSettings
-from src.dna import BeeContext, PurityReport
+from src.dna import ALLOWED_CHAMBERS, AuditObservation, BeeContext
 
 logger = structlog.get_logger(__name__)
 
 
 class BeeTransformer:
-    """T - Transformer: Analyzes purity and generates reports."""
+    """T - Transformer: Analyzes purity and generates audit observations."""
 
     def __init__(self, settings: KeeperSettings) -> None:
         self.settings = settings
@@ -35,14 +35,13 @@ class BeeTransformer:
         else:
             self.manifest = {}
 
-    async def think(self, context: BeeContext) -> PurityReport:
+    async def think(self, context: BeeContext) -> AuditObservation:
         logger.info("bee_transformer_think_started")
 
         # 1. Structural Check (Deterministic)
-        structural_heresies = self._deterministic_audit(context)
+        structural_findings = self._deterministic_audit(context)
 
         # 2. LLM Audit (Reflective)
-        # Handle large diffs
         if len(context.git_diff) > 4000:
             logger.info("large_diff_detected_summarizing_first")
             summary = await self._summarize_diff(context.git_diff)
@@ -50,20 +49,21 @@ class BeeTransformer:
 
         purity_analysis = await self._llm_audit(context)
 
-        # ATCG Purity: Transformer returns deterministic heresies.
-        # LLM findings are isolated in reasoning/metadata for the Generator to chronicle.
-        is_pure = len(structural_heresies) == 0
+        # ATCG Purity: Transformer returns a single AuditObservation.
+        # Reasoning and metadata contain the raw insights.
+        is_pure = len(structural_findings) == 0
 
-        return PurityReport(
+        return AuditObservation(
             is_pure=is_pure,
-            heresies=structural_heresies,
+            heresies=structural_findings,
             narrative=purity_analysis.get("narrative", "The Hive remains silent."),
             reasoning=purity_analysis.get("reasoning", ""),
             token_usage=purity_analysis.get("token_usage", 0),
             metadata={
                 "llm_analysis": purity_analysis,
-                "structural_heresies": structural_heresies,
-                "reflective_heresies": purity_analysis.get("heresies", [])
+                "structural_heresies": structural_findings,
+                "reflective_heresies": purity_analysis.get("heresies", []),
+                "llm_unavailable": purity_analysis.get("llm_unavailable", False),
             },
         )
 
@@ -72,14 +72,31 @@ class BeeTransformer:
         core_path = self.manifest.get("hive", {}).get("core_path", "core-service/src/hive")
         allowed_files = self.manifest.get("hive", {}).get("allowed_files", [])
 
-        # 1. Structural Check
+        # 1. Structural Check (Core and Allowed Chambers)
         for file_path in context.filesystem_map:
             p = Path(file_path)
+
+            # Check core Hive nucleotides
             if str(p.parent) == core_path:
                 if allowed_files and p.name not in allowed_files:
                     heresies.append(
                         f"Structural Heresy: '{p.name}' is an unauthorized growth in the core nucleotides."
                     )
+                continue
+
+            # Check allowed peripheral chambers (Sanctified Infrastructure)
+            is_sanctified = False
+            for chamber, role in ALLOWED_CHAMBERS.items():
+                if str(p).startswith(chamber):
+                    is_sanctified = True
+                    break
+
+            # If it's not in core, not a known chamber, and not a dotfile/metafile, flag it
+            if not is_sanctified and not p.name.startswith(".") and "/" in str(p):
+                 # We only flag top-level unknown directories or files that should be tools
+                 parent_dir = p.parts[0]
+                 if parent_dir not in ["deploy", "proto", "docs", "tools", "tests", "agents", "adapters", "api-gateway", "core-service", "frontend"]:
+                     heresies.append(f"Foreign Body: '{p}' has taken root outside sanctioned chambers.")
 
         # 2. Metric Verification
         success_rate = context.hive_metrics.get("negotiation_success_rate", 1.0)

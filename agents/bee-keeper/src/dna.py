@@ -15,8 +15,8 @@ class BeeContext:
 
 
 @dataclass
-class PurityReport:
-    """The result of an architectural audit."""
+class AuditObservation:
+    """The raw result of an architectural audit."""
     is_pure: bool
     heresies: list[str] = field(default_factory=list)
     narrative: str = ""
@@ -36,6 +36,16 @@ class BeeObservation:
     metadata: dict[str, Any] = field(default_factory=dict)
 
 
+# Sacred Roles for Infrastructure
+ALLOWED_CHAMBERS = {
+    "core-service/migrations": "HiveEvolutionaryScrolls",
+    "core-service/tests": "ValidationPollen",
+    "api-gateway": "HiveGate",
+    "core-service/src/config": "SacredCodex",
+    "core-service/src/services": "WorkerDirectives",
+}
+
+
 @runtime_checkable
 class BeeAggregator(Protocol):
     """A - Aggregator: Gathers signals from Git, Prometheus, and Filesystem."""
@@ -46,16 +56,16 @@ class BeeAggregator(Protocol):
 @runtime_checkable
 class BeeTransformer(Protocol):
     """T - Transformer: Analyzes purity and generates reports."""
-    async def think(self, context: BeeContext) -> PurityReport: ...
+    async def think(self, context: BeeContext) -> AuditObservation: ...
 
 
 @runtime_checkable
 class BeeConnector(Protocol):
     """C - Connector: Interacts with GitHub and NATS."""
-    async def act(self, report: PurityReport, context: BeeContext) -> BeeObservation: ...
+    async def act(self, report: AuditObservation, context: BeeContext) -> BeeObservation: ...
 
 
 @runtime_checkable
 class BeeGenerator(Protocol):
     """G - Generator: Updates documentation and chronicles."""
-    async def generate(self, report: PurityReport, context: BeeContext) -> None: ...
+    async def generate(self, report: AuditObservation, context: BeeContext, observation: BeeObservation) -> None: ...

@@ -4,7 +4,7 @@ import litellm
 import structlog
 
 from src.config import KeeperSettings
-from src.dna import BeeContext, BeeObservation, PurityReport
+from src.dna import ALLOWED_CHAMBERS, AuditObservation, BeeContext, BeeObservation
 
 logger = structlog.get_logger(__name__)
 
@@ -23,7 +23,7 @@ class BeeGenerator:
             else "You are bee.Keeper, guardian of the Aura Hive."
         )
 
-    async def generate(self, report: PurityReport, context: BeeContext, observation: BeeObservation) -> None:
+    async def generate(self, report: AuditObservation, context: BeeContext, observation: BeeObservation) -> None:
         logger.info("bee_generator_generate_started")
 
         # 1. Update llms.txt if needed
@@ -73,7 +73,7 @@ class BeeGenerator:
         except Exception as e:
             logger.error("llms_txt_sync_failed", error=str(e))
 
-    async def _update_hive_state(self, report: PurityReport, context: BeeContext, observation: BeeObservation) -> None:
+    async def _update_hive_state(self, report: AuditObservation, context: BeeContext, observation: BeeObservation) -> None:
         state_path = Path("../../HIVE_STATE.md")
         current_content = state_path.read_text() if state_path.exists() else ""
 
@@ -84,25 +84,37 @@ class BeeGenerator:
         metrics = context.hive_metrics
         success_rate = metrics.get("negotiation_success_rate", 0.0)
 
+        # Formatting Blight vs Heresy
+        # If all LLMs failed, it's a Blight
+        llm_unavailable = report.metadata.get("llm_unavailable", False)
+        status_label = "PURE" if report.is_pure else "IMPURE"
+        if llm_unavailable and not report.is_pure:
+            status_label = "BLIGHTED"
+
         new_entry = f"## Audit: {now}\n\n"
-        new_entry += f"**Status:** {'PURE' if report.is_pure else 'IMPURE'}\n"
+        new_entry += f"**Status:** {status_label}\n"
         new_entry += f"**Negotiation Success Rate:** {success_rate:.2f}\n\n"
         new_entry += f"> {report.narrative}\n\n"
 
         if report.heresies:
-            new_entry += "**Deterministic Heresies (Structural):**\n"
+            new_entry += "**Heresies Detected (Sacred Chambers):**\n"
             for h in report.heresies:
-                new_entry += f"- {h}\n"
+                # Map paths to roles if present in heresy string
+                formatted_h = h
+                for path, role in ALLOWED_CHAMBERS.items():
+                    if path in h:
+                        formatted_h = h.replace(path, f"{path} ({role})")
+                new_entry += f"- {formatted_h}\n"
 
         # Chronicle reflective findings isolated from the Transformer's deterministic logic
         reflective_heresies = report.metadata.get("reflective_heresies", [])
         if reflective_heresies:
-            new_entry += "\n**Reflective Findings (LLM Audit):**\n"
+            new_entry += "\n**Reflective Insights (The Inquisitor's Eye):**\n"
             for rh in reflective_heresies:
                 new_entry += f"- {rh}\n"
 
         if observation.injuries:
-            new_entry += "\n**🤕 Injuries (Failures):**\n"
+            new_entry += "\n**🤕 Injuries (Physical Blockages):**\n"
             for injury in observation.injuries:
                 new_entry += f"- {injury}\n"
 

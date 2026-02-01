@@ -1,12 +1,12 @@
 import structlog
 
 from src.dna import (
+    AuditObservation,
     BeeAggregator,
     BeeConnector,
     BeeGenerator,
     BeeObservation,
     BeeTransformer,
-    PurityReport,
 )
 
 logger = structlog.get_logger(__name__)
@@ -42,7 +42,7 @@ class BeeMetabolism:
         # 2. Transformer (T) - Think/Reason
         if context.event_name == "schedule":
             logger.info("scheduled_heartbeat_detected_skipping_llm_audit")
-            report = PurityReport(
+            report = AuditObservation(
                 is_pure=True,
                 narrative="The Keeper performs a routine inspection. The Hive's pulse is steady.",
                 reasoning="Scheduled heartbeat run. LLM audit skipped to save honey.",

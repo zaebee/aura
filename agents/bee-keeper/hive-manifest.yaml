@@ -1,6 +1,6 @@
 hive:
-  version: "1.1"
-  description: "The Sacred Architecture of the Aura Hive"
+  version: "1.2"
+  description: "The Sacred Architecture of the Aura Hive - Sanctified"
   nucleotides:
     A: "aggregator.py"
     T: "transformer.py"
@@ -18,21 +18,20 @@ hive:
     - "metabolism.py"
     - "dna.py"
     - "types.py"
+    - "metrics.py"
 
-  # Authorized Peripheral Growths
-  authorized_growths:
-    - "agent_identity.py"
-    - "agent_sim.py"
-    - "autonomous_buyer.py"
-    - "core-service/src/llm"
-    - "core-service/src/crypto"
-    - "core-service/src/config"
-    - "core-service/src/services"
-    - "core-service/src/prompts"
-    - "core-service/src/guard"
-    - "core-service/tests"
-    - "core-service/migrations"
-    - "adapters/mcp-server"
-    - "adapters/telegram-bot"
-    - "api-gateway"
-    - "agents/bee-keeper/src/hive/proteins"
+  # Sanctified Infrastructure Chambers
+  sanctified_chambers:
+    core-service/migrations: "HiveEvolutionaryScrolls"
+    core-service/tests: "ValidationPollen"
+    api-gateway: "HiveGate"
+    core-service/src/config: "SacredCodex"
+    core-service/src/services: "WorkerDirectives"
+    core-service/src/llm: "ReasoningNucleus"
+    core-service/src/crypto: "SecurityCitadel"
+    core-service/src/prompts: "EchoChamber"
+    core-service/src/guard: "HiveMembrane"
+
+  # Peripheral Tooling
+  tools_shed:
+    - "tools/simulators"

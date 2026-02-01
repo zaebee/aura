@@ -4,6 +4,7 @@ import structlog
 from opentelemetry import trace
 
 from .dna import Aggregator, Connector, Generator, Membrane, Transformer
+from .metrics import negotiation_accepted_total, negotiation_total
 
 logger = structlog.get_logger(__name__)
 tracer = trace.get_tracer(__name__)
@@ -33,6 +34,7 @@ class MetabolicLoop:
         """
         Execute one full metabolic cycle.
         """
+        negotiation_total.labels(service="core-service").inc()
         with tracer.start_as_current_span("hive_metabolism") as span:
             logger.info("metabolism_cycle_started")
 
@@ -71,6 +73,8 @@ class MetabolicLoop:
             with tracer.start_as_current_span("nucleotide_connector") as c_span:
                 observation = await self.connector.act(safe_decision, context)
                 c_span.set_attribute("success", observation.success)
+                if safe_decision.action == "accept" and observation.success:
+                    negotiation_accepted_total.labels(service="core-service").inc()
 
             # 6. Generator (G) - Pulse/Emit
             with tracer.start_as_current_span("nucleotide_generator"):
