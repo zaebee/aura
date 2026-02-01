@@ -30,5 +30,7 @@ spec:
                   key: "telegram-token"
             - name: AURA_TG__CORE_URL
               value: "{{ .Release.Name }}-core:50051"
+            - name: OTEL_EXPORTER_OTLP_ENDPOINT
+              value: "{{ .Values.monitoring.jaeger.collectorUrl }}"
             - name: LOG_LEVEL
               value: "{{ .Values.telegram.env.LOG_LEVEL }}"

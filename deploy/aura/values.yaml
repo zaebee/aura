@@ -84,17 +84,6 @@ redis:
   enabled: true
   image: redis:7-alpine
 
-# Jaeger Configuration
-jaeger:
-  enabled: true
-  service:
-    type: LoadBalancer # Service type to expose Jaeger
-  # Resource limits for Jaeger
-  resources:
-    limits:
-      cpu: 500m
-      memory: 512Mi
-
 # Frontnend Configuration
 frontend:
   image:
@@ -160,7 +149,14 @@ monitoring:
   prometheus:
     url: "http://prometheus-kube-prometheus-prometheus.monitoring.svc.cluster.local:9090"
   jaeger:
-    queryUrl: "http://jaeger-query.monitoring.svc.cluster.local:16686"
-    collectorUrl: "http://jaeger-collector.monitoring.svc.cluster.local:4317"
+    enabled: true
+    queryUrl: "http://aura-jaeger.monitoring.svc.cluster.local:16686"
+    collectorUrl: "http://aura-jaeger.monitoring.svc.cluster.local:4317"
+    service:
+      type: LoadBalancer
+    resources:
+      limits:
+        cpu: 500m
+        memory: 512Mi
   loki:
     url: "http://loki.monitoring.svc.cluster.local:3100"

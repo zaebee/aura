@@ -22,7 +22,7 @@ class ServerSettings(BaseModel):
         ),
     )
     otel_exporter_otlp_endpoint: HttpUrl = Field(
-        "http://jaeger-collector.monitoring.svc.cluster.local:4317",  # type: ignore
+        "http://aura-jaeger.monitoring.svc.cluster.local:4317",  # type: ignore
         validation_alias=AliasChoices(
             "AURA_SERVER__OTEL_EXPORTER_OTLP_ENDPOINT", "OTEL_EXPORTER_OTLP_ENDPOINT"
         ),
