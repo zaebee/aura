@@ -51,7 +51,7 @@ signature = ed25519.sign(private_key, message)
 ### Signature Verification Algorithm
 
 ```python
-from agent_identity import AgentWallet
+from tools.simulators.agent_identity import AgentWallet
 
 # Example: Generate a wallet and sign a request
 wallet = AgentWallet()
@@ -290,7 +290,7 @@ X-Client-Version: agent_software_version
 ## 🔒 Implementation Details
 
 **AgentWallet Class**:
-- Located in `agent_identity.py`
+- Located in `tools/simulators/agent_identity.py`
 - Handles key generation, signing, and verification
 - Supports both full wallets (with private keys) and view-only wallets (public key only)
 

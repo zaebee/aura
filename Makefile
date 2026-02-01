@@ -42,7 +42,7 @@ test-verbose:
 # Test health endpoints
 test-health:
 	# Test health check endpoints (requires running services)
-	uv run python test_health_endpoints.py
+	uv run python tests/test_health_endpoints.py
 
 # --- 2. BUILD ---
 build: generate build-tg

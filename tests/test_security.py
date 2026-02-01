@@ -10,7 +10,7 @@ import json
 import pytest
 import structlog
 
-from agent_identity import AgentWallet
+from tools.simulators.agent_identity import AgentWallet
 
 logger = structlog.get_logger(__name__)
 

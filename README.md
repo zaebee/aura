@@ -131,13 +131,9 @@ make test-cov
 
 **Agent Negotiation Simulator:**
 ```bash
-python agent_sim.py
+python -m tools.simulators.agent_sim
 ```
 
-**Search Simulator:**
-```bash
-python search_sim.py
-```
 
 ## 📂 Project Structure
 
@@ -264,7 +260,7 @@ The platform now includes **cryptographic signature verification** using Ed25519
 
 1. **Generate agent keys**:
    ```python
-   from agent_identity import AgentWallet
+   from tools.simulators.agent_identity import AgentWallet
    wallet = AgentWallet()
    print(f"DID: {wallet.did}")
    print(f"Private Key: {wallet.private_key_hex}")
@@ -278,13 +274,13 @@ The platform now includes **cryptographic signature verification** using Ed25519
 
 3. **Run secure simulators**:
    ```bash
-   python agent_sim.py
-   python autonomous_buyer.py
+   python -m tools.simulators.agent_sim
+   python -m tools.simulators.autonomous_buyer
    ```
 
 4. **Test security**:
    ```bash
-   python test_security.py
+   python tests/test_security.py
    ```
 
 ### Security Implementation Details
