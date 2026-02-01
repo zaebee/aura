@@ -6,7 +6,7 @@ import nats.errors
 import structlog
 
 from src.config import KeeperSettings
-from aura_core.dna import BeeContext, BeeObservation, PurityReport, find_hive_root
+from aura_core.hive.dna import AuditObservation, BeeContext, BeeObservation, find_hive_root
 from src.hive.proteins.gh_client import GitHubClient
 
 logger = structlog.get_logger(__name__)
@@ -30,8 +30,10 @@ class BeeConnector:
         if self.gh:
             await self.gh.close()
 
-    async def act(self, report: PurityReport, context: BeeContext) -> BeeObservation:
-        logger.info("bee_connector_act_started")
+    async def interact(
+        self, report: AuditObservation, context: BeeContext
+    ) -> BeeObservation:
+        logger.info("bee_connector_interact_started")
 
         # 1. Post to GitHub (if not a heartbeat)
         comment_url = ""
@@ -96,7 +98,9 @@ class BeeConnector:
 
         await asyncio.to_thread(git_commit)
 
-    async def _post_to_github(self, report: PurityReport, context: BeeContext) -> str:
+    async def _post_to_github(
+        self, report: AuditObservation, context: BeeContext
+    ) -> str:
         if not self.gh or not self.repo_name:
             logger.warning("github_client_not_initialized_skipping_post")
             return ""
@@ -118,9 +122,9 @@ class BeeConnector:
         )
         return url
 
-    def _format_github_message(self, report: PurityReport) -> str:
+    def _format_github_message(self, report: AuditObservation) -> str:
         status_emoji = "🍯" if report.is_pure else "⚠️"
-        title = "### BeeKeeper Purity Report"
+        title = "### BeeKeeper Audit Observation"
 
         msg = f"{status_emoji} {title}\n\n"
         msg += f"> {report.narrative}\n\n"
@@ -130,7 +134,13 @@ class BeeConnector:
             for h in report.heresies:
                 msg += f"- {h}\n"
         else:
-            msg += "**Architecture is pure. The Hive thrives.**\n"
+            msg += "**The Hive's structure is sanctified.**\n"
+
+        reflective_heresies = report.metadata.get("reflective_heresies", [])
+        if reflective_heresies:
+            msg += "\n**Reflective Insights (The Inquisitor's Eye):**\n"
+            for rh in reflective_heresies:
+                msg += f"- {rh}\n"
 
         reflective_heresies = report.metadata.get("reflective_heresies", [])
         if reflective_heresies:
@@ -146,7 +156,7 @@ class BeeConnector:
         return msg
 
     async def _emit_nats_event(
-        self, report: PurityReport, context: BeeContext, injuries: list[str]
+        self, report: AuditObservation, context: BeeContext, injuries: list[str]
     ) -> bool:
         try:
             # Use connect_timeout to prevent hanging if NATS is unreachable

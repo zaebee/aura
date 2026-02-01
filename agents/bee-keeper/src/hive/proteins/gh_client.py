@@ -41,7 +41,7 @@ class GitHubClient:
                 logger.warning(
                     "github_rate_limit_hit_metabolic_slowing",
                     wait_time=wait_time,
-                    path=path
+                    path=path,
                 )
                 await asyncio.sleep(wait_time)
                 continue
@@ -61,7 +61,7 @@ class GitHubClient:
         repo: str,
         issue_number: Optional[int] = None,
         commit_sha: Optional[str] = None,
-        body: str = ""
+        body: str = "",
     ) -> str:
         """
         Post a comment to a PR (issue) or a specific commit.

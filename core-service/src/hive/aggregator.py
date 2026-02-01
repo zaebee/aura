@@ -130,7 +130,9 @@ class HiveAggregator:
                 )
 
                 if not (cpu_success or mem_success):
-                    raise httpx.ConnectError(f"All metric fetches failed: {', '.join(errors)}")
+                    raise httpx.ConnectError(
+                        f"All metric fetches failed: {', '.join(errors)}"
+                    )
 
                 metrics = {
                     "status": "ok",

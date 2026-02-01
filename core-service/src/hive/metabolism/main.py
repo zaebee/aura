@@ -3,8 +3,8 @@ from typing import Any
 import structlog
 from opentelemetry import trace
 
-from aura_core.dna import Aggregator, Connector, Generator, Membrane, Transformer
-from ..metrics import negotiation_accepted_total, negotiation_total
+from .dna import Aggregator, Connector, Generator, Membrane, Transformer
+from .metrics import negotiation_accepted_total, negotiation_total
 
 logger = structlog.get_logger(__name__)
 tracer = trace.get_tracer(__name__)

@@ -1,8 +1,15 @@
+import re
 import litellm
 import structlog
 
 from src.config import KeeperSettings
-from aura_core.dna import ALLOWED_CHAMBERS, BeeContext, BeeObservation, PurityReport, find_hive_root
+from aura_core.hive.dna import (
+    ALLOWED_CHAMBERS,
+    AuditObservation,
+    BeeContext,
+    BeeObservation,
+    find_hive_root,
+)
 
 logger = structlog.get_logger(__name__)
 
@@ -23,7 +30,10 @@ class BeeGenerator:
         )
 
     async def generate(
-        self, report: PurityReport, context: BeeContext, observation: BeeObservation
+        self,
+        report: AuditObservation,
+        context: BeeContext,
+        observation: BeeObservation,
     ) -> None:
         logger.info("bee_generator_generate_started")
 
@@ -75,7 +85,10 @@ class BeeGenerator:
             logger.error("llms_txt_sync_failed", error=str(e))
 
     async def _update_hive_state(
-        self, report: PurityReport, context: BeeContext, observation: BeeObservation
+        self,
+        report: AuditObservation,
+        context: BeeContext,
+        observation: BeeObservation,
     ) -> None:
         root = find_hive_root()
         state_path = root / "HIVE_STATE.md"
@@ -92,9 +105,15 @@ class BeeGenerator:
         # Formatting Blight vs Heresy
         # If all LLMs failed, it's a Blight
         llm_unavailable = report.metadata.get("llm_unavailable", False)
+        brain_status = context.metadata.get("brain_status", {})
         status_label = "PURE" if report.is_pure else "IMPURE"
-        if llm_unavailable and not report.is_pure:
+
+        if llm_unavailable or (brain_status and not any(brain_status.values())):
             status_label = "BLIGHTED"
+        elif brain_status and not all(brain_status.values()):
+            # Only set DEGRADED if it's not already IMPURE
+            if status_label == "PURE":
+                status_label = "DEGRADED"
 
         new_entry = f"## Audit: {now}\n\n"
         new_entry += f"**Status:** {status_label}\n"
@@ -119,7 +138,7 @@ class BeeGenerator:
                 new_entry += f"- {rh}\n"
 
         if observation.injuries:
-            new_entry += "\n**🤕 Injuries (Failures):**\n"
+            new_entry += "\n**🤕 Injuries (Physical Blockages):**\n"
             for injury in observation.injuries:
                 new_entry += f"- {injury}\n"
 
@@ -127,24 +146,13 @@ class BeeGenerator:
         new_entry += f"\n<!-- metadata\nexecution_time: {report.execution_time:.2f}s\ntoken_usage: {report.token_usage}\nevent: {context.event_name}\n-->\n"
         new_entry += "\n---\n\n"
 
-        # Idempotency check (compare narrative and heresies)
-        if report.narrative in current_content and all(
-            h in current_content for h in report.heresies
-        ):
-            # Also check if metrics changed significantly?
-            # For now, let's just check if the last entry is basically the same.
-            # Actually, just appending for now as chronicles should be a log.
-            # User said: "The Generator (G) must only produce a new version of HIVE_STATE.md if the actual metrics or task statuses have changed."
-            pass
-
-        # To keep it simple and fulfill the log nature, we append, but we could replace the whole file
-        # if we want a "current state" view. User said "update resource stats in HIVE_STATE.md".
-        # Let's rebuild the file header + current status + audit log.
-
+        # To keep it simple and fulfill the log nature, we rebuild the file header + current status + audit log.
         full_content = "# Aura Hive State\n\n"
         full_content += f"**Last Pulse:** {now}\n"
         full_content += f"**Current Success Rate:** {success_rate:.2f}\n"
-        full_content += f"**Governance Cost (Last):** {report.token_usage} tokens / {report.execution_time:.2f}s\n\n"
+        full_content += (
+            f"**Governance Cost (Last):** {report.token_usage} tokens / {report.execution_time:.2f}s\n\n"
+        )
         full_content += "## Audit Log\n\n"
         full_content += new_entry
 
@@ -154,6 +162,32 @@ class BeeGenerator:
             if log_start != -1:
                 old_log = current_content[log_start + len("## Audit Log") :].strip()
                 full_content += old_log[:5000]  # Truncate old log
+
+        # 3. Update System Vitals (Transformer status)
+        if brain_status:
+            primary_ok = brain_status.get("primary", False)
+            fallback_ok = brain_status.get("fallback", False)
+
+            p_model = self.settings.llm__model
+            f_model = self.settings.llm__fallback_model
+
+            if primary_ok and fallback_ok:
+                vitals_text = f"🟢 ACTIVE. Primary ({p_model}) and Fallback ({f_model}) are both healthy."
+            elif any(brain_status.values()):
+                failed_role = "Fallback" if primary_ok else "Primary"
+                failed_model = f_model if primary_ok else p_model
+                ok_model = p_model if primary_ok else f_model
+                vitals_text = f"🟡 DEGRADED. {ok_model} is OK, but {failed_role} ({failed_model}) failed."
+            else:
+                vitals_text = f"🔴 OFFLINE. Both Primary ({p_model}) and Fallback ({f_model}) are unreachable."
+
+            # Regex to find and replace the Transformer line in the System Vitals section
+            transformer_pattern = r"(- \*\*Transformer \(T\):\*\*) .*"
+            full_content = re.sub(
+                transformer_pattern,
+                lambda m: f"{m.group(1)} {vitals_text}",
+                full_content,
+            )
 
         if full_content.strip() != current_content.strip():
             try:

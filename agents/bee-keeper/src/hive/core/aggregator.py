@@ -4,6 +4,7 @@ import subprocess  # nosec
 from typing import Any
 
 import httpx
+import litellm
 import structlog
 
 from src.config import KeeperSettings
@@ -20,9 +21,10 @@ class BeeAggregator:
         self.prometheus_url = settings.prometheus_url
         self.repo_name = settings.github_repository
         self.event_path = settings.github_event_path
+        self.brain_status: dict[str, bool] = {}
 
-    async def perceive(self) -> BeeContext:
-        logger.info("bee_aggregator_perceive_started")
+    async def sense(self, event_name: str = "manual") -> BeeContext:
+        logger.info("bee_aggregator_sense_started", trigger_event=event_name)
 
         git_diff = await self._get_git_diff()
         hive_metrics = await self._get_hive_metrics()
@@ -34,8 +36,9 @@ class BeeAggregator:
             hive_metrics=hive_metrics,
             filesystem_map=filesystem_map,
             repo_name=self.repo_name,
-            event_name=self.settings.github_event_name,
+            event_name=event_name,
             event_data=event_data,
+            metadata={"brain_status": self.brain_status},
         )
 
     async def _get_git_diff(self) -> str:
@@ -132,32 +135,38 @@ class BeeAggregator:
 
     async def test_brain_connectivity(self) -> bool:
         """Pings the LLM endpoints to verify connectivity."""
-        import litellm
         logger.info("testing_brain_connectivity")
-        models_to_test = [self.settings.llm__model, self.settings.llm__fallback_model]
-        all_ok = True
+        models = {
+            "primary": self.settings.llm__model,
+            "fallback": self.settings.llm__fallback_model,
+        }
+        # Reset status and ensure we have entries for both roles
+        self.brain_status = {role: False for role in models}
 
-        for model in models_to_test:
+        for role, model in models.items():
+            if not model:
+                continue
             try:
-                logger.info("pinging_llm", model=model)
-                # Simple completion to test connectivity
-                await litellm.acompletion(
-                    model=model,
-                    messages=[{"role": "user", "content": "ping"}],
-                    max_tokens=5,
-                    timeout=10.0
-                )
-                logger.info("llm_ping_success", model=model)
-            except (
-                litellm.exceptions.APIConnectionError,
-                litellm.exceptions.ServiceUnavailableError,
-                litellm.exceptions.Timeout,
-                litellm.exceptions.AuthenticationError,
-            ) as e:
-                logger.warning("llm_ping_transient_error", model=model, error=str(e))
-                all_ok = False
-            except Exception as e:
-                logger.error("llm_ping_unexpected_error", model=model, error=str(e))
-                all_ok = False
+                logger.info("pinging_llm", role=role, model=model)
 
-        return all_ok
+                kwargs: dict[str, Any] = {
+                    "model": model,
+                    "messages": [{"role": "user", "content": "ping"}],
+                    "max_tokens": 5,
+                    "timeout": 10.0,
+                    "api_key": self.settings.llm__api_key,
+                }
+
+                if "ollama" in model:
+                    kwargs["api_base"] = self.settings.llm__ollama_base_url
+
+                # Simple completion to test connectivity via LiteLLM
+                await litellm.acompletion(**kwargs)
+
+                logger.info("llm_ping_success", role=role, model=model)
+                self.brain_status[role] = True
+            except Exception as e:
+                # Log as warning to ensure the Hive doesn't exit prematurely if at least one model is alive
+                logger.warning("llm_ping_failed", role=role, model=model, error=str(e))
+
+        return any(self.brain_status.values())

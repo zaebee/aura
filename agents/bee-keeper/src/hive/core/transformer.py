@@ -7,20 +7,20 @@ import structlog
 import yaml  # type: ignore
 
 from src.config import KeeperSettings
-from aura_core.dna import (
+from aura_core.hive.dna import (
+    ALLOWED_CHAMBERS,
     ALLOWED_ROOT_FILES,
     MACRO_ATCG_FOLDERS,
+    AuditObservation,
     BeeContext,
-    PurityReport,
     find_hive_root,
 )
-from aura_core.dna import ALLOWED_CHAMBERS
 
 logger = structlog.get_logger(__name__)
 
 
 class BeeTransformer:
-    """T - Transformer: Analyzes purity and generates reports."""
+    """T - Transformer: Analyzes purity and generates audit observations."""
 
     def __init__(self, settings: KeeperSettings) -> None:
         self.settings = settings
@@ -43,14 +43,13 @@ class BeeTransformer:
         else:
             self.manifest = {}
 
-    async def think(self, context: BeeContext) -> PurityReport:
-        logger.info("bee_transformer_think_started")
+    async def reflect(self, context: BeeContext) -> AuditObservation:
+        logger.info("bee_transformer_reflect_started")
 
         # 1. Structural Check (Deterministic)
-        heresies = self._deterministic_audit(context)
+        structural_findings = self._deterministic_audit(context)
 
         # 2. LLM Audit (Reflective)
-        # Handle large diffs
         if len(context.git_diff) > 4000:
             logger.info("large_diff_detected_summarizing_first")
             summary = await self._summarize_diff(context.git_diff)
@@ -58,26 +57,22 @@ class BeeTransformer:
 
         purity_analysis = await self._llm_audit(context)
 
-        # Merge structural and reflective heresies
-        reflective_heresies = purity_analysis.get("heresies", [])
-        all_heresies = heresies + reflective_heresies
-        is_pure = len(all_heresies) == 0
+        # ATCG Purity: Transformer returns a single AuditObservation.
+        # Reasoning and metadata contain the raw insights.
+        is_pure = len(structural_findings) == 0 and purity_analysis.get("is_pure", True)
 
-        # Idempotency: if status is PURE but LLM found something, it's NOT pure.
-        # But we trust our structural findings more for the "is_pure" flag if LLM is unavailable.
-        llm_unavailable = purity_analysis.get("llm_unavailable", False)
-
-        return PurityReport(
+        return AuditObservation(
             is_pure=is_pure,
-            heresies=all_heresies,
+            heresies=structural_findings,
             narrative=purity_analysis.get("narrative", "The Hive remains silent."),
             reasoning=purity_analysis.get("reasoning", ""),
             token_usage=purity_analysis.get("token_usage", 0),
+            execution_time=0.0,  # Could track this if needed
             metadata={
                 "llm_analysis": purity_analysis,
-                "structural_heresies": heresies,
-                "reflective_heresies": reflective_heresies,
-                "llm_unavailable": llm_unavailable,
+                "structural_heresies": structural_findings,
+                "reflective_heresies": purity_analysis.get("heresies", []),
+                "llm_unavailable": purity_analysis.get("llm_unavailable", False),
             },
         )
 
@@ -130,13 +125,16 @@ class BeeTransformer:
                     is_sanctified = True
                     break
 
-            # If it's not in core, not a known chamber, and not a dotfile/metafile, flag it
-            if not is_sanctified and not p.name.startswith("."):
-                 parent_dir = p.parts[0] if p.parts else ""
-                 allowed_top_levels = set(chamber.split("/")[0] for chamber in ALLOWED_CHAMBERS.keys())
-
-                 if len(p.parts) > 1 and parent_dir not in allowed_top_levels and parent_dir not in MACRO_ATCG_FOLDERS:
-                     heresies.append(f"Unauthorized Growth: '{p}' has expanded outside sanctioned chambers. The Inquisitor demands its removal.")
+            # If it's not in core, not a known chamber, and not a dotfile/metafile/rootfile, flag it
+            if (
+                not is_sanctified
+                and not p.name.startswith(".")
+                and len(p.parts) > 1
+                and p.parts[0] not in MACRO_ATCG_FOLDERS
+            ):
+                heresies.append(
+                    f"Unauthorized Growth: '{p}' has expanded outside sanctioned chambers. The Inquisitor demands its removal."
+                )
 
         # 3. Metric Verification
         metrics = context.hive_metrics
@@ -144,9 +142,9 @@ class BeeTransformer:
         status = metrics.get("status", "ok")
 
         if status != "UNKNOWN" and success_rate < 0.7:
-             heresies.append(
-                 f"Hive Alert: 'negotiation_success_rate' is {success_rate:.2f}, which is below the critical threshold of 0.7. The Hive flow is obstructed."
-             )
+            heresies.append(
+                f"Hive Alert: 'negotiation_success_rate' is {success_rate:.2f}, which is below the critical threshold of 0.7. The Hive flow is obstructed."
+            )
 
         # 4. Pattern Enforcement (No raw print or os.getenv in diff)
         diff_lines = context.git_diff.splitlines()
@@ -224,11 +222,11 @@ class BeeTransformer:
                 logger.error("llm_audit_failed_completely", error=str(fe))
                 # Fallback to a "Safe" pure-ish response so structural audit can still pass
                 return {
-                    "is_pure": True, # Assume pure if LLM is down, structural check still runs in think()
+                    "is_pure": True,  # Assume pure if LLM is down, structural check still runs in think()
                     "heresies": [],
                     "narrative": "A thick mist covers the Hive. The Keeper senses only the physical structures, the deeper patterns remain hidden.",
                     "reasoning": f"LLM Connectivity failure. Primary: {e}. Fallback: {fe}",
-                    "llm_unavailable": True
+                    "llm_unavailable": True,
                 }
 
     async def _summarize_diff(self, diff: str) -> str:
