@@ -34,7 +34,8 @@ def setup_tracing() -> None:
     resource = Resource(attributes={SERVICE_NAME: "telegram-bot"})
     provider = TracerProvider(resource=resource)
 
-    otlp_endpoint = os.getenv("OTEL_EXPORTER_OTLP_ENDPOINT", "http://jaeger:4317")
+    # DNA Rule: FQDN for cross-namespace services
+    otlp_endpoint = os.getenv("OTEL_EXPORTER_OTLP_ENDPOINT", "http://jaeger-collector.monitoring.svc.cluster.local:4317")
     processor = BatchSpanProcessor(
         OTLPSpanExporter(endpoint=otlp_endpoint, insecure=True)
     )

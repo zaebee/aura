@@ -71,8 +71,8 @@ spec:
             - name: AURA_SERVER__NATS_URL
               value: "nats://{{ .Release.Name }}-nats:4222"
             - name: AURA_SERVER__PROMETHEUS_URL
-              value: "{{ .Values.core.env.AURA_SERVER__PROMETHEUS_URL }}"
+              value: "{{ .Values.monitoring.prometheus.url }}"
             - name: AURA_SERVER__OTEL_EXPORTER_OTLP_ENDPOINT
-              value: "http://{{ .Release.Name }}-jaeger:4317"
+              value: "{{ .Values.monitoring.jaeger.collectorUrl }}"
             - name: AURA_SERVER__OTEL_SERVICE_NAME
               value: "{{ .Release.Name }}-core"

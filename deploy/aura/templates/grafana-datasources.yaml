@@ -1,0 +1,35 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: "{{ .Release.Name }}-grafana-datasources"
+  namespace: {{ .Release.Namespace }}
+  labels:
+    app: grafana
+    grafana_datasource: "1"
+data:
+  datasources.yaml: |
+    apiVersion: 1
+    datasources:
+      - name: Prometheus
+        uid: Prometheus
+        type: prometheus
+        url: "{{ .Values.monitoring.prometheus.url }}"
+        access: proxy
+        isDefault: true
+      - name: Jaeger
+        uid: Jaeger
+        type: jaeger
+        url: "{{ .Values.monitoring.jaeger.queryUrl }}"
+        access: proxy
+      - name: Loki
+        uid: Loki
+        type: loki
+        url: "{{ .Values.monitoring.loki.url }}"
+        access: proxy
+        jsonData:
+          derivedFields:
+            - datasourceUid: Jaeger
+              matcherRegex: '"trace_id"\s*:\s*"([a-f0-9]+)"'
+              name: trace_id
+              url: '${__value.raw}'
+              internal: true

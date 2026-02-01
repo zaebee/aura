@@ -18,7 +18,7 @@ class KeeperSettings(BaseSettings):  # type: ignore
     )
 
     prometheus_url: str = Field(
-        "http://prometheus-kube-prometheus-prometheus.monitoring:9090",
+        "http://monitoring-kube-prometheus-prometheus.monitoring.svc.cluster.local:9090",
         alias="AURA_PROMETHEUS_URL",
     )
     nats_url: str = Field(

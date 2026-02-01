@@ -22,15 +22,16 @@ class ServerSettings(BaseModel):
         ),
     )
     otel_exporter_otlp_endpoint: HttpUrl = Field(
-        "http://jaeger:4317",  # type: ignore
+        "http://jaeger-collector.monitoring.svc.cluster.local:4317",  # type: ignore
         validation_alias=AliasChoices(
             "AURA_SERVER__OTEL_EXPORTER_OTLP_ENDPOINT", "OTEL_EXPORTER_OTLP_ENDPOINT"
         ),
     )
 
     # Monitoring
+    # DNA Rule: All cross-namespace service discovery must use full FQDN paths.
     prometheus_url: HttpUrl = Field(
-        "http://prometheus-kube-prometheus-prometheus.monitoring:9090",  # type: ignore
+        "http://prometheus-kube-prometheus-prometheus.monitoring.svc.cluster.local:9090",  # type: ignore
         validation_alias=AliasChoices("AURA_SERVER__PROMETHEUS_URL", "PROMETHEUS_URL"),
     )
 

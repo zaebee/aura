@@ -14,7 +14,7 @@ class TelegramSettings(BaseSettings):
 
     token: SecretStr = Field("")  # type: ignore
     core_url: str = "core-service:50051"
-    negotiation_timeout: float = 30.0
+    negotiation_timeout: float = 60.0
     webhook_domain: str | None = None
 
 
