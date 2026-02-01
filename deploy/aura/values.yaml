@@ -155,3 +155,39 @@ secrets:
   frpClientToken:
     name: frp-client-token
     value: ""  # Must be set during deployment
+
+# Grafana Configuration
+grafana:
+  enabled: true
+  service:
+    type: LoadBalancer
+  datasources:
+    datasources.yaml:
+      apiVersion: 1
+      datasources:
+        - name: Prometheus
+          uid: Prometheus
+          type: prometheus
+          url: "http://monitoring-kube-prometheus-prometheus.monitoring:9090"
+          access: proxy
+          isDefault: true
+        - name: Jaeger
+          uid: Jaeger
+          type: jaeger
+          url: "http://aura-jaeger:16686"
+          access: proxy
+        - name: Loki
+          uid: Loki
+          type: loki
+          url: "http://aura-loki:3100"
+          access: proxy
+          jsonData:
+            derivedFields:
+              - datasourceUid: Jaeger
+                matcherRegex: '"trace_id":\s*"(\w+)"'
+                name: trace_id
+                url: '$${__value.raw}'
+
+# Loki Configuration
+loki:
+  enabled: true

@@ -1,0 +1,40 @@
+{{- if .Values.loki.enabled -}}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: "{{ .Release.Name }}-loki"
+  labels:
+    app: loki
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: loki
+  template:
+    metadata:
+      labels:
+        app: loki
+    spec:
+      containers:
+      - name: loki
+        image: grafana/loki:2.9.2
+        args:
+        - "-config.file=/etc/loki/local-config.yaml"
+        ports:
+        - containerPort: 3100
+          name: http
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: "{{ .Release.Name }}-loki"
+  labels:
+    app: loki
+spec:
+  ports:
+  - port: 3100
+    targetPort: 3100
+    name: http
+  selector:
+    app: loki
+{{- end }}
