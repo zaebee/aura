@@ -5,6 +5,7 @@ import dspy
 import structlog
 
 from src.config import get_settings
+from src.guard.membrane import OutputGuard, SafetyViolation
 from src.llm.engine import AuraNegotiator
 
 from .types import FailureIntent, HiveContext, IntentAction
@@ -24,6 +25,7 @@ class AuraTransformer:
         # Default configuration
         dspy.configure(lm=dspy.LM(self.settings.llm.model))
         self.negotiator = self._load_negotiator()
+        self.guard = OutputGuard()
 
     def _load_negotiator(self) -> AuraNegotiator:
         try:
@@ -50,12 +52,16 @@ class AuraTransformer:
         if cpu_load > 80.0:
             constraints.append("SYSTEM_LOAD_HIGH: Be extremely concise.")
 
+        meta = context.item_data.get("meta", {})
+        floor_price = context.item_data.get("floor_price", 0.0)
+
         return {
             "base_price": context.item_data.get("base_price", 0.0),
-            "floor_price": context.item_data.get("floor_price", 0.0),
+            "floor_price": floor_price,
+            "internal_cost": meta.get("internal_cost", floor_price * 0.8),
             "reputation": context.offer.reputation,
             "system_constraints": constraints,
-            "meta": context.item_data.get("meta", {}),
+            "meta": meta,
         }
 
     async def think(self, context: HiveContext) -> IntentAction:
@@ -91,6 +97,31 @@ class AuraTransformer:
                 )
 
             action_data = result["action"]
+
+            # Validate decision through the Membrane (OutputGuard)
+            try:
+                economic_context = self._build_economic_context(context)
+                self.guard.validate_decision(action_data, economic_context)
+            except SafetyViolation as e:
+                logger.warning(
+                    "transformer_safety_violation",
+                    error=str(e),
+                    action=action_data.get("action"),
+                    price=action_data.get("price"),
+                )
+                # Fallback strategy: Force a counter-offer at floor price
+                floor_price = context.item_data.get("floor_price", 0.0)
+                return IntentAction(
+                    action="counter",
+                    price=floor_price,
+                    message=f"I cannot go that low. My best offer is {floor_price}.",
+                    thought=f"Safety violation: {str(e)}. Overriding with floor price.",
+                    metadata={
+                        "violation": str(e),
+                        "original_action": action_data.get("action"),
+                        "original_price": action_data.get("price"),
+                    },
+                )
 
             logger.info(
                 "transformer_thought_complete",
