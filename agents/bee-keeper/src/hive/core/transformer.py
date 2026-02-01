@@ -25,8 +25,9 @@ class BeeTransformer:
         self.settings = settings
         self.model = settings.llm__model
         litellm.api_key = settings.llm__api_key
+        root = find_hive_root()
 
-        prompt_path = Path("prompts/bee_keeper.md")
+        prompt_path = root / "agents/bee-keeper/prompts/bee_keeper.md"
         self.persona = (
             prompt_path.read_text()
             if prompt_path.exists()
@@ -34,7 +35,7 @@ class BeeTransformer:
         )
 
         # Load manifest
-        manifest_path = Path("hive-manifest.yaml")
+        manifest_path = root / "agents/bee-keeper/hive-manifest.yaml"
         if manifest_path.exists():
             with open(manifest_path) as f:
                 self.manifest = yaml.safe_load(f)
@@ -218,13 +219,11 @@ class BeeTransformer:
                 return await self._call_llm(prompt, use_fallback=True)
             except Exception as fe:
                 logger.error("llm_audit_failed_completely", error=str(fe))
-                # Fallback to a "Safe" pure-ish response so structural audit can still pass
                 return {
-                    "is_pure": True,  # Assume pure if LLM is down, structural check still runs in think()
-                    "heresies": [],
-                    "narrative": "A thick mist covers the Hive. The Keeper senses only the physical structures, the deeper patterns remain hidden.",
-                    "reasoning": f"LLM Connectivity failure. Primary: {e}. Fallback: {fe}",
-                    "llm_unavailable": True,
+                    "is_pure": False,
+                    "heresies": [f"Blight: The Keeper's mind is clouded ({str(fe)})"],
+                    "narrative": "A strange mist descends upon the Hive...",
+                    "reasoning": f"Primary error: {e}. Fallback error: {fe}",
                 }
 
     async def _summarize_diff(self, diff: str) -> str:

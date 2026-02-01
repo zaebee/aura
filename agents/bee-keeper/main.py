@@ -5,7 +5,11 @@ import sys
 import structlog
 
 from src.config import KeeperSettings
-from src.hive.metabolism import MetabolicLoop
+from src.hive.core.aggregator import BeeAggregator
+from src.hive.core.transformer import BeeTransformer
+from src.hive.gateway.connector import BeeConnector
+from src.hive.scribe.generator import BeeGenerator
+from src.hive.metabolism import BeeMetabolism
 
 # Configure logging
 structlog.configure(
@@ -24,23 +28,38 @@ async def main() -> None:
     # 0. Load Settings
     settings = KeeperSettings()
 
-    # 1. Initialize Metabolism
-    loop = MetabolicLoop(settings)
+    # 1. Initialize Nucleotides
+    aggregator = BeeAggregator(settings=settings)
+    transformer = BeeTransformer(settings=settings)
+    connector = BeeConnector(settings=settings)
+    generator = BeeGenerator(settings=settings)
 
-    # 1.5 Sanity Check: Test Brain Connectivity
-    await loop.aggregator.test_brain_connectivity()
+    # 2. Initialize Metabolism
+    metabolism = BeeMetabolism(
+        aggregator=aggregator,
+        transformer=transformer,
+        connector=connector,
+        generator=generator,
+    )
 
-    # 2. Execute Metabolic Pulse
-    event_name = os.getenv("GITHUB_EVENT_NAME", "manual")
+    # 3. Execute Metabolic Cycle
     try:
-        await loop.pulse(event_name=event_name)
-        logger.info("bee_keeper_agent_finished_successfully")
+        observation = await metabolism.execute()
+        if observation.success:
+            logger.info(
+                "bee_keeper_agent_finished_successfully",
+                comment_url=observation.github_comment_url,
+            )
+        else:
+            logger.error("bee_keeper_agent_failed")
+            sys.exit(1)
     except Exception as e:
         logger.error("bee_keeper_agent_critical_error", error=str(e), exc_info=True)
         sys.exit(1)
     finally:
         # Cleanup
         await loop.connector.close()
+
 
 
 if __name__ == "__main__":
