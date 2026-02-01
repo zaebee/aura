@@ -1,6 +1,7 @@
 from pathlib import Path
 from typing import Any
 
+import json
 import litellm
 import structlog
 import yaml  # type: ignore
@@ -126,11 +127,23 @@ class BeeTransformer:
 
         try:
             return await self._call_llm(prompt)
-        except (litellm.exceptions.APIConnectionError, litellm.exceptions.ServiceUnavailableError, litellm.exceptions.TimeoutException, Exception) as e:
+        except (
+            litellm.exceptions.APIConnectionError,
+            litellm.exceptions.ServiceUnavailableError,
+            litellm.exceptions.Timeout,
+            json.JSONDecodeError,
+            Exception
+        ) as e:
             logger.warning("primary_llm_failed_trying_fallback", error=str(e))
             try:
                 return await self._call_llm(prompt, use_fallback=True)
-            except Exception as fe:
+            except (
+                litellm.exceptions.APIConnectionError,
+                litellm.exceptions.ServiceUnavailableError,
+                litellm.exceptions.Timeout,
+                json.JSONDecodeError,
+                Exception
+            ) as fe:
                 logger.error("llm_audit_failed_completely", error=str(fe))
                 # Fallback to a "Safe" pure-ish response so structural audit can still pass
                 return {
@@ -177,7 +190,6 @@ class BeeTransformer:
         try:
             response = await litellm.acompletion(**kwargs)
             content = response.choices[0].message.content
-            import json
 
             data: dict[str, Any] = json.loads(content)
             # Capture token usage if available
@@ -185,8 +197,13 @@ class BeeTransformer:
                 data["token_usage"] = getattr(response.usage, "total_tokens", 0)
 
             return data
-        except (litellm.exceptions.APIConnectionError, litellm.exceptions.ServiceUnavailableError, litellm.exceptions.TimeoutException) as e:
-            logger.warning("llm_connection_error", model=model, error=str(e))
+        except (
+            litellm.exceptions.APIConnectionError,
+            litellm.exceptions.ServiceUnavailableError,
+            litellm.exceptions.Timeout,
+            json.JSONDecodeError
+        ) as e:
+            logger.warning("llm_transient_error", model=model, error=str(e))
             raise e # Let the caller handle fallback
         except Exception as e:
             logger.error("llm_unexpected_error", model=model, error=str(e))
