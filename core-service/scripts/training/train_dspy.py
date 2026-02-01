@@ -17,8 +17,8 @@ from dspy.teleprompt import BootstrapFewShot
 # Add src to path for imports
 sys.path.append(str(Path(__file__).parent / "src"))
 
-from llm.engine import AuraNegotiator
-from llm.prepare.clean import clean_and_parse_json
+from src.hive.transformer.engine import AuraNegotiator
+from src.hive.transformer.prepare.clean import clean_and_parse_json
 
 # Configure logging
 structlog.configure(
@@ -189,10 +189,12 @@ def train_negotiator():
             history=test_example.history,
         )
 
-        logger.info("test_prediction",
-                    input_bid=test_example.input_bid,
-                    response=prediction['response'],
-                    reasoning=prediction['reasoning'][:100])
+        logger.info(
+            "test_prediction",
+            input_bid=test_example.input_bid,
+            response=prediction["response"],
+            reasoning=prediction["reasoning"][:100],
+        )
     except Exception as e:
         logger.info("skipping_test", error=str(e))
 

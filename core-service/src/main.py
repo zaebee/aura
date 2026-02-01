@@ -298,7 +298,7 @@ def create_strategy() -> PricingStrategy:
         logger.info(
             "strategy_selected", type="LiteLLMStrategy", model=settings.llm.model
         )
-        from src.llm.strategy import LiteLLMStrategy
+        from src.hive.transformer.strategy import LiteLLMStrategy
 
         # Select appropriate API key based on model provider
         api_key = None

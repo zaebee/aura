@@ -4,13 +4,16 @@ Simple test for DSPy integration - tests basic functionality.
 """
 
 import sys
+from pathlib import Path
 
 import structlog
-from llm.engine import AuraNegotiator
-from llm.signatures import Negotiate
 
 # Add src to path
+sys.path.append(str(Path(__file__).parent.parent / "src"))
+
 from src.hive.transformer.dspy_strategy import DSPyStrategy
+from src.hive.transformer.engine import AuraNegotiator
+from src.hive.transformer.signatures import Negotiate
 
 # Configure logging
 structlog.configure(
@@ -68,5 +71,6 @@ if __name__ == "__main__":
     except Exception as e:
         logger.error("test_failed", error=str(e))
         import traceback
+
         traceback.print_exc()
         sys.exit(1)

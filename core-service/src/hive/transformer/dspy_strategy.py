@@ -14,7 +14,7 @@ import structlog
 from src.db import InventoryItem, SessionLocal
 from src.guard.membrane import OutputGuard, SafetyViolation
 from src.hive.metabolism.config import get_settings
-from src.llm.engine import AuraNegotiator
+from src.hive.transformer.engine import AuraNegotiator
 from src.proto.aura.negotiation.v1 import negotiation_pb2
 
 logger = structlog.get_logger(__name__)
@@ -88,7 +88,7 @@ class DSPyStrategy:
         """Get fallback strategy (lazy loading)."""
         if self.fallback_strategy is None:
             try:
-                from src.llm.strategy import LiteLLMStrategy
+                from src.hive.transformer.strategy import LiteLLMStrategy
 
                 self.fallback_strategy = LiteLLMStrategy(model=self.settings.llm.model)
             except ImportError:

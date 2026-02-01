@@ -12,11 +12,13 @@ from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 import structlog
-from llm.engine import AuraNegotiator
-from llm.signatures import Negotiate
 
 # Add src to path
+sys.path.append(str(Path(__file__).parent.parent / "src"))
+
 from src.hive.transformer.dspy_strategy import DSPyStrategy
+from src.hive.transformer.engine import AuraNegotiator
+from src.hive.transformer.signatures import Negotiate
 
 # Configure logging
 structlog.configure(
@@ -56,7 +58,7 @@ def test_negotiator_module():
     try:
         negotiator = AuraNegotiator()
         assert negotiator is not None
-        assert hasattr(negotiator, "negotiate")
+        assert hasattr(negotiator, "negotiate_chain")
         logger.info("aura_negotiator_module_created_successfully")
     except Exception as e:
         logger.error("aura_negotiator_creation_failed", error=str(e))

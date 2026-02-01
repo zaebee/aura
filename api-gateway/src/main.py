@@ -11,7 +11,7 @@ from opentelemetry.instrumentation.grpc import GrpcInstrumentorClient
 from pydantic import BaseModel
 from starlette.middleware.cors import CORSMiddleware
 
-from src.config import get_settings
+from config import get_settings
 from src.health import register_health_endpoints
 from src.logging_config import (
     bind_request_id,

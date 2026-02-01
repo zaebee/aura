@@ -12,7 +12,7 @@ from jinja2 import Template
 from pydantic import BaseModel, Field
 
 from src.db import InventoryItem, SessionLocal
-from src.llm.engine import LLMEngine
+from src.hive.transformer.engine import LLMEngine
 from src.logging_config import bind_request_id
 from src.proto.aura.negotiation.v1 import negotiation_pb2
 
@@ -57,7 +57,7 @@ class LiteLLMStrategy:
         self.trigger_price = trigger_price
 
         # Load prompt template
-        template_path = Path(__file__).parent.parent / "prompts" / "system.md"
+        template_path = Path(__file__).parent.parent.parent / "prompts" / "system.md"
         with open(template_path) as f:
             self.prompt_template = Template(f.read())
 
