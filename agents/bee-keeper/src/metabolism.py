@@ -1,6 +1,6 @@
 import structlog
 
-from src.dna import (
+from aura_core.dna import (
     AuditObservation,
     BeeAggregator,
     BeeConnector,

@@ -12,7 +12,11 @@ dependencies = [
     "nats-py>=2.12.0",
     "structlog>=25.5.0",
     "pyyaml>=6.0.3",
+    "aura-core",
 ]
+
+[tool.uv.sources]
+aura-core = { path = "../../packages/aura-core" }
 
 [project.scripts]
 aura-keeper = "main:main"

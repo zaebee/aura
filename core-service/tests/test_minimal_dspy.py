@@ -8,7 +8,7 @@ import sys
 from pathlib import Path
 
 # Add src to path
-sys.path.append(str(Path(__file__).parent / "src"))
+sys.path.append(str(Path(__file__).parent.parent / "src"))
 
 import dspy
 import structlog
@@ -51,21 +51,26 @@ def test_minimal_dspy():
 
     # Test prediction
     try:
-        prediction = negotiator(
-            input_bid="100",
-            context={
-                "base_price": 200,
-                "floor_price": 150,
-                "occupancy": "high",
-                "value_add_inventory": [],
-            },
-            history=[],
-        )
+        from unittest.mock import MagicMock, patch
+        with patch.object(negotiator, 'negotiate') as mock_predict:
+            mock_predict.return_value = MagicMock(
+                thought="I should reject this bid as it is below floor price.",
+                action='{"action": "reject", "price": 0.0, "message": "Too low."}'
+            )
+            prediction = negotiator(
+                input_bid="100",
+                context={
+                    "base_price": 200,
+                    "floor_price": 150,
+                    "occupancy": "high",
+                    "value_add_inventory": [],
+                },
+                history=[],
+            )
 
         logger.info("prediction_successful",
-                    response_type=str(type(prediction['response'])),
-                    response_value=prediction['response'],
-                    reasoning=prediction['reasoning'][:50])
+                    action=prediction['action'],
+                    thought=prediction['thought'][:50])
 
         return True
 

@@ -4,10 +4,10 @@ from pathlib import Path
 import dspy
 import structlog
 
-from src.config import get_settings
+from src.hive.metabolism.config import get_settings
 from src.llm.engine import AuraNegotiator
 
-from .types import FailureIntent, HiveContext, IntentAction
+from aura_core.types import FailureIntent, HiveContext, IntentAction
 
 logger = structlog.get_logger(__name__)
 

@@ -4,7 +4,7 @@ import litellm
 import structlog
 
 from src.config import KeeperSettings
-from src.dna import ALLOWED_CHAMBERS, AuditObservation, BeeContext, BeeObservation
+from aura_core.dna import ALLOWED_CHAMBERS, AuditObservation, BeeContext, BeeObservation
 
 logger = structlog.get_logger(__name__)
 

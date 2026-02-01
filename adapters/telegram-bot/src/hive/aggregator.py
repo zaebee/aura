@@ -4,7 +4,7 @@ import structlog
 from aiogram.types import CallbackQuery, Message
 from opentelemetry import trace
 
-from .dna import HiveContext, NegotiationOffer, TelegramContext
+from aura_core.dna import HiveContext, NegotiationOffer, TelegramContext
 
 logger = structlog.get_logger(__name__)
 tracer = trace.get_tracer(__name__)

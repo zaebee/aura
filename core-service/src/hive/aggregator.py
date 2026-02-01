@@ -8,10 +8,10 @@ import httpx
 import structlog
 from sqlalchemy.exc import SQLAlchemyError
 
-from src.config import get_settings
+from src.hive.metabolism.config import get_settings
 from src.db import InventoryItem, SessionLocal
 
-from .types import HiveContext, NegotiationOffer
+from aura_core.types import HiveContext, NegotiationOffer
 
 logger = structlog.get_logger(__name__)
 

@@ -6,7 +6,7 @@ import nats.errors
 import structlog
 
 from src.config import KeeperSettings
-from src.dna import AuditObservation, BeeContext, BeeObservation
+from aura_core.dna import AuditObservation, BeeContext, BeeObservation
 from src.hive.proteins.gh_client import GitHubClient
 
 logger = structlog.get_logger(__name__)
@@ -137,6 +137,8 @@ class BeeConnector:
 
         if report.reasoning:
             msg += f"\n<details>\n<summary>Keeper's Reasoning</summary>\n\n{report.reasoning}\n</details>"
+
+        msg += "\n\ncc: @jules @gemini-code-assist"
 
         return msg
 

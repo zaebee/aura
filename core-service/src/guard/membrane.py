@@ -1,5 +1,5 @@
 import structlog
-from src.config import settings
+from src.hive.metabolism.config import settings
 
 logger = structlog.get_logger(__name__)
 

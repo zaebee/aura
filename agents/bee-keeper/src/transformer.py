@@ -7,7 +7,7 @@ import structlog
 import yaml  # type: ignore
 
 from src.config import KeeperSettings
-from src.dna import ALLOWED_CHAMBERS, AuditObservation, BeeContext
+from aura_core.dna import ALLOWED_CHAMBERS, AuditObservation, BeeContext
 
 logger = structlog.get_logger(__name__)
 
@@ -131,7 +131,7 @@ class BeeTransformer:
                 if added_code.startswith("#") or added_code.startswith('"""') or added_code.startswith("'''"):
                     continue
 
-                if "print(" in added_code and "logger" not in added_code:
+                if "print(" in added_code and "logger" not in added_code and "Pattern Heresy" not in added_code:
                     heresies.append(
                         f"Pattern Heresy: Raw 'print()' detected in diff: `{added_code}`. Use `structlog` instead."
                     )

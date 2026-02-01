@@ -1,0 +1,10 @@
+[project]
+name = "aura-core"
+version = "0.1.0"
+description = "Shared DNA for the Aura Hive"
+requires-python = ">=3.12"
+dependencies = []
+
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"

@@ -6,12 +6,12 @@ from typing import Any
 import structlog
 from sqlalchemy.exc import SQLAlchemyError
 
-from src.config import get_settings
-from src.crypto.pricing import PriceConverter
+from src.hive.metabolism.config import get_settings
+from src.hive.connector.pricing import PriceConverter
 from src.db import SessionLocal
 from src.proto.aura.negotiation.v1 import negotiation_pb2
 
-from .types import HiveContext, IntentAction, Observation
+from aura_core.types import HiveContext, IntentAction, Observation
 
 logger = structlog.get_logger(__name__)
 

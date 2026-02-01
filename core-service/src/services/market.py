@@ -11,8 +11,8 @@ from datetime import UTC, datetime, timedelta
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from src.crypto.encryption import SecretEncryption
-from src.crypto.interfaces import CryptoProvider
+from src.hive.connector.encryption import SecretEncryption
+from src.hive.connector.interfaces import CryptoProvider
 from src.db import DealStatus, LockedDeal
 from src.proto.aura.negotiation.v1 import negotiation_pb2
 

@@ -14,8 +14,8 @@ from opentelemetry.instrumentation.sqlalchemy import SQLAlchemyInstrumentor
 from prometheus_client import start_http_server
 from sqlalchemy import text
 
-from src.config import settings
-from src.config.llm import get_raw_key
+from src.hive.metabolism.config import settings
+from src.hive.metabolism.config.llm import get_raw_key
 from src.db import InventoryItem, SessionLocal, engine
 from src.embeddings import generate_embedding
 from src.hive.aggregator import HiveAggregator
@@ -291,7 +291,7 @@ def create_strategy() -> PricingStrategy:
         return RuleBasedStrategy()
     elif settings.llm.model == "dspy":
         logger.info("strategy_selected", type="DSPyStrategy", model="self-optimizing")
-        from src.llm.dspy_strategy import DSPyStrategy
+        from src.hive.transformer.dspy_strategy import DSPyStrategy
 
         return DSPyStrategy()
     else:
@@ -331,7 +331,7 @@ def create_crypto_provider() -> Any:
             network=settings.crypto.solana_network,
             currency=settings.crypto.currency,
         )
-        from src.crypto.solana_provider import SolanaProvider
+        from src.hive.connector.solana_provider import SolanaProvider
 
         return SolanaProvider(
             private_key_base58=get_raw_key(settings.crypto.solana_private_key),
@@ -404,7 +404,7 @@ async def serve() -> None:
     crypto_provider = create_crypto_provider()
     market_service = None
     if crypto_provider:
-        from src.crypto.encryption import SecretEncryption
+        from src.hive.connector.encryption import SecretEncryption
         from src.services.market import MarketService
 
         encryption = SecretEncryption(

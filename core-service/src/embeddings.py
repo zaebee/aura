@@ -1,7 +1,7 @@
 from langchain_mistralai import MistralAIEmbeddings
 
-from src.config import settings
-from src.config.llm import get_raw_key
+from src.hive.metabolism.config import settings
+from src.hive.metabolism.config.llm import get_raw_key
 
 
 def get_embeddings_model(model: str = "mistral-embed") -> MistralAIEmbeddings:

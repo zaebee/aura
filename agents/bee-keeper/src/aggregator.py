@@ -9,7 +9,7 @@ import litellm
 import structlog
 
 from src.config import KeeperSettings
-from src.dna import BeeContext
+from aura_core.dna import BeeContext
 
 logger = structlog.get_logger(__name__)
 
