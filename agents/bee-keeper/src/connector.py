@@ -56,12 +56,29 @@ class BeeConnector:
         )
 
     def _find_root(self) -> Path:
-        """Find the repository root by looking for monorepo markers."""
-        current = Path(__file__).resolve()
-        for parent in current.parents:
+        """Find the repository root using git or markers."""
+        # Search from current file upwards
+        p = Path(__file__).resolve()
+        for parent in [p] + list(p.parents):
             if (parent / "core-service").exists() and (parent / "api-gateway").exists():
                 return parent
-        return Path(".")
+
+        # Fallback to git
+        try:
+            import subprocess  # nosec
+
+            res = subprocess.run(
+                ["git", "rev-parse", "--show-toplevel"],
+                capture_output=True,
+                text=True,
+                check=True,
+            )
+            return Path(res.stdout.strip())
+        except Exception:
+            pass
+
+        # Final fallback to CWD
+        return Path.cwd()
 
     async def _commit_changes(self) -> None:
         import subprocess  # nosec

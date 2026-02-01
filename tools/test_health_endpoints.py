@@ -64,9 +64,9 @@ def test_core_service_grpc_health():
     logger.info("testing_core_service_grpc_health")
 
     try:
-        import subprocess
+        import subprocess  # nosec B404
 
-        result = subprocess.run(
+        result = subprocess.run(  # nosec B603, B607
             ["grpc_health_probe", "-addr=localhost:50051"],
             capture_output=True,
             text=True,
