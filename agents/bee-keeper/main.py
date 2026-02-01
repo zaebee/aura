@@ -29,7 +29,9 @@ async def main() -> None:
         metabolism = BeeMetabolism(settings)
 
         # 1.5 Sanity Check: Test Brain Connectivity
-        await metabolism.aggregator.test_brain_connectivity()
+        if not await metabolism.aggregator.test_brain_connectivity():
+            logger.error("Brain connectivity test failed for both primary and fallback models. Exiting.")
+            sys.exit(1)
 
         # 2. Execute Metabolic Pulse
         # KeeperSettings already maps GITHUB_EVENT_NAME
