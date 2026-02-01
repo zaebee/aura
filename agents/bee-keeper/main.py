@@ -3,12 +3,12 @@ import sys
 
 import structlog
 
-from src.aggregator import BeeAggregator
+from src.hive.core.aggregator import BeeAggregator
 from src.config import KeeperSettings
-from src.connector import BeeConnector
-from src.generator import BeeGenerator
-from src.metabolism import BeeMetabolism
-from src.transformer import BeeTransformer
+from src.hive.gateway.connector import BeeConnector
+from src.hive.scribe.generator import BeeGenerator
+from src.hive.metabolism import BeeMetabolism
+from src.hive.core.transformer import BeeTransformer
 
 # Configure logging
 structlog.configure(

@@ -7,7 +7,7 @@ import httpx
 import structlog
 
 from src.config import KeeperSettings
-from src.hive.dna import BeeContext, find_hive_root
+from aura_core.dna import BeeContext, find_hive_root
 
 logger = structlog.get_logger(__name__)
 
@@ -129,3 +129,35 @@ class BeeAggregator:
             except Exception as e:
                 logger.warning("event_data_load_failed", error=str(e))
         return {}
+
+    async def test_brain_connectivity(self) -> bool:
+        """Pings the LLM endpoints to verify connectivity."""
+        import litellm
+        logger.info("testing_brain_connectivity")
+        models_to_test = [self.settings.llm__model, self.settings.llm__fallback_model]
+        all_ok = True
+
+        for model in models_to_test:
+            try:
+                logger.info("pinging_llm", model=model)
+                # Simple completion to test connectivity
+                await litellm.acompletion(
+                    model=model,
+                    messages=[{"role": "user", "content": "ping"}],
+                    max_tokens=5,
+                    timeout=10.0
+                )
+                logger.info("llm_ping_success", model=model)
+            except (
+                litellm.exceptions.APIConnectionError,
+                litellm.exceptions.ServiceUnavailableError,
+                litellm.exceptions.Timeout,
+                litellm.exceptions.AuthenticationError,
+            ) as e:
+                logger.warning("llm_ping_transient_error", model=model, error=str(e))
+                all_ok = False
+            except Exception as e:
+                logger.error("llm_ping_unexpected_error", model=model, error=str(e))
+                all_ok = False
+
+        return all_ok

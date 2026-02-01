@@ -79,7 +79,7 @@ class BeeContext:
 
 
 @dataclass
-class AuditObservation:
+class PurityReport:
     """The raw result of an architectural audit."""
     is_pure: bool
     heresies: list[str] = field(default_factory=list)

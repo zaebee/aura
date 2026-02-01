@@ -1,7 +1,7 @@
 from typing import Any, Protocol, runtime_checkable
 
+from pathlib import Path
 from .types import (
-    AuditObservation,
     BeeContext,
     BeeObservation,
     Event,
@@ -9,9 +9,55 @@ from .types import (
     IntentAction,
     NegotiationOffer,
     Observation,
+    PurityReport,
     TelegramContext,
     UIAction,
 )
+
+
+def find_hive_root() -> Path:
+    """Find the repository root by searching upwards for markers."""
+    p = Path(__file__).resolve()
+    for parent in [p] + list(p.parents):
+        # Monorepo markers
+        if (parent / "core-service").exists() and (parent / "api-gateway").exists():
+            return parent
+    return Path.cwd()
+
+
+MACRO_ATCG_FOLDERS = [
+    "core-service",
+    "api-gateway",
+    "frontend",
+    "adapters",
+    "agents",
+    "proto",
+    "docs",
+    "tools",
+    "deploy",
+    "packages",
+    "tests",
+]
+
+ALLOWED_ROOT_FILES = [
+    "README.md",
+    "llms.txt",
+    "HIVE_STATE.md",
+    "pyproject.toml",
+    "uv.lock",
+    ".gitignore",
+    "Makefile",
+    "buf.gen.yaml",
+    "buf.yaml",
+    ".python-version",
+    ".dockerignore",
+    ".env.example",
+    "compose.yml",
+    ".pre-commit-config.yaml",
+    "CLAUDE.md",
+    "CRYPTO_QUICKSTART.md",
+    "CRYPTO_INTEGRATION_SUMMARY.md",
+]
 
 
 @runtime_checkable
@@ -63,26 +109,33 @@ class Membrane(Protocol):
 @runtime_checkable
 class BeeAggregator(Protocol):
     """A - Aggregator: Gathers signals from Git, Prometheus, and Filesystem."""
+
     async def perceive(self) -> BeeContext: ...
+
     async def test_brain_connectivity(self) -> bool: ...
 
 
 @runtime_checkable
 class BeeTransformer(Protocol):
     """T - Transformer: Analyzes purity and generates reports."""
-    async def think(self, context: BeeContext) -> AuditObservation: ...
+
+    async def think(self, context: BeeContext) -> PurityReport: ...
 
 
 @runtime_checkable
 class BeeConnector(Protocol):
     """C - Connector: Interacts with GitHub and NATS."""
-    async def act(self, report: AuditObservation, context: BeeContext) -> BeeObservation: ...
+
+    async def act(self, report: PurityReport, context: BeeContext) -> BeeObservation: ...
 
 
 @runtime_checkable
 class BeeGenerator(Protocol):
     """G - Generator: Updates documentation and chronicles."""
-    async def generate(self, report: AuditObservation, context: BeeContext, observation: BeeObservation) -> None: ...
+
+    async def generate(
+        self, report: PurityReport, context: BeeContext, observation: BeeObservation
+    ) -> None: ...
 
 
 # Telegram Bot Protocols

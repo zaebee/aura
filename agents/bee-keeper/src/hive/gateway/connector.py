@@ -6,7 +6,7 @@ import nats.errors
 import structlog
 
 from src.config import KeeperSettings
-from src.hive.dna import BeeContext, BeeObservation, PurityReport, find_hive_root
+from aura_core.dna import BeeContext, BeeObservation, PurityReport, find_hive_root
 from src.hive.proteins.gh_client import GitHubClient
 
 logger = structlog.get_logger(__name__)
@@ -132,8 +132,16 @@ class BeeConnector:
         else:
             msg += "**Architecture is pure. The Hive thrives.**\n"
 
+        reflective_heresies = report.metadata.get("reflective_heresies", [])
+        if reflective_heresies:
+            msg += "\n**Reflective Insights (The Inquisitor's Eye):**\n"
+            for rh in reflective_heresies:
+                msg += f"- {rh}\n"
+
         if report.reasoning:
             msg += f"\n<details>\n<summary>Keeper's Reasoning</summary>\n\n{report.reasoning}\n</details>"
+
+        msg += "\n\ncc: @jules @gemini-code-assist"
 
         return msg
 
