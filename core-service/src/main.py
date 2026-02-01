@@ -467,7 +467,6 @@ async def serve() -> None:
             except Exception as e:
                 logger.error("heartbeat_deal_error", error=str(e))
 
-            await asyncio.sleep(settings.server.heartbeat_interval_seconds)
             await asyncio.sleep(settings.heartbeat.interval_seconds)
 
     asyncio.create_task(heartbeat_deal_loop())
