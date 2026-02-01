@@ -6,7 +6,7 @@ import nats.errors
 import structlog
 
 from src.config import KeeperSettings
-from src.dna import BeeContext, BeeObservation, PurityReport
+from src.hive.dna import BeeContext, BeeObservation, PurityReport
 from src.hive.proteins.gh_client import GitHubClient
 
 logger = structlog.get_logger(__name__)

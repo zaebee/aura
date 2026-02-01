@@ -2,6 +2,36 @@ from dataclasses import dataclass, field
 from typing import Any, Protocol, runtime_checkable
 
 
+MACRO_ATCG_FOLDERS = [
+    "core-service",
+    "api-gateway",
+    "frontend",
+    "adapters",
+    "agents",
+    "proto",
+    "docs",
+    "tools",
+    "deploy",
+]
+
+ALLOWED_ROOT_FILES = [
+    "README.md",
+    "llms.txt",
+    "HIVE_STATE.md",
+    "pyproject.toml",
+    "uv.lock",
+    ".gitignore",
+    "Makefile",
+    "buf.gen.yaml",
+    "buf.yaml",
+    ".python-version",
+    ".dockerignore",
+    ".env.example",
+    "compose.yml",
+    ".pre-commit-config.yaml",
+]
+
+
 @dataclass
 class BeeContext:
     """Consolidated context for the BeeKeeper's audit."""

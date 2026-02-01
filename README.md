@@ -131,12 +131,12 @@ make test-cov
 
 **Agent Negotiation Simulator:**
 ```bash
-python agent_sim.py
+python tools/agent_sim.py
 ```
 
 **Search Simulator:**
 ```bash
-python search_sim.py
+python tools/search_sim.py
 ```
 
 ## 📂 Project Structure
@@ -278,8 +278,8 @@ The platform now includes **cryptographic signature verification** using Ed25519
 
 3. **Run secure simulators**:
    ```bash
-   python agent_sim.py
-   python autonomous_buyer.py
+   python tools/agent_sim.py
+   python tools/autonomous_buyer.py
    ```
 
 4. **Test security**:

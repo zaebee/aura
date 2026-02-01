@@ -1,5 +1,8 @@
 # Python-generated files
 __pycache__/
+.ruff_cache/
+.pytest_cache/
+.claude/
 *.py[oc]
 build/
 dist/

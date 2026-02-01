@@ -8,7 +8,7 @@ import httpx
 import structlog
 
 from src.config import KeeperSettings
-from src.dna import BeeContext
+from src.hive.dna import BeeContext
 
 logger = structlog.get_logger(__name__)
 
@@ -102,15 +102,32 @@ class BeeAggregator:
 
         return {"negotiation_success_rate": 0.0, "status": "UNKNOWN"}
 
+    def _find_root(self) -> Path:
+        """Find the repository root by looking for pyproject.toml."""
+        current = Path(__file__).resolve()
+        for parent in current.parents:
+            if (parent / "pyproject.toml").exists():
+                return parent
+        return Path(".")
+
     def _scan_filesystem(self) -> list[str]:
         filesystem_map = []
         # Scan from repository root
-        root_path = Path("../../")
+        root_path = self._find_root()
+
+        # 1. Capture Root Structure (Top-level only) for Macro-ATCG check
+        for path in root_path.iterdir():
+            rel_path = path.relative_to(root_path)
+            filesystem_map.append(str(rel_path))
+
+        # 2. Capture all .py files recursively for deeper audits
         for path in root_path.rglob("*.py"):
             if ".venv" not in path.parts and "proto" not in path.parts:
                 # Store path relative to root
                 rel_path = path.relative_to(root_path)
-                filesystem_map.append(str(rel_path))
+                rel_path_str = str(rel_path)
+                if rel_path_str not in filesystem_map:
+                    filesystem_map.append(rel_path_str)
         return filesystem_map
 
     def _load_event_data(self) -> dict[str, Any]:

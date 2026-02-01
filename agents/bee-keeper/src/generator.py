@@ -4,7 +4,7 @@ import litellm
 import structlog
 
 from src.config import KeeperSettings
-from src.dna import BeeContext, BeeObservation, PurityReport
+from src.hive.dna import BeeContext, BeeObservation, PurityReport
 
 logger = structlog.get_logger(__name__)
 
