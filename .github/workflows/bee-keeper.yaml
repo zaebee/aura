@@ -1,3 +1,4 @@
+# CC: @google-code-assets (Main Reviewer)
 name: bee.Keeper
 
 on:
@@ -39,6 +40,21 @@ jobs:
         run: |
           uv python install 3.12
           uv sync
+
+      - name: Open Hive Umbilical (Port-Forward)
+        run: |
+          # Open tunnels to NATS and Prometheus in the background
+          kubectl port-forward svc/${AURA_NATS_SVC} ${AURA_NATS_PORT}:${AURA_NATS_PORT} &
+          kubectl port-forward svc/${AURA_PROMETHEUS_SVC} -n ${AURA_PROMETHEUS_NS} ${AURA_PROMETHEUS_PORT}:${AURA_PROMETHEUS_PORT} &
+          sleep ${AURA_TUNNEL_SLEEP}
+        env:
+          KUBECONFIG: ${{ secrets.KUBECONFIG_PATH || '/home/runner/.kube/config' }}
+          AURA_NATS_SVC: aura-nats
+          AURA_NATS_PORT: 4222
+          AURA_PROMETHEUS_SVC: monitoring-kube-prometheus-prometheus
+          AURA_PROMETHEUS_NS: monitoring
+          AURA_PROMETHEUS_PORT: 9090
+          AURA_TUNNEL_SLEEP: 5
 
       - name: Run bee.Keeper
         env:

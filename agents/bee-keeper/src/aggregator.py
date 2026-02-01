@@ -141,8 +141,16 @@ class BeeAggregator:
                     timeout=10.0
                 )
                 logger.info("llm_ping_success", model=model)
+            except (
+                litellm.exceptions.APIConnectionError,
+                litellm.exceptions.ServiceUnavailableError,
+                litellm.exceptions.Timeout,
+                litellm.exceptions.AuthenticationError,
+            ) as e:
+                logger.warning("llm_ping_transient_error", model=model, error=str(e))
+                all_ok = False
             except Exception as e:
-                logger.warning("llm_ping_failed", model=model, error=str(e))
+                logger.error("llm_ping_unexpected_error", model=model, error=str(e))
                 all_ok = False
 
         return all_ok
