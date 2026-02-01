@@ -1,6 +1,3 @@
-# 📄 `docs/visual/README.md`
-
-```md
 # Visual Reasoning Layer
 
 This directory contains **visual blueprints** of Aura Hive reasoning models.
@@ -8,7 +5,6 @@ This directory contains **visual blueprints** of Aura Hive reasoning models.
 Visual artifacts are intended to improve **human understanding** of how the
 hive is interpreted by advisory systems. They are **non-executable** and
 **non-authoritative**.
-```
 
 ---
 
