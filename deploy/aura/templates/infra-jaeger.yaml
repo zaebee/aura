@@ -1,7 +1,7 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: {{ .Release.Name }}-jaeger
+  name: aura-jaeger
   labels:
     app: jaeger
 spec:
@@ -45,7 +45,7 @@ spec:
 apiVersion: v1
 kind: Service
 metadata:
-  name: {{ .Release.Name }}-jaeger
+  name: aura-jaeger
 spec:
   type: {{ .Values.monitoring.jaeger.service.type }}
   selector:

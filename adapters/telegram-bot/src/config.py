@@ -14,6 +14,7 @@ class TelegramSettings(BaseSettings):
 
     token: SecretStr = Field("")  # type: ignore
     core_url: str = "core-service:50051"
+    otel_exporter_otlp_endpoint: str = "http://aura-jaeger.monitoring.svc.cluster.local:4317"
     negotiation_timeout: float = 60.0
     webhook_domain: str | None = None
 

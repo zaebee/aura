@@ -12,7 +12,7 @@ from opentelemetry.sdk.trace.export import BatchSpanProcessor, ConsoleSpanExport
 
 
 def init_telemetry(
-    service_name: str, otlp_endpoint: str = "http://aura-jaeger.monitoring.svc.cluster.local:4317"
+    service_name: str, otlp_endpoint: str = "http://jaeger:4317"
 ) -> trace.Tracer:
     """
     Initialize OpenTelemetry tracing with OTLP exporter.
