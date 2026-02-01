@@ -38,11 +38,11 @@ data:
           "datasource": { "type": "prometheus", "uid": "Prometheus" },
           "targets": [
             {
-              "expr": "avg(rate(container_cpu_usage_seconds_total{namespace=\"{{ .Release.Namespace }}\"}[5m])) * 100",
+              "expr": "avg(rate(container_cpu_usage_seconds_total{namespace=\"$namespace\"}[5m])) * 100",
               "legendFormat": "CPU Usage (%)"
             },
             {
-              "expr": "avg(container_memory_working_set_bytes{namespace=\"{{ .Release.Namespace }}\"}) / 1024 / 1024",
+              "expr": "avg(container_memory_working_set_bytes{namespace=\"$namespace\"}) / 1024 / 1024",
               "legendFormat": "Memory Usage (MB)"
             }
           ]
@@ -54,7 +54,7 @@ data:
           "datasource": { "type": "prometheus", "uid": "Prometheus" },
           "targets": [
             {
-              "expr": "sum(rate(negotiation_accepted_total{namespace=\"{{ .Release.Namespace }}\"}[5m])) / sum(rate(negotiation_total{namespace=\"{{ .Release.Namespace }}\"}[5m]))",
+              "expr": "sum(rate(negotiation_accepted_total{namespace=\"$namespace\"}[5m])) / (sum(rate(negotiation_total{namespace=\"$namespace\"}[5m])) > 0) or vector(0)",
               "legendFormat": "Success Rate"
             }
           ],
@@ -91,7 +91,7 @@ data:
           "datasource": { "type": "loki", "uid": "Loki" },
           "targets": [
             {
-              "expr": "{namespace=\"{{ .Release.Namespace }}\", app=~\"core|gateway\"}",
+              "expr": "{namespace=\"$namespace\", app=~\"core|gateway\"}",
               "refId": "A"
             }
           ],
@@ -109,7 +109,23 @@ data:
       "schemaVersion": 38,
       "style": "dark",
       "tags": ["aura", "metabolism"],
-      "templating": { "list": [] },
+      "templating": {
+        "list": [
+          {
+            "name": "namespace",
+            "type": "query",
+            "datasource": { "type": "prometheus", "uid": "Prometheus" },
+            "definition": "label_values(up, namespace)",
+            "hide": 0,
+            "includeAll": false,
+            "multi": false,
+            "query": "label_values(up, namespace)",
+            "refresh": 1,
+            "sort": 1,
+            "current": { "text": "{{ .Release.Namespace }}", "value": "{{ .Release.Namespace }}" }
+          }
+        ]
+      },
       "time": { "from": "now-1h", "to": "now" },
       "timepicker": {},
       "timezone": "",
