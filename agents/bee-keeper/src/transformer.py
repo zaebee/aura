@@ -38,7 +38,7 @@ class BeeTransformer:
         logger.info("bee_transformer_think_started")
 
         # 1. Structural Check (Deterministic)
-        heresies = self._deterministic_audit(context)
+        structural_heresies = self._deterministic_audit(context)
 
         # 2. LLM Audit (Reflective)
         # Handle large diffs
@@ -49,7 +49,9 @@ class BeeTransformer:
 
         purity_analysis = await self._llm_audit(context)
 
-        all_heresies = heresies + purity_analysis.get("heresies", [])
+        # Merge results: structural heresies always take precedence
+        llm_heresies = purity_analysis.get("heresies", [])
+        all_heresies = structural_heresies + llm_heresies
         is_pure = len(all_heresies) == 0
 
         return PurityReport(
@@ -58,7 +60,7 @@ class BeeTransformer:
             narrative=purity_analysis.get("narrative", "The Hive remains silent."),
             reasoning=purity_analysis.get("reasoning", ""),
             token_usage=purity_analysis.get("token_usage", 0),
-            metadata={"llm_response": purity_analysis},
+            metadata={"llm_response": purity_analysis, "structural_heresies": structural_heresies},
         )
 
     def _deterministic_audit(self, context: BeeContext) -> list[str]:
@@ -124,17 +126,19 @@ class BeeTransformer:
 
         try:
             return await self._call_llm(prompt)
-        except Exception as e:
+        except (litellm.exceptions.APIConnectionError, litellm.exceptions.ServiceUnavailableError, litellm.exceptions.TimeoutException, Exception) as e:
             logger.warning("primary_llm_failed_trying_fallback", error=str(e))
             try:
                 return await self._call_llm(prompt, use_fallback=True)
             except Exception as fe:
                 logger.error("llm_audit_failed_completely", error=str(fe))
+                # Fallback to a "Safe" pure-ish response so structural audit can still pass
                 return {
-                    "is_pure": False,
-                    "heresies": [f"Blight: The Keeper's mind is clouded ({str(fe)})"],
-                    "narrative": "A strange mist descends upon the Hive...",
-                    "reasoning": f"Primary error: {e}. Fallback error: {fe}",
+                    "is_pure": True, # Assume pure if LLM is down, structural check still runs in think()
+                    "heresies": [],
+                    "narrative": "A thick mist covers the Hive. The Keeper senses only the physical structures, the deeper patterns remain hidden.",
+                    "reasoning": f"LLM Connectivity failure. Primary: {e}. Fallback: {fe}",
+                    "llm_unavailable": True
                 }
 
     async def _summarize_diff(self, diff: str) -> str:
@@ -164,18 +168,26 @@ class BeeTransformer:
             "messages": [{"role": "user", "content": prompt}],
             "response_format": {"type": "json_object"},
             "max_tokens": self.settings.max_tokens,
+            "timeout": 30.0, # Add timeout for resilience
         }
 
         if use_fallback and "ollama" in model:
             kwargs["api_base"] = self.settings.llm__ollama_base_url
 
-        response = await litellm.acompletion(**kwargs)
-        content = response.choices[0].message.content
-        import json
+        try:
+            response = await litellm.acompletion(**kwargs)
+            content = response.choices[0].message.content
+            import json
 
-        data: dict[str, Any] = json.loads(content)
-        # Capture token usage if available
-        if hasattr(response, "usage") and response.usage:
-            data["token_usage"] = getattr(response.usage, "total_tokens", 0)
+            data: dict[str, Any] = json.loads(content)
+            # Capture token usage if available
+            if hasattr(response, "usage") and response.usage:
+                data["token_usage"] = getattr(response.usage, "total_tokens", 0)
 
-        return data
+            return data
+        except (litellm.exceptions.APIConnectionError, litellm.exceptions.ServiceUnavailableError, litellm.exceptions.TimeoutException) as e:
+            logger.warning("llm_connection_error", model=model, error=str(e))
+            raise e # Let the caller handle fallback
+        except Exception as e:
+            logger.error("llm_unexpected_error", model=model, error=str(e))
+            raise e

@@ -32,6 +32,9 @@ async def main() -> None:
     connector = BeeConnector(settings=settings)
     generator = BeeGenerator(settings=settings)
 
+    # 1.5 Sanity Check: Test Brain Connectivity
+    await aggregator.test_brain_connectivity()
+
     # 2. Initialize Metabolism
     metabolism = BeeMetabolism(
         aggregator=aggregator,

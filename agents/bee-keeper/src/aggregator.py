@@ -5,6 +5,7 @@ from pathlib import Path
 from typing import Any
 
 import httpx
+import litellm
 import structlog
 
 from src.config import KeeperSettings
@@ -122,3 +123,26 @@ class BeeAggregator:
             except Exception as e:
                 logger.warning("event_data_load_failed", error=str(e))
         return {}
+
+    async def test_brain_connectivity(self) -> bool:
+        """Pings the LLM endpoints to verify connectivity."""
+        logger.info("testing_brain_connectivity")
+        models_to_test = [self.settings.llm__model, self.settings.llm__fallback_model]
+        all_ok = True
+
+        for model in models_to_test:
+            try:
+                logger.info("pinging_llm", model=model)
+                # Simple completion to test connectivity
+                await litellm.acompletion(
+                    model=model,
+                    messages=[{"role": "user", "content": "ping"}],
+                    max_tokens=5,
+                    timeout=10.0
+                )
+                logger.info("llm_ping_success", model=model)
+            except Exception as e:
+                logger.warning("llm_ping_failed", model=model, error=str(e))
+                all_ok = False
+
+        return all_ok

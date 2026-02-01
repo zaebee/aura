@@ -40,6 +40,7 @@ class BeeObservation:
 class BeeAggregator(Protocol):
     """A - Aggregator: Gathers signals from Git, Prometheus, and Filesystem."""
     async def perceive(self) -> BeeContext: ...
+    async def test_brain_connectivity(self) -> bool: ...
 
 
 @runtime_checkable
