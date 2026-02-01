@@ -7,6 +7,7 @@ import structlog
 
 logger = structlog.get_logger(__name__)
 
+
 class GitHubClient:
     """Async GitHub client protein for BeeKeeper."""
 

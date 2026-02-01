@@ -1,4 +1,4 @@
-.PHONY: lint test test-cov test-verbose build generate push install-dev format test-health
+.PHONY: lint test test-cov test-verbose build generate push install-dev format test-health simulate
 
 # Makefile for Aura Project
 TAG ?= latest
@@ -42,7 +42,11 @@ test-verbose:
 # Test health endpoints
 test-health:
 	# Test health check endpoints (requires running services)
-	uv run python tests/test_health_endpoints.py
+	uv run python tools/test_health_endpoints.py
+
+simulate:
+	# Run agent negotiation simulation
+	uv run python tools/agent_sim.py
 
 # --- 2. BUILD ---
 build: generate build-tg
