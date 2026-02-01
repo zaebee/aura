@@ -442,8 +442,11 @@ async def serve() -> None:
                 logger.info("triggering_heartbeat_deal")
 
                 # Fetch a valid item for the mock deal
-                with SessionLocal() as session:
-                    item = session.query(InventoryItem).first()
+                def get_item():
+                    with SessionLocal() as session:
+                        return session.query(InventoryItem).first()
+
+                item = await asyncio.to_thread(get_item)
 
                 if item:
                     # Use real protobuf types for the heartbeat signal
