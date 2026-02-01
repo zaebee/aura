@@ -140,43 +140,33 @@ class BeeAggregator:
             "primary": self.settings.llm__model,
             "fallback": self.settings.llm__fallback_model,
         }
-        self.brain_status = {}
-        litellm.api_key = self.settings.llm__api_key
+        # Reset status and ensure we have entries for both roles
+        self.brain_status = {role: False for role in models}
 
         for role, model in models.items():
+            if not model:
+                continue
             try:
                 logger.info("pinging_llm", role=role, model=model)
 
-                kwargs = {
+                kwargs: dict[str, Any] = {
                     "model": model,
                     "messages": [{"role": "user", "content": "ping"}],
                     "max_tokens": 5,
                     "timeout": 10.0,
+                    "api_key": self.settings.llm__api_key,
                 }
 
                 if "ollama" in model:
                     kwargs["api_base"] = self.settings.llm__ollama_base_url
 
-                # Simple completion to test connectivity
+                # Simple completion to test connectivity via LiteLLM
                 await litellm.acompletion(**kwargs)
 
                 logger.info("llm_ping_success", role=role, model=model)
                 self.brain_status[role] = True
-            except (
-                litellm.exceptions.APIConnectionError,
-                litellm.exceptions.ServiceUnavailableError,
-                litellm.exceptions.Timeout,
-                litellm.exceptions.AuthenticationError,
-            ) as e:
-                logger.warning(
-                    "llm_ping_transient_error", role=role, model=model, error=str(e)
-                )
-                self.brain_status[role] = False
             except Exception as e:
-                # Still log as warning to satisfy "log a WARNING but don't exit" spirit for single model failures
-                logger.warning(
-                    "llm_ping_unexpected_error", role=role, model=model, error=str(e)
-                )
-                self.brain_status[role] = False
+                # Log as warning to ensure the Hive doesn't exit prematurely if at least one model is alive
+                logger.warning("llm_ping_failed", role=role, model=model, error=str(e))
 
         return any(self.brain_status.values())
