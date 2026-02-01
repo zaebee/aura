@@ -1,5 +1,6 @@
 hive:
-  version: "1.0"
+  version: "1.1"
+  description: "The Sacred Architecture of the Aura Hive"
   nucleotides:
     A: "aggregator.py"
     T: "transformer.py"
@@ -17,3 +18,21 @@ hive:
     - "metabolism.py"
     - "dna.py"
     - "types.py"
+
+  # Authorized Peripheral Growths
+  authorized_growths:
+    - "agent_identity.py"
+    - "agent_sim.py"
+    - "autonomous_buyer.py"
+    - "core-service/src/llm"
+    - "core-service/src/crypto"
+    - "core-service/src/config"
+    - "core-service/src/services"
+    - "core-service/src/prompts"
+    - "core-service/src/guard"
+    - "core-service/tests"
+    - "core-service/migrations"
+    - "adapters/mcp-server"
+    - "adapters/telegram-bot"
+    - "api-gateway"
+    - "agents/bee-keeper/src/hive/proteins"

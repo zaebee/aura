@@ -90,9 +90,16 @@ class BeeGenerator:
         new_entry += f"> {report.narrative}\n\n"
 
         if report.heresies:
-            new_entry += "**Heresies Detected:**\n"
+            new_entry += "**Deterministic Heresies (Structural):**\n"
             for h in report.heresies:
                 new_entry += f"- {h}\n"
+
+        # Chronicle reflective findings isolated from the Transformer's deterministic logic
+        reflective_heresies = report.metadata.get("reflective_heresies", [])
+        if reflective_heresies:
+            new_entry += "\n**Reflective Findings (LLM Audit):**\n"
+            for rh in reflective_heresies:
+                new_entry += f"- {rh}\n"
 
         if observation.injuries:
             new_entry += "\n**🤕 Injuries (Failures):**\n"

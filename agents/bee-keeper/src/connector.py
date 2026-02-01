@@ -123,11 +123,17 @@ class BeeConnector:
         msg += f"> {report.narrative}\n\n"
 
         if report.heresies:
-            msg += "**Architectural Heresies Detected:**\n"
+            msg += "**Deterministic Heresies (Structural):**\n"
             for h in report.heresies:
                 msg += f"- {h}\n"
         else:
             msg += "**Architecture is pure. The Hive thrives.**\n"
+
+        reflective_heresies = report.metadata.get("reflective_heresies", [])
+        if reflective_heresies:
+            msg += "\n**Reflective Findings (LLM Audit):**\n"
+            for rh in reflective_heresies:
+                msg += f"- {rh}\n"
 
         if report.reasoning:
             msg += f"\n<details>\n<summary>Keeper's Reasoning</summary>\n\n{report.reasoning}\n</details>"

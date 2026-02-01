@@ -50,18 +50,21 @@ class BeeTransformer:
 
         purity_analysis = await self._llm_audit(context)
 
-        # Merge results: structural heresies always take precedence
-        llm_heresies = purity_analysis.get("heresies", [])
-        all_heresies = structural_heresies + llm_heresies
-        is_pure = len(all_heresies) == 0
+        # ATCG Purity: Transformer returns deterministic heresies.
+        # LLM findings are isolated in reasoning/metadata for the Generator to chronicle.
+        is_pure = len(structural_heresies) == 0
 
         return PurityReport(
             is_pure=is_pure,
-            heresies=all_heresies,
+            heresies=structural_heresies,
             narrative=purity_analysis.get("narrative", "The Hive remains silent."),
             reasoning=purity_analysis.get("reasoning", ""),
             token_usage=purity_analysis.get("token_usage", 0),
-            metadata={"llm_response": purity_analysis, "structural_heresies": structural_heresies},
+            metadata={
+                "llm_analysis": purity_analysis,
+                "structural_heresies": structural_heresies,
+                "reflective_heresies": purity_analysis.get("heresies", [])
+            },
         )
 
     def _deterministic_audit(self, context: BeeContext) -> list[str]:
@@ -78,7 +81,14 @@ class BeeTransformer:
                         f"Structural Heresy: '{p.name}' is an unauthorized growth in the core nucleotides."
                     )
 
-        # 2. Pattern Enforcement (No raw print or os.getenv in diff)
+        # 2. Metric Verification
+        success_rate = context.hive_metrics.get("negotiation_success_rate", 1.0)
+        if success_rate < 0.7:
+             heresies.append(
+                 f"Hive Alert: 'negotiation_success_rate' is {success_rate:.2f}, which is below the critical threshold of 0.7. The Hive flow is obstructed."
+             )
+
+        # 3. Pattern Enforcement (No raw print or os.getenv in diff)
         diff_lines = context.git_diff.splitlines()
         for line in diff_lines:
             if line.startswith("+") and not line.startswith("+++"):
