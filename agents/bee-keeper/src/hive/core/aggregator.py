@@ -1,7 +1,6 @@
 import json
 import os
 import subprocess  # nosec
-from pathlib import Path
 from typing import Any
 
 import httpx

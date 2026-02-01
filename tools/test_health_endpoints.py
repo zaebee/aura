@@ -69,8 +69,9 @@ def test_core_service_grpc_health():
 
         probe_path = shutil.which("grpc_health_probe")
         if not probe_path:
-            logger.warning("grpc_health_skipped",
-                           reason="grpc_health_probe not found in PATH")
+            logger.warning(
+                "grpc_health_skipped", reason="grpc_health_probe not found in PATH"
+            )
             return None
 
         result = subprocess.run(  # nosec B603
