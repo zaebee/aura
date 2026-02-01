@@ -13,7 +13,7 @@ class Settings(BaseSettings):
 
     # gRPC Core Service Connection
     core_service_host: str = "localhost:50051"
-    negotiation_timeout: float = 30.0
+    negotiation_timeout: float = 60.0
 
     # HTTP Server
     http_port: int = 8000
@@ -29,7 +29,7 @@ class Settings(BaseSettings):
 
     # Health Check Configuration
     health_check_timeout: float = (
-        0.5  # Timeout for core service health checks (seconds)
+        5.0  # Timeout for core service health checks (seconds)
     )
     health_check_slow_threshold_ms: float = (
         100.0  # Log warning if health check exceeds this duration (milliseconds)

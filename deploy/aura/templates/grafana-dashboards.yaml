@@ -1,8 +1,8 @@
-{{- if .Values.grafana.enabled -}}
 apiVersion: v1
 kind: ConfigMap
 metadata:
   name: "{{ .Release.Name }}-grafana-dashboards-data"
+  namespace: {{ .Release.Namespace }}
   labels:
     app: grafana
     grafana_dashboard: "1"
@@ -73,9 +73,21 @@ data:
           }
         },
         {
-          "title": "Latest Traces & Decision Logs",
+          "title": "Latest Traces (Jaeger)",
+          "type": "jaeger",
+          "gridPos": { "h": 12, "w": 12, "x": 0, "y": 16 },
+          "datasource": { "type": "jaeger", "uid": "Jaeger" },
+          "targets": [
+            {
+              "queryType": "search",
+              "service": "{{ .Release.Name }}-core"
+            }
+          ]
+        },
+        {
+          "title": "Decision Logs (Loki)",
           "type": "logs",
-          "gridPos": { "h": 12, "w": 24, "x": 0, "y": 16 },
+          "gridPos": { "h": 12, "w": 12, "x": 12, "y": 16 },
           "datasource": { "type": "loki", "uid": "Loki" },
           "targets": [
             {
@@ -106,4 +118,3 @@ data:
       "version": 1,
       "weekStart": ""
     }
-{{- end }}
