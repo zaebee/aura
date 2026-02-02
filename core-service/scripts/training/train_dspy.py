@@ -14,9 +14,6 @@ import dspy
 import structlog
 from dspy.teleprompt import BootstrapFewShot
 
-# Add src to path for imports
-sys.path.append(str(Path(__file__).parent.parent.parent / "src"))
-
 from llm.engine import AuraNegotiator
 from llm.prepare.clean import clean_and_parse_json
 
