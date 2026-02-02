@@ -12,7 +12,6 @@ from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 import structlog
-
 from llm.dspy_strategy import DSPyStrategy
 from llm.engine import AuraNegotiator
 from llm.signatures import Negotiate

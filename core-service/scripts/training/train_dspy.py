@@ -33,7 +33,9 @@ logger = structlog.get_logger(__name__)
 
 def load_training_data() -> list[dict]:
     """Load and flatten training data from JSON file."""
-    data_path = Path(__file__).parent.parent.parent / "data" / "negotiation_training.json"
+    data_path = (
+        Path(__file__).parent.parent.parent / "data" / "negotiation_training.json"
+    )
 
     if not data_path.exists():
         raise FileNotFoundError(f"Training data not found at {data_path}")

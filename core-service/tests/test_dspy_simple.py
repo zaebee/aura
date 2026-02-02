@@ -4,10 +4,8 @@ Simple test for DSPy integration - tests basic functionality.
 """
 
 import sys
-from pathlib import Path
 
 import structlog
-
 from llm.dspy_strategy import DSPyStrategy
 from llm.engine import AuraNegotiator
 from llm.signatures import Negotiate

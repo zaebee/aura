@@ -5,7 +5,6 @@ Minimal DSPy test to isolate the issue.
 
 import json
 import sys
-from pathlib import Path
 
 import dspy
 import structlog

@@ -4,7 +4,6 @@ Test the robust JSON parsing function in DSPy strategy.
 """
 
 import sys
-from pathlib import Path
 
 import structlog
 from llm.prepare.clean import clean_and_parse_json

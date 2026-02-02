@@ -175,6 +175,7 @@ class Generator(Protocol):
 
 # --- bee.Keeper Protocols ---
 
+
 @dataclass
 class BeeContext:
     """Consolidated context for the BeeKeeper's audit."""
