@@ -14,5 +14,6 @@ frontend/.next
 tests
 docs
 *.md
+!README.md
 .vscode
 .DS_Store
