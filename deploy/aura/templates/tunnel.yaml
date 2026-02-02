@@ -33,9 +33,9 @@ data:
     [[proxies]]
     name = "grafana"
     type = "tcp"
-    localIP = "monitoring-grafana.monitoring"
-    localPort = 80
-    remotePort = 8083
+    localIP = {{ .Values.tunnel.grafana.localIP | quote }}
+    localPort = {{ .Values.tunnel.grafana.localPort }}
+    remotePort = {{ .Values.tunnel.grafana.remotePort }}
 
 ---
 apiVersion: apps/v1
