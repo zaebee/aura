@@ -95,7 +95,7 @@ buf generate
 
 # This will create generated code in:
 # - api-gateway/src/proto/
-# - core-service/src/proto/
+# - core/src/proto/
 ```
 
 ## 🏃 Running the Platform
@@ -120,13 +120,13 @@ docker-compose up --build
 **1. Train the Brain (Mandatory)**
 Before running the Core service, you must train the DSPy-based negotiation engine:
 ```bash
-uv run core-service/train_dspy.py
+uv run core/train_dspy.py
 ```
 
 **2. Run the Service**
 ```bash
-# Navigate to core-service directory
-cd core-service
+# Navigate to core directory
+cd core
 
 # Run the core service
 uv run python -m src.main
@@ -150,7 +150,7 @@ uv run python -m src.main
 
 ```bash
 # For core service (requires watchfiles)
-cd core-service
+cd core
 uv run python -m src.main --reload
 
 # For API gateway
@@ -206,20 +206,20 @@ Aura now requires **PostgreSQL with pgvector** for all environments. SQLite is n
 
 ```bash
 # Run database migrations
-docker-compose exec core-service alembic upgrade head
+docker-compose exec core alembic upgrade head
 
 # Create a new migration
-docker-compose exec core-service alembic revision --autogenerate -m "add_new_feature"
+docker-compose exec core alembic revision --autogenerate -m "add_new_feature"
 
 # Downgrade migrations
-docker-compose exec core-service alembic downgrade -1
+docker-compose exec core alembic downgrade -1
 ```
 
 ### Seeding the Database
 
 ```bash
 # Seed initial data
-docker-compose exec core-service python -m src.seed
+docker-compose exec core python -m src.seed
 ```
 
 ### Connecting to PostgreSQL
@@ -267,7 +267,7 @@ docker-compose exec db psql -U user -d aura_db
 
 2. **Implement the feature**:
    - Add new Protocol Buffer definitions if needed
-   - Implement backend logic in core-service
+   - Implement backend logic in core
    - Add API endpoints in api-gateway
    - Write tests
 
@@ -292,13 +292,13 @@ git commit -m "feat(negotiation): add new negotiation strategy"
 
 ```bash
 # View logs for a specific service
-docker-compose logs core-service
+docker-compose logs core
 
 # Follow logs in real-time
 docker-compose logs -f api-gateway
 
 # Access service shell
-docker-compose exec core-service bash
+docker-compose exec core bash
 
 # Check running containers
 docker-compose ps
@@ -345,7 +345,7 @@ The platform uses OpenTelemetry for metrics collection. You can integrate with:
 
 1. **Create a new strategy class**:
    ```python
-   # In core-service/src/llm_strategy.py
+   # In core/src/llm_strategy.py
    class NewStrategy:
        def evaluate(self, item_id, bid, reputation, request_id):
            # Your logic here
@@ -362,7 +362,7 @@ The platform uses OpenTelemetry for metrics collection. You can integrate with:
 
 3. **Update the service to use your strategy**:
    ```python
-   # In core-service/src/main.py
+   # In core/src/main.py
    strategy = NewStrategy()  # Instead of MistralStrategy()
    ```
 
@@ -383,7 +383,7 @@ The platform uses OpenTelemetry for metrics collection. You can integrate with:
 
 3. **Implement in Core Service**:
    ```python
-   # In core-service/src/main.py
+   # In core/src/main.py
    def NewEndpoint(self, request, context):
        # Your implementation
        return NewResponse()
@@ -434,10 +434,10 @@ aura/proto/
 - **Versioning**: Organized by version (v1/)
 - **Code Generation**: `buf generate` creates Python classes
 
-### Core Service (`core-service/`)
+### Core Service (`core/`)
 
 ```
-aura/core-service/
+aura/core/
 ├── src/
 │   ├── main.py                  # gRPC service implementation
 │   ├── llm_strategy.py           # Pricing strategies
@@ -592,7 +592,7 @@ nano .env
 **Issue: gRPC connection refused**
 ```bash
 # Solution: Check if core service is running
-docker-compose logs core-service
+docker-compose logs core
 
 # Verify ports are correctly mapped
 netstat -tuln | grep 50051

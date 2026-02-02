@@ -312,7 +312,7 @@ Consider adding a `/metrics` endpoint with:
 
 3. Test gRPC connectivity manually:
    ```bash
-   kubectl exec -it <gateway-pod> -- grpc_health_probe -addr=<core-service>:50051
+   kubectl exec -it <gateway-pod> -- grpc_health_probe -addr=<core>:50051
    ```
 
 ### Core service health check failing
@@ -337,20 +337,20 @@ Consider adding a `/metrics` endpoint with:
 
 1. Check service logs:
    ```bash
-   docker-compose logs core-service
+   docker-compose logs core
    docker-compose logs api-gateway
    ```
 
 2. Verify health check command works:
    ```bash
    docker-compose exec api-gateway curl -f http://localhost:8000/healthz
-   docker-compose exec core-service grpc_health_probe -addr=:50051
+   docker-compose exec core grpc_health_probe -addr=:50051
    ```
 
 3. Check if required binaries are present:
    ```bash
    docker-compose exec api-gateway which curl
-   docker-compose exec core-service which grpc_health_probe
+   docker-compose exec core which grpc_health_probe
    ```
 
 ---

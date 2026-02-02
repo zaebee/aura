@@ -33,7 +33,7 @@ jobs:
               with:
                   filters: |
                       code:
-                      - 'core-service/**'
+                      - 'core/**'
                       - 'api-gateway/**'
                       - 'frontend/**'
                       - 'proto/**'
@@ -59,7 +59,7 @@ jobs:
               with:
                   name: proto-stubs
                   path: |
-                      core-service/src/proto
+                      core/src/hive/proto
                       api-gateway/src/proto
                       frontend/src/lib/aura
 
@@ -99,7 +99,7 @@ jobs:
         strategy:
             fail-fast: false
             matrix:
-                service: [core-service, api-gateway, frontend, telegram-bot]
+                service: [core, api-gateway, frontend, telegram-bot]
         permissions:
             contents: read
             packages: write
@@ -129,8 +129,8 @@ jobs:
                   if [ "$SERVICE" = "telegram-bot" ]; then
                     echo "dir=adapters/telegram-bot" >> $GITHUB_OUTPUT
                     echo "name=telegram-bot" >> $GITHUB_OUTPUT
-                  elif [ "$SERVICE" = "core-service" ]; then
-                    echo "dir=core-service" >> $GITHUB_OUTPUT
+                  elif [ "$SERVICE" = "core" ]; then
+                    echo "dir=core" >> $GITHUB_OUTPUT
                     echo "name=core" >> $GITHUB_OUTPUT
                   elif [ "$SERVICE" = "api-gateway" ]; then
                     echo "dir=api-gateway" >> $GITHUB_OUTPUT

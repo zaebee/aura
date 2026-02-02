@@ -13,7 +13,7 @@ class TelegramSettings(BaseSettings):
     )
 
     token: SecretStr = Field("")  # type: ignore
-    core_url: str = "core-service:50051"
+    core_url: str = "core:50051"
     otel_exporter_otlp_endpoint: str = (
         "http://aura-jaeger.monitoring.svc.cluster.local:4317"
     )

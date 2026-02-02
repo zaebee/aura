@@ -105,7 +105,7 @@ FastAPIInstrumentor.instrument_app(app)
 GrpcInstrumentorClient().instrument()
 ```
 
-#### Core Service (`core-service/src/main.py`)
+#### Core Service (`core/src/main.py`)
 
 - **gRPC Server Instrumentation**: Automatic tracing of gRPC methods
 - **SQLAlchemy Instrumentation**: Database query tracing

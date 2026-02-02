@@ -11,7 +11,8 @@ from opentelemetry.sdk.trace import TracerProvider
 from opentelemetry.sdk.trace.export import BatchSpanProcessor
 
 from src.bot import router
-from src.client import GRPCNegotiationClient
+from src.hive.connector.proteins.aura_client import GRPCNegotiationClient
+from src.hive.connector.proteins.telegram_api import TelegramProtein
 from src.config import settings
 from src.hive.aggregator import TelegramAggregator
 from src.hive.connector import TelegramConnector
@@ -71,10 +72,16 @@ async def main() -> None:
     # Initialize Bot
     bot = Bot(token=settings.token.get_secret_value())
 
+    # Initialize Proteins
+    telegram_protein = TelegramProtein(bot)
+    aura_protein = GRPCNegotiationClient(
+        settings.core_url, timeout=settings.negotiation_timeout
+    )
+
     # Initialize Hive components
     aggregator = TelegramAggregator()
     transformer = TelegramTransformer()
-    connector = TelegramConnector(bot, client)
+    connector = TelegramConnector(telegram_protein, aura_protein)
     generator = TelegramGenerator(nats_client=nc)
     metabolism = TelegramMetabolism(aggregator, transformer, connector, generator)
 
@@ -97,7 +104,7 @@ async def main() -> None:
     except Exception as e:
         logger.error("Bot crashed unexpectedly", error=str(e), exc_info=True)
     finally:
-        await client.close()
+        await aura_protein.close()
         await bot.session.close()
         if nc:
             await nc.close()

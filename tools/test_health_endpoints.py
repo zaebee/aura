@@ -109,7 +109,7 @@ def test_readiness_when_core_unavailable():
         elif response.status_code == 200:
             logger.info(
                 "readiness_core_running_info",
-                note="To test failure scenario, stop core-service first",
+                note="To test failure scenario, stop core first",
             )
         else:
             logger.error(

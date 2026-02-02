@@ -36,7 +36,7 @@
 | Service | Test Command | Interval | Timeout | Retries |
 |---------|--------------|----------|---------|---------|
 | db | `pg_isready -U user -d aura_db` | 5s | 5s | 5 |
-| core-service | `grpc_health_probe -addr=:50051` | 10s | 5s | 3 |
+| core | `grpc_health_probe -addr=:50051` | 10s | 5s | 3 |
 | api-gateway | `curl -f http://localhost:8000/healthz` | 10s | 5s | 3 |
 | frontend | `curl -f http://localhost:3000` | 10s | 5s | 3 |
 

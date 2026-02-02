@@ -18,7 +18,7 @@ docker-compose up -d db
 docker-compose exec db pg_isready -U user -d aura_db
 
 # Apply migration
-docker-compose exec core-service alembic upgrade head
+docker-compose exec core alembic upgrade head
 
 # Verify table created
 docker-compose exec db psql -U user -d aura_db -c "\d locked_deals"
@@ -102,7 +102,7 @@ export $(cat .env | grep -v '^#' | xargs)
 docker-compose up --build
 
 # In another terminal, check logs
-docker-compose logs -f core-service | grep crypto
+docker-compose logs -f core | grep crypto
 
 # Expected log output:
 # crypto_provider_initialized provider="solana" network="devnet" ...
@@ -268,8 +268,8 @@ open http://localhost:16686
 
 ### No payment instructions returned
 - Verify `CRYPTO_ENABLED=true` in environment
-- Check core-service logs: `docker-compose logs core-service | grep crypto_enabled`
-- Restart services: `docker-compose restart core-service`
+- Check core logs: `docker-compose logs core | grep crypto_enabled`
+- Restart services: `docker-compose restart core`
 
 ## Testing Different Scenarios
 
@@ -285,7 +285,7 @@ curl -X POST http://localhost:8000/v1/negotiate -d '{"item_id":"room-101","bid_a
 ```bash
 # Set short TTL
 export DEAL_TTL_SECONDS=60  # 1 minute
-docker-compose restart core-service
+docker-compose restart core
 
 # Negotiate → Wait 61 seconds → Check status → EXPIRED
 ```
@@ -299,7 +299,7 @@ curl -X POST http://localhost:8000/v1/deals/invalid-uuid/status
 ### Test 4: Crypto Disabled
 ```bash
 export CRYPTO_ENABLED=false
-docker-compose restart core-service
+docker-compose restart core
 
 curl -X POST http://localhost:8000/v1/negotiate -d '{"item_id":"room-101","bid_amount":160,"currency":"USD","agent_did":"test1"}'
 # Expected: reservation_code in response (no payment required)
@@ -308,8 +308,8 @@ curl -X POST http://localhost:8000/v1/negotiate -d '{"item_id":"room-101","bid_a
 ## Next Steps
 
 1. ✅ **You are here** - Local testing on devnet
-2. 🔜 Write unit tests (`core-service/tests/test_market_service.py`)
-3. 🔜 Write integration tests (`core-service/tests/test_crypto_integration.py`)
+2. 🔜 Write unit tests (`core/tests/test_market_service.py`)
+3. 🔜 Write integration tests (`core/tests/test_crypto_integration.py`)
 4. 🔜 Deploy to staging with testnet
 5. 🔜 Deploy to production with mainnet
 
@@ -328,8 +328,8 @@ Before enabling on mainnet:
 ## Support
 
 - Documentation: `CRYPTO_INTEGRATION_SUMMARY.md`
-- Code examples: `core-service/src/crypto/`, `core-service/src/services/`
-- Logs: `docker-compose logs -f core-service | grep -E "deal_created|payment_verified"`
+- Code examples: `core/src/crypto/`, `core/src/services/`
+- Logs: `docker-compose logs -f core | grep -E "deal_created|payment_verified"`
 - Traces: http://localhost:16686
 
 ---

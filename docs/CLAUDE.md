@@ -42,7 +42,7 @@ docker-compose up --build
 #### Running Individually
 ```bash
 # Core Service (from project root)
-cd core-service && uv run python -m src.main
+cd core && uv run python -m src.main
 
 # API Gateway (from project root)
 cd api-gateway && uv run python -m src.main
@@ -60,7 +60,7 @@ make test-cov
 make test-verbose
 
 # Run specific test file
-uv run pytest core-service/tests/test_rule_based_strategy.py -v
+uv run pytest core/tests/test_rule_based_strategy.py -v
 ```
 
 ### Code Quality
@@ -78,13 +78,13 @@ buf lint
 ### Database Operations
 ```bash
 # Run migrations
-docker-compose exec core-service alembic upgrade head
+docker-compose exec core alembic upgrade head
 
 # Create new migration
-docker-compose exec core-service alembic revision --autogenerate -m "description"
+docker-compose exec core alembic revision --autogenerate -m "description"
 
 # Downgrade migration
-docker-compose exec core-service alembic downgrade -1
+docker-compose exec core alembic downgrade -1
 
 # Connect to PostgreSQL
 docker-compose exec db psql -U user -d aura_db
@@ -130,7 +130,7 @@ All APIs are defined in `proto/aura/negotiation/v1/negotiation.proto`. The workf
 
 1. **Modify .proto file** to add/change service definitions
 2. **Run `buf generate`** to regenerate Python code in both services
-3. **Update implementations** in core-service/src/main.py (gRPC handler) and api-gateway/src/main.py (HTTP endpoint)
+3. **Update implementations** in core/src/main.py (gRPC handler) and api-gateway/src/main.py (HTTP endpoint)
 4. **Generated code lives in** `*/src/proto/` directories and should NEVER be manually edited
 
 ### Service Communication Flow
@@ -157,16 +157,16 @@ The Core Service uses a pluggable strategy pattern for pricing decisions, config
 
 **LiteLLMStrategy** (any other `LLM_MODEL` value): LLM-based intelligent negotiation
 - Supports any provider via litellm (OpenAI, Mistral, Anthropic, Ollama, etc.)
-- Uses Jinja2 prompt templates from `core-service/src/prompts/system.md`
+- Uses Jinja2 prompt templates from `core/src/prompts/system.md`
 - Returns decisions with reasoning
 - Handles complex negotiation scenarios
 - Example models: `mistral/mistral-large-latest`, `openai/gpt-4o`, `ollama/mistral`
 
 Implementation:
-- Strategy factory: `core-service/src/main.py:create_strategy()`
-- Rule-based: `core-service/src/llm_strategy.py:RuleBasedStrategy`
-- LiteLLM: `core-service/src/llm/strategy.py:LiteLLMStrategy`
-- LLM engine: `core-service/src/llm/engine.py:LLMEngine`
+- Strategy factory: `core/src/main.py:create_strategy()`
+- Rule-based: `core/src/llm_strategy.py:RuleBasedStrategy`
+- LiteLLM: `core/src/llm/strategy.py:LiteLLMStrategy`
+- LLM engine: `core/src/llm/engine.py:LLMEngine`
 
 ### Vector Embeddings and Semantic Search
 
@@ -176,7 +176,7 @@ The Search endpoint (`/v1/search`) uses pgvector for semantic search:
 2. **Vector similarity search** in PostgreSQL using cosine distance
 3. **Results ranked by similarity** with configurable thresholds
 
-Implementation: `core-service/src/embeddings.py` generates embeddings, `core-service/src/main.py:105-167` handles search logic.
+Implementation: `core/src/embeddings.py` generates embeddings, `core/src/main.py:105-167` handles search logic.
 
 ### Hidden Knowledge Pattern
 
@@ -205,40 +205,40 @@ The Core Service can query its own infrastructure health from Prometheus:
 - Graceful degradation: Returns cached data or error dict on failure
 
 Implementation:
-- Prometheus client: `core-service/src/monitor.py:get_hive_metrics()`
-- Cache layer: `core-service/src/monitor.py:MetricsCache`
-- gRPC handler: `core-service/src/main.py:GetSystemStatus()`
+- Prometheus client: `core/src/monitor.py:get_hive_metrics()`
+- Cache layer: `core/src/monitor.py:MetricsCache`
+- gRPC handler: `core/src/main.py:GetSystemStatus()`
 - HTTP endpoint: `api-gateway/src/main.py:/v1/system/status`
 
 ## Critical Code Locations
 
 ### Protocol Buffer Definitions
 - **Service contracts**: `proto/aura/negotiation/v1/negotiation.proto`
-- **Generated Python code**: `api-gateway/src/proto/` and `core-service/src/proto/`
+- **Generated Python code**: `api-gateway/src/proto/` and `core/src/proto/`
 
 ### Core Service (gRPC)
-- **Main service**: `core-service/src/main.py`
+- **Main service**: `core/src/main.py`
   - `NegotiationService.Negotiate()` handler
   - `NegotiationService.Search()` handler
   - `NegotiationService.GetSystemStatus()` handler
   - `create_strategy()` factory for pricing strategy selection
 - **Pricing strategies**:
-  - `RuleBasedStrategy`: `core-service/src/llm_strategy.py`
-  - `LiteLLMStrategy`: `core-service/src/llm/strategy.py`
-  - `LLMEngine`: `core-service/src/llm/engine.py`
-- **Infrastructure monitoring**: `core-service/src/monitor.py`
-- **Prompt templates**: `core-service/src/prompts/system.md`
-- **Database models**: `core-service/src/db.py`
-- **Embeddings**: `core-service/src/embeddings.py`
+  - `RuleBasedStrategy`: `core/src/llm_strategy.py`
+  - `LiteLLMStrategy`: `core/src/llm/strategy.py`
+  - `LLMEngine`: `core/src/llm/engine.py`
+- **Infrastructure monitoring**: `core/src/monitor.py`
+- **Prompt templates**: `core/src/prompts/system.md`
+- **Database models**: `core/src/db.py`
+- **Embeddings**: `core/src/embeddings.py`
 
 ### API Gateway (FastAPI)
 - **HTTP endpoints**: `api-gateway/src/main.py`
 - **Configuration**: `api-gateway/src/config.py`
 
 ### Tests
-- **Rule-based strategy tests**: `core-service/tests/test_rule_based_strategy.py`
-- **LiteLLM strategy tests**: `core-service/tests/test_litellm_strategy.py`
-- **Test fixtures**: `core-service/tests/conftest.py`
+- **Rule-based strategy tests**: `core/tests/test_rule_based_strategy.py`
+- **LiteLLM strategy tests**: `core/tests/test_litellm_strategy.py`
+- **Test fixtures**: `core/tests/conftest.py`
 
 ## Configuration and Environment
 
@@ -289,9 +289,9 @@ OTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:4317
    }
    ```
 2. Run `buf generate` to regenerate code
-3. Implement gRPC handler in `core-service/src/main.py`
+3. Implement gRPC handler in `core/src/main.py`
 4. Add HTTP endpoint in `api-gateway/src/main.py`
-5. Add tests in `core-service/tests/`
+5. Add tests in `core/tests/`
 
 ### Changing LLM Models
 
@@ -314,7 +314,7 @@ export OPENAI_API_KEY=sk-proj-xxx
 export LLM_MODEL=ollama/mistral
 
 # Then restart services
-docker-compose restart core-service
+docker-compose restart core
 ```
 
 **Via Helm** (Kubernetes deployment):
@@ -332,25 +332,25 @@ helm install aura deploy/aura \
 ### Modifying Pricing Strategy
 
 To add a new pricing strategy:
-1. Create new class in `core-service/src/llm/` or `core-service/src/llm_strategy.py`
+1. Create new class in `core/src/llm/` or `core/src/llm_strategy.py`
 2. Implement `PricingStrategy` protocol with `evaluate()` method
 3. Return `negotiation_pb2.NegotiateResponse` with one of: `accepted`, `countered`, `rejected`, or `ui_required`
-4. Update `core-service/src/main.py:create_strategy()` factory to instantiate your strategy
-5. Add tests in `core-service/tests/test_<strategy_name>.py`
+4. Update `core/src/main.py:create_strategy()` factory to instantiate your strategy
+5. Add tests in `core/tests/test_<strategy_name>.py`
 
 ### Customizing Prompt Templates
 
 To modify LLM prompts:
-1. Edit `core-service/src/prompts/system.md` (Jinja2 template)
+1. Edit `core/src/prompts/system.md` (Jinja2 template)
 2. Available variables: `business_type`, `item_name`, `base_price`, `floor_price`, `market_load`, `trigger_price`, `bid`, `reputation`
-3. Test changes: `docker-compose restart core-service`
+3. Test changes: `docker-compose restart core`
 
 ### Database Schema Changes
 
-1. Modify models in `core-service/src/db.py`
-2. Create migration: `docker-compose exec core-service alembic revision --autogenerate -m "description"`
-3. Review generated migration in `core-service/migrations/versions/`
-4. Apply migration: `docker-compose exec core-service alembic upgrade head`
+1. Modify models in `core/src/db.py`
+2. Create migration: `docker-compose exec core alembic revision --autogenerate -m "description"`
+3. Review generated migration in `core/migrations/versions/`
+4. Apply migration: `docker-compose exec core alembic upgrade head`
 
 ## Observability
 
@@ -367,7 +367,7 @@ To modify LLM prompts:
 ### Viewing Traces
 ```bash
 # Follow logs for specific service
-docker-compose logs -f core-service
+docker-compose logs -f core
 docker-compose logs -f api-gateway
 
 # View all logs
@@ -382,7 +382,7 @@ If you're upgrading from the old hardcoded `MistralStrategy`:
 
 **Before** (hardcoded Mistral):
 ```python
-# core-service/src/main.py
+# core/src/main.py
 from llm_strategy import MistralStrategy
 strategy = MistralStrategy()
 

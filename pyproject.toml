@@ -48,6 +48,8 @@ dependencies = [
 
 [tool.uv.sources]
 aura-core = { path = "packages/aura-core" }
+aura-protein-solana = { path = "components/proteins/solana" }
+aura-protein-observability = { path = "components/proteins/observability" }
 
 [dependency-groups]
 dev = [

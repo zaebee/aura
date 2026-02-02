@@ -9,7 +9,7 @@ from src.bot import (
     process_bid,
     process_select_hotel,
 )
-from src.hive.dna import Observation
+from aura_core.dna import Observation
 
 
 @pytest.mark.asyncio

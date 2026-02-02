@@ -16,10 +16,10 @@ services:
       timeout: 5s
       retries: 5
 
-  core-service:
+  core:
     build:
       context: .
-      dockerfile: core-service/Dockerfile
+      dockerfile: core/Dockerfile
     restart: on-failure
     environment:
       AURA_DATABASE__URL: postgresql://user:password@db:5432/aura_db
@@ -61,14 +61,14 @@ services:
       dockerfile: api-gateway/Dockerfile
     restart: on-failure
     environment:
-      CORE_SERVICE_HOST: core-service:50051
+      CORE_SERVICE_HOST: core:50051
       OTEL_SERVICE_NAME: "aura-gateway"
       OTEL_EXPORTER_OTLP_ENDPOINT: "http://jaeger:4317"
       CORS_ORIGINS: "http://localhost:3000,http://127.0.0.1:3000"
     ports:
       - "8000:8000"
     depends_on:
-      - core-service
+      - core
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8000/healthz"]
       interval: 15s
@@ -130,9 +130,9 @@ services:
     restart: on-failure
     environment:
       AURA_TG__TOKEN: ${AURA_TG__TOKEN}
-      AURA_TG__CORE_URL: core-service:50051
+      AURA_TG__CORE_URL: core:50051
     depends_on:
-      core-service:
+      core:
         condition: service_healthy
 
 volumes:

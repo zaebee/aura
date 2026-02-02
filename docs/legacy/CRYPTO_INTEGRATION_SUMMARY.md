@@ -25,12 +25,12 @@ Successfully implemented a **chain-agnostic crypto payment system** for Aura Cor
 
 **Key Design Decision:** Used `oneof` to make reservation_code mutually exclusive with crypto_payment, ensuring backward compatibility.
 
-#### 2. Database Models (`core-service/src/db.py`)
+#### 2. Database Models (`core/src/db.py`)
 - ✅ Added `DealStatus` enum (PENDING, PAID, EXPIRED)
 - ✅ Added `LockedDeal` SQLAlchemy model with all required fields
 - ✅ Imported necessary types (UUID, DateTime, Text, Enum)
 
-#### 3. Database Migration (`core-service/migrations/versions/001_add_locked_deals.py`)
+#### 3. Database Migration (`core/migrations/versions/001_add_locked_deals.py`)
 - ✅ Created `locked_deals` table with:
   - UUID primary key
   - Item details (item_id, item_name)
@@ -46,7 +46,7 @@ Successfully implemented a **chain-agnostic crypto payment system** for Aura Cor
 
 ### Phase 2: Crypto Provider Interface & Solana Implementation ✅
 
-#### 4. Provider Interface (`core-service/src/crypto/interfaces.py`)
+#### 4. Provider Interface (`core/src/crypto/interfaces.py`)
 - ✅ Defined `@dataclass PaymentProof` with transaction_hash, block_number, from_address, confirmed_at
 - ✅ Defined `Protocol CryptoProvider` with:
   - `get_address() -> str`
@@ -55,7 +55,7 @@ Successfully implemented a **chain-agnostic crypto payment system** for Aura Cor
 
 **Design Pattern:** Protocol-based interface enables future blockchain support (Ethereum, Polygon) without refactoring.
 
-#### 5. Solana Provider (`core-service/src/crypto/solana_provider.py`)
+#### 5. Solana Provider (`core/src/crypto/solana_provider.py`)
 - ✅ Implemented `SolanaProvider` class
 - ✅ Loads keypair from base58-encoded private key using `solders.keypair.Keypair`
 - ✅ Queries Solana RPC using `httpx.AsyncClient`:
@@ -76,7 +76,7 @@ Successfully implemented a **chain-agnostic crypto payment system** for Aura Cor
 
 ### Phase 3: Service Layer & Business Logic ✅
 
-#### 6. Market Service (`core-service/src/services/market.py`)
+#### 6. Market Service (`core/src/services/market.py`)
 - ✅ Implemented `MarketService` class with:
 
 **Method: `create_offer()`**
@@ -104,7 +104,7 @@ Successfully implemented a **chain-agnostic crypto payment system** for Aura Cor
 
 ### Phase 4: gRPC Integration ✅
 
-#### 7. Core Service Main (`core-service/src/main.py`)
+#### 7. Core Service Main (`core/src/main.py`)
 
 **Added Functions:**
 - ✅ `create_crypto_provider()` - Factory for SolanaProvider (returns None if disabled)
@@ -132,7 +132,7 @@ Successfully implemented a **chain-agnostic crypto payment system** for Aura Cor
 
 ### Phase 5: API Gateway Integration ✅
 
-#### 8. Configuration (`core-service/src/config.py`)
+#### 8. Configuration (`core/src/config.py`)
 - ✅ Added crypto payment settings:
   - `crypto_enabled: bool = False` (feature toggle)
   - `crypto_provider: str = "solana"`
@@ -183,15 +183,15 @@ Successfully implemented a **chain-agnostic crypto payment system** for Aura Cor
 
 **Generated Files Verified:**
 - `api-gateway/src/proto/aura/negotiation/v1/negotiation_pb2.py`
-- `core-service/src/proto/aura/negotiation/v1/negotiation_pb2.py`
-- `core-service/src/proto/aura/negotiation/v1/negotiation_pb2_grpc.py`
+- `core/src/proto/aura/negotiation/v1/negotiation_pb2.py`
+- `core/src/proto/aura/negotiation/v1/negotiation_pb2_grpc.py`
 
 ---
 
 ### Phase 7: Docker Compose & Environment ✅
 
 #### 11. Docker Configuration (`compose.yml`)
-- ✅ Added crypto-related environment variables to `core-service`:
+- ✅ Added crypto-related environment variables to `core`:
   - `CRYPTO_ENABLED=${CRYPTO_ENABLED:-false}` (default: disabled)
   - `CRYPTO_PROVIDER=${CRYPTO_PROVIDER:-solana}`
   - `CRYPTO_CURRENCY=${CRYPTO_CURRENCY:-SOL}`
@@ -242,7 +242,7 @@ Successfully implemented a **chain-agnostic crypto payment system** for Aura Cor
 ## File Structure
 
 ```
-core-service/
+core/
 ├── src/
 │   ├── crypto/
 │   │   ├── __init__.py                 # Export CryptoProvider, PaymentProof
@@ -304,10 +304,10 @@ AURA_CRYPTO__SOL_USD_RATE=100.0  # 1 SOL = $100 USD
 ```
 
 **Files Added:**
-- `core-service/src/crypto/pricing.py` - PriceConverter implementation
-- Updated `core-service/src/crypto/__init__.py` - Export PriceConverter
-- Updated `core-service/src/main.py` - Convert before create_offer()
-- Updated `core-service/src/config/crypto.py` - Add conversion config
+- `core/src/crypto/pricing.py` - PriceConverter implementation
+- Updated `core/src/crypto/__init__.py` - Export PriceConverter
+- Updated `core/src/main.py` - Convert before create_offer()
+- Updated `core/src/config/crypto.py` - Add conversion config
 - Updated `.env.example` - Add conversion settings
 
 ### Current Status
@@ -351,7 +351,7 @@ AURA_CRYPTO__SOL_USD_RATE=100.0  # 1 SOL = $100 USD
 ### 1. Run Database Migration
 ```bash
 # Apply migration
-docker-compose exec core-service alembic upgrade head
+docker-compose exec core alembic upgrade head
 
 # Verify table created
 docker-compose exec db psql -U user -d aura_db -c "\d locked_deals"
@@ -440,7 +440,7 @@ curl -X POST http://localhost:8000/v1/deals/<deal_id>/status
 ### 6. Monitoring
 ```bash
 # Check logs
-docker-compose logs -f core-service | grep -E "deal_created|payment_verified|offer_locked"
+docker-compose logs -f core | grep -E "deal_created|payment_verified|offer_locked"
 
 # View traces in Jaeger
 open http://localhost:16686
@@ -606,7 +606,7 @@ export SOLANA_RPC_URL="https://api.devnet.solana.com"
 export SOLANA_NETWORK="devnet"
 
 # Restart services
-docker-compose restart core-service
+docker-compose restart core
 
 # Test payment flow (see test_crypto_payment_e2e.py)
 \`\`\`

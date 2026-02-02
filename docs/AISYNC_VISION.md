@@ -18,7 +18,7 @@ We use **Protocol Buffers** (`proto/`) as the single source of truth for the hiv
 
 Our configuration and data models are defined using **Pydantic V2**.
 - **Current**: Manual mapping in `DEVELOPER_GUIDE.md`.
-- **Vision**: Use `sphinx-pydantic` or custom scripts to extract field descriptions and validation rules directly from `core-service/src/config/` and inject them into the markdown files.
+- **Vision**: Use `sphinx-pydantic` or custom scripts to extract field descriptions and validation rules directly from `core/src/config/` and inject them into the markdown files.
 
 ### 3. API Reflection (The Guard's Registry)
 

@@ -75,7 +75,7 @@ graph TD
 
 4. **Train the Brain (DSPy):**
    ```bash
-   uv run core-service/train_dspy.py
+   uv run core/train_dspy.py
    ```
 
 5. **Generate Protocol Buffer code:**
@@ -106,7 +106,7 @@ This will start:
 
 **Core Service:**
 ```bash
-cd core-service
+cd core
 uv run python -m src.main
 ```
 
@@ -145,7 +145,7 @@ python -m tools.simulators.autonomous_buyer
 aura/
 ├── proto/                 # Protocol Buffer definitions
 ├── api-gateway/          # API Gateway service (FastAPI)
-├── core-service/         # Core business logic service (DSPy Engine)
+├── core/         # Core business logic service (DSPy Engine)
 ├── adapters/             # External interface adapters
 │   ├── telegram-bot/     # Telegram Bot interface
 │   └── mcp-server/       # Model Context Protocol (MCP) server
@@ -183,10 +183,10 @@ make format
 ### Database Migrations
 ```bash
 # Run migrations
-docker-compose exec core-service alembic upgrade head
+docker-compose exec core alembic upgrade head
 
 # Create new migration
-docker-compose exec core-service alembic revision --autogenerate -m "description"
+docker-compose exec core alembic revision --autogenerate -m "description"
 ```
 
 ## 📖 API Endpoints

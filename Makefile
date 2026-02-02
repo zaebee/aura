@@ -12,9 +12,9 @@ lint:
 	# Python Lint (Ruff)
 	uv run ruff check .
 	# Python Type Check (Mypy)
-	MYPYPATH=core-service uv run mypy core-service/src
+	MYPYPATH=core uv run mypy core/src
 	MYPYPATH=api-gateway uv run mypy api-gateway/src
-	MYPYPATH=adapters/telegram-bot:core-service/src/proto uv run mypy adapters/telegram-bot/src
+	MYPYPATH=adapters/telegram-bot:core/src/hive/proto uv run mypy adapters/telegram-bot/src
 	# Security Audit (Bandit)
 	uv run bandit -r . -c pyproject.toml
 	# Frontend Lint
@@ -26,18 +26,18 @@ setup-hooks:
 
 # Run tests
 test:
-	# Run core-service tests
-	PYTHONPATH=core-service uv run pytest core-service/tests/ -v
+	# Run core tests
+	PYTHONPATH=core uv run pytest core/tests/ -v
 	# Run telegram-bot tests with isolated path to avoid 'src' collision
-	PYTHONPATH=adapters/telegram-bot:core-service/src/proto uv run pytest adapters/telegram-bot/tests/ -v
+	PYTHONPATH=adapters/telegram-bot:core/src/hive/proto uv run pytest adapters/telegram-bot/tests/ -v
 
 # Run tests with coverage report
 test-cov:
-	PYTHONPATH=core-service uv run pytest core-service/tests/ -v --cov=core-service/src --cov-report=term-missing
+	PYTHONPATH=core uv run pytest core/tests/ -v --cov=core/src --cov-report=term-missing
 
 # Run tests with verbose output
 test-verbose:
-	PYTHONPATH=core-service uv run pytest core-service/tests/ -vv -s
+	PYTHONPATH=core uv run pytest core/tests/ -vv -s
 
 # Test health endpoints
 test-health:
@@ -52,7 +52,7 @@ simulate:
 build: generate build-tg
 	# Build Docker images for all services
 	docker build --platform $(PLATFORM) -t $(REGISTRY)/aura-gateway:$(TAG) -f api-gateway/Dockerfile .
-	docker build --platform $(PLATFORM) -t $(REGISTRY)/aura-core:$(TAG) -f core-service/Dockerfile .
+	docker build --platform $(PLATFORM) -t $(REGISTRY)/aura-core:$(TAG) -f core/Dockerfile .
 	docker build --platform $(PLATFORM) -t $(REGISTRY)/aura-frontend:$(TAG) -f frontend/Dockerfile .
 
 build-tg:
