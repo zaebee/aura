@@ -46,7 +46,6 @@ jobs:
           # Open tunnels to NATS, Prometheus, and Grafana in the background
           kubectl port-forward svc/${AURA_NATS_SVC} ${AURA_NATS_PORT}:${AURA_NATS_PORT} &
           kubectl port-forward svc/${AURA_PROMETHEUS_SVC} -n ${AURA_PROMETHEUS_NS} ${AURA_PROMETHEUS_PORT}:${AURA_PROMETHEUS_PORT} &
-          kubectl port-forward svc/${AURA_GRAFANA_SVC} -n ${AURA_PROMETHEUS_NS} ${AURA_GRAFANA_PORT}:80 &
           sleep ${AURA_TUNNEL_SLEEP}
         env:
           KUBECONFIG: ${{ secrets.KUBECONFIG_PATH || '/home/runner/.kube/config' }}
@@ -55,8 +54,6 @@ jobs:
           AURA_PROMETHEUS_SVC: monitoring-kube-prometheus-prometheus
           AURA_PROMETHEUS_NS: monitoring
           AURA_PROMETHEUS_PORT: 9090
-          AURA_GRAFANA_SVC: monitoring-grafana
-          AURA_GRAFANA_PORT: 3001
           AURA_TUNNEL_SLEEP: 5
 
       - name: Run bee.Keeper
@@ -68,12 +65,13 @@ jobs:
           AURA_LLM__API_KEY: ${{ secrets.MISTRAL_API_KEY }}
           AURA_LLM__MODEL: "mistral/mistral-large-latest"
           AURA_LLM__FALLBACK_MODEL: "openai/gpt-4o-mini"
-          MISTRAL_API_KEY: ${{ secrets.MISTRAL_API_KEY }}
-          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
           AURA_LLM__OLLAMA_BASE_URL: "http://localhost:11434"
           AURA_PROMETHEUS_URL: "http://localhost:9090"
           AURA_NATS_URL: "nats://localhost:4222"
           AURA_BEE_KEEPER__MAX_TOKENS: 1000
+
+          MISTRAL_API_KEY: ${{ secrets.MISTRAL_API_KEY }}
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
         run: |
           # Configure git for auto-commits
           git config --global user.name "bee.Keeper"
