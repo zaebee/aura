@@ -62,7 +62,7 @@ spec:
           name: "{{ .Release.Name }}-frpc-config"
       - name: token-volume
         secret:
-          secretName: aura-secrets
+          secretName: "{{ .Release.Name }}-secrets"
           items:
           - key: frp-client-token
             path: frp-token
