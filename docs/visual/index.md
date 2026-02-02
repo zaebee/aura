@@ -76,9 +76,9 @@ Aura Hive uses **Technical Folklore** — bio-organic metaphors layered over pre
 |------------------|---------------------|-----------|----------------|
 | **Bee** | Autonomous Service | Self-contained, cooperative agents with agency | `agents/bee-keeper/` |
 | **ATCG-M** | Service Architecture Pattern | DNA analogy for fractal 5-nucleotide structure | `FOUNDATION.md:27` |
-| **A (Aggregator)** | Input/Sensor Layer | Collects signals from environment | `dna.py:156-164` |
-| **T (Transformer)** | Reasoning/LLM Layer | Processes signals via Ona (DSPy, LangChain) | `dna.py:166-172` |
-| **C (Connector)** | Output/Action Layer | Acts through Jules (Proteins/Skills) | `dna.py:147-154` |
+| **A (Aggregator)** | Input/Sensor Layer | Collects signals from environment | `dna.py:153-156` |
+| **T (Transformer)** | Reasoning/LLM Layer | Processes signals via Ona (DSPy, LangChain) | `dna.py:160-163` |
+| **C (Connector)** | Output/Action Layer | Acts through Jules (Proteins/Skills) | `dna.py:167-170` |
 | **G (Generator)** | Event/Chronicle Layer | Pulses state updates and events | `dna.py:174-177` |
 | **M (Membrane)** | Input/Output Guards | Immune system: validates inputs, enforces rules | `core-service/src/hive/membrane.py` |
 | **Bloodstream** | NATS Event Bus | Circulatory system distributes signals | `FOUNDATION.md:14` |

@@ -144,22 +144,26 @@ elif field_name == "agent.did":
 ### 1. Floor Price Enforcement (Economic Invariant)
 
 ```python
-# membrane.py:93-102
-if decision.action == "accept":
-    bid = context.offer.bid_amount
-    if bid < floor_price:
-        logger.warning("membrane_reject_below_floor", bid=bid, floor=floor_price)
-        decision.action = "reject"
-        decision.reason = "Bid below floor price"
+# membrane.py:98-107
+if decision.price < floor_price:
+    logger.warning(
+        "membrane_rule_violation",
+        rule="floor_price",
+        proposed=decision.price,
+        floor=floor_price,
+    )
+    return self._override_with_safe_offer(
+        decision, floor_price * 1.05, "FLOOR_PRICE_VIOLATION"
+    )
 ```
 
-**Why Critical?** Even if the LLM hallucinates and says "accept $1 for a $100 item," the Membrane **overrides** the decision.
+**Why Critical?** Even if the LLM hallucinates and says "accept $1 for a $100 item," the Membrane **overrides** with a safe counter-offer at floor_price + 5%.
 
 **Example:**
 - Floor price: $50
 - Bid: $30
 - LLM decision: "accept" (hallucination or adversarial prompt)
-- **Membrane override:** "reject"
+- **Membrane override:** Counter-offer at $52.50 (floor_price * 1.05) with self-healing
 
 ---
 
@@ -183,22 +187,23 @@ if "floor_price" in decision.reason.lower():
 ### 3. Self-Healing via FailureIntent Handling
 
 ```python
-# membrane.py:75-91
+# membrane.py:76-83
 if isinstance(decision, FailureIntent) or decision.action == "error":
-    logger.warning("membrane_handling_failure_intent")
-    counter = floor_price * (1 + DEFAULT_MIN_MARGIN)
-    return IntentAction(
-        action="counter",
-        counter_offer=counter,
-        reason="System unavailable, minimum offer provided",
+    logger.warning(
+        "membrane_handling_failure_intent",
+        error=getattr(decision, "error", "Unknown error"),
+    )
+    return self._override_with_safe_offer(
+        decision, floor_price * 1.05, "FAILURE_RECOVERY"
     )
 ```
 
-**Why Critical?** If the LLM crashes, times out, or returns garbage, the Membrane **gracefully degrades** to a safe counter-offer instead of failing the entire request.
+**Why Critical?** If the LLM crashes, times out, or returns garbage, the Membrane **gracefully degrades** to a safe counter-offer via `_override_with_safe_offer` instead of failing the entire request.
 
 **Example:**
 - LLM result: `FailureIntent(error="Timeout")`
-- **Membrane fallback:** Counter-offer at `floor_price + 10%`
+- **Membrane fallback:** Counter-offer at `floor_price * 1.05` ($52.50 for $50 floor)
+- **Message:** "I've reached my final limit for this item. My best offer is $52.50."
 
 ---
 
@@ -230,13 +235,13 @@ sequenceDiagram
     T->>M_out: IntentAction(action="accept")
 
     alt Bid < Floor Price
-        M_out->>M_out: Override: "accept" → "reject"
-        M_out->>C: IntentAction(action="reject", reason="Bid below minimum")
+        M_out->>M_out: Override via _override_with_safe_offer(floor * 1.05)
+        M_out->>C: IntentAction(action="counter", price=$52.50, message="My best offer...")
     else LLM Failure
-        M_out->>M_out: FailureIntent → Counter-offer (floor + 10%)
-        M_out->>C: IntentAction(action="counter", counter_offer: $55)
+        M_out->>M_out: FailureIntent → _override_with_safe_offer(floor * 1.05)
+        M_out->>C: IntentAction(action="counter", price=$52.50, message="My best offer...")
     else Valid Decision
-        M_out->>C: IntentAction(action="counter", counter_offer: $40)
+        M_out->>C: IntentAction(action="counter", price=$40)
     end
 
     C->>Agent: NegotiateResponse
@@ -282,14 +287,16 @@ if injection_detected:
 
 ### Pattern 3: Override (Outbound)
 
-**When:** LLM decision violates business rules (floor price, data leakage)
+**When:** LLM decision violates business rules (floor price, min margin)
 
-**Action:** Change decision action/reason to comply with invariants
+**Action:** Replace with safe counter-offer via `_override_with_safe_offer`
 
 **Code:**
 ```python
-if bid < floor_price and decision.action == "accept":
-    decision.action = "reject"
+if decision.price < floor_price:
+    return self._override_with_safe_offer(
+        decision, floor_price * 1.05, "FLOOR_PRICE_VIOLATION"
+    )
 ```
 
 ---
@@ -298,13 +305,17 @@ if bid < floor_price and decision.action == "accept":
 
 **When:** LLM fails entirely (FailureIntent, timeout, crash)
 
-**Action:** Return deterministic fallback (counter-offer at floor + margin)
+**Action:** Return deterministic fallback via `_override_with_safe_offer`
 
 **Code:**
 ```python
 if isinstance(decision, FailureIntent):
-    return IntentAction(action="counter", counter_offer=floor_price * 1.1)
+    return self._override_with_safe_offer(
+        decision, floor_price * 1.05, "FAILURE_RECOVERY"
+    )
 ```
+
+**Implementation:** `core-service/src/hive/membrane.py:134-148`
 
 ---
 
