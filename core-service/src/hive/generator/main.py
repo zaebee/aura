@@ -4,10 +4,9 @@ from typing import Any
 
 import nats.errors
 import structlog
+from aura_core.types import Event, Observation
 
-from src.config import get_settings
-
-from .types import Event, Observation
+from src.hive.metabolism import get_settings
 
 logger = structlog.get_logger(__name__)
 

@@ -1,10 +1,9 @@
 from typing import Any
 
 import structlog
+from aura_core.types import FailureIntent, HiveContext, IntentAction
 
-from src.config import get_settings
-
-from .types import FailureIntent, HiveContext, IntentAction
+from src.hive.metabolism import get_settings
 
 logger = structlog.get_logger(__name__)
 

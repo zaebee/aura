@@ -1,10 +1,9 @@
 import structlog
 from aiogram import Bot
+from aura_core.types import Observation, TelegramContext, UIAction
 from opentelemetry import trace
 from src.client import GRPCNegotiationClient
 from src.interfaces import NegotiationResult, SearchResult
-
-from .dna import Observation, TelegramContext, UIAction
 
 logger = structlog.get_logger(__name__)
 tracer = trace.get_tracer(__name__)

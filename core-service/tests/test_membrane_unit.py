@@ -1,5 +1,5 @@
 import pytest
-from src.guard.membrane import OutputGuard, SafetyViolation
+from src.hive.guard.membrane import OutputGuard, SafetyViolation
 
 
 def test_margin_violation():

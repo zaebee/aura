@@ -6,7 +6,7 @@ import nats.errors
 import structlog
 
 from src.config import KeeperSettings
-from src.hive.dna import AuditObservation, BeeContext, BeeObservation, find_hive_root
+from aura_core.dna import AuditObservation, BeeContext, BeeObservation, find_hive_root
 from src.hive.proteins.gh_client import GitHubClient
 
 logger = structlog.get_logger(__name__)

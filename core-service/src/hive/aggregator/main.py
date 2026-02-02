@@ -6,12 +6,11 @@ from typing import Any
 
 import httpx
 import structlog
+from aura_core.types import HiveContext, NegotiationOffer
 from sqlalchemy.exc import SQLAlchemyError
 
-from src.config import get_settings
 from src.db import InventoryItem, SessionLocal
-
-from .types import HiveContext, NegotiationOffer
+from src.hive.metabolism import get_settings
 
 logger = structlog.get_logger(__name__)
 

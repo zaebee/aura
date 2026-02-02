@@ -8,7 +8,7 @@ import litellm
 import structlog
 
 from src.config import KeeperSettings
-from src.hive.dna import BeeContext, find_hive_root
+from aura_core.dna import BeeContext, find_hive_root
 
 logger = structlog.get_logger(__name__)
 

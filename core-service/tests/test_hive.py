@@ -1,15 +1,15 @@
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
-from src.hive.aggregator import HiveAggregator
-from src.hive.membrane import HiveMembrane
-from src.hive.types import HiveContext, IntentAction, NegotiationOffer
+from aura_core.types import HiveContext, IntentAction, NegotiationOffer
+from src.hive.aggregator.main import HiveAggregator
+from src.hive.membrane.main import HiveMembrane
 
 
 @pytest.mark.asyncio
 async def test_aggregator_perceive(mocker):
     # Mock DB and monitor
-    mock_session_factory = mocker.patch("src.hive.aggregator.SessionLocal")
+    mock_session_factory = mocker.patch("src.hive.aggregator.main.SessionLocal")
     mock_session = mock_session_factory.return_value.__enter__.return_value
     mock_query = mock_session.query.return_value.filter_by.return_value.first
     mock_query.return_value = MagicMock(

@@ -1,6 +1,6 @@
 import pytest
-from src.hive.membrane import HiveMembrane
-from src.hive.types import HiveContext, IntentAction, NegotiationOffer
+from aura_core.types import HiveContext, IntentAction, NegotiationOffer
+from src.hive.membrane.main import HiveMembrane
 
 
 @pytest.mark.asyncio

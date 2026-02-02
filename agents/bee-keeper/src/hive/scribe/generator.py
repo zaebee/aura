@@ -3,7 +3,7 @@ import litellm
 import structlog
 
 from src.config import KeeperSettings
-from src.hive.dna import (
+from aura_core.dna import (
     ALLOWED_CHAMBERS,
     AuditObservation,
     BeeContext,

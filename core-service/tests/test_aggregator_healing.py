@@ -2,7 +2,7 @@ from unittest.mock import AsyncMock, MagicMock
 
 import httpx
 import pytest
-from src.hive.aggregator import HiveAggregator
+from src.hive.aggregator.main import HiveAggregator
 
 
 @pytest.mark.asyncio

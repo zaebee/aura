@@ -1,0 +1,11 @@
+[project]
+name = "aura-core"
+version = "0.1.0"
+description = "Shared DNA and protocols for the Aura Hive"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = []
+
+[tool.uv]
+managed = true
+package = true

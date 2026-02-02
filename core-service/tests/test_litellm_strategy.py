@@ -3,7 +3,7 @@
 from unittest.mock import MagicMock, patch
 
 import pytest
-from src.llm.strategy import AI_Decision, LiteLLMStrategy
+from src.hive.transformer.strategy import AI_Decision, LiteLLMStrategy
 
 
 class TestLiteLLMStrategy:
@@ -29,7 +29,7 @@ class TestLiteLLMStrategy:
         - Mocked LLM engine
         - Mocked _get_item method returning mock_item
         """
-        with patch("llm.strategy.LiteLLMStrategy._get_item") as mock_get_item:
+        with patch("src.hive.transformer.strategy.LiteLLMStrategy._get_item") as mock_get_item:
             mock_get_item.return_value = mock_item
             strategy = LiteLLMStrategy(model="openai/gpt-4o", temperature=0.7)
             strategy._get_item = mock_get_item

@@ -5,7 +5,7 @@ from src.config import KeeperSettings
 from src.hive.core.aggregator import BeeAggregator
 from src.hive.gateway.connector import BeeConnector
 from src.hive.core.transformer import BeeTransformer
-from src.hive.dna import BeeContext, AuditObservation
+from aura_core.dna import BeeContext, AuditObservation
 from src.hive.scribe.generator import BeeGenerator
 
 logger = structlog.get_logger(__name__)

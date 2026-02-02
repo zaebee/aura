@@ -2,6 +2,7 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 from aiogram.filters import CommandObject
+from aura_core.types import Observation
 from src.bot import (
     NegotiationStates,
     cmd_search,
@@ -9,7 +10,6 @@ from src.bot import (
     process_bid,
     process_select_hotel,
 )
-from src.hive.dna import Observation
 
 
 @pytest.mark.asyncio

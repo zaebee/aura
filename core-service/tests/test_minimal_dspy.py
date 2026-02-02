@@ -12,7 +12,7 @@ sys.path.append(str(Path(__file__).parent / "src"))
 
 import dspy
 import structlog
-from llm.engine import AuraNegotiator
+from src.hive.transformer.engine import AuraNegotiator
 
 # Configure logging
 structlog.configure(

@@ -11,9 +11,9 @@ import structlog
 # Add src to path
 sys.path.append(str(Path(__file__).parent / "src"))
 
-from llm.dspy_strategy import DSPyStrategy
-from llm.engine import AuraNegotiator
-from llm.signatures import Negotiate
+from src.hive.transformer.dspy_strategy import DSPyStrategy
+from src.hive.transformer.engine import AuraNegotiator
+from src.hive.transformer.signatures import Negotiate
 
 # Configure logging
 structlog.configure(

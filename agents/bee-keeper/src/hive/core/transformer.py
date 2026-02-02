@@ -7,7 +7,7 @@ import structlog
 import yaml  # type: ignore
 
 from src.config import KeeperSettings
-from src.hive.dna import (
+from aura_core.dna import (
     ALLOWED_CHAMBERS,
     ALLOWED_ROOT_FILES,
     MACRO_ATCG_FOLDERS,

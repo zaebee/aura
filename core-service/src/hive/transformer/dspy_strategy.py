@@ -11,10 +11,10 @@ from typing import Any, cast
 import dspy
 import structlog
 
-from src.config import get_settings
 from src.db import InventoryItem, SessionLocal
-from src.guard.membrane import OutputGuard, SafetyViolation
-from src.llm.engine import AuraNegotiator
+from src.hive.guard.membrane import OutputGuard, SafetyViolation
+from src.hive.metabolism import get_settings
+from src.hive.transformer.engine import AuraNegotiator
 from src.proto.aura.negotiation.v1 import negotiation_pb2
 
 logger = structlog.get_logger(__name__)
@@ -88,11 +88,11 @@ class DSPyStrategy:
         """Get fallback strategy (lazy loading)."""
         if self.fallback_strategy is None:
             try:
-                from src.llm.strategy import LiteLLMStrategy
+                from src.hive.transformer.strategy import LiteLLMStrategy
 
                 self.fallback_strategy = LiteLLMStrategy(model=self.settings.llm.model)
             except ImportError:
-                from src.llm_strategy import RuleBasedStrategy
+                from src.hive.transformer.rule_based_strategy import RuleBasedStrategy
 
                 self.fallback_strategy = RuleBasedStrategy()
         return self.fallback_strategy
