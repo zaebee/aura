@@ -4,10 +4,9 @@ from typing import Any
 
 import nats.errors
 import structlog
+from aura_core.dna import Event, Observation
 
 from src.config import get_settings
-
-from aura_core.dna import Event, Observation
 
 logger = structlog.get_logger(__name__)
 

@@ -14,8 +14,8 @@ import structlog
 from src.config import get_settings
 from src.hive.aggregator import InventoryItem, SessionLocal
 from src.hive.membrane import OutputGuard, SafetyViolation
-from src.hive.transformer.llm.engine import AuraNegotiator
 from src.hive.proto.aura.negotiation.v1 import negotiation_pb2
+from src.hive.transformer.llm.engine import AuraNegotiator
 
 logger = structlog.get_logger(__name__)
 

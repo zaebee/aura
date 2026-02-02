@@ -12,9 +12,9 @@ from jinja2 import Template
 from pydantic import BaseModel, Field
 
 from src.hive.aggregator import InventoryItem, SessionLocal
-from src.hive.transformer.llm.engine import LLMEngine
 from src.hive.metabolism.logging_config import bind_request_id
 from src.hive.proto.aura.negotiation.v1 import negotiation_pb2
+from src.hive.transformer.llm.engine import LLMEngine
 
 logger = structlog.get_logger(__name__)
 

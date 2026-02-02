@@ -11,11 +11,11 @@ from opentelemetry.sdk.trace import TracerProvider
 from opentelemetry.sdk.trace.export import BatchSpanProcessor
 
 from src.bot import router
-from src.hive.connector.proteins.aura_client import GRPCNegotiationClient
-from src.hive.connector.proteins.telegram_api import TelegramProtein
 from src.config import settings
 from src.hive.aggregator import TelegramAggregator
 from src.hive.connector import TelegramConnector
+from src.hive.connector.proteins.aura_client import GRPCNegotiationClient
+from src.hive.connector.proteins.telegram_api import TelegramProtein
 from src.hive.generator import TelegramGenerator
 from src.hive.metabolism import TelegramMetabolism
 from src.hive.transformer import TelegramTransformer

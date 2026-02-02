@@ -1,7 +1,7 @@
 import structlog
+from aura_core.dna import Observation, TelegramContext, UIAction
 from opentelemetry import trace
 
-from aura_core.dna import Observation, TelegramContext, UIAction
 from .proteins.aura_client import GRPCNegotiationClient
 from .proteins.telegram_api import TelegramProtein
 

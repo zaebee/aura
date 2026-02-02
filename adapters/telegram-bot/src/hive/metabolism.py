@@ -1,11 +1,11 @@
 from typing import Any
 
 import structlog
+from aura_core.dna import Observation
 from opentelemetry import trace
 
 from .aggregator import TelegramAggregator
 from .connector import TelegramConnector
-from aura_core.dna import Observation
 from .generator import TelegramGenerator
 from .transformer import TelegramTransformer
 

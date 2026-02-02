@@ -6,7 +6,6 @@ from src.config import KeeperSettings
 from .aggregator import BeeAggregator
 from .connector import BeeConnector
 from .transformer import BeeTransformer
-from aura_core.dna import BeeContext, AuditObservation
 from .generator import BeeGenerator
 
 logger = structlog.get_logger(__name__)

@@ -17,10 +17,10 @@ from .dna import (
     Connector,
     # Core Data Types
     Event,
+    FailureIntent,
     Generator,
     HiveContext,
     IntentAction,
-    FailureIntent,
     NegotiationOffer,
     NegotiationResult,
     Observation,

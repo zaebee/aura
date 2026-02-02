@@ -16,20 +16,27 @@ from sqlalchemy import text
 
 from src.config import settings
 from src.config.llm import get_raw_key
-from .hive.aggregator import InventoryItem, SessionLocal, engine, generate_embedding, HiveAggregator
+
+from .hive.aggregator import (
+    HiveAggregator,
+    InventoryItem,
+    SessionLocal,
+    engine,
+    generate_embedding,
+)
 from .hive.connector import HiveConnector
 from .hive.generator import HiveGenerator
 from .hive.membrane import HiveMembrane
 from .hive.metabolism import MetabolicLoop
-from .hive.transformer import AuraTransformer
 from .hive.metabolism.logging_config import (
     bind_request_id,
     clear_request_context,
     configure_logging,
     get_logger,
 )
-from .hive.proto.aura.negotiation.v1 import negotiation_pb2, negotiation_pb2_grpc
 from .hive.metabolism.telemetry import init_telemetry
+from .hive.proto.aura.negotiation.v1 import negotiation_pb2, negotiation_pb2_grpc
+from .hive.transformer import AuraTransformer
 
 # Configure structured logging on startup
 configure_logging(log_level=settings.server.log_level)
