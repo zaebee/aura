@@ -469,7 +469,14 @@ async def serve() -> None:
 
             await asyncio.sleep(settings.heartbeat.interval_seconds)
 
-    asyncio.create_task(heartbeat_deal_loop())
+    if settings.heartbeat.enabled:
+        asyncio.create_task(heartbeat_deal_loop())
+        logger.info(
+            "heartbeat_loop_started",
+            interval_seconds=settings.heartbeat.interval_seconds,
+        )
+    else:
+        logger.info("heartbeat_loop_disabled")
 
     logger.info(
         "initialization_complete",
