@@ -11,12 +11,7 @@ from aura_core.dna import (
     find_hive_root,
 )
 
-<<<<<<<< HEAD:agents/bee-keeper/src/hive/connector/__init__.py
-from src.config import KeeperSettings
-from aura_core.dna import AuditObservation, BeeContext, BeeObservation, find_hive_root
-========
 from .metabolism.config import KeeperSettings
->>>>>>>> main:agents/bee-keeper/src/hive/connector.py
 from .proteins.gh_client import GitHubClient
 
 logger = structlog.get_logger(__name__)
