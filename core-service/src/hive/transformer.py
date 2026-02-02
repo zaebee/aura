@@ -94,14 +94,14 @@ class AuraTransformer:
                 )
                 # Schedule NATS event emission (non-blocking)
                 try:
-                    loop = asyncio.get_event_loop()
-                    if loop.is_running():
-                        asyncio.create_task(self._emit_brain_dead_event(searched))
-                    else:
-                        asyncio.run(self._emit_brain_dead_event(searched))
+                    # If a loop is running, create a task. This is non-blocking.
+                    loop = asyncio.get_running_loop()
+                    loop.create_task(self._emit_brain_dead_event(searched))
                 except RuntimeError:
-                    # No event loop available during init
-                    pass
+                    # No running loop. We are in a sync context.
+                    # Run the async function in a new event loop. This is blocking,
+                    # but acceptable for a one-off event on startup.
+                    asyncio.run(self._emit_brain_dead_event(searched))
                 return AuraNegotiator()
         except Exception as e:
             logger.error("failed_to_load_dspy_program", error=str(e))
