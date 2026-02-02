@@ -5,7 +5,6 @@ import dspy
 import structlog
 
 from src.config import get_settings
-from src.guard.membrane import OutputGuard, SafetyViolation
 from src.llm.engine import AuraNegotiator
 
 from .types import FailureIntent, HiveContext, IntentAction
@@ -25,7 +24,6 @@ class AuraTransformer:
         # Default configuration
         dspy.configure(lm=dspy.LM(self.settings.llm.model))
         self.negotiator = self._load_negotiator()
-        self.guard = OutputGuard()
 
     def _load_negotiator(self) -> AuraNegotiator:
         try:
@@ -94,28 +92,6 @@ class AuraTransformer:
 
             action_data = result["action"]
 
-            # Task 3: Integrate OutputGuard into the reasoning engine
-            economic_context = self._build_economic_context(context)
-            # Ensure internal_cost is present for the guard
-            economic_context["internal_cost"] = context.item_data.get(
-                "internal_cost", economic_context["floor_price"] * 0.8
-            )
-
-            try:
-                self.guard.validate_decision(action_data, economic_context)
-            except SafetyViolation as e:
-                logger.warning(
-                    "transformer_safety_violation",
-                    error=str(e),
-                    action=action_data.get("action"),
-                    price=action_data.get("price"),
-                )
-                # Fallback: Trigger a FailureIntent which HiveMembrane will convert to a safe counter-offer
-                return FailureIntent(
-                    error=f"Safety Violation: {str(e)}",
-                    metadata={"original_action": action_data},
-                )
-
             logger.info(
                 "transformer_thought_complete",
                 action=action_data.get("action"),
@@ -130,7 +106,7 @@ class AuraTransformer:
                 metadata={"dspy_result": result, "model_used": model},
             )
 
-        except (ValueError, KeyError, TypeError, RuntimeError, SafetyViolation) as e:
+        except (ValueError, KeyError, TypeError, RuntimeError) as e:
             logger.error("transformer_error", error=str(e), exc_info=True)
             # Return FailureIntent which the Membrane will handle
             return FailureIntent(

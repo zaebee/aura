@@ -57,7 +57,7 @@ class OutputGuard:
                 raise SafetyViolation("Economic suicide attempt")
 
         # 4. Floor Price Violation
-        if action in ["accept", "counter"] and offered_price < floor_price:
+        if action == "accept" and offered_price < floor_price:
             logger.warning(
                 "safety_floor_violation",
                 action=action,
