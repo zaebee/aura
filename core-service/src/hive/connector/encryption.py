@@ -88,6 +88,6 @@ def generate_encryption_key() -> str:
 
     Example:
         >>> key = generate_encryption_key()
-        >>> print(f"SECRET_ENCRYPTION_KEY={key}")
+        >>> # Result: SECRET_ENCRYPTION_KEY=...
     """
     return Fernet.generate_key().decode()  # type: ignore

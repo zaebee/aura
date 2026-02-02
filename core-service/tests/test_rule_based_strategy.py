@@ -1,6 +1,6 @@
 """Unit tests for RuleBasedStrategy."""
 
-from src.llm_strategy import RuleBasedStrategy
+from src.hive.transformer.rule_strategy import RuleBasedStrategy
 
 
 class TestRuleBasedStrategy:

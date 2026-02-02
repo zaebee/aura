@@ -286,7 +286,7 @@ def create_strategy() -> PricingStrategy:
     """
     if settings.llm.model == "rule":
         logger.info("strategy_selected", type="RuleBasedStrategy", llm_required=False)
-        from src.llm_strategy import RuleBasedStrategy
+        from src.hive.transformer.rule_strategy import RuleBasedStrategy
 
         return RuleBasedStrategy()
     elif settings.llm.model == "dspy":
@@ -405,7 +405,7 @@ async def serve() -> None:
     market_service = None
     if crypto_provider:
         from src.hive.connector.encryption import SecretEncryption
-        from src.services.market import MarketService
+        from src.hive.connector.market import MarketService
 
         encryption = SecretEncryption(
             get_raw_key(settings.crypto.secret_encryption_key)

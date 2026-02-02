@@ -92,7 +92,7 @@ class DSPyStrategy:
 
                 self.fallback_strategy = LiteLLMStrategy(model=self.settings.llm.model)
             except ImportError:
-                from src.llm_strategy import RuleBasedStrategy
+                from src.hive.transformer.rule_strategy import RuleBasedStrategy
 
                 self.fallback_strategy = RuleBasedStrategy()
         return self.fallback_strategy
