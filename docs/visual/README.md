@@ -1,6 +1,6 @@
 # Visual Reasoning Layer
 
-This directory contains **visual blueprints** of Aura Hive reasoning models.
+This directory contains **visual Hive Maps** of Aura Hive reasoning models.
 
 Visual artifacts are intended to improve **human understanding** of how the
 hive is interpreted by advisory systems. They are **non-executable** and
@@ -22,13 +22,14 @@ Visual documents **do not** define runtime behavior.
 ## Canonical Source of Truth
 
 All visual artifacts are derived from or aligned with
-declarative advisory models defined elsewhere in the repository
-(e.g. `imp/imp-001/hive.yaml`).
+the canonical architecture defined in `docs/FOUNDATION.md`,
+`packages/aura-core/src/aura_core/dna.py`, and operational state
+in `HIVE_STATE.md`.
 
 **Hierarchy of truth:**
 
-1. Declarative advisory model (YAML)
-2. Visual blueprints (Mermaid, Markdown)
+1. Implemented architecture (FOUNDATION.md, dna.py Protocols, operational code)
+2. Visual Hive Maps (Mermaid, Markdown)
 3. Rendered documentation
 
 ---
@@ -37,7 +38,7 @@ declarative advisory models defined elsewhere in the repository
 
 ```text
 visual/
- ├─ hive/         # Hive-level reasoning blueprints
+ ├─ hive/         # Hive-level reasoning maps
  ├─ pipelines/    # Advisory and observability flows
  ├─ components/   # Optional component-focused views
  └─ index.md      # Visual entry point
@@ -60,7 +61,11 @@ Additional formats MAY be introduced if they remain static and readable.
 
 * Visual artifacts MUST NOT be used for automation
 * Visual artifacts MUST NOT introduce new semantics
-* Visual artifacts SHOULD remain high-level
+* Visual artifacts SHOULD declare their abstraction level:
+  - **Level 1 (Organism):** Full Bee service boundaries and inter-service communication
+  - **Level 2 (Cellular):** ATCG-M nucleotide interactions within a single Bee
+  - **Level 3 (Molecular):** Protocol/interface contracts (gRPC, SkillProtocol)
+  - **Level 4 (Ecosystem):** Multi-bee choreography and event flows
 
 ---
 
