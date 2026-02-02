@@ -5,6 +5,9 @@ TAG ?= latest
 REGISTRY ?= ghcr.io/myuser
 PLATFORM ?= linux/amd64
 
+# Shared PYTHONPATH for core service logic
+CORE_PYTHONPATH = core-service:core-service/src:core-service/src/proto
+
 # --- 1. CODE QUALITY ---
 lint:
 	# Protobuf Lint
@@ -26,18 +29,18 @@ setup-hooks:
 
 # Run tests
 test:
-	# Run core tests
-	PYTHONPATH=core uv run pytest core/tests/ -v
+	# Run core-service tests
+	PYTHONPATH=$(CORE_PYTHONPATH) uv run pytest core/tests/ -v
 	# Run telegram-bot tests with isolated path to avoid 'src' collision
 	PYTHONPATH=adapters/telegram-bot:core/src/hive/proto uv run pytest adapters/telegram-bot/tests/ -v
 
 # Run tests with coverage report
 test-cov:
-	PYTHONPATH=core uv run pytest core/tests/ -v --cov=core/src --cov-report=term-missing
+	PYTHONPATH=$(CORE_PYTHONPATH) uv run pytest core/tests/ -v --cov=core/src --cov-report=term-missing
 
 # Run tests with verbose output
 test-verbose:
-	PYTHONPATH=core uv run pytest core/tests/ -vv -s
+	PYTHONPATH=$(CORE_PYTHONPATH) uv run pytest core/tests/ -vv -s
 
 # Test health endpoints
 test-health:
@@ -47,6 +50,10 @@ test-health:
 simulate:
 	# Run agent negotiation simulation
 	uv run python tools/simulators/agent_sim.py
+
+train:
+	# Train the DSPy negotiation engine
+	PYTHONPATH=$(CORE_PYTHONPATH) uv run python core-service/scripts/training/train_dspy.py
 
 # --- 2. BUILD ---
 build: generate build-tg

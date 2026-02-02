@@ -4,13 +4,8 @@ Simple test for DSPy integration - tests basic functionality.
 """
 
 import sys
-from pathlib import Path
 
 import structlog
-
-# Add src to path
-sys.path.append(str(Path(__file__).parent / "src"))
-
 from llm.dspy_strategy import DSPyStrategy
 from llm.engine import AuraNegotiator
 from llm.signatures import Negotiate
@@ -35,8 +30,8 @@ def main():
     assert "input_bid" in Negotiate.input_fields
     assert "context" in Negotiate.input_fields
     assert "history" in Negotiate.input_fields
-    assert "reasoning" in Negotiate.output_fields
-    assert "response" in Negotiate.output_fields
+    assert "thought" in Negotiate.output_fields
+    assert "action" in Negotiate.output_fields
     logger.info("signature_defined_correctly")
 
     # Test 2: AuraNegotiator creation

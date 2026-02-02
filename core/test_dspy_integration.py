@@ -12,10 +12,6 @@ from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 import structlog
-
-# Add src to path
-sys.path.append(str(Path(__file__).parent / "src"))
-
 from llm.dspy_strategy import DSPyStrategy
 from llm.engine import AuraNegotiator
 from llm.signatures import Negotiate
@@ -41,8 +37,8 @@ def test_signature_creation():
     assert "input_bid" in Negotiate.fields
     assert "context" in Negotiate.fields
     assert "history" in Negotiate.fields
-    assert "reasoning" in Negotiate.fields
-    assert "response" in Negotiate.fields
+    assert "thought" in Negotiate.fields
+    assert "action" in Negotiate.fields
 
     # Test that we can create the signature (DSPy signatures don't need instantiation like this)
     # Instead, we test that the class is properly defined

@@ -1,8 +1,11 @@
 import re
 import litellm
 import structlog
+<<<<<<<< HEAD:agents/bee-keeper/src/hive/generator/__init__.py
 
 from src.config import KeeperSettings
+========
+>>>>>>>> main:agents/bee-keeper/src/hive/generator.py
 from aura_core.dna import (
     ALLOWED_CHAMBERS,
     AuditObservation,
@@ -10,6 +13,8 @@ from aura_core.dna import (
     BeeObservation,
     find_hive_root,
 )
+
+from .metabolism.config import KeeperSettings
 
 logger = structlog.get_logger(__name__)
 

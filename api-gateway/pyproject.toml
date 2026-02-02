@@ -19,6 +19,7 @@ dependencies = [
     "opentelemetry-instrumentation-grpc>=0.45b0",
     "grpcio-health-checking>=1.76.0",
     "aura-core",
+    "pynacl~=1.6.2",
 ]
 
 [tool.uv.sources]

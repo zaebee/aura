@@ -30,7 +30,7 @@ class AuraNegotiator(dspy.Module):
     def __init__(self) -> None:
         super().__init__()
         # Use Predict instead of ChainOfThought because 'thought' is explicitly in signature
-        self.negotiate = dspy.Predict(Negotiate)
+        self.negotiate_chain = dspy.Predict(Negotiate)
         logger.info("dspy_negotiator_initialized", module="AuraNegotiator")
 
     def forward(
@@ -61,7 +61,7 @@ class AuraNegotiator(dspy.Module):
         )
 
         # 2. Execute DSPy prediction
-        prediction = self.negotiate(
+        prediction = self.negotiate_chain(
             input_bid=str(input_bid), context=context_json, history=history_json
         )
 
