@@ -43,7 +43,11 @@ dependencies = [
     "nats-py>=2.9.0",
     "pygithub>=2.8.1",
     "types-pyyaml>=6.0.12.20250915",
+    "aura-core",
 ]
+
+[tool.uv.sources]
+aura-core = { workspace = true }
 
 [dependency-groups]
 dev = [
@@ -120,6 +124,15 @@ skips = ["B101"] # B101 is assert_used, often okay in some contexts but bandit d
 [[tool.mypy.overrides]]
 module = ["proto.*", "aura.*", "src.proto.*"]
 ignore_errors = true
+
+[tool.uv.workspace]
+members = [
+    "packages/*",
+    "core-service",
+    "api-gateway",
+    "adapters/telegram-bot",
+    "agents/bee-keeper",
+]
 
 # [[tool.uv.index]]
 # url = "https://buf.build/gen/python"

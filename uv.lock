@@ -2,6 +2,16 @@ version = 1
 revision = 3
 requires-python = "==3.12.*"
 
+[manifest]
+members = [
+    "api-gateway",
+    "aura",
+    "aura-core",
+    "aura-keeper",
+    "core-service",
+    "telegram-bot",
+]
+
 [[package]]
 name = "aiofiles"
 version = "25.1.0"
@@ -130,6 +140,47 @@ wheels = [
 ]
 
 [[package]]
+name = "api-gateway"
+version = "0.1.0"
+source = { virtual = "api-gateway" }
+dependencies = [
+    { name = "aura-core" },
+    { name = "fastapi" },
+    { name = "grpcio" },
+    { name = "grpcio-health-checking" },
+    { name = "grpcio-tools" },
+    { name = "opentelemetry-api" },
+    { name = "opentelemetry-exporter-otlp" },
+    { name = "opentelemetry-instrumentation-fastapi" },
+    { name = "opentelemetry-instrumentation-grpc" },
+    { name = "opentelemetry-sdk" },
+    { name = "protobuf" },
+    { name = "pydantic" },
+    { name = "pydantic-settings" },
+    { name = "structlog" },
+    { name = "uvicorn" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "aura-core", editable = "packages/aura-core" },
+    { name = "fastapi", specifier = ">=0.128.0" },
+    { name = "grpcio", specifier = ">=1.76.0" },
+    { name = "grpcio-health-checking", specifier = ">=1.76.0" },
+    { name = "grpcio-tools", specifier = ">=1.76.0" },
+    { name = "opentelemetry-api", specifier = ">=1.24.0" },
+    { name = "opentelemetry-exporter-otlp", specifier = ">=1.24.0" },
+    { name = "opentelemetry-instrumentation-fastapi", specifier = ">=0.45b0" },
+    { name = "opentelemetry-instrumentation-grpc", specifier = ">=0.45b0" },
+    { name = "opentelemetry-sdk", specifier = ">=1.24.0" },
+    { name = "protobuf", specifier = ">=6.33.5" },
+    { name = "pydantic", specifier = ">=2.0.0" },
+    { name = "pydantic-settings", specifier = ">=2.0.0" },
+    { name = "structlog", specifier = ">=25.0.0" },
+    { name = "uvicorn", specifier = ">=0.40.0" },
+]
+
+[[package]]
 name = "asgiref"
 version = "3.11.0"
 source = { registry = "https://pypi.org/simple" }
@@ -165,6 +216,7 @@ version = "0.1.0"
 source = { virtual = "." }
 dependencies = [
     { name = "alembic" },
+    { name = "aura-core" },
     { name = "cryptography" },
     { name = "dspy-ai" },
     { name = "fastapi" },
@@ -219,6 +271,7 @@ dev = [
 [package.metadata]
 requires-dist = [
     { name = "alembic", specifier = ">=1.18.1" },
+    { name = "aura-core", editable = "packages/aura-core" },
     { name = "cryptography", specifier = ">=43.0.0" },
     { name = "dspy-ai", specifier = ">=2.0.0" },
     { name = "fastapi", specifier = ">=0.128.0" },
@@ -268,6 +321,50 @@ dev = [
     { name = "ruff", specifier = ">=0.8.0" },
     { name = "types-requests" },
     { name = "types-setuptools" },
+]
+
+[[package]]
+name = "aura-core"
+version = "0.1.0"
+source = { editable = "packages/aura-core" }
+
+[[package]]
+name = "aura-keeper"
+version = "0.1.0"
+source = { editable = "agents/bee-keeper" }
+dependencies = [
+    { name = "aura-core" },
+    { name = "httpx" },
+    { name = "litellm" },
+    { name = "nats-py" },
+    { name = "pydantic-settings" },
+    { name = "pygithub" },
+    { name = "pyyaml" },
+    { name = "structlog" },
+]
+
+[package.dev-dependencies]
+dev = [
+    { name = "pydantic-settings" },
+    { name = "types-pyyaml" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "aura-core", editable = "packages/aura-core" },
+    { name = "httpx", specifier = ">=0.28.1" },
+    { name = "litellm", specifier = ">=1.63.0" },
+    { name = "nats-py", specifier = ">=2.12.0" },
+    { name = "pydantic-settings", specifier = ">=2.12.0" },
+    { name = "pygithub", specifier = ">=2.8.1" },
+    { name = "pyyaml", specifier = ">=6.0.3" },
+    { name = "structlog", specifier = ">=25.5.0" },
+]
+
+[package.metadata.requires-dev]
+dev = [
+    { name = "pydantic-settings", specifier = ">=2.12.0" },
+    { name = "types-pyyaml", specifier = ">=6.0.12.20250915" },
 ]
 
 [[package]]
@@ -422,6 +519,95 @@ dependencies = [
 sdist = { url = "https://files.pythonhosted.org/packages/f6/ae/659fe4866d89ef5a3a65cddbdd7b35882f4feb72db383821965f2fcea934/construct_typing-0.7.0.tar.gz", hash = "sha256:71d110dedff39bd3b603c734077032a7065bc597a49db1f5b03a211d05dbac23", size = 45104, upload-time = "2025-10-27T19:30:29.614Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/8c/0c/2db6f7e1ae9795e436c6a0dc0bc38b12b8c8a228cb63203e24190b755b3b/construct_typing-0.7.0-py3-none-any.whl", hash = "sha256:c92383c6e8e5d07ba25811c8d5163820458d821e73bb1006541f43f89788646c", size = 24350, upload-time = "2025-10-27T19:30:27.505Z" },
+]
+
+[[package]]
+name = "core-service"
+version = "0.1.0"
+source = { virtual = "core-service" }
+dependencies = [
+    { name = "alembic" },
+    { name = "aura-core" },
+    { name = "cryptography" },
+    { name = "dspy-ai" },
+    { name = "fastapi" },
+    { name = "grpcio" },
+    { name = "grpcio-health-checking" },
+    { name = "grpcio-tools" },
+    { name = "httpx" },
+    { name = "jinja2" },
+    { name = "langchain-mistralai" },
+    { name = "litellm" },
+    { name = "nats-py" },
+    { name = "opentelemetry-api" },
+    { name = "opentelemetry-exporter-otlp" },
+    { name = "opentelemetry-instrumentation-fastapi" },
+    { name = "opentelemetry-instrumentation-grpc" },
+    { name = "opentelemetry-instrumentation-langchain" },
+    { name = "opentelemetry-instrumentation-sqlalchemy" },
+    { name = "opentelemetry-sdk" },
+    { name = "pgvector" },
+    { name = "prometheus-client" },
+    { name = "protobuf" },
+    { name = "psycopg2-binary" },
+    { name = "pydantic-settings" },
+    { name = "python-dotenv" },
+    { name = "solana" },
+    { name = "solders" },
+    { name = "sqlalchemy" },
+    { name = "structlog" },
+    { name = "uvicorn" },
+]
+
+[package.dev-dependencies]
+dev = [
+    { name = "pytest" },
+    { name = "pytest-asyncio" },
+    { name = "pytest-cov" },
+    { name = "pytest-mock" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "alembic", specifier = ">=1.18.1" },
+    { name = "aura-core", editable = "packages/aura-core" },
+    { name = "cryptography", specifier = ">=43.0.0" },
+    { name = "dspy-ai", specifier = ">=2.0.0" },
+    { name = "fastapi", specifier = ">=0.128.0" },
+    { name = "grpcio", specifier = ">=1.76.0" },
+    { name = "grpcio-health-checking", specifier = ">=1.76.0" },
+    { name = "grpcio-tools", specifier = ">=1.76.0" },
+    { name = "httpx", specifier = ">=0.27.0" },
+    { name = "jinja2", specifier = ">=3.1.4" },
+    { name = "langchain-mistralai", specifier = ">=1.1.1" },
+    { name = "litellm", specifier = ">=1.63.0" },
+    { name = "nats-py", specifier = ">=2.9.0" },
+    { name = "opentelemetry-api", specifier = ">=1.24.0" },
+    { name = "opentelemetry-exporter-otlp", specifier = ">=1.24.0" },
+    { name = "opentelemetry-instrumentation-fastapi", specifier = ">=0.45b0" },
+    { name = "opentelemetry-instrumentation-grpc", specifier = ">=0.45b0" },
+    { name = "opentelemetry-instrumentation-langchain", specifier = ">=0.1.0" },
+    { name = "opentelemetry-instrumentation-sqlalchemy", specifier = ">=0.45b0" },
+    { name = "opentelemetry-sdk", specifier = ">=1.24.0" },
+    { name = "pgvector", specifier = ">=0.4.2" },
+    { name = "prometheus-client", specifier = ">=0.21.1" },
+    { name = "protobuf", specifier = ">=6.33.5" },
+    { name = "psycopg2-binary", specifier = ">=2.9.11" },
+    { name = "pydantic-settings", specifier = ">=2.0.0" },
+    { name = "python-dotenv", specifier = ">=1.2.1" },
+    { name = "solana", specifier = ">=0.34.0" },
+    { name = "solders", specifier = ">=0.21.0" },
+    { name = "sqlalchemy", specifier = ">=2.0.46" },
+    { name = "structlog", specifier = ">=25.0.0" },
+    { name = "uvicorn", specifier = ">=0.40.0" },
+]
+
+[package.metadata.requires-dev]
+dev = [
+    { name = "pytest", specifier = ">=8.0.0" },
+    { name = "pytest-asyncio", specifier = ">=1.3.0" },
+    { name = "pytest-cov", specifier = ">=4.0.0" },
+    { name = "pytest-mock", specifier = ">=3.15.1" },
 ]
 
 [[package]]
@@ -2074,6 +2260,53 @@ source = { registry = "https://pypi.org/simple" }
 sdist = { url = "https://files.pythonhosted.org/packages/ef/52/9ba0f43b686e7f3ddfeaa78ac3af750292662284b3661e91ad5494f21dbc/structlog-25.5.0.tar.gz", hash = "sha256:098522a3bebed9153d4570c6d0288abf80a031dfdb2048d59a49e9dc2190fc98", size = 1460830, upload-time = "2025-10-27T08:28:23.028Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/a8/45/a132b9074aa18e799b891b91ad72133c98d8042c70f6240e4c5f9dabee2f/structlog-25.5.0-py3-none-any.whl", hash = "sha256:a8453e9b9e636ec59bd9e79bbd4a72f025981b3ba0f5837aebf48f02f37a7f9f", size = 72510, upload-time = "2025-10-27T08:28:21.535Z" },
+]
+
+[[package]]
+name = "telegram-bot"
+version = "0.1.0"
+source = { virtual = "adapters/telegram-bot" }
+dependencies = [
+    { name = "aiogram" },
+    { name = "aura-core" },
+    { name = "grpcio" },
+    { name = "nats-py" },
+    { name = "opentelemetry-api" },
+    { name = "opentelemetry-exporter-otlp" },
+    { name = "opentelemetry-sdk" },
+    { name = "protobuf" },
+    { name = "pydantic-settings" },
+    { name = "structlog" },
+]
+
+[package.dev-dependencies]
+dev = [
+    { name = "grpcio-tools" },
+    { name = "pytest" },
+    { name = "pytest-asyncio" },
+    { name = "pytest-mock" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "aiogram", specifier = ">=3.17.0" },
+    { name = "aura-core", editable = "packages/aura-core" },
+    { name = "grpcio", specifier = ">=1.70.0" },
+    { name = "nats-py", specifier = ">=2.9.0" },
+    { name = "opentelemetry-api", specifier = ">=1.24.0" },
+    { name = "opentelemetry-exporter-otlp", specifier = ">=1.24.0" },
+    { name = "opentelemetry-sdk", specifier = ">=1.24.0" },
+    { name = "protobuf", specifier = ">=6.33.5" },
+    { name = "pydantic-settings", specifier = ">=2.7.1" },
+    { name = "structlog", specifier = ">=25.1.0" },
+]
+
+[package.metadata.requires-dev]
+dev = [
+    { name = "grpcio-tools", specifier = ">=1.70.0" },
+    { name = "pytest", specifier = ">=8.0.0" },
+    { name = "pytest-asyncio", specifier = ">=0.23.0" },
+    { name = "pytest-mock", specifier = ">=3.12.0" },
 ]
 
 [[package]]
