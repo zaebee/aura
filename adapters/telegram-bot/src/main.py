@@ -35,7 +35,7 @@ def setup_tracing() -> None:
     provider = TracerProvider(resource=resource)
 
     # DNA Rule: FQDN for cross-namespace services
-    otlp_endpoint = os.getenv("OTEL_EXPORTER_OTLP_ENDPOINT", "http://jaeger-collector.monitoring.svc.cluster.local:4317")
+    otlp_endpoint = settings.otel_exporter_otlp_endpoint
     processor = BatchSpanProcessor(
         OTLPSpanExporter(endpoint=otlp_endpoint, insecure=True)
     )

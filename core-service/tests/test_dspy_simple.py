@@ -26,17 +26,17 @@ structlog.configure(
 logger = structlog.get_logger(__name__)
 
 
-def test_dspy_integration_basics():
+def main():
     logger.info("testing_dspy_integration")
 
     # Test 1: Signature definition
     logger.info("testing_signature_definition")
     # Check that signature has the expected fields
-    assert "input_bid" in Negotiate.fields
-    assert "context" in Negotiate.fields
-    assert "history" in Negotiate.fields
-    assert "thought" in Negotiate.fields
-    assert "action" in Negotiate.fields
+    assert "input_bid" in Negotiate.input_fields
+    assert "context" in Negotiate.input_fields
+    assert "history" in Negotiate.input_fields
+    assert "thought" in Negotiate.output_fields
+    assert "action" in Negotiate.output_fields
     logger.info("signature_defined_correctly")
 
     # Test 2: AuraNegotiator creation
@@ -45,12 +45,18 @@ def test_dspy_integration_basics():
     assert negotiator is not None
     logger.info("aura_negotiator_created_successfully")
 
-    # Test 3: AuraTransformer creation
-    logger.info("testing_aura_transformer_creation")
-    transformer = AuraTransformer()
-    assert transformer is not None
-    assert transformer.negotiator is not None
-    logger.info("aura_transformer_created_successfully")
+    # Test 3: DSPyStrategy creation
+    logger.info("testing_dspy_strategy_creation")
+    strategy = DSPyStrategy()
+    assert strategy is not None
+    assert strategy.negotiator is not None
+    logger.info("dspy_strategy_created_successfully")
+
+    # Test 4: Fallback mechanism
+    logger.info("testing_fallback_mechanism")
+    fallback = strategy._get_fallback_strategy()
+    assert fallback is not None
+    logger.info("fallback_mechanism_works")
 
     logger.info("all_basic_tests_passed")
     logger.info("dspy_integration_working")

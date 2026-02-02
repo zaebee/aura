@@ -2,7 +2,7 @@ from typing import Any
 
 import structlog
 from aiogram.types import CallbackQuery, Message
-from aura_core.dna import HiveContext, NegotiationOffer, TelegramContext
+from aura_core.types import HiveContext, NegotiationOffer, TelegramContext
 from opentelemetry import trace
 
 logger = structlog.get_logger(__name__)

@@ -1,7 +1,7 @@
 import asyncio
 import uuid
 from concurrent import futures
-from typing import Any
+from typing import Any, Protocol
 
 import grpc
 import grpc.aio
@@ -63,6 +63,12 @@ def extract_request_id(context: Any) -> str | None:
     """Extract request_id from gRPC metadata."""
     metadata = dict(context.invocation_metadata())
     return metadata.get(REQUEST_ID_METADATA_KEY)
+
+
+class PricingStrategy(Protocol):
+    def evaluate(
+        self, item_id: str, bid: float, reputation: float, request_id: str | None
+    ) -> negotiation_pb2.NegotiateResponse: ...
 
 
 class NegotiationService(negotiation_pb2_grpc.NegotiationServiceServicer):
