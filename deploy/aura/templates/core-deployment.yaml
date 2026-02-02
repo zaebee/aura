@@ -46,8 +46,6 @@ spec:
           resources: 
             {{ toYaml .Values.core.resources | nindent 12 }}
           env:
-            - name: AURA_CRYPTO__ENABLED
-              value: "{{ .Values.core.env.AURA_CRYPTO__ENABLED }}"
             - name: AURA_CRYPTO__SECRET_ENCRYPTION_KEY
               valueFrom:
                 secretKeyRef:
@@ -66,9 +64,11 @@ spec:
               valueFrom:
                 secretKeyRef:
                   name: "{{ .Release.Name }}-secrets"
-                  key: "mistral-key"
+                  key: "api-key"
             - name: AURA_LLM__MODEL
               value: "{{ .Values.core.env.AURA_LLM__MODEL }}"
+            - name: AURA_CRYPTO__ENABLED
+              value: "{{ .Values.core.env.AURA_CRYPTO__ENABLED }}"
             - name: AURA_LLM__OPENAI_API_KEY
               valueFrom:
                 secretKeyRef:

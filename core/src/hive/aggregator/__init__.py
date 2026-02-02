@@ -8,7 +8,6 @@ from typing import Any
 
 import httpx
 import structlog
-from aura_core.dna import HiveContext, NegotiationOffer
 from langchain_mistralai import MistralAIEmbeddings
 from pgvector.sqlalchemy import Vector
 from sqlalchemy import (
@@ -21,11 +20,13 @@ from sqlalchemy import (
     create_engine,
 )
 from sqlalchemy.dialects.postgresql import JSONB, UUID
-from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, sessionmaker
+from sqlalchemy.exc import SQLAlchemyError
 
-from src.config import get_settings
-from src.config.llm import get_raw_key
+from ...config import get_settings
+from ...config.llm import get_raw_key
+
+from aura_core.dna import HiveContext, NegotiationOffer
 
 logger = structlog.get_logger(__name__)
 
@@ -189,7 +190,7 @@ class HiveAggregator:
                     if results and len(results[0].get("value", [])) > 1:
                         return float(results[0]["value"][1]), True
                 errors.append(f"{metric_name}_no_data")
-            except Exception: errors.append(f"{metric_name}_parse_error")
+            except Exception as e: errors.append(f"{metric_name}_parse_error")
         else: errors.append(f"{metric_name}_fetch_error")
         return 0.0, False
 

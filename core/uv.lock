@@ -190,7 +190,7 @@ wheels = [
 
 [[package]]
 name = "aura-core"
-version = "0.1.1"
+version = "0.1.0"
 source = { directory = "../packages/aura-core" }
 
 [[package]]

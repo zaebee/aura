@@ -3,8 +3,9 @@ import time
 from typing import Any
 
 import structlog
-from aura_core.dna import Event, Observation
 from opentelemetry import trace
+
+from aura_core.dna import Event, Observation
 
 logger = structlog.get_logger(__name__)
 tracer = trace.get_tracer(__name__)

@@ -1,11 +1,11 @@
 version: v2
 plugins:
   - remote: buf.build/protocolbuffers/pyi
-    out: core/src/proto
+    out: core/src/hive/proto
   - remote: buf.build/grpc/python:v1.76.0
-    out: core/src/proto
+    out: core/src/hive/proto
   - remote: buf.build/protocolbuffers/python
-    out: core/src/proto
+    out: core/src/hive/proto
 
   - remote: buf.build/protocolbuffers/pyi
     out: api-gateway/src/proto
@@ -13,6 +13,13 @@ plugins:
     out: api-gateway/src/proto
   - remote: buf.build/protocolbuffers/python
     out: api-gateway/src/proto
+
+  - remote: buf.build/protocolbuffers/pyi
+    out: adapters/telegram-bot/src/proto
+  - remote: buf.build/grpc/python:v1.76.0
+    out: adapters/telegram-bot/src/proto
+  - remote: buf.build/protocolbuffers/python
+    out: adapters/telegram-bot/src/proto
 
   - remote: buf.build/bufbuild/es
     out: frontend/src/lib

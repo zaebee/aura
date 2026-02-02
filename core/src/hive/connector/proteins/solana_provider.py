@@ -8,9 +8,9 @@ from datetime import UTC, datetime
 from typing import Any
 
 import httpx
-from aura_core.dna import Observation, SkillProtocol
 from solders.keypair import Keypair  # type: ignore
 from solders.pubkey import Pubkey  # type: ignore
+from aura_core.dna import Observation, SkillProtocol
 
 from .interfaces import PaymentProof
 

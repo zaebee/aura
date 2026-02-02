@@ -11,9 +11,9 @@ from datetime import UTC, datetime, timedelta
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from ..aggregator import DealStatus, LockedDeal
 from ..connector.proteins.encryption import SecretEncryption
 from ..connector.proteins.interfaces import CryptoProvider
+from ..aggregator import DealStatus, LockedDeal
 from ..proto.aura.negotiation.v1 import negotiation_pb2
 
 logger = logging.getLogger(__name__)

@@ -1,9 +1,9 @@
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
-from aura_core.dna import HiveContext, IntentAction, NegotiationOffer
 from src.hive.aggregator import HiveAggregator
 from src.hive.membrane import HiveMembrane
+from aura_core.dna import HiveContext, IntentAction, NegotiationOffer
 
 
 @pytest.mark.asyncio

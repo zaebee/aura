@@ -16,27 +16,20 @@ from sqlalchemy import text
 
 from src.config import settings
 from src.config.llm import get_raw_key
-
-from .hive.aggregator import (
-    HiveAggregator,
-    InventoryItem,
-    SessionLocal,
-    engine,
-    generate_embedding,
-)
-from .hive.connector import HiveConnector
-from .hive.generator import HiveGenerator
-from .hive.membrane import HiveMembrane
-from .hive.metabolism import MetabolicLoop
-from .hive.metabolism.logging_config import (
+from src.hive.aggregator import InventoryItem, SessionLocal, engine, generate_embedding, HiveAggregator
+from src.hive.connector import HiveConnector
+from src.hive.generator import HiveGenerator
+from src.hive.membrane import HiveMembrane
+from src.hive.metabolism import MetabolicLoop
+from src.hive.transformer import AuraTransformer
+from src.hive.metabolism.logging_config import (
     bind_request_id,
     clear_request_context,
     configure_logging,
     get_logger,
 )
-from .hive.metabolism.telemetry import init_telemetry
-from .hive.proto.aura.negotiation.v1 import negotiation_pb2, negotiation_pb2_grpc
-from .hive.transformer import AuraTransformer
+from src.hive.proto.aura.negotiation.v1 import negotiation_pb2, negotiation_pb2_grpc
+from src.hive.metabolism.telemetry import init_telemetry
 
 # Configure structured logging on startup
 configure_logging(log_level=settings.server.log_level)
@@ -291,19 +284,19 @@ def create_strategy() -> PricingStrategy:
     """
     if settings.llm.model == "rule":
         logger.info("strategy_selected", type="RuleBasedStrategy", llm_required=False)
-        from .hive.transformer import RuleBasedStrategy
+        from src.hive.transformer import RuleBasedStrategy
 
         return RuleBasedStrategy()
     elif settings.llm.model == "dspy":
         logger.info("strategy_selected", type="DSPyStrategy", model="self-optimizing")
-        from .hive.llm.dspy_strategy import DSPyStrategy
+        from src.hive.transformer.llm.dspy_strategy import DSPyStrategy
 
         return DSPyStrategy()
     else:
         logger.info(
             "strategy_selected", type="LiteLLMStrategy", model=settings.llm.model
         )
-        from .hive.llm.strategy import LiteLLMStrategy
+        from src.hive.transformer.llm.strategy import LiteLLMStrategy
 
         # Select appropriate API key based on model provider
         api_key = None
@@ -336,7 +329,7 @@ def create_crypto_provider() -> Any:
             network=settings.crypto.solana_network,
             currency=settings.crypto.currency,
         )
-        from .hive.crypto.solana_provider import SolanaProvider
+        from src.hive.connector.proteins.solana_provider import SolanaProvider
 
         return SolanaProvider(
             private_key_base58=get_raw_key(settings.crypto.solana_private_key),
@@ -409,8 +402,8 @@ async def serve() -> None:
     crypto_provider = create_crypto_provider()
     market_service = None
     if crypto_provider:
-        from .hive.crypto.encryption import SecretEncryption
-        from .hive.services.market import MarketService
+        from src.hive.connector.proteins.encryption import SecretEncryption
+        from src.hive.services.market import MarketService
 
         encryption = SecretEncryption(
             get_raw_key(settings.crypto.secret_encryption_key)
@@ -474,14 +467,7 @@ async def serve() -> None:
 
             await asyncio.sleep(settings.heartbeat.interval_seconds)
 
-    if settings.heartbeat.enabled:
-        asyncio.create_task(heartbeat_deal_loop())
-        logger.info(
-            "heartbeat_loop_started",
-            interval_seconds=settings.heartbeat.interval_seconds,
-        )
-    else:
-        logger.info("heartbeat_loop_disabled")
+    asyncio.create_task(heartbeat_deal_loop())
 
     logger.info(
         "initialization_complete",

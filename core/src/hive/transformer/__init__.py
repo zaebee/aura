@@ -5,13 +5,12 @@ from typing import Any, Protocol
 
 import dspy
 import structlog
-from aura_core.dna import FailureIntent, HiveContext, IntentAction
 
-from src.config import get_settings
-
+from ...config import get_settings
+from .llm.engine import AuraNegotiator
 from ..aggregator import InventoryItem, SessionLocal
 from ..metabolism.logging_config import bind_request_id
-from .llm.engine import AuraNegotiator
+from aura_core.dna import FailureIntent, HiveContext, IntentAction
 
 logger = structlog.get_logger(__name__)
 

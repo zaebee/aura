@@ -13,6 +13,10 @@ from pathlib import Path
 import dspy
 import structlog
 from dspy.teleprompt import BootstrapFewShot
+
+# Add src to path for imports
+sys.path.append(str(Path(__file__).parent / "src"))
+
 from llm.engine import AuraNegotiator
 from llm.prepare.clean import clean_and_parse_json
 
@@ -29,9 +33,7 @@ logger = structlog.get_logger(__name__)
 
 def load_training_data() -> list[dict]:
     """Load and flatten training data from JSON file."""
-    data_path = (
-        Path(__file__).parent.parent.parent / "data" / "negotiation_training.json"
-    )
+    data_path = Path(__file__).parent / "data" / "negotiation_training.json"
 
     if not data_path.exists():
         raise FileNotFoundError(f"Training data not found at {data_path}")
@@ -48,8 +50,8 @@ def load_training_data() -> list[dict]:
                     "input_bid": turn["input_bid"],
                     "context": context,
                     "history": [],  # Would be populated with previous turns in multi-turn scenarios
-                    "thought": turn["reasoning"],
-                    "action": json.dumps(turn["ideal_response"]),
+                    "reasoning": turn["reasoning"],
+                    "response": turn["ideal_response"],
                 }
             )
 
@@ -66,7 +68,7 @@ def economic_metric(gold, pred, trace=None):
     - Value-add utilization
     """
     # 1. Expected answer
-    gold_resp = gold.action
+    gold_resp = gold.response
     if isinstance(gold_resp, str):
         try:
             gold_resp = json.loads(gold_resp)
@@ -83,9 +85,9 @@ def economic_metric(gold, pred, trace=None):
 
     # 3. Predicted answer (AuraNegotiator now returns a dict)
     if isinstance(pred, dict):
-        pred_resp = pred.get("action", {})
+        pred_resp = pred.get("response", {})
     else:
-        pred_resp = getattr(pred, "action", {})
+        pred_resp = getattr(pred, "response", {})
 
     if isinstance(pred_resp, str):
         try:
@@ -131,15 +133,15 @@ def train_negotiator():
     logger.info("training_data_loaded", count=len(training_examples))
 
     # Create DSPy examples
-    # Note: inputs and action are passed as dicts/lists to ensure clean saved JSON
+    # Note: inputs and response are passed as dicts/lists to ensure clean saved JSON
     # and consistent comparison in metrics. AuraNegotiator handles string conversion.
     dspy_examples = [
         dspy.Example(
             input_bid=str(item["input_bid"]),
             context=item["context"],
             history=item["history"],
-            thought=item["thought"],
-            action=item["action"],
+            reasoning=item["reasoning"],
+            response=item["response"],
         ).with_inputs("input_bid", "context", "history")
         for item in training_examples
     ]
@@ -172,7 +174,7 @@ def train_negotiator():
         compiled_negotiator = negotiator
 
     # Save compiled program
-    output_path = Path(__file__).parent.parent.parent / "data" / "aura_brain.json"
+    output_path = Path(__file__).parent / "data" / "aura_brain.json"
     compiled_negotiator.save(str(output_path))
 
     logger.info("training_complete", saved_to=str(output_path))
@@ -190,8 +192,8 @@ def train_negotiator():
         logger.info(
             "test_prediction",
             input_bid=test_example.input_bid,
-            action=prediction["action"],
-            thought=prediction["thought"][:100],
+            response=prediction["response"],
+            reasoning=prediction["reasoning"][:100],
         )
     except Exception as e:
         logger.info("skipping_test", error=str(e))

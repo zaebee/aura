@@ -7,7 +7,7 @@ from aiogram.types import (
     Message,
 )
 
-from src.hive.metabolism import TelegramMetabolism
+from .hive.metabolism import TelegramMetabolism
 
 router = Router()
 

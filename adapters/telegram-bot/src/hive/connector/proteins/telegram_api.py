@@ -1,5 +1,4 @@
 from typing import Any
-
 import structlog
 from aiogram import Bot
 from aura_core.dna import Observation, SkillProtocol

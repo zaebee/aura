@@ -11,11 +11,11 @@ from typing import Any, cast
 import dspy
 import structlog
 
-from src.config import get_settings
-from src.hive.aggregator import InventoryItem, SessionLocal
-from src.hive.membrane import OutputGuard, SafetyViolation
-from src.hive.proto.aura.negotiation.v1 import negotiation_pb2
-from src.hive.transformer.llm.engine import AuraNegotiator
+from ....config import get_settings
+from ....hive.aggregator import InventoryItem, SessionLocal
+from ....hive.membrane import OutputGuard, SafetyViolation
+from ....hive.transformer.llm.engine import AuraNegotiator
+from ....hive.proto.aura.negotiation.v1 import negotiation_pb2
 
 logger = structlog.get_logger(__name__)
 
@@ -62,11 +62,12 @@ class DSPyStrategy:
 
             # Define paths in search order.
             # 1. Path specified in settings (as-is).
-            # 2. `data/` directory (new default for trained models).
+            # 2. `/app/core/data/` or `core/data/` (new default for trained models).
             # 3. `src/` directory (legacy location).
             potential_paths = [
                 settings_path,
-                Path(__file__).parent.parent.parent / "data" / filename,
+                Path("/app/core/data") / filename,
+                Path(__file__).parent.parent.parent.parent / "data" / filename,
                 Path(__file__).parent.parent / filename,
             ]
 
@@ -88,10 +89,10 @@ class DSPyStrategy:
         """Get fallback strategy (lazy loading)."""
         if self.fallback_strategy is None:
             try:
-                from src.hive.transformer.llm.strategy import LiteLLMStrategy
+                from ....hive.transformer.llm.strategy import LiteLLMStrategy
                 self.fallback_strategy = LiteLLMStrategy(model=self.settings.llm.model)
             except ImportError:
-                from src.hive.transformer import RuleBasedStrategy
+                from ....hive.transformer import RuleBasedStrategy
                 self.fallback_strategy = RuleBasedStrategy()
         return self.fallback_strategy
 

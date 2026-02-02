@@ -1,9 +1,7 @@
-from typing import Any
-
 import structlog
+from typing import Any
+from ...config import settings, get_settings
 from aura_core.dna import FailureIntent, HiveContext, IntentAction
-
-from src.config import get_settings, settings
 
 logger = structlog.get_logger(__name__)
 
