@@ -1,6 +1,3 @@
-# 📄 `docs/visual/index.md`
-
-```md
 # Aura Hive — Visual Reasoning Index
 
 This section provides a visual overview of Aura Hive
@@ -8,7 +5,6 @@ from an **advisory and reasoning perspective**.
 
 The diagrams in this section illustrate how observability signals,
 events, and interpretations relate conceptually.
-```
 
 ---
 
