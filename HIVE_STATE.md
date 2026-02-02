@@ -179,8 +179,20 @@ event: manual
 - [ ] **Task 17: External Oracles.** (Connect A to real hotel APIs).
 - [ ] **Task 39: The Patient Bee.** (Increase gRPC timeouts to 30s for LLM reasoning).
 - [ ] **Task 40/41: Total Fractalization.** (Refactor Bot and MCP to 100% ATCG).
+- [ ] Implement Multi-stage Docker builds to reduce image size by 70%.
+- [ ] Automate `minikube ssh docker system prune` via host-level cron.
 
 ## 🔋 System Vitals (Senses)
 - **Aggregator (A):** 🟢 PROXIED. (Caddy/FRP active).
 - **Transformer (T):** 🔴 AMNESIA. (Core is untrained).
 - **Connector (C):** 🟢 PULSING. (NATS connected).
+- **Storage:** 🔴 CRITICAL (40GB consumed by Minikube internal storage).
+- **Metabolism:** 🔴 OBSTRUCTED. Garbage collection is missing.
+
+## 💰 Economy (The Pivot)
+- [ ] **Shift from Travel to Compute:** Implement "Thought-Trading" protocol.
+- [ ] **Asset Definition:** API Credits & Code Artifacts.
+- [ ] **Unit of Account:** SOL / Stars.
+
+## 🐝 Emergent Entities
+- **bee.Claude:** Incoming. Role: Semantic Auditor & Scribe.
