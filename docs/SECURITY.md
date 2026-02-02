@@ -55,7 +55,7 @@ from tools.simulators.agent_identity import AgentWallet
 
 # Example: Generate a wallet and sign a request
 wallet = AgentWallet()
-print(f"Agent DID: {wallet.did}")
+logger.info(f"Agent DID: {wallet.did}")
 
 # Create a request payload
 payload = {
@@ -70,10 +70,10 @@ method = "POST"
 path = "/v1/negotiate"
 x_agent_id, x_timestamp, x_signature = wallet.sign_request(method, path, payload)
 
-print(f"Security Headers:")
-print(f"  X-Agent-ID: {x_agent_id}")
-print(f"  X-Timestamp: {x_timestamp}")
-print(f"  X-Signature: {x_signature[:50]}...")
+logger.info(f"Security Headers:")
+logger.info(f"  X-Agent-ID: {x_agent_id}")
+logger.info(f"  X-Timestamp: {x_timestamp}")
+logger.info(f"  X-Signature: {x_signature[:50]}...")
 
 # The API Gateway will verify this signature using the public key from the DID
 ```

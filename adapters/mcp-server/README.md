@@ -168,7 +168,7 @@ from aura_mcp.main import mcp
 
 # Simulate a tool call
 result = mcp.call_tool("search_hotels", arguments={"query": "luxury"})
-print(result)
+# logger.info(result)
 ```
 
 Run with: `uv run test_flow.py`

@@ -1,5 +1,3 @@
-"""Business logic services for Aura Core."""
-
-from .market import MarketService
+from ..hive.connector.market import MarketService
 
 __all__ = ["MarketService"]

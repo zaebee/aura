@@ -1,5 +1,4 @@
 import asyncio
-import os
 
 import nats
 import structlog
@@ -50,7 +49,7 @@ async def main() -> None:
     # Initialize NATS
     nc = None
     try:
-        nats_url = os.getenv("NATS_URL", "nats://nats:4222")
+        nats_url = settings.nats_url
         nc = await nats.connect(
             nats_url,
             connect_timeout=5,
