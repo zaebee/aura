@@ -264,7 +264,7 @@ ANTHROPIC_API_KEY=sk-ant-xxx
 LLM_MODEL=ollama/mistral                    # No API key (assumes Ollama running locally)
 
 # Infrastructure Monitoring
-PROMETHEUS_URL=http://prometheus-kube-prometheus-prometheus.monitoring:9090
+PROMETHEUS_URL=http://monitoring-kube-prometheus-prometheus.monitoring.svc.cluster.local:9090
 
 # API Gateway
 CORE_SERVICE_HOST=localhost:50051

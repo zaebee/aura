@@ -31,7 +31,7 @@ class ServerSettings(BaseModel):
     # Monitoring
     # DNA Rule: All cross-namespace service discovery must use full FQDN paths.
     prometheus_url: HttpUrl = Field(
-        "http://prometheus-kube-prometheus-prometheus.monitoring.svc.cluster.local:9090",  # type: ignore
+        "http://monitoring-kube-prometheus-prometheus.monitoring.svc.cluster.local:9090",  # type: ignore
         validation_alias=AliasChoices("AURA_SERVER__PROMETHEUS_URL", "PROMETHEUS_URL"),
     )
 

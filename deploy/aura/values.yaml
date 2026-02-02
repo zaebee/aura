@@ -123,10 +123,14 @@ telegram:
 # For production, it is strongly recommended to use a secret management solution
 # like Vault or External Secrets Operator instead of providing plain-text secrets here.
 secrets:
-  # API key for Mistral AI, required by the core service.
+  # Primary LLM API key, required by the core service.
   # This value must be provided during installation via CI/CD.
-  # Injected via: --set secrets.mistralApiKey="your-key"
-  mistralApiKey: ""
+  # Injected via: --set secrets.llmApiKey="your-key"
+  llmApiKey: ""
+  # Fernet key (Base64-encoded, 32 bytes) for encrypting deal secrets.
+  # Required by the core service for crypto payment features.
+  # Injected via: --set secrets.secretEncryptionKey="your-key"
+  secretEncryptionKey: ""
   # Telegram Bot Token, required by the telegram bot service.
   # This value must be provided during installation via CI/CD.
   # Injected via: --set secrets.telegramToken="your-token"
@@ -147,7 +151,7 @@ secrets:
 # Monitoring Stack Configuration (Cross-namespace)
 monitoring:
   prometheus:
-    url: "http://prometheus-kube-prometheus-prometheus.monitoring.svc.cluster.local:9090"
+    url: "http://monitoring-kube-prometheus-prometheus.monitoring.svc.cluster.local:9090"
   jaeger:
     enabled: true
     queryUrl: "http://aura-jaeger.monitoring.svc.cluster.local:16686"
