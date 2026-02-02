@@ -1,4 +1,34 @@
-Aura Hive Architecture Vision
+# Aura Hive Architecture Vision
+
+# Aura Hive Architecture Vision
+
+```mermaid
+graph TD
+    subgraph "Level 1: GENOME (Immutable)"
+        DNA["packages/aura-core<br/>(Protocols & Types)"]
+    end
+
+    subgraph "Level 2: NUCLEUS (The Brain)"
+        Core["core-service<br/>(DSPy + ATCG Metabolism)"]
+    end
+
+    subgraph "Level 3: ORGANS (Proteins)"
+        TG_P["Telegram Protein"]
+        SOL_P["Solana Protein"]
+        PROM_P["Prometheus Protein"]
+    end
+
+    subgraph "Level 4: CITIZENS (Active)"
+        Keeper["bee.Keeper<br/>(Auditor)"]
+        Bot["Telegram Bot<br/>(Interface)"]
+    end
+
+    DNA --> Core
+    Core --> TG_P & SOL_P & PROM_P
+    TG_P --> Bot
+    PROM_P --> Keeper
+```
+
 Aura Hive is conceived as a cooperative, layered architecture that channels the collective intelligence of many agents (bees) without centralized authority. At a high level, the Hive separates concerns into distinct components – the Runtime, Control, Advisory, and Visual layers – each playing a specialized role in processing, decision-making, monitoring, and presentation. The Runtime layer is the core “data plane” where Worker Bees execute domain logic and handle tasks. Surrounding it, the Control layer acts as a “control plane” scheduler or orchestrator, deciding what needs to happen. The Advisory layer observes activity and provides guidance or analysis (like Watcher and Advisor Bees), and the Visual layer (with docs/visual/) presents information and blueprints to humans (visualizations, dashboards, “blueprint” diagrams). These layers mirror common cloud-native patterns: for example, Kubernetes separates a control plane (API server, scheduler, etc.) that “decides what needs to happen” from a data plane of worker nodes that actually do the work[1][2]. In Aura Hive, the Control layer is the “brain” that sets policies and plans, while the Runtime/Worker bees are the “muscles” executing tasks (echoing the control-plane vs data-plane design[2]). This separation of concerns aligns with hexagonal (ports-and-adapters) architecture: the business logic lives at the core (Runtime), isolated from UIs, databases or infrastructure by defined interfaces[3][4]. The architecture therefore remains loosely coupled and testable – core Hive logic can be changed or tested independently of the outer layers[3][4].
 The purpose of the Hive is to enable safe, explainable, and extensible coordination of autonomous processes (the Bees) under human oversight. Each major layer has clear responsibilities:
 - Runtime (Worker Bees): Executes tasks and domain logic. This is where code runs and “work” is done. Worker Bees handle incoming jobs, process data, and emit results. The Runtime is insulated from external changes; it should not directly call up into the Control or Advisory layers, but only respond to interfaces (e.g. APIs, messages) provided by Control.
