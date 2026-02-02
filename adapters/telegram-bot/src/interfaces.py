@@ -1,19 +1,6 @@
-from typing import Any, Protocol, TypedDict
+from typing import Protocol
 
-
-class SearchResult(TypedDict):
-    item_id: str
-    name: str
-    base_price: float
-    description_snippet: str | None
-
-
-class NegotiationResult(TypedDict, total=False):
-    accepted: dict[str, Any] | None
-    countered: dict[str, Any] | None
-    rejected: dict[str, Any] | None
-    ui_required: dict[str, Any] | None
-    error: str | None
+from aura_core.dna import NegotiationResult, SearchResult
 
 
 class NegotiationProvider(Protocol):

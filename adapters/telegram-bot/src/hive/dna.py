@@ -3,14 +3,23 @@ from typing import Any, Protocol, runtime_checkable
 
 from aiogram.types import InlineKeyboardMarkup
 from aura_core.dna import (
-    Event,
-    HiveContext,
-    Observation,
+    Event as Event,
+)
+from aura_core.dna import (
+    HiveContext as HiveContext,
 )
 from aura_core.dna import (
     NegotiationOffer as NegotiationOffer,
 )
-from src.interfaces import NegotiationResult, SearchResult
+from aura_core.dna import (
+    NegotiationResult as NegotiationResult,
+)
+from aura_core.dna import (
+    Observation as Observation,
+)
+from aura_core.dna import (
+    SearchResult as SearchResult,
+)
 
 
 @dataclass

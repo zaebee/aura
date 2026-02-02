@@ -1,6 +1,7 @@
+import time
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Protocol, runtime_checkable
+from typing import Any, Protocol, TypedDict, runtime_checkable
 
 
 def find_hive_root() -> Path:
@@ -119,7 +120,22 @@ class Event:
 
     topic: str
     payload: dict[str, Any]
-    timestamp: float = field(default_factory=lambda: 0.0)
+    timestamp: float = field(default_factory=time.time)
+
+
+class SearchResult(TypedDict):
+    item_id: str
+    name: str
+    base_price: float
+    description_snippet: str | None
+
+
+class NegotiationResult(TypedDict, total=False):
+    accepted: dict[str, Any] | None
+    countered: dict[str, Any] | None
+    rejected: dict[str, Any] | None
+    ui_required: dict[str, Any] | None
+    error: str | None
 
 
 @runtime_checkable
