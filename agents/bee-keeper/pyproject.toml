@@ -16,7 +16,7 @@ dependencies = [
 ]
 
 [tool.uv.sources]
-aura-core = { path = "../../packages/aura-core" }
+aura-core = { workspace = true }
 
 [project.scripts]
 aura-keeper = "main:main"

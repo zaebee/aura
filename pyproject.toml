@@ -46,8 +46,11 @@ dependencies = [
     "aura-core",
 ]
 
+[tool.uv.workspace]
+members = ["packages/*", "core", "api-gateway", "adapters/*", "agents/*"]
+
 [tool.uv.sources]
-aura-core = { path = "packages/aura-core" }
+aura-core = { workspace = true }
 aura-protein-solana = { path = "components/proteins/solana" }
 aura-protein-observability = { path = "components/proteins/observability" }
 

@@ -103,9 +103,10 @@ class AuraTransformer:
 
         search_paths.extend(
             [
+                Path("/app/core/data/aura_brain.json"),
                 Path("/app/data/aura_brain.json"),
-                Path("/app/src/aura_brain.json"),
-                Path("./src/aura_brain.json"),
+                Path("./data/aura_brain.json"),
+                Path("/app/core/src/aura_brain.json"),
                 Path(__file__).parent.parent / "aura_brain.json",
             ]
         )

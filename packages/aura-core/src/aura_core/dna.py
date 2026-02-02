@@ -59,6 +59,7 @@ ALLOWED_CHAMBERS = {
     "core/src/hive/membrane": "HiveMembrane",
     "core/src/hive/aggregator": "SensoryNexus",
     "core/src/hive/generator": "NeuralPulse",
+    "core/src/hive/metabolism": "SacredCodex",
     "deploy": "HiveArmor",
     "proto": "SacredScrolls",
     "docs": "ChroniclersArchive",

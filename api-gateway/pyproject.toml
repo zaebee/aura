@@ -22,4 +22,4 @@ dependencies = [
 ]
 
 [tool.uv.sources]
-aura-core = { path = "../packages/aura-core" }
+aura-core = { workspace = true }
