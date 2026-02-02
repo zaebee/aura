@@ -24,6 +24,8 @@ from .dna import (
     NegotiationResult,
     Observation,
     SearchResult,
+    # Skill Protocol (Level 3: Proteins)
+    SkillProtocol,
     Transformer,
     # Utilities
     find_hive_root,
@@ -50,6 +52,8 @@ __all__ = [
     "Transformer",
     "Connector",
     "Generator",
+    # Skill Protocol (Level 3: Proteins)
+    "SkillProtocol",
     # bee.Keeper Types
     "BeeContext",
     "AuditObservation",
