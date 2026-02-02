@@ -38,7 +38,7 @@ dependencies = [
 ]
 
 [tool.uv.sources]
-aura-core = { workspace = true }
+aura-core = { path = "../packages/aura-core" }
 
 [dependency-groups]
 dev = [

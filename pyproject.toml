@@ -47,7 +47,7 @@ dependencies = [
 ]
 
 [tool.uv.sources]
-aura-core = { workspace = true }
+aura-core = { path = "packages/aura-core" }
 
 [dependency-groups]
 dev = [
@@ -124,16 +124,6 @@ skips = ["B101"] # B101 is assert_used, often okay in some contexts but bandit d
 [[tool.mypy.overrides]]
 module = ["proto.*", "aura.*", "src.proto.*"]
 ignore_errors = true
-
-[tool.uv.workspace]
-members = [
-    "packages/*",
-    "core-service",
-    "api-gateway",
-    "adapters/telegram-bot",
-    "adapters/mcp-server",
-    "agents/bee-keeper",
-]
 
 # [[tool.uv.index]]
 # url = "https://buf.build/gen/python"
