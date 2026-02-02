@@ -30,6 +30,13 @@ data:
     localPort = 8000
     remotePort = 8082
 
+    [[proxies]]
+    name = "grafana"
+    type = "tcp"
+    localIP = "monitoring-grafana.monitoring"
+    localPort = 80
+    remotePort = 8083
+
 ---
 apiVersion: apps/v1
 kind: Deployment
