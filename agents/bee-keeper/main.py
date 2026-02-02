@@ -30,7 +30,9 @@ async def main() -> None:
 
         # 1.5 Sanity Check: Test Brain Connectivity
         if not await metabolism.aggregator.test_brain_connectivity():
-            logger.error("Brain connectivity test failed for both primary and fallback models. Exiting.")
+            logger.error(
+                "Brain connectivity test failed for both primary and fallback models. Exiting."
+            )
             sys.exit(1)
 
         # 2. Execute Metabolic Pulse

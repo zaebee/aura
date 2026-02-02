@@ -68,6 +68,7 @@ core:
   env:
     AURA_SERVER__LOG_LEVEL: info
     AURA_LLM__MODEL: "mistral/mistral-large-latest"  # Can override: openai/gpt-4o, ollama/mistral, rule
+    AURA_CRYPTO__ENABLED: "false"
 
 # PostgreSQL Database Configuration
 postgres:
@@ -83,17 +84,6 @@ postgres:
 redis:
   enabled: true
   image: redis:7-alpine
-
-# Jaeger Configuration
-jaeger:
-  enabled: true
-  service:
-    type: LoadBalancer # Service type to expose Jaeger
-  # Resource limits for Jaeger
-  resources:
-    limits:
-      cpu: 500m
-      memory: 512Mi
 
 # Frontnend Configuration
 frontend:
@@ -134,10 +124,18 @@ telegram:
 # For production, it is strongly recommended to use a secret management solution
 # like Vault or External Secrets Operator instead of providing plain-text secrets here.
 secrets:
-  # API key for Mistral AI, required by the core service.
+  # Primary LLM API key, required by the core service.
   # This value must be provided during installation via CI/CD.
-  # Injected via: --set secrets.mistralApiKey="your-key"
-  mistralApiKey: ""
+  # Injected via: --set secrets.llmApiKey="your-key"
+  llmApiKey: ""
+  # Fernet key (Base64-encoded, 32 bytes) for encrypting deal secrets.
+  # Required by the core service for crypto payment features.
+  # Injected via: --set secrets.secretEncryptionKey="your-key"
+  secretEncryptionKey: ""
+  # Solana Private Key (Base58-encoded) for crypto payments.
+  # Required if AURA_CRYPTO__ENABLED is true.
+  # Injected via: --set secrets.solanaPrivateKey="your-key"
+  solanaPrivateKey: ""
   # Telegram Bot Token, required by the telegram bot service.
   # This value must be provided during installation via CI/CD.
   # Injected via: --set secrets.telegramToken="your-token"
@@ -158,9 +156,16 @@ secrets:
 # Monitoring Stack Configuration (Cross-namespace)
 monitoring:
   prometheus:
-    url: "http://prometheus-kube-prometheus-prometheus.monitoring.svc.cluster.local:9090"
+    url: "http://monitoring-kube-prometheus-prometheus.monitoring.svc.cluster.local:9090"
   jaeger:
-    queryUrl: "http://jaeger-query.monitoring.svc.cluster.local:16686"
-    collectorUrl: "http://jaeger-collector.monitoring.svc.cluster.local:4317"
+    enabled: true
+    queryUrl: "http://aura-jaeger.monitoring.svc.cluster.local:16686"
+    collectorUrl: "http://aura-jaeger.monitoring.svc.cluster.local:4317"
+    service:
+      type: LoadBalancer
+    resources:
+      limits:
+        cpu: 500m
+        memory: 512Mi
   loki:
     url: "http://loki.monitoring.svc.cluster.local:3100"

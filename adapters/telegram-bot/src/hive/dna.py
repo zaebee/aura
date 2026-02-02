@@ -2,28 +2,24 @@ from dataclasses import dataclass, field
 from typing import Any, Protocol, runtime_checkable
 
 from aiogram.types import InlineKeyboardMarkup
-from src.interfaces import NegotiationResult, SearchResult
-
-
-@dataclass
-class NegotiationOffer:
-    """Internal representation of an incoming bid."""
-
-    bid_amount: float
-    reputation: float = 1.0
-    agent_did: str = "telegram-user"
-
-
-@dataclass
-class HiveContext:
-    """Consolidated context for the Hive's decision making."""
-
-    item_id: str
-    offer: NegotiationOffer
-    item_data: dict[str, Any] = field(default_factory=dict)
-    system_health: dict[str, Any] = field(default_factory=dict)
-    request_id: str = ""
-    metadata: dict[str, Any] = field(default_factory=dict)
+from aura_core.dna import (
+    Event as Event,
+)
+from aura_core.dna import (
+    HiveContext as HiveContext,
+)
+from aura_core.dna import (
+    NegotiationOffer as NegotiationOffer,
+)
+from aura_core.dna import (
+    NegotiationResult as NegotiationResult,
+)
+from aura_core.dna import (
+    Observation as Observation,
+)
+from aura_core.dna import (
+    SearchResult as SearchResult,
+)
 
 
 @dataclass
@@ -53,35 +49,9 @@ class UIAction:
     metadata: dict[str, Any] = field(default_factory=dict)
 
 
-@dataclass
-class Observation:
-    """Observation resulting from an action."""
-
-    success: bool
-    message_id: int | None = None
-    error: str | None = None
-    event_type: str = ""
-    metadata: dict[str, Any] = field(default_factory=dict)
-
-
-@dataclass
-class Event:
-    """An event emitted to the Hive's blood stream (NATS)."""
-
-    topic: str
-    payload: dict[str, Any]
-    timestamp: float = field(default_factory=lambda: 0.0)
-
-
+# Specialized Protocols for Telegram if needed, otherwise use the core ones
 @runtime_checkable
-class BeeDNA(Protocol):
-    """Protocol for the Telegram Bot Hive components."""
-
-    pass
-
-
-@runtime_checkable
-class Aggregator(Protocol):
+class TelegramAggregator(Protocol):
     """A - Aggregator: Extracts Telegram signals into context."""
 
     async def perceive(
@@ -90,7 +60,7 @@ class Aggregator(Protocol):
 
 
 @runtime_checkable
-class Transformer(Protocol):
+class TelegramTransformer(Protocol):
     """T - Transformer: Decides on UI actions."""
 
     async def think(
@@ -102,7 +72,7 @@ class Transformer(Protocol):
 
 
 @runtime_checkable
-class Connector(Protocol):
+class TelegramConnector(Protocol):
     """C - Connector: Executes UI actions and gRPC calls."""
 
     async def act(self, action: UIAction, context: TelegramContext) -> Observation: ...
@@ -113,7 +83,7 @@ class Connector(Protocol):
 
 
 @runtime_checkable
-class Generator(Protocol):
+class TelegramGenerator(Protocol):
     """G - Generator: Emits events to NATS."""
 
     async def pulse(self, observation: Observation) -> list[Event]: ...

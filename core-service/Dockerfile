@@ -12,11 +12,15 @@ RUN apt-get update && \
 ENV UV_COMPILE_BYTECODE=1
 ENV UV_LINK_MODE=copy
 
-COPY pyproject.toml uv.lock ./
+# Copy dependency files
+COPY packages/aura-core /app/packages/aura-core
+COPY core-service/pyproject.toml core-service/uv.lock /app/core-service/
+
+WORKDIR /app/core-service
 
 RUN uv sync --frozen --no-dev --no-install-project
 
-ENV PATH="/app/.venv/bin:$PATH"
+ENV PATH="/app/core-service/.venv/bin:$PATH"
 
 # Verify critical packages installed
 RUN python -c "import grpc_health.v1.health_pb2"
@@ -30,7 +34,7 @@ COPY core-service/migrations ./migrations
 COPY core-service/data ./data
 COPY core-service/train_dspy.py .
 
-ENV PYTHONPATH=/app:/app/src:/app/src/proto
+ENV PYTHONPATH=/app/core-service:/app/core-service/src:/app/core-service/src/proto
 
 EXPOSE 50051
 EXPOSE 9091

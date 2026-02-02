@@ -2,7 +2,7 @@
 name = "telegram-bot"
 version = "0.1.0"
 description = "Telegram Bot for Aura Platform"
-requires-python = ">=3.11"
+requires-python = ">=3.12"
 dependencies = [
     "aiogram>=3.17.0",
     "grpcio>=1.70.0",
@@ -13,7 +13,11 @@ dependencies = [
     "opentelemetry-sdk>=1.24.0",
     "opentelemetry-exporter-otlp>=1.24.0",
     "nats-py>=2.9.0",
+    "aura-core",
 ]
+
+[tool.uv.sources]
+aura-core = { path = "../../packages/aura-core" }
 
 [dependency-groups]
 dev = [

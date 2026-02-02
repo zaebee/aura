@@ -162,35 +162,17 @@ jobs:
         runs-on: self-hosted
         env:
             KUBECONFIG: /home/runner/.kube/config
-            AURA__API_KEY: ${{ secrets.MISTRAL_API_KEY }}
-            AURA__FRP_CLIENT_TOKEN: ${{ secrets.FRP_CLIENT_TOKEN }}
-            AURA__OPENAI_KEY: ${{ secrets.OPENAI_API_KEY }}
-            AURA__SECRET_ENCRYPTION_KEY: ${{ secrets.AURA_SECRET_ENCRYPTION_KEY }}
-            AURA__SOLANA_PRIVATE_KEY: ${{ secrets.SOLANA_PRIVATE_KEY }}
-            AURA__AURA_TG__TOKEN: ${{ secrets.AURA_TELEGRAM_TOKEN }}
         steps:
             - uses: actions/checkout@v4
 
-            - name: Sync K8s Secrets
-              env:
-                TG_TOKEN: ${{ secrets.AURA_TELEGRAM_TOKEN }}
-                API_KEY: ${{ secrets.MISTRAL_API_KEY }}
-                OPENAI_KEY: ${{ secrets.OPENAI_API_KEY }}
-                SOL_KEY: ${{ secrets.SOLANA_PRIVATE_KEY }}
-                FRP_TOKEN: ${{ secrets.FRP_CLIENT_TOKEN }}
-                ENC_KEY: ${{ secrets.AURA_SECRET_ENCRYPTION_KEY }}
-              run: |
-                  kubectl delete secret aura-secrets --ignore-not-found
-                  kubectl create secret generic aura-secrets \
-                    --from-literal=telegram-token="$TG_TOKEN" \
-                    --from-literal=api-key="$API_KEY" \
-                    --from-literal=openai-key="$OPENAI_KEY" \
-                    --from-literal=solana-private-key="$SOL_KEY" \
-                    --from-literal=frp-client-token="$FRP_TOKEN" \
-                    --from-literal=secret-encryption-key="$ENC_KEY" \
-                    --dry-run=client -o yaml | kubectl apply -f -
-
             - name: Deploy to Cluster
+              env:
+                  TG_TOKEN: ${{ secrets.AURA_TELEGRAM_TOKEN }}
+                  API_KEY: ${{ secrets.MISTRAL_API_KEY }}
+                  OPENAI_KEY: ${{ secrets.OPENAI_API_KEY }}
+                  SOL_KEY: ${{ secrets.SOLANA_PRIVATE_KEY }}
+                  FRP_TOKEN: ${{ secrets.FRP_CLIENT_TOKEN }}
+                  ENC_KEY: ${{ secrets.AURA_SECRET_ENCRYPTION_KEY }}
               run: |
                   SHORT_SHA=$(git rev-parse --short HEAD)
                   CHART_VERSION="0.1.${{ github.run_number }}"
@@ -205,7 +187,13 @@ jobs:
                     --set core.image.tag=sha-$SHORT_SHA \
                     --set gateway.image.tag=sha-$SHORT_SHA \
                     --set frontend.image.tag=sha-$SHORT_SHA \
-                    --set telegram.image.tag=sha-$SHORT_SHA
+                    --set telegram.image.tag=sha-$SHORT_SHA \
+                    --set secrets.llmApiKey="$API_KEY" \
+                    --set secrets.openaiApiKey="$OPENAI_KEY" \
+                    --set secrets.telegramToken="$TG_TOKEN" \
+                    --set secrets.secretEncryptionKey="$ENC_KEY" \
+                    --set secrets.solanaPrivateKey="$SOL_KEY" \
+                    --set secrets.frpClientToken.value="$FRP_TOKEN"
 
             - name: Verify Rollout
               run: |

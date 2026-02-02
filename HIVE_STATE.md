@@ -140,5 +140,6 @@ event: manual
 - [ ] **Task 40/41: Total Fractalization.** (Refactor Bot and MCP to 100% ATCG).
 
 ## 🔋 System Vitals (Senses)
-- **Transformer (T):** 🟡 DEGRADED. Mistral is OK, but OpenAI fallback returned 401 (Auth Error).
-- **Metabolism:** 🟢 ACTIVE (but vulnerable).
+- **Aggregator (A):** 🔴 BLIND. ConnectError to Prometheus. (DNS resolved, connection refused).
+- **Transformer (T):** 🟡 AMNESIA. `aura_brain.json` not found at /app/src/. Running untrained.
+- **Connector (C):** 🟡 NUMB. Jaeger export failing (StatusCode.UNAVAILABLE).

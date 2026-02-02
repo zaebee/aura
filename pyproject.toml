@@ -43,7 +43,11 @@ dependencies = [
     "nats-py>=2.9.0",
     "pygithub>=2.8.1",
     "types-pyyaml>=6.0.12.20250915",
+    "aura-core",
 ]
+
+[tool.uv.sources]
+aura-core = { path = "packages/aura-core" }
 
 [dependency-groups]
 dev = [
