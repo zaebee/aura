@@ -249,7 +249,9 @@ class BeeTransformer:
             logger.warning("diff_summarization_failed", error=str(e))
             return "Large diff (could not summarize)."
 
-    async def _call_llm(self, prompt: str, use_fallback: bool = False) -> dict[str, Any]:
+    async def _call_llm(
+        self, prompt: str, use_fallback: bool = False
+    ) -> dict[str, Any]:
         model = self.settings.llm__fallback_model if use_fallback else self.model
         kwargs: dict[str, Any] = {
             "model": model,

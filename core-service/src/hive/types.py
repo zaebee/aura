@@ -1,3 +1,5 @@
+from dataclasses import dataclass
+
 from aura_core.dna import (
     Event,
     HiveContext,
@@ -5,7 +7,6 @@ from aura_core.dna import (
     NegotiationOffer,
     Observation,
 )
-from dataclasses import dataclass
 
 
 @dataclass

@@ -131,6 +131,7 @@ members = [
     "core-service",
     "api-gateway",
     "adapters/telegram-bot",
+    "adapters/mcp-server",
     "agents/bee-keeper",
 ]
 

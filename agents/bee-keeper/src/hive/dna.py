@@ -1,49 +1,12 @@
 from dataclasses import dataclass, field
-from pathlib import Path
 from typing import Any, Protocol, runtime_checkable
 
-
-def find_hive_root() -> Path:
-    """Find the repository root by searching upwards for markers."""
-    p = Path(__file__).resolve()
-    for parent in [p] + list(p.parents):
-        # Monorepo markers
-        if (parent / "core-service").exists() and (parent / "api-gateway").exists():
-            return parent
-    return Path.cwd()
-
-
-MACRO_ATCG_FOLDERS = [
-    "core-service",
-    "api-gateway",
-    "frontend",
-    "adapters",
-    "agents",
-    "proto",
-    "docs",
-    "tools",
-    "deploy",
-]
-
-ALLOWED_ROOT_FILES = [
-    "README.md",
-    "llms.txt",
-    "HIVE_STATE.md",
-    "pyproject.toml",
-    "uv.lock",
-    ".gitignore",
-    "Makefile",
-    "buf.gen.yaml",
-    "buf.yaml",
-    ".python-version",
-    ".dockerignore",
-    ".env.example",
-    "compose.yml",
-    ".pre-commit-config.yaml",
-    "CLAUDE.md",
-    "CRYPTO_INTEGRATION_SUMMARY.md",
-    "CRYPTO_QUICKSTART.md",
-]
+from aura_core.dna import (
+    ALLOWED_CHAMBERS as ALLOWED_CHAMBERS,
+    ALLOWED_ROOT_FILES as ALLOWED_ROOT_FILES,
+    MACRO_ATCG_FOLDERS as MACRO_ATCG_FOLDERS,
+    find_hive_root as find_hive_root,
+)
 
 
 @dataclass
@@ -81,28 +44,6 @@ class BeeObservation:
     nats_event_sent: bool = False
     injuries: list[str] = field(default_factory=list)
     metadata: dict[str, Any] = field(default_factory=dict)
-
-
-# Sacred Roles for Infrastructure
-ALLOWED_CHAMBERS = {
-    "core-service/migrations": "HiveEvolutionaryScrolls",
-    "core-service/tests": "ValidationPollen",
-    "api-gateway": "HiveGate",
-    "core-service/src/config": "SacredCodex",
-    "core-service/src/services": "WorkerDirectives",
-    "core-service/src/llm": "ReasoningNucleus",
-    "core-service/src/crypto": "SecurityCitadel",
-    "core-service/src/prompts": "EchoChamber",
-    "core-service/src/guard": "HiveMembrane",
-    "deploy": "HiveArmor",
-    "proto": "SacredScrolls",
-    "docs": "ChroniclersArchive",
-    "agents": "WorkerCells",
-    "adapters": "HiveExtensions",
-    "frontend": "HiveWindow",
-    "tools": "ToolShed",
-    "tests": "OuterValidationPollen",
-}
 
 
 @runtime_checkable

@@ -150,9 +150,7 @@ class BeeGenerator:
         full_content = "# Aura Hive State\n\n"
         full_content += f"**Last Pulse:** {now}\n"
         full_content += f"**Current Success Rate:** {success_rate:.2f}\n"
-        full_content += (
-            f"**Governance Cost (Last):** {report.token_usage} tokens / {report.execution_time:.2f}s\n\n"
-        )
+        full_content += f"**Governance Cost (Last):** {report.token_usage} tokens / {report.execution_time:.2f}s\n\n"
         full_content += "## Audit Log\n\n"
         full_content += new_entry
 

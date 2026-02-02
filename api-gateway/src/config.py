@@ -21,7 +21,9 @@ class Settings(BaseSettings):
     # OpenTelemetry Configuration
     otel_service_name: str = "aura-gateway"
     # DNA Rule: FQDN for cross-namespace services
-    otel_exporter_otlp_endpoint: HttpUrl = "http://aura-jaeger.monitoring.svc.cluster.local:4317"  # type: ignore
+    otel_exporter_otlp_endpoint: HttpUrl = (
+        "http://aura-jaeger.monitoring.svc.cluster.local:4317"  # type: ignore
+    )
 
     # CORS Configuration
     # Comma-separated list of allowed origins (e.g., "https://app1.com,https://app2.com")

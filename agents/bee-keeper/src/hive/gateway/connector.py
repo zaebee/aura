@@ -169,7 +169,9 @@ class BeeConnector:
                     "injuries": injuries,
                     "timestamp": now,
                 }
-                await nc.publish("aura.hive.injury", json.dumps(injury_payload).encode())
+                await nc.publish(
+                    "aura.hive.injury", json.dumps(injury_payload).encode()
+                )
 
             await nc.close()
             return True

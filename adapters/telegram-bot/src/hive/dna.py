@@ -1,18 +1,17 @@
-from typing import Any, Protocol, runtime_checkable
 from dataclasses import dataclass, field
+from typing import Any, Protocol, runtime_checkable
+
 from aiogram.types import InlineKeyboardMarkup
-from src.interfaces import NegotiationResult, SearchResult
 from aura_core.dna import (
-    NegotiationOffer,
+    Event,
     HiveContext,
     Observation,
-    Event,
-    BeeDNA,
-    Aggregator,
-    Transformer,
-    Connector,
-    Generator
 )
+from aura_core.dna import (
+    NegotiationOffer as NegotiationOffer,
+)
+from src.interfaces import NegotiationResult, SearchResult
+
 
 @dataclass
 class TelegramContext:
