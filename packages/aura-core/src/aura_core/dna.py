@@ -52,6 +52,7 @@ ALLOWED_CHAMBERS = {
     "core-service/migrations": "HiveEvolutionaryScrolls",
     "core-service/tests": "ValidationPollen",
     "core-service/scripts": "HiveAutomationScrolls",
+    "core-service/data": "HiveMemory",
     "api-gateway": "HiveGate",
     "core-service/src/config": "SacredCodex",
     "core-service/src/services": "WorkerDirectives",
@@ -68,6 +69,9 @@ ALLOWED_CHAMBERS = {
     "tools": "ToolShed",
     "tests": "OuterValidationPollen",
     "packages": "SharedNucleotides",
+    # ATCG Sub-structures (legal within hive/ directories)
+    "proteins": "EnzymaticHelpers",
+    "metabolism": "MetabolicCore",
 }
 
 
