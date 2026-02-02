@@ -9,9 +9,19 @@ RUN apt-get update && apt-get install -y --no-install-recommends curl && \
 ENV UV_COMPILE_BYTECODE=1
 ENV UV_LINK_MODE=copy
 
-COPY pyproject.toml uv.lock ./
+COPY pyproject.toml uv.lock README.md ./
+# Copy all pyproject.toml files to satisfy workspace requirements
+COPY packages/aura-core/pyproject.toml ./packages/aura-core/
+COPY core-service/pyproject.toml ./core-service/
+COPY api-gateway/pyproject.toml ./api-gateway/
+COPY adapters/telegram-bot/pyproject.toml ./adapters/telegram-bot/
+COPY adapters/mcp-server/pyproject.toml ./adapters/mcp-server/
+COPY agents/bee-keeper/pyproject.toml ./agents/bee-keeper/
 
-RUN uv sync --frozen --no-dev --no-install-project
+# Copy the shared package code
+COPY packages/aura-core ./packages/aura-core
+
+RUN uv sync --frozen --no-dev --no-install-project --package api-gateway
 
 ENV PATH="/app/.venv/bin:$PATH"
 

@@ -12,11 +12,20 @@ COPY --from=ghcr.io/astral-sh/uv:latest /uv /usr/local/bin/uv
 ENV UV_COMPILE_BYTECODE=1
 ENV UV_LINK_MODE=copy
 
-# Copy dependency files
-COPY adapters/telegram-bot/pyproject.toml adapters/telegram-bot/uv.lock ./
+# Copy workspace dependency files
+COPY pyproject.toml uv.lock README.md ./
+COPY packages/aura-core/pyproject.toml ./packages/aura-core/
+COPY core-service/pyproject.toml ./core-service/
+COPY api-gateway/pyproject.toml ./api-gateway/
+COPY adapters/telegram-bot/pyproject.toml ./adapters/telegram-bot/
+COPY adapters/mcp-server/pyproject.toml ./adapters/mcp-server/
+COPY agents/bee-keeper/pyproject.toml ./agents/bee-keeper/
+
+# Copy the shared package code
+COPY packages/aura-core ./packages/aura-core
 
 # Install dependencies (including dev for grpcio-tools)
-RUN uv sync --frozen --no-install-project --group dev
+RUN uv sync --frozen --no-install-project --group dev --package telegram-bot
 
 # Copy proto definitions
 COPY proto/ /app/proto/
@@ -39,11 +48,20 @@ COPY --from=ghcr.io/astral-sh/uv:latest /uv /usr/local/bin/uv
 ENV UV_COMPILE_BYTECODE=1
 ENV UV_LINK_MODE=copy
 
-# Copy dependency files
-COPY adapters/telegram-bot/pyproject.toml adapters/telegram-bot/uv.lock ./
+# Copy workspace dependency files
+COPY pyproject.toml uv.lock README.md ./
+COPY packages/aura-core/pyproject.toml ./packages/aura-core/
+COPY core-service/pyproject.toml ./core-service/
+COPY api-gateway/pyproject.toml ./api-gateway/
+COPY adapters/telegram-bot/pyproject.toml ./adapters/telegram-bot/
+COPY adapters/mcp-server/pyproject.toml ./adapters/mcp-server/
+COPY agents/bee-keeper/pyproject.toml ./agents/bee-keeper/
+
+# Copy the shared package code
+COPY packages/aura-core ./packages/aura-core
 
 # Install only production dependencies
-RUN uv sync --frozen --no-install-project
+RUN uv sync --frozen --no-install-project --package telegram-bot
 
 # Copy generated proto stubs
 COPY --from=builder /app/src/proto/ /app/src/proto/
