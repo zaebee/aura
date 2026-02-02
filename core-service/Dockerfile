@@ -13,6 +13,7 @@ ENV UV_COMPILE_BYTECODE=1
 ENV UV_LINK_MODE=copy
 
 COPY pyproject.toml uv.lock ./
+COPY packages/aura-core ./packages/aura-core
 
 RUN uv sync --frozen --no-dev --no-install-project
 
@@ -28,7 +29,7 @@ COPY core-service/migrations ./migrations
 
 # Copy the compiled brain (aura_brain.json) and training data
 COPY core-service/data ./data
-COPY core-service/train_dspy.py .
+COPY core-service/scripts ./scripts
 
 ENV PYTHONPATH=/app:/app/src:/app/src/proto
 

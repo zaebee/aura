@@ -81,7 +81,7 @@ class TestConfigurationValidation(unittest.TestCase):
         """Test valid configuration."""
         # Import core-service Settings for this test
         sys.path.insert(0, "core-service/src")
-        from config import Settings as CoreServiceSettings
+        from src.hive.metabolism.config import Settings as CoreServiceSettings
 
         settings = CoreServiceSettings(
             database_url="postgresql://user:password@localhost:5432/aura_db",
@@ -95,7 +95,7 @@ class TestConfigurationValidation(unittest.TestCase):
     def test_empty_service_name(self):
         """Test validation of empty service name."""
         sys.path.insert(0, "core-service/src")
-        from config import Settings as CoreServiceSettings
+        from src.hive.metabolism.config import Settings as CoreServiceSettings
 
         with self.assertRaises(ValueError) as context:
             settings = CoreServiceSettings(
@@ -110,7 +110,7 @@ class TestConfigurationValidation(unittest.TestCase):
     def test_invalid_otlp_endpoint(self):
         """Test validation of invalid OTLP endpoint."""
         sys.path.insert(0, "core-service/src")
-        from config import Settings as CoreServiceSettings
+        from src.hive.metabolism.config import Settings as CoreServiceSettings
 
         with self.assertRaises(ValueError) as context:
             settings = CoreServiceSettings(
@@ -215,7 +215,7 @@ class TestEnvironmentVariables(unittest.TestCase):
 
         # Import core-service Settings for this test
         sys.path.insert(0, "core-service/src")
-        from config import Settings as CoreServiceSettings
+        from src.hive.metabolism.config import Settings as CoreServiceSettings
 
         settings = CoreServiceSettings(
             database_url="postgresql://user:password@localhost:5432/aura_db",

@@ -5,11 +5,14 @@ Minimal DSPy test to isolate the issue.
 
 import json
 import sys
+from pathlib import Path
 
 # Add src to path
+sys.path.append(str(Path(__file__).parent.parent / "src"))
+
 import dspy
 import structlog
-from llm.engine import AuraNegotiator
+from src.hive.transformer.engine import AuraNegotiator
 
 # Configure logging
 structlog.configure(
@@ -48,32 +51,30 @@ def test_minimal_dspy():
 
     # Test prediction
     try:
-        from unittest.mock import MagicMock, patch
-        with patch.object(negotiator, 'negotiate') as mock_predict:
-            mock_predict.return_value = MagicMock(
-                thought="I should reject this bid as it is below floor price.",
-                action='{"action": "reject", "price": 0.0, "message": "Too low."}'
-            )
-            prediction = negotiator(
-                input_bid="100",
-                context={
-                    "base_price": 200,
-                    "floor_price": 150,
-                    "occupancy": "high",
-                    "value_add_inventory": [],
-                },
-                history=[],
-            )
+        prediction = negotiator(
+            input_bid="100",
+            context={
+                "base_price": 200,
+                "floor_price": 150,
+                "occupancy": "high",
+                "value_add_inventory": [],
+            },
+            history=[],
+        )
 
-        logger.info("prediction_successful",
-                    action=prediction['action'],
-                    thought=prediction['thought'][:50])
+        logger.info(
+            "prediction_successful",
+            response_type=str(type(prediction["response"])),
+            response_value=prediction["response"],
+            reasoning=prediction["reasoning"][:50],
+        )
 
         return True
 
     except Exception as e:
         logger.error("prediction_failed", error=str(e))
         import traceback
+
         traceback.print_exc()
         return False
 

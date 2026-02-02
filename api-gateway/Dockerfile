@@ -10,6 +10,7 @@ ENV UV_COMPILE_BYTECODE=1
 ENV UV_LINK_MODE=copy
 
 COPY pyproject.toml uv.lock ./
+COPY packages/aura-core ./packages/aura-core
 
 RUN uv sync --frozen --no-dev --no-install-project
 

@@ -1,7 +1,7 @@
 import asyncio
 import uuid
 from concurrent import futures
-from typing import Any
+from typing import Any, Protocol
 
 import grpc
 import grpc.aio
@@ -63,6 +63,12 @@ def extract_request_id(context: Any) -> str | None:
     """Extract request_id from gRPC metadata."""
     metadata = dict(context.invocation_metadata())
     return metadata.get(REQUEST_ID_METADATA_KEY)
+
+
+class PricingStrategy(Protocol):
+    def evaluate(
+        self, item_id: str, bid: float, reputation: float, request_id: str | None
+    ) -> negotiation_pb2.NegotiateResponse: ...
 
 
 class NegotiationService(negotiation_pb2_grpc.NegotiationServiceServicer):
@@ -265,6 +271,47 @@ class NegotiationService(negotiation_pb2_grpc.NegotiationServiceServicer):
         finally:
             if request_id:
                 clear_request_context()
+
+
+def create_strategy() -> PricingStrategy:
+    """Create pricing strategy based on LLM_MODEL configuration.
+
+    Strategies:
+    - "rule": RuleBasedStrategy (no LLM required)
+    - "dspy": DSPyStrategy (self-optimizing negotiation engine)
+    - Any litellm model: LiteLLMStrategy (e.g., "openai/gpt-4o", "mistral/mistral-large-latest")
+
+    Returns:
+        Strategy instance implementing PricingStrategy protocol
+    """
+    if settings.llm.model == "rule":
+        logger.info("strategy_selected", type="RuleBasedStrategy", llm_required=False)
+        from src.llm_strategy import RuleBasedStrategy
+
+        return RuleBasedStrategy()
+    elif settings.llm.model == "dspy":
+        logger.info("strategy_selected", type="DSPyStrategy", model="self-optimizing")
+        from src.hive.transformer.dspy_strategy import DSPyStrategy
+
+        return DSPyStrategy()
+    else:
+        logger.info(
+            "strategy_selected", type="LiteLLMStrategy", model=settings.llm.model
+        )
+        from src.hive.transformer.strategy import LiteLLMStrategy
+
+        # Select appropriate API key based on model provider
+        api_key = None
+        if settings.llm.model.startswith("openai/"):
+            api_key = get_raw_key(settings.llm.openai_api_key)
+        elif settings.llm.model.startswith("mistral/"):
+            api_key = get_raw_key(settings.llm.api_key)
+
+        return LiteLLMStrategy(
+            model=settings.llm.model,
+            temperature=settings.llm.temperature,
+            api_key=api_key,
+        )
 
 
 def create_crypto_provider() -> Any:

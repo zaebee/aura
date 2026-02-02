@@ -54,8 +54,9 @@ class HiveAggregator:
 
         search_paths.extend(
             [
-                Path(__file__).parent.parent / "aura_brain.json",
+                Path("/app/src/aura_brain.json"),
                 Path("./src/aura_brain.json"),
+                Path(__file__).parent.parent / "aura_brain.json",
             ]
         )
 

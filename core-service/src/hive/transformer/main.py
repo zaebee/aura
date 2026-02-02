@@ -6,7 +6,7 @@ import structlog
 from aura_core.types import FailureIntent, HiveContext, IntentAction
 
 from src.hive.metabolism.config import get_settings
-from src.llm.engine import AuraNegotiator
+from src.hive.transformer.engine import AuraNegotiator
 
 logger = structlog.get_logger(__name__)
 

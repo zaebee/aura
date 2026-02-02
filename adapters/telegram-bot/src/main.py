@@ -12,7 +12,7 @@ from opentelemetry.sdk.trace.export import BatchSpanProcessor
 
 from src.bot import router
 from src.client import GRPCNegotiationClient
-from src.config import settings
+from config import settings
 from src.hive.aggregator import TelegramAggregator
 from src.hive.connector import TelegramConnector
 from src.hive.generator import TelegramGenerator
@@ -35,7 +35,7 @@ def setup_tracing() -> None:
     provider = TracerProvider(resource=resource)
 
     # DNA Rule: FQDN for cross-namespace services
-    otlp_endpoint = os.getenv("OTEL_EXPORTER_OTLP_ENDPOINT", "http://jaeger-collector.monitoring.svc.cluster.local:4317")
+    otlp_endpoint = settings.otel_exporter_otlp_endpoint
     processor = BatchSpanProcessor(
         OTLPSpanExporter(endpoint=otlp_endpoint, insecure=True)
     )
