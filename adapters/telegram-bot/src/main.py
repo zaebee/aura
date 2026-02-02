@@ -11,11 +11,11 @@ from opentelemetry.sdk.trace import TracerProvider
 from opentelemetry.sdk.trace.export import BatchSpanProcessor
 
 from src.bot import router
-from src.hive.connector.proteins.aura_client import GRPCNegotiationClient
-from src.hive.connector.proteins.telegram_api import TelegramProtein
 from src.config import settings
 from src.hive.aggregator import TelegramAggregator
 from src.hive.connector import TelegramConnector
+from src.hive.connector.proteins.aura_client import GRPCNegotiationClient
+from src.hive.connector.proteins.telegram_api import TelegramProtein
 from src.hive.generator import TelegramGenerator
 from src.hive.metabolism import TelegramMetabolism
 from src.hive.transformer import TelegramTransformer
@@ -63,11 +63,6 @@ async def main() -> None:
         logger.error("Failed to connect to NATS (service might be down)", error=str(e))
     except Exception as e:
         logger.error("Unexpected error connecting to NATS", error=str(e))
-
-    # Initialize gRPC client
-    client = GRPCNegotiationClient(
-        settings.core_url, timeout=settings.negotiation_timeout
-    )
 
     # Initialize Bot
     bot = Bot(token=settings.token.get_secret_value())

@@ -1,9 +1,9 @@
 import structlog
 from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup
-from opentelemetry import trace
-from ...interfaces import NegotiationResult, SearchResult
-
 from aura_core.dna import TelegramContext, UIAction
+from opentelemetry import trace
+
+from ...interfaces import NegotiationResult, SearchResult
 
 logger = structlog.get_logger(__name__)
 tracer = trace.get_tracer(__name__)
@@ -23,9 +23,7 @@ class TelegramTransformer:
             if search_results is not None:
                 span.set_attribute("action", "search_results")
                 if not search_results:
-                    return UIAction(
-                        text="No results found or core unreachable. 😕"
-                    )
+                    return UIAction(text="No results found or core unreachable. 😕")
 
                 keyboard = []
                 for item in search_results:

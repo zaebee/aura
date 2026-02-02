@@ -1,7 +1,7 @@
 import asyncio
 import uuid
 from concurrent import futures
-from typing import Any, Protocol
+from typing import Any
 
 import grpc
 import grpc.aio
@@ -16,20 +16,26 @@ from sqlalchemy import text
 
 from src.config import settings
 from src.config.llm import get_raw_key
-from src.hive.aggregator import InventoryItem, SessionLocal, engine, generate_embedding, HiveAggregator
+from src.hive.aggregator import (
+    HiveAggregator,
+    InventoryItem,
+    SessionLocal,
+    engine,
+    generate_embedding,
+)
 from src.hive.connector import HiveConnector
 from src.hive.generator import HiveGenerator
 from src.hive.membrane import HiveMembrane
 from src.hive.metabolism import MetabolicLoop
-from src.hive.transformer import AuraTransformer
 from src.hive.metabolism.logging_config import (
     bind_request_id,
     clear_request_context,
     configure_logging,
     get_logger,
 )
-from src.hive.proto.aura.negotiation.v1 import negotiation_pb2, negotiation_pb2_grpc
 from src.hive.metabolism.telemetry import init_telemetry
+from src.hive.proto.aura.negotiation.v1 import negotiation_pb2, negotiation_pb2_grpc
+from src.hive.transformer import AuraTransformer
 
 # Configure structured logging on startup
 configure_logging(log_level=settings.server.log_level)
@@ -61,12 +67,6 @@ def extract_request_id(context: Any) -> str | None:
     """Extract request_id from gRPC metadata."""
     metadata = dict(context.invocation_metadata())
     return metadata.get(REQUEST_ID_METADATA_KEY)
-
-
-class PricingStrategy(Protocol):
-    def evaluate(
-        self, item_id: str, bid: float, reputation: float, request_id: str | None
-    ) -> negotiation_pb2.NegotiateResponse: ...
 
 
 class NegotiationService(negotiation_pb2_grpc.NegotiationServiceServicer):
@@ -269,47 +269,6 @@ class NegotiationService(negotiation_pb2_grpc.NegotiationServiceServicer):
         finally:
             if request_id:
                 clear_request_context()
-
-
-def create_strategy() -> PricingStrategy:
-    """Create pricing strategy based on LLM_MODEL configuration.
-
-    Strategies:
-    - "rule": RuleBasedStrategy (no LLM required)
-    - "dspy": DSPyStrategy (self-optimizing negotiation engine)
-    - Any litellm model: LiteLLMStrategy (e.g., "openai/gpt-4o", "mistral/mistral-large-latest")
-
-    Returns:
-        Strategy instance implementing PricingStrategy protocol
-    """
-    if settings.llm.model == "rule":
-        logger.info("strategy_selected", type="RuleBasedStrategy", llm_required=False)
-        from src.hive.transformer import RuleBasedStrategy
-
-        return RuleBasedStrategy()
-    elif settings.llm.model == "dspy":
-        logger.info("strategy_selected", type="DSPyStrategy", model="self-optimizing")
-        from src.hive.transformer.llm.dspy_strategy import DSPyStrategy
-
-        return DSPyStrategy()
-    else:
-        logger.info(
-            "strategy_selected", type="LiteLLMStrategy", model=settings.llm.model
-        )
-        from src.hive.transformer.llm.strategy import LiteLLMStrategy
-
-        # Select appropriate API key based on model provider
-        api_key = None
-        if settings.llm.model.startswith("openai/"):
-            api_key = get_raw_key(settings.llm.openai_api_key)
-        elif settings.llm.model.startswith("mistral/"):
-            api_key = get_raw_key(settings.llm.api_key)
-
-        return LiteLLMStrategy(
-            model=settings.llm.model,
-            temperature=settings.llm.temperature,
-            api_key=api_key,
-        )
 
 
 def create_crypto_provider() -> Any:

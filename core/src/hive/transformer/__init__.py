@@ -1,27 +1,31 @@
 import asyncio
 import time
 from pathlib import Path
-from typing import Any, Protocol
+from typing import Protocol
 
 import dspy
 import structlog
+from aura_core.dna import FailureIntent, HiveContext, IntentAction
 
 from ...config import get_settings
-from .llm.engine import AuraNegotiator
 from ..aggregator import InventoryItem, SessionLocal
 from ..metabolism.logging_config import bind_request_id
-from aura_core.dna import FailureIntent, HiveContext, IntentAction
+from .llm.engine import AuraNegotiator
 
 logger = structlog.get_logger(__name__)
 
 # --- 1. Rule-Based Strategy (The Hive's Instincts) ---
 
+
 class ItemRepository(Protocol):
     """Protocol for item repository to enable dependency injection."""
+
     def get_item(self, item_id: str) -> InventoryItem | None: ...
+
 
 class DatabaseItemRepository:
     """Default repository implementation using the database."""
+
     def get_item(self, item_id: str) -> InventoryItem | None:
         session = SessionLocal()
         try:
@@ -29,11 +33,13 @@ class DatabaseItemRepository:
         finally:
             session.close()
 
+
 class RuleBasedStrategy:
     """
     Rule-based pricing strategy that doesn't require an LLM.
     Integrated into Transformer as a fallback/deterministic mode.
     """
+
     def __init__(
         self,
         repository: ItemRepository | None = None,
@@ -50,7 +56,12 @@ class RuleBasedStrategy:
 
         item = self.repository.get_item(item_id)
         if not item:
-            return IntentAction(action="reject", price=0.0, message="Item not found", metadata={"reason_code": "ITEM_NOT_FOUND"})
+            return IntentAction(
+                action="reject",
+                price=0.0,
+                message="Item not found",
+                metadata={"reason_code": "ITEM_NOT_FOUND"},
+            )
 
         # Rule: High-value bids require UI confirmation
         if bid > self.trigger_price:
@@ -58,7 +69,7 @@ class RuleBasedStrategy:
                 action="ui_required",
                 price=bid,
                 message=f"Bid of ${bid} exceeds security threshold",
-                metadata={"template_id": "high_value_confirm"}
+                metadata={"template_id": "high_value_confirm"},
             )
 
         # Rule: Bid below floor price - counter with floor price
@@ -67,7 +78,7 @@ class RuleBasedStrategy:
                 action="counter",
                 price=item.floor_price,
                 message=f"We cannot accept less than ${item.floor_price}.",
-                metadata={"reason_code": "BELOW_FLOOR"}
+                metadata={"reason_code": "BELOW_FLOOR"},
             )
 
         # Rule: Bid at or above floor price - accept
@@ -75,10 +86,12 @@ class RuleBasedStrategy:
             action="accept",
             price=bid,
             message="Offer accepted.",
-            metadata={"reservation_code": f"RULE-{int(time.time())}"}
+            metadata={"reservation_code": f"RULE-{int(time.time())}"},
         )
 
+
 # --- 2. Aura Transformer (The Sovereign Brain) ---
+
 
 class AuraTransformer:
     """T - Transformer: Pure reasoning engine using DSPy or deterministic rules."""
@@ -90,11 +103,10 @@ class AuraTransformer:
         )
 
         # Default configuration
+        self.negotiator: AuraNegotiator | None = None
         if self.settings.llm.model != "rule":
             dspy.configure(lm=dspy.LM(self.settings.llm.model))
             self.negotiator = self._load_negotiator()
-        else:
-            self.negotiator = None
 
     def _resolve_brain_path(self) -> str:
         search_paths = []
@@ -152,14 +164,14 @@ class AuraTransformer:
         Reason about the negotiation using self-reflective tuning.
         Returns a strictly typed IntentAction.
         """
-        #モード check: Deterministic Rule mode
-        if self.settings.llm.model == "rule":
+        # モード check: Deterministic Rule mode
+        if self.settings.llm.model == "rule" or self.negotiator is None:
             strategy = RuleBasedStrategy()
             return strategy.evaluate(
                 context.item_id,
                 context.offer.bid_amount,
                 context.offer.reputation,
-                context.request_id
+                context.request_id,
             )
 
         cpu_load = context.system_health.get("cpu_usage_percent", 0.0)
@@ -171,7 +183,9 @@ class AuraTransformer:
         if cpu_load > 80.0:
             model = "mistral-small-latest"
             temperature = 0.1
-            logger.warning("reflective_tuning_applied", reason="high_cpu", cpu_load=cpu_load)
+            logger.warning(
+                "reflective_tuning_applied", reason="high_cpu", cpu_load=cpu_load
+            )
 
         try:
             with dspy.context(lm=dspy.LM(model, temperature=temperature)):

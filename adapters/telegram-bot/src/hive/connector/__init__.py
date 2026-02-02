@@ -1,7 +1,13 @@
 import structlog
+from aura_core.dna import (
+    NegotiationResult,
+    Observation,
+    SearchResult,
+    TelegramContext,
+    UIAction,
+)
 from opentelemetry import trace
 
-from aura_core.dna import Observation, TelegramContext, UIAction
 from .proteins.aura_client import GRPCNegotiationClient
 from .proteins.telegram_api import TelegramProtein
 
@@ -32,7 +38,7 @@ class TelegramConnector:
                 success=False, error=f"Unsupported action type: {action.action_type}"
             )
 
-    async def call_core(self, context: TelegramContext) -> dict:
+    async def call_core(self, context: TelegramContext) -> NegotiationResult:
         if not context.hive_context:
             return {"error": "No hive context"}
 
@@ -43,8 +49,12 @@ class TelegramConnector:
                 "bid_amount": context.hive_context.offer.bid_amount,
             },
         )
-        return obs.data if obs.success else {"error": obs.error}
+        if obs.success:
+            return obs.data  # type: ignore
+        return {"error": obs.error}
 
-    async def search_core(self, query: str) -> list:
+    async def search_core(self, query: str) -> list[SearchResult]:
         obs = await self.aura.execute("search", {"query": query})
-        return obs.data if obs.success else []
+        if obs.success:
+            return obs.data  # type: ignore
+        return []
