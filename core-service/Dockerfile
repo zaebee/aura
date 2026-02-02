@@ -32,7 +32,7 @@ COPY core-service/migrations ./migrations
 
 # Copy the compiled brain (aura_brain.json) and training data
 COPY core-service/data ./data
-COPY core-service/train_dspy.py .
+COPY core-service/scripts ./scripts
 
 ENV PYTHONPATH=/app/core-service:/app/core-service/src:/app/core-service/src/proto
 

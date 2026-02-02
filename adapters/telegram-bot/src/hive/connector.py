@@ -29,7 +29,9 @@ class TelegramConnector:
                         parse_mode=action.parse_mode,
                     )
                     span.set_attribute("message_id", msg.message_id)
-                    return Observation(success=True, message_id=msg.message_id)
+                    return Observation(
+                        success=True, metadata={"message_id": msg.message_id}
+                    )
                 else:
                     # Support other action types if needed
                     logger.warning(

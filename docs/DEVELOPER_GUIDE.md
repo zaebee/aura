@@ -120,7 +120,7 @@ docker-compose up --build
 **1. Train the Brain (Mandatory)**
 Before running the Core service, you must train the DSPy-based negotiation engine:
 ```bash
-uv run core-service/train_dspy.py
+make train
 ```
 
 **2. Run the Service**

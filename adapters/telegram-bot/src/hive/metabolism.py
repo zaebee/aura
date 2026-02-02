@@ -55,19 +55,23 @@ class TelegramMetabolism:
             # Enrich observation for G
             if "accepted" in core_response and core_response["accepted"]:
                 observation.event_type = "deal_accepted"
-                observation.metadata = {
-                    "item_id": context.hive_context.item_id
-                    if context.hive_context
-                    else "",
-                    "price": core_response["accepted"].get("final_price", 0),
-                    "user_id": context.user_id,
-                }
+                observation.metadata.update(
+                    {
+                        "item_id": context.hive_context.item_id
+                        if context.hive_context
+                        else "",
+                        "price": core_response["accepted"].get("final_price", 0),
+                        "user_id": context.user_id,
+                    }
+                )
             elif "error" in core_response:
                 observation.event_type = "error"
-                observation.metadata = {
-                    "error": core_response["error"],
-                    "user_id": context.user_id,
-                }
+                observation.metadata.update(
+                    {
+                        "error": core_response["error"],
+                        "user_id": context.user_id,
+                    }
+                )
 
             # G - Generator
             await self.generator.pulse(observation)
@@ -93,11 +97,13 @@ class TelegramMetabolism:
 
             # G - Generator
             observation.event_type = "user_searched"
-            observation.metadata = {
-                "query": query,
-                "results_count": len(results),
-                "user_id": context.user_id,
-            }
+            observation.metadata.update(
+                {
+                    "query": query,
+                    "results_count": len(results),
+                    "user_id": context.user_id,
+                }
+            )
 
             await self.generator.pulse(observation)
             return observation

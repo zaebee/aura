@@ -1,15 +1,15 @@
 import re
 import litellm
 import structlog
-
-from src.config import KeeperSettings
-from src.hive.dna import (
+from aura_core.dna import (
     ALLOWED_CHAMBERS,
     AuditObservation,
     BeeContext,
     BeeObservation,
     find_hive_root,
 )
+
+from .metabolism.config import KeeperSettings
 
 logger = structlog.get_logger(__name__)
 

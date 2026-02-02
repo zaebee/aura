@@ -27,7 +27,7 @@ setup-hooks:
 # Run tests
 test:
 	# Run core-service tests
-	PYTHONPATH=core-service uv run pytest core-service/tests/ -v
+	PYTHONPATH=core-service:core-service/src:core-service/src/proto uv run pytest core-service/tests/ -v
 	# Run telegram-bot tests with isolated path to avoid 'src' collision
 	PYTHONPATH=adapters/telegram-bot:core-service/src/proto uv run pytest adapters/telegram-bot/tests/ -v
 
@@ -47,6 +47,10 @@ test-health:
 simulate:
 	# Run agent negotiation simulation
 	uv run python tools/simulators/agent_sim.py
+
+train:
+	# Train the DSPy negotiation engine
+	PYTHONPATH=core-service:core-service/src:core-service/src/proto uv run python core-service/scripts/training/train_dspy.py
 
 # --- 2. BUILD ---
 build: generate build-tg
