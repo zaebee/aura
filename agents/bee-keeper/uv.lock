@@ -141,10 +141,16 @@ wheels = [
 ]
 
 [[package]]
+name = "aura-core"
+version = "0.1.1"
+source = { directory = "../../packages/aura-core" }
+
+[[package]]
 name = "aura-keeper"
 version = "0.1.0"
 source = { editable = "." }
 dependencies = [
+    { name = "aura-core" },
     { name = "httpx" },
     { name = "litellm" },
     { name = "nats-py" },
@@ -162,6 +168,7 @@ dev = [
 
 [package.metadata]
 requires-dist = [
+    { name = "aura-core", directory = "../../packages/aura-core" },
     { name = "httpx", specifier = ">=0.28.1" },
     { name = "litellm", specifier = ">=1.63.0" },
     { name = "nats-py", specifier = ">=2.12.0" },

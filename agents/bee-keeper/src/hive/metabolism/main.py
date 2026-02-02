@@ -1,12 +1,13 @@
 import time
 import structlog
+from aura_core.dna import AuditObservation, BeeContext
 
-from src.config import KeeperSettings
-from src.hive.core.aggregator import BeeAggregator
-from src.hive.gateway.connector import BeeConnector
-from src.hive.core.transformer import BeeTransformer
-from src.hive.dna import BeeContext, AuditObservation
-from src.hive.scribe.generator import BeeGenerator
+from src.hive.aggregator import BeeAggregator
+from src.hive.connector import BeeConnector
+from src.hive.generator import BeeGenerator
+from src.hive.transformer import BeeTransformer
+
+from .config import KeeperSettings
 
 logger = structlog.get_logger(__name__)
 

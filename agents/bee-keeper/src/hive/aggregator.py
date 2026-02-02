@@ -6,9 +6,9 @@ from typing import Any
 import httpx
 import litellm
 import structlog
+from aura_core.dna import BeeContext, find_hive_root
 
-from src.config import KeeperSettings
-from src.hive.dna import BeeContext, find_hive_root
+from .metabolism.config import KeeperSettings
 
 logger = structlog.get_logger(__name__)
 

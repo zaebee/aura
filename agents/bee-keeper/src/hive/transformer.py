@@ -5,9 +5,7 @@ import json
 import litellm
 import structlog
 import yaml  # type: ignore
-
-from src.config import KeeperSettings
-from src.hive.dna import (
+from aura_core.dna import (
     ALLOWED_CHAMBERS,
     ALLOWED_ROOT_FILES,
     MACRO_ATCG_FOLDERS,
@@ -15,6 +13,8 @@ from src.hive.dna import (
     BeeContext,
     find_hive_root,
 )
+
+from .metabolism.config import KeeperSettings
 
 logger = structlog.get_logger(__name__)
 

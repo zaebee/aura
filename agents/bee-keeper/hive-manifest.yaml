@@ -2,12 +2,12 @@ hive:
   version: "1.2"
   description: "The Sacred Architecture of the Aura Hive - Sanctified"
   nucleotides:
-    A: "src/hive/core/aggregator.py"
-    T: "src/hive/core/transformer.py"
-    C: "src/hive/gateway/connector.py"
-    G: "src/hive/scribe/generator.py"
+    A: "src/hive/aggregator.py"
+    T: "src/hive/transformer.py"
+    C: "src/hive/connector.py"
+    G: "src/hive/generator.py"
   core_path: "core-service/src/hive"
-  dna_path: "core-service/src/hive/dna.py"
+  dna_path: "packages/aura-core/src/aura_core/dna.py"
   allowed_files:
     - "__init__.py"
     - "aggregator.py"
@@ -24,6 +24,7 @@ hive:
   sanctified_chambers:
     core-service/migrations: "HiveEvolutionaryScrolls"
     core-service/tests: "ValidationPollen"
+    core-service/scripts: "HiveAutomationScrolls"
     api-gateway: "HiveGate"
     core-service/src/config: "SacredCodex"
     core-service/src/services: "WorkerDirectives"

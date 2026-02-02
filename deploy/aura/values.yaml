@@ -7,6 +7,10 @@ tunnel:
     repository: snowdreamtech/frpc
     tag: alpine3.22
     pullPolicy: IfNotPresent
+  grafana:
+    localIP: "monitoring-grafana.monitoring.svc.cluster.local"
+    localPort: 80
+    remotePort: 8083
 
 # API Gateway Service Configuration
 gateway:
@@ -159,8 +163,8 @@ monitoring:
     url: "http://monitoring-kube-prometheus-prometheus.monitoring.svc.cluster.local:9090"
   jaeger:
     enabled: true
-    queryUrl: "http://aura-jaeger.monitoring.svc.cluster.local:16686"
-    collectorUrl: "http://aura-jaeger.monitoring.svc.cluster.local:4317"
+    queryUrl: "http://aura-jaeger.default.svc.cluster.local:16686"
+    collectorUrl: "http://aura-jaeger.default.svc.cluster.local:4317"
     service:
       type: LoadBalancer
     resources:

@@ -30,6 +30,13 @@ data:
     localPort = 8000
     remotePort = 8082
 
+    [[proxies]]
+    name = "grafana"
+    type = "tcp"
+    localIP = {{ .Values.tunnel.grafana.localIP | quote }}
+    localPort = {{ .Values.tunnel.grafana.localPort }}
+    remotePort = {{ .Values.tunnel.grafana.remotePort }}
+
 ---
 apiVersion: apps/v1
 kind: Deployment

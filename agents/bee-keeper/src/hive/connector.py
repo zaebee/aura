@@ -4,10 +4,15 @@ import json
 import nats
 import nats.errors
 import structlog
+from aura_core.dna import (
+    AuditObservation,
+    BeeContext,
+    BeeObservation,
+    find_hive_root,
+)
 
-from src.config import KeeperSettings
-from src.hive.dna import AuditObservation, BeeContext, BeeObservation, find_hive_root
-from src.hive.proteins.gh_client import GitHubClient
+from .metabolism.config import KeeperSettings
+from .proteins.gh_client import GitHubClient
 
 logger = structlog.get_logger(__name__)
 
