@@ -14,7 +14,7 @@ ENV UV_LINK_MODE=copy
 
 # Copy dependency files
 COPY packages/aura-core /app/packages/aura-core
-COPY core-service/pyproject.toml /app/core-service/
+COPY core-service/pyproject.toml core-service/uv.lock /app/core-service/
 
 WORKDIR /app/core-service
 

@@ -11,7 +11,7 @@ ENV UV_LINK_MODE=copy
 
 # Copy dependency files
 COPY packages/aura-core /app/packages/aura-core
-COPY api-gateway/pyproject.toml /app/api-gateway/
+COPY api-gateway/pyproject.toml api-gateway/uv.lock /app/api-gateway/
 
 WORKDIR /app/api-gateway
 
