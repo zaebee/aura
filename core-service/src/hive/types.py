@@ -1,6 +1,6 @@
 from dataclasses import dataclass
 
-from aura_core.dna import (
+from aura_core import (
     Event,
     HiveContext,
     IntentAction,

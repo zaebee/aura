@@ -1,7 +1,10 @@
 import asyncio
+import json
+import time
 from pathlib import Path
 
 import dspy
+import nats
 import structlog
 
 from src.config import get_settings
@@ -10,6 +13,13 @@ from src.llm.engine import AuraNegotiator
 from .types import FailureIntent, HiveContext, IntentAction
 
 logger = structlog.get_logger(__name__)
+
+# Brain search paths in priority order (Docker path first, then local dev paths)
+BRAIN_SEARCH_PATHS = [
+    "/app/data/aura_brain.json",  # Docker container path (primary)
+    "/app/src/aura_brain.json",  # Legacy Docker path
+    "data/aura_brain.json",  # Local dev path (relative to core-service)
+]
 
 
 class AuraTransformer:
@@ -20,24 +30,78 @@ class AuraTransformer:
         self.compiled_program_path = (
             compiled_program_path or self.settings.llm.compiled_program_path
         )
+        self.brain_loaded = False
+        self.brain_path: str | None = None
 
         # Default configuration
         dspy.configure(lm=dspy.LM(self.settings.llm.model))
         self.negotiator = self._load_negotiator()
 
-    def _load_negotiator(self) -> AuraNegotiator:
-        try:
-            program_path = Path(self.compiled_program_path)
-            if not program_path.is_absolute():
-                program_path = Path(__file__).parent.parent / self.compiled_program_path
+    def _find_brain_path(self) -> Path | None:
+        """Search for aura_brain.json in priority order."""
+        # First check explicit path from settings
+        explicit_path = Path(self.compiled_program_path)
+        if explicit_path.is_absolute() and explicit_path.exists():
+            return explicit_path
 
-            if program_path.exists():
-                logger.info("loading_compiled_dspy_program", path=str(program_path))
-                return dspy.load(str(program_path))  # type: ignore
+        # Check standard search paths
+        for search_path in BRAIN_SEARCH_PATHS:
+            path = Path(search_path)
+            if path.exists():
+                logger.info("brain_found", path=str(path))
+                return path
+
+        # Fallback: check relative to this file (for local dev)
+        relative_path = Path(__file__).parent.parent / self.compiled_program_path
+        if relative_path.exists():
+            return relative_path
+
+        return None
+
+    async def _emit_brain_dead_event(self, searched_paths: list[str]) -> None:
+        """Emit NATS event when brain cannot be found."""
+        try:
+            nc = await nats.connect(self.settings.server.nats_url)
+            event = {
+                "event": "aura.core.brain_dead",
+                "timestamp": time.time(),
+                "searched_paths": searched_paths,
+                "message": "Transformer brain (aura_brain.json) not found. Running untrained.",
+            }
+            await nc.publish("aura.core.brain_dead", json.dumps(event).encode())
+            await nc.flush()
+            await nc.close()
+            logger.warning("brain_dead_event_emitted", paths=searched_paths)
+        except Exception as e:
+            logger.error("failed_to_emit_brain_dead_event", error=str(e))
+
+    def _load_negotiator(self) -> AuraNegotiator:
+        """Load the compiled DSPy program with failsafe path resolution."""
+        try:
+            brain_path = self._find_brain_path()
+
+            if brain_path and brain_path.exists():
+                logger.info("loading_compiled_dspy_program", path=str(brain_path))
+                self.brain_loaded = True
+                self.brain_path = str(brain_path)
+                return dspy.load(str(brain_path))  # type: ignore
             else:
+                # Brain not found - emit event asynchronously
+                searched = BRAIN_SEARCH_PATHS + [self.compiled_program_path]
                 logger.warning(
-                    "compiled_program_not_found_using_untrained", path=str(program_path)
+                    "brain_not_found_using_untrained",
+                    searched_paths=searched,
                 )
+                # Schedule NATS event emission (non-blocking)
+                try:
+                    # If a loop is running, create a task. This is non-blocking.
+                    loop = asyncio.get_running_loop()
+                    loop.create_task(self._emit_brain_dead_event(searched))
+                except RuntimeError:
+                    # No running loop. We are in a sync context.
+                    # Run the async function in a new event loop. This is blocking,
+                    # but acceptable for a one-off event on startup.
+                    asyncio.run(self._emit_brain_dead_event(searched))
                 return AuraNegotiator()
         except Exception as e:
             logger.error("failed_to_load_dspy_program", error=str(e))
