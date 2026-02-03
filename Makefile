@@ -29,7 +29,7 @@ setup-hooks:
 # Run tests
 test:
 	# Run core tests
-	PYTHONPATH=core uv run pytest core/tests/ -v
+	PYTHONPATH=core:core/src uv run pytest core/tests/ -v
 	# Run telegram-bot tests with isolated path to avoid 'src' collision
 	PYTHONPATH=adapters/telegram-bot/src:adapters/telegram-bot/src/proto uv run pytest adapters/telegram-bot/tests/ -v
 
@@ -78,11 +78,15 @@ push-tg:
 # --- 5. DEV TASKS ---
 seed:
 	# Seed the database with initial inventory
-	uv run python core/scripts/seed.py
+	PYTHONPATH=core:core/src uv run python core/scripts/seed.py
 
 train:
 	# Train the DSPy negotiation engine
-	uv run python core/scripts/training/train_dspy.py
+	PYTHONPATH=core:core/src uv run python core/scripts/training/train_dspy.py
+
+pulse:
+	# Trigger a manual NegotiationAccepted event
+	PYTHONPATH=core:core/src uv run python core/scripts/trigger_pulse.py
 
 install-dev:
 	# Install development dependencies

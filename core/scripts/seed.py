@@ -1,11 +1,3 @@
-import sys
-from pathlib import Path
-
-# Add core and src to path for imports
-core_root = Path(__file__).parent.parent
-sys.path.append(str(core_root))
-sys.path.append(str(core_root / "src"))
-
 from src.hive.aggregator import InventoryItem, SessionLocal, generate_embedding
 from src.hive.metabolism.logging_config import configure_logging, get_logger
 

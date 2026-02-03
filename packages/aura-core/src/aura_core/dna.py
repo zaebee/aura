@@ -357,3 +357,52 @@ class TelegramGenerator(Protocol):
     """G - Generator: Emits events to NATS."""
 
     async def pulse(self, observation: Observation) -> list[Event]: ...
+
+
+class MetabolicLoop:
+    """
+    Generic ATCG Metabolic Loop.
+    Can be used by both core and adapters.
+    """
+
+    def __init__(
+        self,
+        aggregator: Any,
+        transformer: Any,
+        connector: Any,
+        generator: Any,
+        membrane: Any = None,
+    ):
+        self.aggregator = aggregator
+        self.transformer = transformer
+        self.connector = connector
+        self.generator = generator
+        self.membrane = membrane
+
+    async def execute(self, signal: Any, **kwargs: Any) -> Observation:
+        """
+        Execute one full metabolic cycle:
+        Signal -> [Membrane In] -> Aggregator -> Transformer -> [Membrane Out] -> Connector -> Generator
+        """
+        # 1. Inbound Membrane
+        if self.membrane and hasattr(self.membrane, "inspect_inbound"):
+            signal = await self.membrane.inspect_inbound(signal)
+
+        # 2. Aggregator (A)
+        context = await self.aggregator.perceive(signal, **kwargs)
+
+        # 3. Transformer (T)
+        # Note: Some transformers might need extra data passed in via kwargs
+        decision = await self.transformer.think(context)
+
+        # 4. Outbound Membrane
+        if self.membrane and hasattr(self.membrane, "inspect_outbound"):
+            decision = await self.membrane.inspect_outbound(decision, context)
+
+        # 5. Connector (C)
+        observation = await self.connector.act(decision, context)
+
+        # 6. Generator (G)
+        await self.generator.pulse(observation)
+
+        return observation

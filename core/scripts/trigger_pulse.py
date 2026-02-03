@@ -1,9 +1,8 @@
 import asyncio
 import json
+import os
 import time
 import nats
-from pathlib import Path
-import sys
 import structlog
 
 # Configure logging
@@ -16,12 +15,9 @@ structlog.configure(
 )
 logger = structlog.get_logger(__name__)
 
-# Add core to path
-sys.path.append(str(Path(__file__).parent.parent))
-
 async def main():
-    # Use nats:4222 as default for Hive internal networking
-    nats_url = "nats://nats:4222"
+    # Use AURA_NATS_URL or fallback to nats:4222 for Hive internal networking
+    nats_url = os.environ.get("AURA_NATS_URL", "nats://nats:4222")
     topic = "aura.hive.events.NegotiationAccepted"
 
     payload = {

@@ -8,9 +8,6 @@ from pathlib import Path
 
 import structlog
 
-# Add core to path
-sys.path.append(str(Path(__file__).parent.parent))
-
 from src.hive.transformer.llm.dspy_strategy import DSPyStrategy
 from src.hive.transformer.llm.engine import AuraNegotiator
 from src.hive.transformer.llm.signatures import Negotiate
