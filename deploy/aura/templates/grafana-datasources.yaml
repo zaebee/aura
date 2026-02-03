@@ -19,7 +19,7 @@ data:
       - name: Jaeger
         uid: Jaeger
         type: jaeger
-        url: "{{ .Values.monitoring.jaeger.queryUrl }}"
+        url: {{ .Values.monitoring.jaeger.queryUrl | default (include "aura.jaeger.queryUrl" .) | quote }}
         access: proxy
       - name: Loki
         uid: Loki
@@ -29,7 +29,7 @@ data:
         jsonData:
           derivedFields:
             - datasourceUid: Jaeger
-              matcherRegex: '"trace_id"\s*:\s*"([a-f0-9]+)"'
+              matcherRegex: 'trace_id[:=]\s*["\']?([a-fA-F0-9]+)'
               name: trace_id
               url: '${__value.raw}'
               internal: true

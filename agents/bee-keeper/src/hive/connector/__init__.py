@@ -5,7 +5,7 @@ import nats
 import nats.errors
 import structlog
 
-from ...config import KeeperSettings
+from config import KeeperSettings
 from aura_core.dna import AuditObservation, BeeContext, BeeObservation, find_hive_root
 from .proteins.gh_client import GitHubClient
 
@@ -151,7 +151,9 @@ class BeeConnector:
         if report.reasoning:
             msg += f"\n<details>\n<summary>Keeper's Reasoning</summary>\n\n{report.reasoning}\n</details>"
 
-        msg += "\n\ncc: @jules"
+        if self.settings.github_cc_recipients:
+            msg += f"\n\ncc: {self.settings.github_cc_recipients}"
+
         return msg
 
     async def _emit_nats_event(

@@ -1,9 +1,8 @@
 import structlog
 from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup
 from aura_core.dna import TelegramContext, UIAction
+from interfaces import NegotiationResult, SearchResult
 from opentelemetry import trace
-
-from ...interfaces import NegotiationResult, SearchResult
 
 logger = structlog.get_logger(__name__)
 tracer = trace.get_tracer(__name__)

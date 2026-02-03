@@ -1,6 +1,6 @@
 import pytest
 from aura_core.dna import HiveContext, IntentAction, NegotiationOffer
-from src.hive.membrane import HiveMembrane
+from hive.membrane import HiveMembrane
 
 
 @pytest.mark.asyncio
