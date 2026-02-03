@@ -29,7 +29,7 @@ data:
         jsonData:
           derivedFields:
             - datasourceUid: Jaeger
-              matcherRegex: 'trace_id[:=]\s*(\w+)'
+              matcherRegex: 'trace_id[:=]\s*([a-fA-F0-9]+)'
               name: trace_id
               url: '${__value.raw}'
               internal: true
