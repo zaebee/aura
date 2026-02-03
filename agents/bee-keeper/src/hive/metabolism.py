@@ -1,17 +1,12 @@
 import time
-from typing import Any
 
 import structlog
 
 from config import KeeperSettings
 from aura_core import (
-    Aggregator,
     AuditObservation,
     BeeContext,
     BeeObservation,
-    Connector,
-    Generator,
-    Transformer,
 )
 from .aggregator import BeeAggregator
 from .connector import BeeConnector
@@ -26,14 +21,10 @@ class BeeMetabolism:
 
     def __init__(self, settings: KeeperSettings) -> None:
         self.settings = settings
-        self.aggregator: Aggregator[Any, BeeContext] = BeeAggregator(settings)
-        self.transformer: Transformer[BeeContext, AuditObservation] = BeeTransformer(
-            settings
-        )
-        self.connector: Connector[AuditObservation, BeeObservation, BeeContext] = (
-            BeeConnector(settings)
-        )
-        self.generator: Generator[BeeObservation, Any] = BeeGenerator(settings)
+        self.aggregator: BeeAggregator = BeeAggregator(settings)
+        self.transformer: BeeTransformer = BeeTransformer(settings)
+        self.connector: BeeConnector = BeeConnector(settings)
+        self.generator: BeeGenerator = BeeGenerator(settings)
 
     async def execute(self, event_name: str = "scheduled_pulse") -> None:
         """Execute one complete metabolic cycle."""

@@ -1,6 +1,5 @@
-import time
 from pathlib import Path
-from typing import Any, Generic, Protocol, TypeVar, runtime_checkable
+from typing import Any, Protocol, TypeVar, runtime_checkable
 
 from .types import Observation
 
@@ -87,35 +86,35 @@ ALLOWED_CHAMBERS = {
 
 # 2. Define the Unified Generic Protocols
 @runtime_checkable
-class Aggregator(Protocol, Generic[S_inv, C_cov]):
+class Aggregator[S_inv, C_cov](Protocol):
     """Standard sensory organ. Turns Signal into Context."""
 
     async def perceive(self, signal: S_inv, **kwargs: Any) -> C_cov: ...
 
 
 @runtime_checkable
-class Transformer(Protocol, Generic[C_inv, I_inv]):
+class Transformer[C_inv, I_inv](Protocol):
     """Standard reasoning organ. Turns Context into Intent."""
 
     async def think(self, context: C_inv, **kwargs: Any) -> I_inv: ...
 
 
 @runtime_checkable
-class Connector(Protocol, Generic[I_inv, O_cov, C_inv]):
+class Connector[I_inv, O_cov, C_inv](Protocol):
     """Standard motor organ. Turns Intent into Observation."""
 
     async def act(self, action: I_inv, context: C_inv) -> O_cov: ...
 
 
 @runtime_checkable
-class Generator(Protocol, Generic[O_cov, E_cov]):
+class Generator[O_cov, E_cov](Protocol):
     """Standard pulse organ. Turns Observation into Events."""
 
     async def pulse(self, observation: O_cov) -> list[E_cov]: ...
 
 
 @runtime_checkable
-class Membrane(Protocol, Generic[S_inv, I_inv, C_inv]):
+class Membrane[S_inv, I_inv, C_inv](Protocol):
     """Standard safety organ. Inspects Inbound and Outbound."""
 
     async def inspect_inbound(self, signal: S_inv) -> S_inv: ...
@@ -136,7 +135,7 @@ class Skill(Protocol):
     async def execute(self, intent: str, params: dict[str, Any]) -> Observation: ...
 
 
-class MetabolicLoop(Generic[S_inv, C_cov, I_inv, O_cov, E_cov]):
+class MetabolicLoop[S_inv, C_cov, I_inv, O_cov, E_cov]:
     """
     Generic ATCG Metabolic Loop.
     Can be used by both core and adapters.
