@@ -19,7 +19,7 @@ data:
       - name: Jaeger
         uid: Jaeger
         type: jaeger
-        url: "{{ .Values.monitoring.jaeger.queryUrl }}"
+        url: {{ .Values.monitoring.jaeger.queryUrl | default (include "aura.jaeger.queryUrl" .) | quote }}
         access: proxy
       - name: Loki
         uid: Loki

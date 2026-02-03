@@ -163,8 +163,8 @@ monitoring:
     url: "http://monitoring-kube-prometheus-prometheus.monitoring.svc.cluster.local:9090"
   jaeger:
     enabled: true
-    queryUrl: "http://aura-jaeger.default.svc.cluster.local:16686"
-    collectorUrl: "http://aura-jaeger.default.svc.cluster.local:4317"
+    queryUrl: "" # Defaults to http://aura-jaeger.<release-namespace>.svc.cluster.local:16686 if empty
+    collectorUrl: "" # Defaults to http://aura-jaeger.<release-namespace>.svc.cluster.local:4317 if empty
     service:
       type: LoadBalancer
     resources:
