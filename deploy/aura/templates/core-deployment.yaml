@@ -80,6 +80,6 @@ spec:
             - name: AURA_SERVER__PROMETHEUS_URL
               value: "{{ .Values.monitoring.prometheus.url }}"
             - name: AURA_SERVER__OTEL_EXPORTER_OTLP_ENDPOINT
-              value: {{ .Values.monitoring.jaeger.collectorUrl | default (printf "http://aura-jaeger.%s.svc.cluster.local:4317" .Release.Namespace) | quote }}
+              value: {{ .Values.monitoring.jaeger.collectorUrl | default (include "aura.jaeger.collectorUrl" .) | quote }}
             - name: AURA_SERVER__OTEL_SERVICE_NAME
               value: "{{ .Release.Name }}-core"
