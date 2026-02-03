@@ -29,7 +29,7 @@ class MetabolicLoop(BaseMetabolicLoop):
         self,
         aggregator: Aggregator[Any, Any],
         transformer: Transformer[Any, Any],
-        connector: Connector[Any, Any],
+        connector: Connector[Any, Any, Any],
         generator: Generator[Any, Any],
         membrane: Membrane[Any, Any, Any],
     ):

@@ -5,6 +5,7 @@ from typing import Any, Generic, Protocol, TypeVar, runtime_checkable
 # 1. Define TypeVars for the metabolic steps
 S_inv = TypeVar("S_inv", contravariant=True)  # Input Signal
 C_cov = TypeVar("C_cov", covariant=True)  # Output Context
+C_inv = TypeVar("C_inv", contravariant=True)  # Input Context
 I_inv = TypeVar("I_inv", contravariant=True)  # Input Intent
 O_cov = TypeVar("O_cov", covariant=True)  # Output Observation
 E_cov = TypeVar("E_cov", covariant=True)  # Output Event
@@ -91,17 +92,17 @@ class Aggregator(Protocol, Generic[S_inv, C_cov]):
 
 
 @runtime_checkable
-class Transformer(Protocol, Generic[C_cov, I_inv]):
+class Transformer(Protocol, Generic[C_inv, I_inv]):
     """Standard reasoning organ. Turns Context into Intent."""
 
-    async def think(self, context: C_cov, **kwargs: Any) -> I_inv: ...
+    async def think(self, context: C_inv, **kwargs: Any) -> I_inv: ...
 
 
 @runtime_checkable
-class Connector(Protocol, Generic[I_inv, O_cov]):
+class Connector(Protocol, Generic[I_inv, O_cov, C_inv]):
     """Standard motor organ. Turns Intent into Observation."""
 
-    async def act(self, action: I_inv, context: Any = None) -> O_cov: ...
+    async def act(self, action: I_inv, context: C_inv) -> O_cov: ...
 
 
 @runtime_checkable
@@ -112,12 +113,12 @@ class Generator(Protocol, Generic[O_cov, E_cov]):
 
 
 @runtime_checkable
-class Membrane(Protocol, Generic[S_inv, I_inv, C_cov]):
+class Membrane(Protocol, Generic[S_inv, I_inv, C_inv]):
     """Standard safety organ. Inspects Inbound and Outbound."""
 
     async def inspect_inbound(self, signal: S_inv) -> S_inv: ...
 
-    async def inspect_outbound(self, decision: I_inv, context: C_cov) -> I_inv: ...
+    async def inspect_outbound(self, decision: I_inv, context: C_inv) -> I_inv: ...
 
 
 @runtime_checkable
@@ -133,6 +134,13 @@ class Skill(Protocol):
     async def execute(self, intent: str, params: dict[str, Any]) -> Any: ...
 
 
+@runtime_checkable
+class BeeDNA(Protocol):
+    """Protocol for the Hive components."""
+
+    pass
+
+
 class MetabolicLoop:
     """
     Generic ATCG Metabolic Loop.
@@ -143,7 +151,7 @@ class MetabolicLoop:
         self,
         aggregator: Aggregator[Any, Any],
         transformer: Transformer[Any, Any],
-        connector: Connector[Any, Any],
+        connector: Connector[Any, Any, Any],
         generator: Generator[Any, Any],
         membrane: Membrane[Any, Any, Any] | None = None,
     ):

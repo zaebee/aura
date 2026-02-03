@@ -19,7 +19,7 @@ from .proteins.gh_client import GitHubClient
 logger = structlog.get_logger(__name__)
 
 
-class BeeConnector(Connector[AuditObservation, BeeObservation]):
+class BeeConnector(Connector[AuditObservation, BeeObservation, BeeContext | None]):
     """C - Connector: Interacts with GitHub and NATS."""
 
     def __init__(self, settings: KeeperSettings) -> None:
@@ -38,15 +38,19 @@ class BeeConnector(Connector[AuditObservation, BeeObservation]):
             await self.gh.close()
 
     async def act(
-        self, action: AuditObservation, context: Any = None
+        self, action: AuditObservation, context: BeeContext | None = None
     ) -> BeeObservation:
         # Context here is expected to be BeeContext
         return await self.interact(action, context)
 
     async def interact(
-        self, report: AuditObservation, context: BeeContext
+        self, report: AuditObservation, context: BeeContext | None
     ) -> BeeObservation:
         logger.info("bee_connector_interact_started")
+
+        if context is None:
+            logger.error("missing_bee_context")
+            return BeeObservation(success=False, injuries=["Missing BeeContext"])
 
         # 1. Post to GitHub (if not a heartbeat)
         comment_url = ""

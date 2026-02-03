@@ -19,7 +19,7 @@ class BeeMetabolism:
         self.settings = settings
         self.aggregator: Aggregator[Any, BeeContext] = BeeAggregator(settings)
         self.transformer: Transformer[BeeContext, AuditObservation] = BeeTransformer(settings)
-        self.connector: Connector[AuditObservation, BeeObservation] = BeeConnector(settings)
+        self.connector: Connector[AuditObservation, BeeObservation, BeeContext | None] = BeeConnector(settings)
         self.generator: Generator[BeeObservation, Any] = BeeGenerator(settings)
 
     async def execute(self, event_name: str = "scheduled_pulse") -> None:

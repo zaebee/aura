@@ -26,13 +26,13 @@ class TelegramMetabolism(MetabolicLoop):
         self,
         aggregator: Aggregator[Any, Any],
         transformer: Transformer[Any, Any],
-        connector: Connector[Any, Any],
+        connector: Connector[Any, Any, Any],
         generator: Generator[Any, Any],
     ):
         super().__init__(aggregator, transformer, connector, generator)
         self.aggregator: Aggregator[Any, Any] = aggregator
         self.transformer: Transformer[Any, Any] = transformer
-        self.connector: Connector[Any, Any] = connector
+        self.connector: Connector[Any, Any, Any] = connector
         self.generator: Generator[Any, Any] = generator
 
     async def execute_search(self, query: str, message: Message) -> Observation:

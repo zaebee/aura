@@ -16,14 +16,14 @@ from .proteins.pricing import PriceConverter
 logger = structlog.get_logger(__name__)
 
 
-class HiveConnector(Connector[IntentAction, Observation]):
+class HiveConnector(Connector[IntentAction, Observation, HiveContext | None]):
     """C - Connector: Maps internal IntentAction to gRPC responses and external systems."""
 
     def __init__(self, market_service: Any = None) -> None:
         self.market_service = market_service
         self.settings = get_settings()
 
-    async def act(self, action: IntentAction, context: Any = None) -> Observation:
+    async def act(self, action: IntentAction, context: HiveContext | None = None) -> Observation:
         """
         Execute the decision and produce an observation (the gRPC response).
         """
