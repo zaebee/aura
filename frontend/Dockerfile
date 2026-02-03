@@ -3,12 +3,13 @@ FROM oven/bun:1.1-alpine AS builder
 
 WORKDIR /app
 
-# Copy lockfile and package.json
-COPY package.json bun.lock ./
+# Copy lockfile and package.json from the frontend directory
+# Context is the repository root
+COPY frontend/package.json frontend/bun.lock ./
 RUN bun install
 
-# Copy source and config
-COPY . .
+# Copy source and config from the frontend directory
+COPY frontend/ .
 
 # Build the application
 # Note: VITE_ variables are embedded at build time for SPAs
