@@ -1,53 +1,30 @@
-# Dockerfile for Aura Frontend
-# Build stage
-FROM oven/bun:1.1 AS builder
+# Stage 1: Build static assets
+FROM oven/bun:1.1-alpine AS builder
 
 WORKDIR /app
 
-# Install dependencies
-COPY frontend/package.json ./
-COPY frontend/bun.lock ./
+# Copy lockfile and package.json
+COPY package.json bun.lock ./
 RUN bun install
 
-# Copy configuration files individually to maximize layer caching
-COPY frontend/next.config.js ./
-COPY frontend/tailwind.config.ts ./
-COPY frontend/tsconfig.json ./
-COPY frontend/postcss.config.mjs ./
-COPY frontend/eslint.config.mjs ./
-COPY frontend/env.d.ts ./
-COPY frontend/.env.production ./
-
-# Copy source files
-COPY frontend/src ./src
-COPY frontend/public ./public
+# Copy source and config
+COPY . .
 
 # Build the application
+# Note: VITE_ variables are embedded at build time for SPAs
 RUN bun run build
 
-# Production stage
-FROM oven/bun:1.1 AS runner
+# Stage 2: Serve with Nginx
+FROM nginx:alpine
 
-WORKDIR /app
+# Copy built assets to nginx html directory
+COPY --from=builder /app/dist /usr/share/nginx/html
 
-# Copy built files from builder
-COPY --from=builder /app/.next ./.next
-COPY --from=builder /app/public ./public
-COPY --from=builder /app/package.json ./package.json
-COPY --from=builder /app/bun.lock ./bun.lock
-COPY --from=builder /app/next.config.js ./next.config.js
-COPY --from=builder /app/.env.production ./.env.production
+# Expose port 80
+EXPOSE 80
 
-# Install only production dependencies
-RUN bun install --production
+# Healthy check
+HEALTHCHECK --interval=30s --timeout=3s \
+  CMD wget -qO- http://localhost:80/ || exit 1
 
-# Environment variables
-ENV NODE_ENV=production
-ENV PORT=3000
-ENV HOSTNAME="0.0.0.0"
-
-# Expose port
-EXPOSE 3000
-
-# Start the application
-CMD ["bun", "start"]
+CMD ["nginx", "-g", "daemon off;"]
