@@ -61,11 +61,11 @@ Additional formats MAY be introduced if they remain static and readable.
 
 * Visual artifacts MUST NOT be used for automation
 * Visual artifacts MUST NOT introduce new semantics
-* Visual artifacts SHOULD declare their abstraction level:
-  - **Level 1 (Organism):** Full Bee service boundaries and inter-service communication
-  - **Level 2 (Cellular):** ATCG-M nucleotide interactions within a single Bee
-  - **Level 3 (Molecular):** Protocol/interface contracts (gRPC, SkillProtocol)
-  - **Level 4 (Ecosystem):** Multi-bee choreography and event flows
+* Visual artifacts SHOULD declare their **diagram abstraction level** (distinct from the Four Ontological Levels in FOUNDATION.md):
+  - **Organism View:** Full Bee service boundaries and inter-service communication
+  - **Cellular View:** ATCG-M nucleotide interactions within a single Bee
+  - **Molecular View:** Protocol/interface contracts (gRPC, SkillProtocol)
+  - **Ecosystem View:** Multi-bee choreography and event flows
 
 ---
 
