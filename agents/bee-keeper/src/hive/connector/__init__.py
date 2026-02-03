@@ -40,7 +40,10 @@ class BeeConnector(Connector[AuditObservation, BeeObservation, BeeContext | None
     async def act(
         self, action: AuditObservation, context: BeeContext | None = None
     ) -> BeeObservation:
-        # Context here is expected to be BeeContext
+        if not isinstance(context, BeeContext):
+            error_msg = f"Invalid context type. Expected BeeContext, got {type(context).__name__}"
+            logger.error("connector_act_invalid_context", error=error_msg)
+            return BeeObservation(success=False, injuries=[error_msg])
         return await self.interact(action, context)
 
     async def interact(
