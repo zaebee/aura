@@ -4,9 +4,13 @@ Test the robust JSON parsing function in DSPy strategy.
 """
 
 import sys
+from pathlib import Path
+
+# Add src to path
+sys.path.append(str(Path(__file__).parent / "src"))
 
 import structlog
-from src.hive.transformer.llm.prepare.clean import clean_and_parse_json
+from llm.prepare.clean import clean_and_parse_json
 
 # Configure logging
 structlog.configure(

@@ -3,7 +3,7 @@ from typing import Any
 import structlog
 from aura_core.dna import FailureIntent, HiveContext, IntentAction
 
-from config import get_settings, settings
+from ...config import get_settings, settings
 
 logger = structlog.get_logger(__name__)
 
