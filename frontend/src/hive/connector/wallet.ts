@@ -30,11 +30,17 @@ export class AgentWallet implements Connector {
     try {
       switch (action) {
         case 'search': {
+          if (!params || typeof params !== 'object' || !('query' in params)) {
+            return { success: false, error: 'Invalid params for search: missing query' };
+          }
           const p = params as { query: string; limit?: number };
           const searchResult = await this.search(p.query, p.limit);
           return { success: true, data: searchResult };
         }
         case 'negotiate': {
+          if (!params || typeof params !== 'object' || !('itemId' in params) || !('bidAmount' in params)) {
+            return { success: false, error: 'Invalid params for negotiate: missing itemId or bidAmount' };
+          }
           const p = params as { itemId: string; bidAmount: number; currency?: string };
           const negotiateResult = await this.negotiate(p.itemId, p.bidAmount, p.currency);
           return { success: true, data: negotiateResult };

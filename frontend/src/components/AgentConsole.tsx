@@ -51,8 +51,12 @@ export default function AgentConsole() {
     setError(null)
     
     try {
-      const results = await aggregator.perceive({ query: searchQuery, limit: 5 }) as SearchResponse;
-      setSearchResults(results.results)
+      const results = await aggregator.perceive({ query: searchQuery, limit: 5 });
+      if (results && typeof results === 'object' && 'results' in results) {
+        setSearchResults((results as SearchResponse).results)
+      } else {
+        throw new Error('Invalid search response format');
+      }
       setSelectedItem(null)
       setNegotiationHistory([])
       setCurrentStatus(null)
@@ -97,7 +101,12 @@ export default function AgentConsole() {
         throw new Error(observation.error || 'Negotiation failed');
       }
 
-      const result = observation.data as NegotiateResponse;
+      const result = observation.data;
+      if (!result || typeof result !== 'object' || !('result' in result)) {
+        throw new Error('Invalid negotiation response format');
+      }
+
+      const negotiateRes = result as NegotiateResponse;
       
       // Add to negotiation history
       setNegotiationHistory(prev => [...prev, {
@@ -107,8 +116,8 @@ export default function AgentConsole() {
       }])
 
       // Handle different response types using proto discriminated union
-      if (result.result.case === 'accepted') {
-        const accepted = result.result.value
+      if (negotiateRes.result.case === 'accepted') {
+        const accepted = negotiateRes.result.value
         setCurrentStatus('accepted')
 
         const reservationCode = accepted.revealMethod?.case === 'reservationCode'
@@ -121,8 +130,8 @@ export default function AgentConsole() {
           reservationCode: reservationCode,
           timestamp: new Date().toISOString()
         }])
-      } else if (result.result.case === 'countered') {
-        const countered = result.result.value
+      } else if (negotiateRes.result.case === 'countered') {
+        const countered = negotiateRes.result.value
         setCurrentStatus('countered')
         setNegotiationHistory(prev => [...prev, {
           type: 'counter',
@@ -130,12 +139,12 @@ export default function AgentConsole() {
           message: countered.humanMessage,
           timestamp: new Date().toISOString()
         }])
-      } else if (result.result.case === 'uiRequired') {
-        const uiRequest = result.result.value
+      } else if (negotiateRes.result.case === 'uiRequired') {
+        const uiRequest = negotiateRes.result.value
         setCurrentStatus('ui_required')
         setJitManifest(uiRequest)
-      } else if (result.result.case === 'rejected') {
-        const rejected = result.result.value
+      } else if (negotiateRes.result.case === 'rejected') {
+        const rejected = negotiateRes.result.value
         setCurrentStatus('rejected')
         setNegotiationHistory(prev => [...prev, {
           type: 'reject',
@@ -177,7 +186,7 @@ export default function AgentConsole() {
   return (
     <div className="max-w-7xl mx-auto space-y-6 p-4">
       <header className="flex justify-between items-center py-6 border-b border-gray-700 animate-fade-in">
-        <h1 className="text-5xl font-bold bg-gradient-to-r from-[#00f2ff] to-[#bc13fe] bg-clip-text text-transparent">Aura Agent Console</h1>
+        <h1 className="h1 bg-gradient-to-r from-[#00f2ff] to-[#bc13fe] bg-clip-text text-transparent">Aura Agent Console</h1>
         <div className="flex items-center space-x-3 bg-gray-800 px-4 py-2 rounded-lg border border-gray-700">
           <Wallet className="text-cyberpunk-purple" size={18} />
           <span className="body-text-sm">Agent: {wallet.getAgentId()}</span>

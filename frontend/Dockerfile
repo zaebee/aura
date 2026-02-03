@@ -9,7 +9,16 @@ COPY frontend/package.json frontend/bun.lock ./
 RUN bun install
 
 # Copy source and config from the frontend directory
-COPY frontend/ .
+COPY frontend/public ./public
+COPY frontend/src ./src
+COPY frontend/index.html ./
+COPY frontend/vite.config.ts ./
+COPY frontend/tsconfig.json ./
+COPY frontend/tsconfig.app.json ./
+COPY frontend/tsconfig.node.json ./
+COPY frontend/tailwind.config.ts ./
+COPY frontend/postcss.config.mjs ./
+COPY frontend/eslint.config.js ./
 
 # Build the application
 # Note: VITE_ variables are embedded at build time for SPAs

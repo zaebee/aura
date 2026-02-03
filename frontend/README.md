@@ -60,4 +60,4 @@ The project uses a multi-stage Docker build:
 1. **Builder**: Uses `oven/bun:alpine` to build static assets.
 2. **Runner**: Uses `nginx:alpine` to serve the `dist/` folder.
 
-Final image size is optimized to be under 50MB.
+Final image size is optimized to be under 25MB.
