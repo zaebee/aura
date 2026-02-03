@@ -19,7 +19,7 @@ data:
       - name: Jaeger
         uid: Jaeger
         type: jaeger
-        url: "{{ .Values.monitoring.jaeger.queryUrl }}"
+        url: {{ .Values.monitoring.jaeger.queryUrl | default (printf "http://aura-jaeger.%s.svc.cluster.local:16686" .Release.Namespace) | quote }}
         access: proxy
       - name: Loki
         uid: Loki

@@ -26,9 +26,9 @@ spec:
             grpc:
               port: 50051
             initialDelaySeconds: {{ .Values.core.livenessProbe.initialDelaySeconds }}
-            periodSeconds: {{ .Values.core.livenessProbe.periodSeconds }}
-            timeoutSeconds: {{ .Values.core.livenessProbe.timeoutSeconds }}
-            failureThreshold: {{ .Values.core.livenessProbe.failureThreshold }}
+            periodSeconds: {{ .Values.core.periodSeconds }}
+            timeoutSeconds: {{ .Values.core.timeoutSeconds }}
+            failureThreshold: {{ .Values.core.failureThreshold }}
           readinessProbe:
             grpc:
               port: 50051
@@ -80,6 +80,6 @@ spec:
             - name: AURA_SERVER__PROMETHEUS_URL
               value: "{{ .Values.monitoring.prometheus.url }}"
             - name: AURA_SERVER__OTEL_EXPORTER_OTLP_ENDPOINT
-              value: "{{ .Values.monitoring.jaeger.collectorUrl }}"
+              value: {{ .Values.monitoring.jaeger.collectorUrl | default (printf "http://aura-jaeger.%s.svc.cluster.local:4317" .Release.Namespace) | quote }}
             - name: AURA_SERVER__OTEL_SERVICE_NAME
               value: "{{ .Release.Name }}-core"
