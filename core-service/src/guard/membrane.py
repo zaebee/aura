@@ -81,7 +81,7 @@ class OutputGuard:
 
         # 5. Addons Validation
         addons = set(decision.get("addons", []))
-        unauthorized_addons = sorted(list(addons - self.allowed_addons))
+        unauthorized_addons = sorted(addons - self.allowed_addons)
         if unauthorized_addons:
             logger.warning("unauthorized_addons_detected", addons=unauthorized_addons)
             raise SafetyViolation(
