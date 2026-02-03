@@ -8,6 +8,7 @@ import nats
 import structlog
 
 from src.config import get_settings
+from src.guard.membrane import OutputGuard, SafetyViolation
 from src.llm.engine import AuraNegotiator
 
 from .types import FailureIntent, HiveContext, IntentAction
@@ -32,6 +33,7 @@ class AuraTransformer:
         )
         self.brain_loaded = False
         self.brain_path: str | None = None
+        self.guard = OutputGuard()
 
         # Default configuration
         dspy.configure(lm=dspy.LM(self.settings.llm.model))
@@ -114,13 +116,28 @@ class AuraTransformer:
         if cpu_load > 80.0:
             constraints.append("SYSTEM_LOAD_HIGH: Be extremely concise.")
 
+        meta = context.item_data.get("meta", {})
+        floor_price = context.item_data.get("floor_price", 0.0)
+
         return {
             "base_price": context.item_data.get("base_price", 0.0),
-            "floor_price": context.item_data.get("floor_price", 0.0),
+            "floor_price": floor_price,
+            "internal_cost": meta.get("internal_cost", floor_price * 0.8),
             "reputation": context.offer.reputation,
             "system_constraints": constraints,
-            "meta": context.item_data.get("meta", {}),
+            "meta": meta,
         }
+
+    def _create_safe_counter_offer(self, floor_price: float) -> IntentAction:
+        """Create a safe counter-offer at floor price when guardrails are hit."""
+        rounded_price = round(floor_price, 2)
+        return IntentAction(
+            action="counter",
+            price=rounded_price,
+            message=f"I cannot go that low. My best offer is ${rounded_price:.2f}.",
+            thought="Membrane Pattern: SafetyViolation detected. Forcing counter-offer at floor price.",
+            metadata={"reason": "GUARDRAIL_INTERVENTION"},
+        )
 
     async def think(self, context: HiveContext) -> IntentAction:
         """
@@ -155,6 +172,21 @@ class AuraTransformer:
                 )
 
             action_data = result["action"]
+            economic_context = self._build_economic_context(context)
+
+            # Deterministic safety layer (Membrane Pattern)
+            try:
+                self.guard.validate_decision(action_data, economic_context)
+            except SafetyViolation as e:
+                logger.warning(
+                    "safety_violation_intercepted",
+                    error=str(e),
+                    action=action_data.get("action"),
+                    price=action_data.get("price"),
+                )
+                return self._create_safe_counter_offer(
+                    economic_context.get("floor_price", 0.0)
+                )
 
             logger.info(
                 "transformer_thought_complete",

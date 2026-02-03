@@ -38,9 +38,8 @@ class OutputGuard:
         internal_cost = context.get("internal_cost", 0.0)
 
         # 2. Margin Check
-        if offered_price > 0:
-            # Profit Margin = (Revenue - Cost) / Revenue
-            margin = (offered_price - internal_cost) / offered_price
+        if internal_cost > 0:
+            margin = (offered_price - internal_cost) / internal_cost
             if margin < settings.safety.min_profit_margin:
                 logger.warning(
                     "safety_margin_violation",
@@ -49,20 +48,39 @@ class OutputGuard:
                     margin=margin,
                     min_margin=settings.safety.min_profit_margin,
                 )
-                raise SafetyViolation("Minimum profit margin violation")
+                raise SafetyViolation("Economic suicide attempt")
         elif action in ["accept", "counter"]:
-            logger.warning("invalid_offered_price", price=offered_price)
-            raise SafetyViolation("Invalid offered price")
+            logger.warning("invalid_internal_cost", internal_cost=internal_cost)
+            raise SafetyViolation("Invalid economic context")
 
         # 3. Floor Price Violation
-        # Check both accept and counter actions against floor price
-        if action in ["accept", "counter"] and offered_price < floor_price:
+        if action == "accept" and offered_price < floor_price:
             logger.warning(
                 "safety_floor_violation",
                 action=action,
                 offered_price=offered_price,
                 floor_price=floor_price,
             )
-            raise SafetyViolation("Floor price violation")
+            raise SafetyViolation("Floor price breach")
+
+        # 4. Max Discount Violation
+        base_price = context.get("base_price", 0.0)
+        if base_price > 0 and action in ["accept", "counter"]:
+            discount = (base_price - offered_price) / base_price
+            if discount > settings.safety.max_discount_percent:
+                logger.warning(
+                    "safety_discount_violation",
+                    offered_price=offered_price,
+                    base_price=base_price,
+                    discount=discount,
+                )
+                raise SafetyViolation("Maximum discount exceeded")
+
+        # 5. Addons Validation
+        addons = decision.get("addons", [])
+        for addon in addons:
+            if addon not in settings.safety.allowed_addons:
+                logger.warning("unauthorized_addon", addon=addon)
+                raise SafetyViolation(f"Unauthorized addon: {addon}")
 
         return True
