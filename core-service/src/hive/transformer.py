@@ -15,6 +15,9 @@ from .types import FailureIntent, HiveContext, IntentAction
 
 logger = structlog.get_logger(__name__)
 
+# Fallback cost-to-floor-price ratio
+DEFAULT_COST_FLOOR_RATIO = 0.8
+
 # Brain search paths in priority order (Docker path first, then local dev paths)
 BRAIN_SEARCH_PATHS = [
     "/app/data/aura_brain.json",  # Docker container path (primary)
@@ -128,7 +131,9 @@ class AuraTransformer:
         return {
             "base_price": context.item_data.get("base_price", 0.0),
             "floor_price": floor_price,
-            "internal_cost": meta.get("internal_cost", floor_price * 0.8),
+            "internal_cost": meta.get(
+                "internal_cost", floor_price * DEFAULT_COST_FLOOR_RATIO
+            ),
             "reputation": context.offer.reputation,
             "system_constraints": constraints,
             "meta": meta,
