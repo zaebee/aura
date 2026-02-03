@@ -1,10 +1,30 @@
+"""Core-service ATCG Protocol definitions.
+
+Imports base types from aura_core and defines specialized protocols
+for the core negotiation service with stricter type hints.
+"""
+
 from typing import Any, Protocol, runtime_checkable
 
-from .types import Event, HiveContext, IntentAction, Observation
+from aura_core import (
+    Event,
+    HiveContext,
+    IntentAction,
+    Observation,
+)
 
-# HIVE DNA: CONFIGURATION PROTOCOLS
-# 1. Cross-namespace service discovery MUST use full FQDN paths (e.g., service.namespace.svc.cluster.local).
-# 2. Monitoring (Technical Layer) and Aura Core (Business Layer) integration must be deterministic and traceable.
+# Re-export for backward compatibility
+__all__ = [
+    "Event",
+    "HiveContext",
+    "IntentAction",
+    "Observation",
+    "Aggregator",
+    "Transformer",
+    "Connector",
+    "Generator",
+    "Membrane",
+]
 
 
 @runtime_checkable

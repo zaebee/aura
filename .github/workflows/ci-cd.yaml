@@ -169,7 +169,7 @@ jobs:
             - name: Deploy to Cluster
               env:
                   TG_TOKEN: ${{ secrets.AURA_TELEGRAM_TOKEN }}
-                  API_KEY: ${{ secrets.MISTRAL_API_KEY }}
+                  MISTRAL_KEY: ${{ secrets.MISTRAL_API_KEY }}
                   OPENAI_KEY: ${{ secrets.OPENAI_API_KEY }}
                   SOL_KEY: ${{ secrets.SOLANA_PRIVATE_KEY }}
                   FRP_TOKEN: ${{ secrets.FRP_CLIENT_TOKEN }}
@@ -189,8 +189,8 @@ jobs:
                     --set gateway.image.tag=sha-$SHORT_SHA \
                     --set frontend.image.tag=sha-$SHORT_SHA \
                     --set telegram.image.tag=sha-$SHORT_SHA \
-                    --set secrets.llmApiKey="$API_KEY" \
-                    --set secrets.openaiApiKey="$OPENAI_KEY" \
+                    --set secrets.mistralKey="$MISTRAL_KEY" \
+                    --set secrets.openaiKey="$OPENAI_KEY" \
                     --set secrets.telegramToken="$TG_TOKEN" \
                     --set secrets.secretEncryptionKey="$ENC_KEY" \
                     --set secrets.solanaPrivateKey="$SOL_KEY" \
