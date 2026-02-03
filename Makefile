@@ -35,11 +35,11 @@ test:
 
 # Run tests with coverage report
 test-cov:
-	PYTHONPATH=core uv run pytest core/tests/ -v --cov=core/src --cov-report=term-missing
+	PYTHONPATH=core:core/src uv run pytest core/tests/ -v --cov=core/src --cov-report=term-missing
 
 # Run tests with verbose output
 test-verbose:
-	PYTHONPATH=core uv run pytest core/tests/ -vv -s
+	PYTHONPATH=core:core/src uv run pytest core/tests/ -vv -s
 
 # Test health endpoints
 test-health:

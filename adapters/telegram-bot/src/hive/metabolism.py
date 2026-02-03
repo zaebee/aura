@@ -10,8 +10,10 @@ from aura_core.dna import (
     TelegramGenerator,
     TelegramTransformer,
 )
+from opentelemetry import trace
 
 logger = structlog.get_logger(__name__)
+tracer = trace.get_tracer(__name__)
 
 
 class TelegramMetabolism(MetabolicLoop):
@@ -35,61 +37,74 @@ class TelegramMetabolism(MetabolicLoop):
 
     async def execute_search(self, query: str, message: Message) -> Observation:
         """Execute a search metabolic cycle."""
-        # A: Perceive (Get context from message)
-        context = await self.aggregator.perceive(message, {})
+        with tracer.start_as_current_span("metabolism_search") as span:
+            logger.info("search_cycle_started", query=query)
+            span.set_attribute("query", query)
 
-        # C: Call Core Search
-        results = await self.connector.search_core(query)
+            # A: Perceive (Get context from message)
+            context = await self.aggregator.perceive(message, {})
 
-        # T: Think (Decide on UI based on results)
-        action = await self.transformer.think(context, search_results=results)
+            # C: Call Core Search
+            results = await self.connector.search_core(query)
 
-        # C: Act (Send Message)
-        observation = await self.connector.act(action, context)
+            # T: Think (Decide on UI based on results)
+            action = await self.transformer.think(context, search_results=results)
 
-        # G: Pulse
-        observation.event_type = "user_searched"
-        observation.metadata = {
-            "query": query,
-            "results_count": len(results),
-            "user_id": context.user_id,
-        }
-        await self.generator.pulse(observation)
+            # C: Act (Send Message)
+            observation = await self.connector.act(action, context)
 
-        return observation
+            # G: Pulse
+            observation.event_type = "user_searched"
+            observation.metadata = {
+                "query": query,
+                "results_count": len(results),
+                "user_id": context.user_id,
+            }
+            await self.generator.pulse(observation)
+
+            return observation
 
     async def execute_negotiation(
         self, signal: Any, state_data: dict[str, Any]
     ) -> Observation:
         """Execute a negotiation metabolic cycle."""
-        # A: Perceive (Get context from message and state)
-        context = await self.aggregator.perceive(signal, state_data)
+        with tracer.start_as_current_span("metabolism_negotiate") as span:
+            logger.info("negotiation_cycle_started")
 
-        # C: Call Core Negotiation
-        core_result = await self.connector.call_core(context)
+            # A: Perceive (Get context from message and state)
+            context = await self.aggregator.perceive(signal, state_data)
 
-        # T: Think (Decide on UI based on core result)
-        action = await self.transformer.think(context, core_response=core_result)
+            if context.hive_context:
+                span.set_attribute("item_id", context.hive_context.item_id)
+                span.set_attribute("bid_amount", context.hive_context.offer.bid_amount)
 
-        # C: Act (Send Message)
-        observation = await self.connector.act(action, context)
+            # C: Call Core Negotiation
+            core_result = await self.connector.call_core(context)
 
-        # Enrich observation for G
-        if "accepted" in core_result and core_result["accepted"]:
-            observation.event_type = "deal_accepted"
-            observation.metadata = {
-                "item_id": context.hive_context.item_id if context.hive_context else "",
-                "price": core_result["accepted"].get("final_price", 0),
-                "user_id": context.user_id,
-            }
-        elif "error" in core_result:
-            observation.event_type = "error"
-            observation.metadata = {
-                "error": core_result["error"],
-                "user_id": context.user_id,
-            }
+            # T: Think (Decide on UI based on core result)
+            action = await self.transformer.think(context, core_response=core_result)
 
-        # G: Pulse
-        await self.generator.pulse(observation)
+            # C: Act (Send Message)
+            observation = await self.connector.act(action, context)
 
-        return observation
+            # Enrich observation for G
+            if "accepted" in core_result and core_result["accepted"]:
+                observation.event_type = "deal_accepted"
+                observation.metadata = {
+                    "item_id": context.hive_context.item_id
+                    if context.hive_context
+                    else "",
+                    "price": core_result["accepted"].get("final_price", 0),
+                    "user_id": context.user_id,
+                }
+            elif "error" in core_result:
+                observation.event_type = "error"
+                observation.metadata = {
+                    "error": core_result["error"],
+                    "user_id": context.user_id,
+                }
+
+            # G: Pulse
+            await self.generator.pulse(observation)
+
+            return observation
