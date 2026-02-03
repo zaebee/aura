@@ -101,7 +101,7 @@ check_untyped_defs = true
 warn_return_any = true
 warn_unused_configs = true
 plugins = ["pydantic.mypy"]
-exclude = [".*/proto/.*", "tests/.*", "proto/.*"]
+exclude = [".*/proto/.*", "tests/.*", "proto/.*", "core/src/hive/proto/.*"]
 
 [[tool.mypy.overrides]]
 module = [
@@ -127,7 +127,7 @@ exclude_dirs = ["tests", "venv", ".venv"]
 skips = ["B101"] # B101 is assert_used, often okay in some contexts but bandit defaults can be strict.
 
 [[tool.mypy.overrides]]
-module = ["proto.*", "aura.*", "src.proto.*", "hive.proto.*"]
+module = ["proto.*", "aura.*", "src.proto.*", "hive.proto.*", "src.hive.proto.*"]
 ignore_errors = true
 
 # [[tool.uv.index]]
