@@ -1,73 +1,63 @@
-# React + TypeScript + Vite
+# Aura Frontend
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+A lightning-fast, tiny containerized React application built with Vite and TypeScript, following the ATCG-M architectural pattern.
 
-Currently, two official plugins are available:
+## 🚀 Overview
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Babel](https://babeljs.io/) (or [oxc](https://oxc.rs) when used in [rolldown-vite](https://vite.dev/guide/rolldown)) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
+The Aura Frontend serves as the user interface for the Aura Agent system. It has been migrated from Next.js to a pure client-side Vite + React setup to achieve minimal image size (<50MB) and maximum performance.
 
-## React Compiler
+## 🧬 ATCG-M Architecture
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+This project follows the Hive's internal structure:
 
-## Expanding the ESLint configuration
+- **Aggregator (`src/hive/aggregator/`)**: Logic for fetching Hive State and Search results.
+- **Transformer (`src/hive/transformer/`)**: The JIT (Just-In-Time) UI engine that transforms backend requests into dynamic React components.
+- **Connector (`src/hive/connector/`)**: API calling logic and Agent Wallet management.
+- **Membrane (`src/hive/membrane/`)**: Input validation and schema checking.
 
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
+## 🛠️ Development
 
-```js
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
+### Prerequisites
 
-      // Remove tseslint.configs.recommended and replace with this
-      tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      tseslint.configs.stylisticTypeChecked,
+- [Bun](https://bun.sh/) (preferred) or Node.js 20+
 
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+### Setup
+
+```bash
+cd frontend
+bun install
 ```
 
-You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
+### Run Development Server
 
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
-
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs['recommended-typescript'],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+```bash
+bun run dev
 ```
+
+### Build for Production
+
+```bash
+bun run build
+```
+
+### Linting
+
+```bash
+bun run lint
+```
+
+### Protocol Synchronization
+
+To regenerate TypeScript stubs from Protobuf definitions:
+
+```bash
+bun run gen:proto
+```
+
+## 🐳 Docker
+
+The project uses a multi-stage Docker build:
+1. **Builder**: Uses `oven/bun:alpine` to build static assets.
+2. **Runner**: Uses `nginx:alpine` to serve the `dist/` folder.
+
+Final image size is optimized to be under 50MB.

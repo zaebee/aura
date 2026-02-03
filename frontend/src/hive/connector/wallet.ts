@@ -28,13 +28,14 @@ export class AgentWallet implements Connector {
 
   async act(action: string, params: unknown): Promise<Observation> {
     try {
-      const p = params as any;
       switch (action) {
         case 'search': {
+          const p = params as { query: string; limit?: number };
           const searchResult = await this.search(p.query, p.limit);
           return { success: true, data: searchResult };
         }
         case 'negotiate': {
+          const p = params as { itemId: string; bidAmount: number; currency?: string };
           const negotiateResult = await this.negotiate(p.itemId, p.bidAmount, p.currency);
           return { success: true, data: negotiateResult };
         }

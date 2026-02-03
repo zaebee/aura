@@ -18,6 +18,8 @@ RUN bun run build
 # Stage 2: Serve with Nginx
 FROM nginx:alpine
 
+RUN apk add --no-cache wget
+
 # Copy built assets to nginx html directory
 COPY --from=builder /app/dist /usr/share/nginx/html
 

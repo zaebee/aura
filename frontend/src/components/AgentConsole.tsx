@@ -5,19 +5,19 @@ import type {
   SearchResponse,
   NegotiateResponse,
   JitUiRequest
-} from '../lib/aura/negotiation/v1/negotiation_pb'
-import { Button } from './ui/button'
-import { Input } from './ui/input'
-import { Card, CardHeader, CardTitle, CardDescription, CardContent } from './ui/card'
-import { ScrollArea } from './ui/scroll-area'
-import { Badge } from './ui/badge'
-import { Alert, AlertDescription, AlertTitle } from './ui/alert'
+} from '@/lib/aura/negotiation/v1/negotiation_pb'
+import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
+import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card'
+import { ScrollArea } from '@/components/ui/scroll-area'
+import { Badge } from '@/components/ui/badge'
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
 
 // Hive Modules
-import { AgentWallet } from '../hive/connector/wallet'
-import { SearchAggregator } from '../hive/aggregator/search'
-import { WalletMembrane } from '../hive/membrane/validator'
-import { JITRenderer } from '../hive/transformer/engine'
+import { AgentWallet } from '@/hive/connector/wallet'
+import { SearchAggregator } from '@/hive/aggregator/search'
+import { WalletMembrane } from '@/hive/membrane/validator'
+import { JITRenderer } from '@/hive/transformer/engine'
 
 interface NegotiationEntry {
   type: 'bid' | 'counter' | 'accept' | 'reject' | 'jit_approved' | 'jit_rejected';
