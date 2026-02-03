@@ -190,20 +190,15 @@ class AuraTransformer:
             try:
                 self.guard.validate_decision(action_data, economic_context)
             except SafetyViolation as e:
-                logger.warning(
-                    "safety_violation_intercepted",
-                    error=str(e),
-                    action=action_data.get("action"),
-                    price=action_data.get("price"),
-                )
+                log_details = {
+                    "error": str(e),
+                    "action": action_data.get("action"),
+                    "price": action_data.get("price"),
+                }
+                logger.warning("safety_violation_intercepted", **log_details)
                 floor_price = economic_context.get("floor_price", 0.0)
                 if floor_price <= 0:
-                    logger.error(
-                        "cannot_fallback_no_floor_price",
-                        error=str(e),
-                        action=action_data.get("action"),
-                        price=action_data.get("price"),
-                    )
+                    logger.error("cannot_fallback_no_floor_price", **log_details)
                     return FailureIntent(
                         error="Safety violation with no valid floor price for fallback."
                     )
