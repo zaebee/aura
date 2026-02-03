@@ -196,9 +196,17 @@ class AuraTransformer:
                     action=action_data.get("action"),
                     price=action_data.get("price"),
                 )
-                return self._create_safe_counter_offer(
-                    economic_context.get("floor_price", 0.0)
-                )
+                floor_price = economic_context.get("floor_price", 0.0)
+                if floor_price <= 0:
+                    logger.error(
+                        "cannot_fallback_no_floor_price",
+                        error=str(e),
+                        action=action_data.get("action"),
+                    )
+                    return FailureIntent(
+                        error="Safety violation with no valid floor price for fallback."
+                    )
+                return self._create_safe_counter_offer(floor_price)
 
             logger.info(
                 "transformer_thought_complete",

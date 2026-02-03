@@ -72,5 +72,19 @@ def test_unauthorized_addon():
         "price": 800.0,
         "addons": ["Free Helicopter Ride"],
     }
-    with pytest.raises(SafetyViolation, match="Unauthorized addon: Free Helicopter Ride"):
+    with pytest.raises(SafetyViolation, match="Unauthorized addons: Free Helicopter Ride"):
+        guard.validate_decision(decision, context)
+
+
+def test_multiple_unauthorized_addons():
+    guard = OutputGuard()
+    context = {"base_price": 1000.0, "floor_price": 600.0, "internal_cost": 500.0}
+    decision = {
+        "action": "counter",
+        "price": 800.0,
+        "addons": ["Free Helicopter Ride", "Private Jet"],
+    }
+    with pytest.raises(
+        SafetyViolation, match="Unauthorized addons: Free Helicopter Ride, Private Jet"
+    ):
         guard.validate_decision(decision, context)
