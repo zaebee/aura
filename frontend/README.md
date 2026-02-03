@@ -4,7 +4,7 @@ A lightning-fast, tiny containerized React application built with Vite and TypeS
 
 ## 🚀 Overview
 
-The Aura Frontend serves as the user interface for the Aura Agent system. It has been migrated from Next.js to a pure client-side Vite + React setup to achieve minimal image size (<50MB) and maximum performance.
+The Aura Frontend serves as the user interface for the Aura Agent system. It has been migrated from Next.js to a pure client-side Vite + React setup to achieve minimal image size (<25MB) and maximum performance.
 
 ## 🧬 ATCG-M Architecture
 

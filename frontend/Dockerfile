@@ -8,17 +8,14 @@ WORKDIR /app
 COPY frontend/package.json frontend/bun.lock ./
 RUN bun install
 
+# Copy configuration files first to leverage Docker cache
+COPY frontend/tsconfig.json frontend/tsconfig.app.json frontend/tsconfig.node.json ./
+COPY frontend/vite.config.ts frontend/tailwind.config.ts frontend/postcss.config.mjs frontend/eslint.config.js ./
+
 # Copy source and config from the frontend directory
 COPY frontend/public ./public
 COPY frontend/src ./src
 COPY frontend/index.html ./
-COPY frontend/vite.config.ts ./
-COPY frontend/tsconfig.json ./
-COPY frontend/tsconfig.app.json ./
-COPY frontend/tsconfig.node.json ./
-COPY frontend/tailwind.config.ts ./
-COPY frontend/postcss.config.mjs ./
-COPY frontend/eslint.config.js ./
 
 # Build the application
 # Note: VITE_ variables are embedded at build time for SPAs

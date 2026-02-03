@@ -40,7 +40,6 @@ export default function AgentConsole() {
   const [bidAmount, setBidAmount] = useState('')
   const [negotiationHistory, setNegotiationHistory] = useState<NegotiationEntry[]>([])
   const [jitManifest, setJitManifest] = useState<JitUiRequest | null>(null)
-  const [, setCurrentStatus] = useState<string | null>(null)
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
@@ -59,7 +58,6 @@ export default function AgentConsole() {
       }
       setSelectedItem(null)
       setNegotiationHistory([])
-      setCurrentStatus(null)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Search failed')
       console.error('Search error:', err)
@@ -72,7 +70,6 @@ export default function AgentConsole() {
     setSelectedItem(item)
     setBidAmount(item.basePrice ? (item.basePrice * 0.8).toFixed(2) : '')
     setNegotiationHistory([])
-    setCurrentStatus(null)
   }
 
   const handleNegotiate = async () => {
@@ -118,7 +115,6 @@ export default function AgentConsole() {
       // Handle different response types using proto discriminated union
       if (negotiateRes.result.case === 'accepted') {
         const accepted = negotiateRes.result.value
-        setCurrentStatus('accepted')
 
         const reservationCode = accepted.revealMethod?.case === 'reservationCode'
           ? accepted.revealMethod.value
@@ -132,7 +128,6 @@ export default function AgentConsole() {
         }])
       } else if (negotiateRes.result.case === 'countered') {
         const countered = negotiateRes.result.value
-        setCurrentStatus('countered')
         setNegotiationHistory(prev => [...prev, {
           type: 'counter',
           amount: countered.proposedPrice,
@@ -141,11 +136,9 @@ export default function AgentConsole() {
         }])
       } else if (negotiateRes.result.case === 'uiRequired') {
         const uiRequest = negotiateRes.result.value
-        setCurrentStatus('ui_required')
         setJitManifest(uiRequest)
       } else if (negotiateRes.result.case === 'rejected') {
         const rejected = negotiateRes.result.value
-        setCurrentStatus('rejected')
         setNegotiationHistory(prev => [...prev, {
           type: 'reject',
           reason: rejected.reasonCode,
