@@ -3,7 +3,6 @@ from typing import Any
 import structlog
 from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup
 from aura_core import TelegramContext, Transformer, UIAction
-from interfaces import NegotiationResult, SearchResult
 from opentelemetry import trace
 
 logger = structlog.get_logger(__name__)

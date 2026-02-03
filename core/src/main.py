@@ -1,7 +1,7 @@
 import asyncio
 import uuid
 from concurrent import futures
-from typing import Any
+from typing import Any, cast
 
 import grpc
 import grpc.aio
@@ -199,7 +199,9 @@ class NegotiationService(negotiation_pb2_grpc.NegotiationServiceServicer):
             return negotiation_pb2.GetSystemStatusResponse(status="initializing")
 
         try:
-            metrics = await self.metabolism.aggregator.get_system_metrics()
+            # Cast to HiveAggregator to access core-specific monitoring methods
+            aggregator = cast(HiveAggregator, self.metabolism.aggregator)
+            metrics = await aggregator.get_system_metrics()
             return negotiation_pb2.GetSystemStatusResponse(
                 status=metrics["status"],
                 cpu_usage_percent=metrics.get("cpu_usage_percent", 0.0),

@@ -48,7 +48,8 @@ class MetabolicLoop(BaseMetabolicLoop[Any, HiveContext, IntentAction, Observatio
 
             # 1. Membrane (Inbound) - Filter/Sanitize
             with tracer.start_as_current_span("nucleotide_membrane_in"):
-                signal = await self.membrane.inspect_inbound(signal)
+                if self.membrane:
+                    signal = await self.membrane.inspect_inbound(signal)
 
             # 2. Aggregator (A) - Perceive/Sense
             with tracer.start_as_current_span("nucleotide_aggregator") as a_span:
@@ -65,7 +66,10 @@ class MetabolicLoop(BaseMetabolicLoop[Any, HiveContext, IntentAction, Observatio
 
             # 4. Membrane (Outbound) - Guard/Verify
             with tracer.start_as_current_span("nucleotide_membrane_out") as m_out_span:
-                safe_decision = await self.membrane.inspect_outbound(decision, context)
+                safe_decision = decision
+                if self.membrane:
+                    safe_decision = await self.membrane.inspect_outbound(decision, context)
+
                 if safe_decision != decision:
                     logger.info(
                         "membrane_override_applied",
