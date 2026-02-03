@@ -400,7 +400,7 @@ class MetabolicLoop:
             decision = await self.membrane.inspect_outbound(decision, context)
 
         # 5. Connector (C)
-        observation = await self.connector.act(decision, context)
+        observation: Observation = await self.connector.act(decision, context)
 
         # 6. Generator (G)
         await self.generator.pulse(observation)

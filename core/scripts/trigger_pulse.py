@@ -25,7 +25,7 @@ async def main():
         "success": True,
         "event_type": "NegotiationAccepted",
         "timestamp": time.time(),
-        "session_token": "manual-pulse-token"
+        "session_token": "manual-pulse-token"  # nosec
     }
 
     # Redact credentials for safe logging

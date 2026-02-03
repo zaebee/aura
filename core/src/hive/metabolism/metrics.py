@@ -1,12 +1,14 @@
+from typing import cast
+
 from prometheus_client import REGISTRY, Counter
 
 
 # Negotiation Metrics
-def _get_counter(name, documentation, labelnames):
+def _get_counter(name: str, documentation: str, labelnames: list[str]) -> Counter:
     """Safely get or create a counter to avoid duplication errors during reloads."""
     # Use internal registry maps to find existing collector by name
     if name in REGISTRY._names_to_collectors:
-        return REGISTRY._names_to_collectors[name]
+        return cast(Counter, REGISTRY._names_to_collectors[name])
     return Counter(name, documentation, labelnames)
 
 negotiation_total = _get_counter(

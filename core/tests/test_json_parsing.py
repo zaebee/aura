@@ -111,7 +111,7 @@ def test_json_parsing():
             failed += 1
 
     logger.info("test_summary", passed=passed, failed=failed)
-    return failed == 0
+    assert failed == 0
 
 
 if __name__ == "__main__":

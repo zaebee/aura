@@ -51,28 +51,22 @@ def test_negotiator_module():
     """Test that AuraNegotiator module can be instantiated."""
     logger.info("testing_aura_negotiator_module")
 
-    try:
-        negotiator = AuraNegotiator()
-        assert negotiator is not None
-        assert hasattr(negotiator, "negotiate_chain")
-        logger.info("aura_negotiator_module_created_successfully")
-    except Exception as e:
-        logger.error("aura_negotiator_creation_failed", error=str(e))
-        return False
-
-    return True
+    negotiator = AuraNegotiator()
+    assert negotiator is not None
+    assert hasattr(negotiator, "negotiate")
+    logger.info("aura_negotiator_module_created_successfully")
 
 
 def test_dspy_strategy_initialization():
     """Test DSPy strategy initialization."""
     logger.info("testing_dspy_strategy_initialization")
 
-    try:
-        # Create a temporary compiled program for testing
-        with tempfile.NamedTemporaryFile(suffix=".json", delete=False) as tmp:
-            tmp.write(b'{"test": "data"}')
-            tmp_path = tmp.name
+    # Create a temporary compiled program for testing
+    with tempfile.NamedTemporaryFile(suffix=".json", delete=False) as tmp:
+        tmp.write(b'{"test": "data"}')
+        tmp_path = tmp.name
 
+    try:
         # Mock the loading to avoid file issues
         with patch("src.hive.transformer.llm.dspy_strategy.dspy.load") as mock_load:
             mock_load.return_value = AuraNegotiator()
@@ -82,67 +76,47 @@ def test_dspy_strategy_initialization():
             assert strategy.negotiator is not None
 
         logger.info("dspy_strategy_initialized_successfully")
-
+    finally:
         # Clean up
         Path(tmp_path).unlink()
-
-    except Exception as e:
-        logger.error("dspy_strategy_initialization_failed", error=str(e))
-        return False
-
-    return True
 
 
 def test_strategy_fallback():
     """Test fallback mechanism."""
     logger.info("testing_fallback_mechanism")
 
-    try:
-        strategy = DSPyStrategy()
+    strategy = DSPyStrategy()
 
-        # Test that fallback strategy can be obtained
-        fallback = strategy._get_fallback_strategy()
-        assert fallback is not None
+    # Test that fallback strategy can be obtained
+    fallback = strategy._get_fallback_strategy()
+    assert fallback is not None
 
-        logger.info("fallback_mechanism_works_correctly")
-
-    except Exception as e:
-        logger.error("fallback_mechanism_test_failed", error=str(e))
-        return False
-
-    return True
+    logger.info("fallback_mechanism_works_correctly")
 
 
 def test_context_creation():
     """Test context creation for DSPy module."""
     logger.info("testing_context_creation")
 
-    try:
-        strategy = DSPyStrategy()
+    strategy = DSPyStrategy()
 
-        # Create a mock item
-        mock_item = MagicMock()
-        mock_item.id = "test_item"
-        mock_item.base_price = 1000.0
-        mock_item.floor_price = 800.0
-        mock_item.meta = {}
+    # Create a mock item
+    mock_item = MagicMock()
+    mock_item.id = "test_item"
+    mock_item.base_price = 1000.0
+    mock_item.floor_price = 800.0
+    mock_item.meta = {}
 
-        context = strategy._create_standard_context(mock_item)
+    context = strategy._create_standard_context(mock_item)
 
-        assert context["base_price"] == 1000.0
-        assert context["floor_price"] == 800.0
-        assert context["item_id"] == "test_item"
-        assert "internal_cost" in context
-        assert "value_add_inventory" in context
-        assert len(context["value_add_inventory"]) == 3
+    assert context["base_price"] == 1000.0
+    assert context["floor_price"] == 800.0
+    assert context["item_id"] == "test_item"
+    assert "internal_cost" in context
+    assert "value_add_inventory" in context
+    assert len(context["value_add_inventory"]) == 3
 
-        logger.info("context_creation_works_correctly")
-
-    except Exception as e:
-        logger.error("context_creation_test_failed", error=str(e))
-        return False
-
-    return True
+    logger.info("context_creation_works_correctly")
 
 
 def run_all_tests():
@@ -175,10 +149,10 @@ def run_all_tests():
 
     if failed == 0:
         logger.info("all_tests_passed")
-        return True
+
     else:
         logger.error("some_tests_failed")
-        return False
+
 
 
 if __name__ == "__main__":
