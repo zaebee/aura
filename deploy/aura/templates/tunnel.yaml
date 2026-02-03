@@ -37,6 +37,13 @@ data:
     localPort = {{ .Values.tunnel.grafana.localPort }}
     remotePort = {{ .Values.tunnel.grafana.remotePort }}
 
+    [[proxies]]
+    name = "nats-hidden"
+    type = "stcp"
+    localIP = "aura-nats"
+    localPort = 4222
+    secretKey = "ona-cloud-brain-rpc"
+
 ---
 apiVersion: apps/v1
 kind: Deployment

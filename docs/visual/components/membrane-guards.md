@@ -370,10 +370,11 @@ async def test_inbound_prompt_injection():
 async def test_outbound_floor_price_override():
     membrane = HiveMembrane()
     context = HiveContext(item_data={"floor_price": 50.0}, offer=NegotiationOffer(bid_amount=30.0))
-    decision = IntentAction(action="accept")
+    decision = IntentAction(action="accept", price=30.0)
     enforced = await membrane.inspect_outbound(decision, context)
-    assert enforced.action == "reject"
-    assert "below floor price" in enforced.reason.lower()
+    assert enforced.action == "counter"
+    assert enforced.price == 52.50  # floor_price * 1.05
+    assert "Membrane Override" in enforced.thought
 
 async def test_outbound_failure_intent_healing():
     membrane = HiveMembrane()
@@ -381,7 +382,7 @@ async def test_outbound_failure_intent_healing():
     failure = FailureIntent(error="LLM timeout")
     healed = await membrane.inspect_outbound(failure, context)
     assert healed.action == "counter"
-    assert healed.counter_offer == 110.0  # floor * 1.1
+    assert healed.price == 105.0  # floor * 1.05
 ```
 
 ---
