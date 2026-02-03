@@ -118,7 +118,8 @@ class AuraTransformer:
         Currently supports 'economic' mode.
         """
         if mode != "economic":
-            logger.warning("unknown_aggregation_mode", mode=mode)
+            logger.error("unsupported_aggregation_mode", mode=mode)
+            raise NotImplementedError(f"Aggregation mode '{mode}' is not supported.")
 
         cpu_load = context.system_health.get("cpu_usage_percent", 0.0)
         constraints = []
