@@ -1,4 +1,4 @@
-FROM python:3.12-slim AS builder
+FROM python:3.12-slim-bookworm AS builder
 
 WORKDIR /app
 
@@ -12,15 +12,13 @@ COPY --from=ghcr.io/astral-sh/uv:latest /uv /usr/local/bin/uv
 ENV UV_COMPILE_BYTECODE=1
 ENV UV_LINK_MODE=copy
 
-# Copy dependency files
-# We need aura-core because it's a local dependency
+# Copy workspace and dependency files
+COPY pyproject.toml uv.lock /app/
 COPY packages/aura-core /app/packages/aura-core
-COPY adapters/telegram-bot/pyproject.toml adapters/telegram-bot/uv.lock /app/adapters/telegram-bot/
+COPY adapters/telegram-bot/pyproject.toml /app/adapters/telegram-bot/
 
-WORKDIR /app/adapters/telegram-bot
-
-# Install dependencies (including dev for grpcio-tools)
-RUN uv sync --frozen --no-install-project --group dev
+# Install dependencies including dev for stub generation, scoped to telegram-bot
+RUN uv sync --frozen --no-install-project --group dev --package telegram-bot
 
 # Copy proto definitions (needed for stub generation)
 COPY proto/ /app/proto/
@@ -33,33 +31,25 @@ RUN mkdir -p /app/adapters/telegram-bot/src/proto && \
     --pyi_out=/app/adapters/telegram-bot/src/proto \
     /app/proto/aura/negotiation/v1/negotiation.proto
 
+# Final sync for production (no-dev, no-editable, scoped to package)
+RUN uv sync --frozen --no-dev --no-install-project --no-editable --package telegram-bot
+
 # Final stage
-FROM python:3.12-slim AS runtime
+FROM python:3.12-slim-bookworm AS runtime
 
 WORKDIR /app
 
-# Install uv
-COPY --from=ghcr.io/astral-sh/uv:latest /uv /usr/local/bin/uv
-ENV UV_COMPILE_BYTECODE=1
-ENV UV_LINK_MODE=copy
+# Copy virtual environment from builder (workspace root .venv)
+COPY --from=builder /app/.venv /app/.venv
 
-# Copy dependency files
-COPY packages/aura-core /app/packages/aura-core
-COPY adapters/telegram-bot/pyproject.toml adapters/telegram-bot/uv.lock /app/adapters/telegram-bot/
+# Copy source code and generated stubs to the same relative path as builder
+COPY adapters/telegram-bot/src /app/adapters/telegram-bot/src
+COPY --from=builder /app/adapters/telegram-bot/src/proto /app/adapters/telegram-bot/src/proto
 
 WORKDIR /app/adapters/telegram-bot
 
-# Install only production dependencies
-RUN uv sync --frozen --no-install-project
-
-# Copy generated proto stubs from builder
-COPY --from=builder /app/adapters/telegram-bot/src/proto/ /app/adapters/telegram-bot/src/proto/
-
-# Copy source code
-COPY adapters/telegram-bot/src/ /app/adapters/telegram-bot/src/
-
-# Set environment variables
-ENV PATH="/app/adapters/telegram-bot/.venv/bin:$PATH"
+# Set PATH to use the virtual environment
+ENV PATH="/app/.venv/bin:$PATH"
 ENV PYTHONPATH=/app/adapters/telegram-bot/src:/app/adapters/telegram-bot/src/proto
 
 # Command to run the bot
