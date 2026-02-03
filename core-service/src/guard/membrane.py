@@ -81,11 +81,15 @@ class OutputGuard:
 
         # 5. Addons Validation
         raw_addons = decision.get("addons")
-        if raw_addons is not None and not isinstance(raw_addons, list):
+        addons = set()
+        if isinstance(raw_addons, list):
+            for item in raw_addons:
+                if isinstance(item, str):
+                    addons.add(item)
+                else:
+                    logger.warning("invalid_addon_item_type", item=repr(item))
+        elif raw_addons is not None:
             logger.warning("malformed_addons_format", addons=raw_addons)
-            addons = set()
-        else:
-            addons = set(raw_addons or [])
 
         unauthorized_addons = sorted(addons - self.allowed_addons)
         if unauthorized_addons:

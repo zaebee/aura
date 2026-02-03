@@ -96,3 +96,19 @@ def test_multiple_unauthorized_addons(monkeypatch):
         SafetyViolation, match="Unauthorized addons: Free Helicopter Ride, Private Jet"
     ):
         guard.validate_decision(decision, context)
+
+
+def test_malformed_addon_item_type(monkeypatch):
+    monkeypatch.setattr(
+        "src.guard.membrane.settings.safety.allowed_addons", ["Valid Addon"]
+    )
+    guard = OutputGuard()
+    context = {"base_price": 1000.0, "floor_price": 600.0, "internal_cost": 500.0}
+    decision = {
+        "action": "counter",
+        "price": 800.0,
+        "addons": ["Valid Addon", {"unhashable": "dict"}],
+    }
+    # The unhashable dict should be ignored (logged) and only Valid Addon is processed.
+    # Since Valid Addon is in allowed_addons, this should pass.
+    assert guard.validate_decision(decision, context) is True
