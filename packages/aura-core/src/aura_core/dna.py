@@ -2,6 +2,8 @@ import time
 from pathlib import Path
 from typing import Any, Generic, Protocol, TypeVar, runtime_checkable
 
+from .types import Observation
+
 # 1. Define TypeVars for the metabolic steps
 S_inv = TypeVar("S_inv", contravariant=True)  # Input Signal
 C_cov = TypeVar("C_cov", covariant=True)  # Output Context
@@ -131,17 +133,10 @@ class Skill(Protocol):
 
     async def initialize(self) -> bool: ...
 
-    async def execute(self, intent: str, params: dict[str, Any]) -> Any: ...
+    async def execute(self, intent: str, params: dict[str, Any]) -> Observation: ...
 
 
-@runtime_checkable
-class BeeDNA(Protocol):
-    """Protocol for the Hive components."""
-
-    pass
-
-
-class MetabolicLoop:
+class MetabolicLoop(Generic[S_inv, C_cov, I_inv, O_cov, E_cov]):
     """
     Generic ATCG Metabolic Loop.
     Can be used by both core and adapters.
@@ -149,11 +144,11 @@ class MetabolicLoop:
 
     def __init__(
         self,
-        aggregator: Aggregator[Any, Any],
-        transformer: Transformer[Any, Any],
-        connector: Connector[Any, Any, Any],
-        generator: Generator[Any, Any],
-        membrane: Membrane[Any, Any, Any] | None = None,
+        aggregator: Aggregator[S_inv, C_cov],
+        transformer: Transformer[C_cov, I_inv],
+        connector: Connector[I_inv, O_cov, C_cov],
+        generator: Generator[O_cov, E_cov],
+        membrane: Membrane[S_inv, I_inv, C_cov] | None = None,
     ):
         self.aggregator = aggregator
         self.transformer = transformer
@@ -161,7 +156,7 @@ class MetabolicLoop:
         self.generator = generator
         self.membrane = membrane
 
-    async def execute(self, signal: Any, **kwargs: Any) -> Any:
+    async def execute(self, signal: S_inv, **kwargs: Any) -> O_cov:
         """
         Execute one full metabolic cycle:
         Signal -> [Membrane In] -> Aggregator -> Transformer -> [Membrane Out] -> Connector -> Generator

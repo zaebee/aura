@@ -16,34 +16,30 @@ from .proteins.pricing import PriceConverter
 logger = structlog.get_logger(__name__)
 
 
-class HiveConnector(Connector[IntentAction, Observation, HiveContext | None]):
+class HiveConnector(Connector[IntentAction, Observation, HiveContext]):
     """C - Connector: Maps internal IntentAction to gRPC responses and external systems."""
 
     def __init__(self, market_service: Any = None) -> None:
         self.market_service = market_service
         self.settings = get_settings()
 
-    async def act(self, action: IntentAction, context: HiveContext | None = None) -> Observation:
+    async def act(self, action: IntentAction, context: HiveContext) -> Observation:
         """
         Execute the decision and produce an observation (the gRPC response).
         """
-        if context is not None and not isinstance(context, HiveContext):
-            logger.error("invalid_context_type", expected="HiveContext", actual=type(context).__name__)
-            # We continue but some fields might be missing
-
+        # Type safety is now enforced by the generic protocol and static analysis
         logger.debug("connector_act_started", action=action.action)
 
         # 1. Map IntentAction to Protobuf NegotiateResponse
         response = negotiation_pb2.NegotiateResponse()
-        request_id = getattr(context, "request_id", None) if context else None
-        response.session_token = "sess_" + (request_id or str(uuid.uuid4()))
+        response.session_token = "sess_" + (context.request_id or str(uuid.uuid4()))
         response.valid_until_timestamp = int(time.time() + 600)
 
         if action.action == "accept":
             response.accepted.final_price = action.price
             response.accepted.reservation_code = f"HIVE-{uuid.uuid4()}"
 
-            if self.settings.crypto.enabled and self.market_service and context:
+            if self.settings.crypto.enabled and self.market_service:
                 await self._handle_crypto_lock(response, action, context)
 
         elif action.action == "counter":

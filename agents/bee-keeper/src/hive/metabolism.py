@@ -6,7 +6,15 @@ from config import KeeperSettings
 from .aggregator import BeeAggregator
 from .connector import BeeConnector
 from .transformer import BeeTransformer
-from aura_core import BeeContext, AuditObservation, BeeObservation, Aggregator, Transformer, Connector, Generator
+from aura_core import (
+    BeeContext,
+    AuditObservation,
+    BeeObservation,
+    Aggregator,
+    Transformer,
+    Connector,
+    Generator
+)
 from .generator import BeeGenerator
 
 logger = structlog.get_logger(__name__)
@@ -19,7 +27,7 @@ class BeeMetabolism:
         self.settings = settings
         self.aggregator: Aggregator[Any, BeeContext] = BeeAggregator(settings)
         self.transformer: Transformer[BeeContext, AuditObservation] = BeeTransformer(settings)
-        self.connector: Connector[AuditObservation, BeeObservation, BeeContext | None] = BeeConnector(settings)
+        self.connector: Connector[AuditObservation, BeeObservation, BeeContext] = BeeConnector(settings)
         self.generator: Generator[BeeObservation, Any] = BeeGenerator(settings)
 
     async def execute(self, event_name: str = "scheduled_pulse") -> None:
@@ -56,7 +64,7 @@ class BeeMetabolism:
             await self.generator.pulse(observation)
 
         logger.info(
-            "bee_metabolism_completed",
+            "bee_metabolism_started",
             pure=report.is_pure,
             heresies=len(report.heresies),
             execution_time=f"{report.execution_time:.2f}s",

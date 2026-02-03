@@ -18,19 +18,19 @@ logger = structlog.get_logger(__name__)
 tracer = trace.get_tracer(__name__)
 
 
-class TelegramConnector(Connector[UIAction, Observation, TelegramContext | None]):
+class TelegramConnector(Connector[UIAction, Observation, TelegramContext]):
     """C - Connector: Executes UI actions and gRPC calls via Proteins."""
 
     def __init__(self, telegram: TelegramProtein, aura: GRPCNegotiationClient):
         self.telegram = telegram
         self.aura = aura
 
-    async def act(self, action: UIAction, context: TelegramContext | None = None) -> Observation:
+    async def act(self, action: UIAction, context: TelegramContext) -> Observation:
         with tracer.start_as_current_span("connector_act") as span:
             span.set_attribute("action_type", action.action_type)
             if action.action_type == "send_message":
                 params = {
-                    "chat_id": getattr(context, "chat_id", 0) if context else 0,
+                    "chat_id": context.chat_id,
                     "text": action.text,
                     "reply_markup": action.reply_markup,
                     "parse_mode": action.parse_mode,

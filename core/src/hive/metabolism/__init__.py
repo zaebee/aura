@@ -5,7 +5,10 @@ from aura_core import (
     Aggregator,
     Connector,
     Generator,
+    HiveContext,
+    IntentAction,
     Membrane,
+    Observation,
     Transformer,
 )
 from aura_core import (
@@ -19,7 +22,7 @@ logger = structlog.get_logger(__name__)
 tracer = trace.get_tracer(__name__)
 
 
-class MetabolicLoop(BaseMetabolicLoop):
+class MetabolicLoop(BaseMetabolicLoop[Any, HiveContext, IntentAction, Observation, Any]):
     """
     Orchestrates the ATCG flow with core-specific telemetry:
     Signal -> Membrane(In) -> Aggregator -> Transformer -> Membrane(Out) -> Connector -> Generator
@@ -27,11 +30,11 @@ class MetabolicLoop(BaseMetabolicLoop):
 
     def __init__(
         self,
-        aggregator: Aggregator[Any, Any],
-        transformer: Transformer[Any, Any],
-        connector: Connector[Any, Any, Any],
-        generator: Generator[Any, Any],
-        membrane: Membrane[Any, Any, Any],
+        aggregator: Aggregator[Any, HiveContext],
+        transformer: Transformer[HiveContext, IntentAction],
+        connector: Connector[IntentAction, Observation, HiveContext],
+        generator: Generator[Observation, Any],
+        membrane: Membrane[Any, IntentAction, HiveContext],
     ):
         super().__init__(aggregator, transformer, connector, generator, membrane)
 

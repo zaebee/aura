@@ -8,7 +8,9 @@ from aura_core import (
     Generator,
     MetabolicLoop,
     Observation,
+    TelegramContext,
     Transformer,
+    UIAction,
 )
 from opentelemetry import trace
 
@@ -16,7 +18,7 @@ logger = structlog.get_logger(__name__)
 tracer = trace.get_tracer(__name__)
 
 
-class TelegramMetabolism(MetabolicLoop):
+class TelegramMetabolism(MetabolicLoop[Any, TelegramContext, UIAction, Observation, Any]):
     """
     Orchestrates the ATCG flow for Telegram:
     Aggregator -> Connector (Core) -> Transformer -> Connector (UI) -> Generator
@@ -24,16 +26,16 @@ class TelegramMetabolism(MetabolicLoop):
 
     def __init__(
         self,
-        aggregator: Aggregator[Any, Any],
-        transformer: Transformer[Any, Any],
-        connector: Connector[Any, Any, Any],
-        generator: Generator[Any, Any],
+        aggregator: Aggregator[Any, TelegramContext],
+        transformer: Transformer[TelegramContext, UIAction],
+        connector: Connector[UIAction, Observation, TelegramContext],
+        generator: Generator[Observation, Any],
     ):
         super().__init__(aggregator, transformer, connector, generator)
-        self.aggregator: Aggregator[Any, Any] = aggregator
-        self.transformer: Transformer[Any, Any] = transformer
-        self.connector: Connector[Any, Any, Any] = connector
-        self.generator: Generator[Any, Any] = generator
+        self.aggregator: Aggregator[Any, TelegramContext] = aggregator
+        self.transformer: Transformer[TelegramContext, UIAction] = transformer
+        self.connector: Connector[UIAction, Observation, TelegramContext] = connector
+        self.generator: Generator[Observation, Any] = generator
 
     async def execute_search(self, query: str, message: Message) -> Observation:
         """Execute a search metabolic cycle."""
@@ -45,7 +47,14 @@ class TelegramMetabolism(MetabolicLoop):
             context = await self.aggregator.perceive(message, state_data={})
 
             # C: Call Core Search
-            results = await self.connector.search_core(query)
+            # Note: We use the specialized methods on the concrete instance if needed,
+            # or rely on the execute method of the skill if it were wrapped.
+            # For now we cast or rely on the implementation having these methods.
+            from .connector import TelegramConnector
+            if isinstance(self.connector, TelegramConnector):
+                results = await self.connector.search_core(query)
+            else:
+                results = []
 
             # T: Think (Decide on UI based on results)
             action = await self.transformer.think(context, search_results=results)
@@ -79,7 +88,11 @@ class TelegramMetabolism(MetabolicLoop):
                 span.set_attribute("bid_amount", context.hive_context.offer.bid_amount)
 
             # C: Call Core Negotiation
-            core_result = await self.connector.call_core(context)
+            from .connector import TelegramConnector
+            if isinstance(self.connector, TelegramConnector):
+                core_result = await self.connector.call_core(context)
+            else:
+                core_result = {"error": "Invalid connector type"}
 
             # T: Think (Decide on UI based on core result)
             action = await self.transformer.think(context, core_response=core_result)

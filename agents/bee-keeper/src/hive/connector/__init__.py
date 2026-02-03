@@ -19,7 +19,7 @@ from .proteins.gh_client import GitHubClient
 logger = structlog.get_logger(__name__)
 
 
-class BeeConnector(Connector[AuditObservation, BeeObservation, BeeContext | None]):
+class BeeConnector(Connector[AuditObservation, BeeObservation, BeeContext]):
     """C - Connector: Interacts with GitHub and NATS."""
 
     def __init__(self, settings: KeeperSettings) -> None:
@@ -38,22 +38,15 @@ class BeeConnector(Connector[AuditObservation, BeeObservation, BeeContext | None
             await self.gh.close()
 
     async def act(
-        self, action: AuditObservation, context: BeeContext | None = None
+        self, action: AuditObservation, context: BeeContext
     ) -> BeeObservation:
-        if not isinstance(context, BeeContext):
-            error_msg = f"Invalid context type. Expected BeeContext, got {type(context).__name__}"
-            logger.error("connector_act_invalid_context", error=error_msg)
-            return BeeObservation(success=False, injuries=[error_msg])
+        # Context here is expected to be BeeContext
         return await self.interact(action, context)
 
     async def interact(
-        self, report: AuditObservation, context: BeeContext | None
+        self, report: AuditObservation, context: BeeContext
     ) -> BeeObservation:
         logger.info("bee_connector_interact_started")
-
-        if context is None:
-            logger.error("missing_bee_context")
-            return BeeObservation(success=False, injuries=["Missing BeeContext"])
 
         # 1. Post to GitHub (if not a heartbeat)
         comment_url = ""
