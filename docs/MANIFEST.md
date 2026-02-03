@@ -79,7 +79,7 @@ Aura Hive is structured into five layers – Docs, Visual, Advisory, Control, an
 ### Docs Layer
 The outermost layer containing documentation, standards, and specifications. Here live the governance documents, protocols, issue templates, and contribution guides. Docs are read by and help all other layers, but do not execute logic.
 ### Visual Layer
-A thin layer of presentations and diagrams built from the Docs/Visual blueprints. It provides dashboards, charts, and architectural diagrams. Humans and even some agent roles (like Advisor Bees) use this layer to understand the system. **The Visual layer reads from the Advisory layer outputs** (following the adjacent-only communication rule) but does not inject commands into lower layers.
+A thin layer of static documentation (Markdown files, Mermaid diagrams in `docs/visual/`) that presents architectural concepts and reasoning flows. It provides visual representations of the system for human understanding. **The Visual layer is informed by concepts from the Advisory layer** (showing how advisors reason and observe) but is not a dynamic component—it consists of static artifacts that document the architecture.
 ### Advisory Layer
 Houses the advisor agents and analytics. It consumes metrics, logs, and data from below (Control and Runtime) and produces insights. Its output is passed to humans or to Control (as suggestions). For instance, an Advisor Bee might raise an issue in the system based on its analysis. Importantly, it never side-steps the Control layer to change the running system.
 ### Control Layer

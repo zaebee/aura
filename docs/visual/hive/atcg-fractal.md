@@ -143,7 +143,7 @@ This fractal pattern means:
 - **T:** `agents/bee-keeper/src/hive/transformer.py` — `reflect()` method
 - **C:** `agents/bee-keeper/src/hive/connector.py` — `act()` method
 - **G:** `agents/bee-keeper/src/hive/generator.py` — `pulse()` method
-- **M:** Implicit in input validation (prompts, file access)
+- **M:** Implicit in input validation (prompts, file access). *Note: bee-keeper is an advisory-only service without economic decisions, so deterministic guards are minimal. Future enhancement: extract to explicit `membrane.py` for consistency.*
 
 ### core-service ATCG-M
 - **A:** `core-service/src/hive/aggregator.py` — Data collection layer

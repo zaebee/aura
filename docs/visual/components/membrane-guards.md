@@ -250,7 +250,7 @@ sequenceDiagram
 **Key Moments:**
 1. **M (in)** detects prompt injection, sanitizes before LLM sees it
 2. **T (Transformer)** hallucinates "accept $30" despite floor being $50
-3. **M (out)** overrides to "reject" because `bid < floor_price`
+3. **M (out)** overrides to "counter" because `bid < floor_price`
 4. **C (Connector)** sends sanitized, rule-compliant response
 
 ---

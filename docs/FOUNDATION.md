@@ -8,7 +8,7 @@ Every element of the Hive exists at one of four levels:
    - **Content:** Pure Python `Protocols`, `BaseModels`, and `Type` definitions.
    - **Rule:** No business logic. No external I/O. This is the shared language of all Bees.
 
-2. **Level 2: The Nucleus (`/core`)**
+2. **Level 2: The Nucleus (`/core-service`)**
    - **Status:** The Sovereign Brain.
    - **Content:** The ATCG-M metabolism implementation for decision making.
    - **Rule:** Uses the Genome to reason. Communicates via NATS "Bloodstream".
