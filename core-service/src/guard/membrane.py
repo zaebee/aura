@@ -16,6 +16,9 @@ class OutputGuard:
     Protects against economic hallucinations and floor price breaches.
     """
 
+    def __init__(self) -> None:
+        self.allowed_addons = set(settings.safety.allowed_addons)
+
     def validate_decision(self, decision: dict, context: dict) -> bool:
         """
         Validates a negotiation decision against economic guardrails.
@@ -79,7 +82,7 @@ class OutputGuard:
         # 5. Addons Validation
         addons = decision.get("addons", [])
         for addon in addons:
-            if addon not in settings.safety.allowed_addons:
+            if addon not in self.allowed_addons:
                 logger.warning("unauthorized_addon", addon=addon)
                 raise SafetyViolation(f"Unauthorized addon: {addon}")
 
