@@ -1,95 +1,93 @@
 import nacl from 'tweetnacl'
 import { fromJson } from "@bufbuild/protobuf";
-import { SearchResponseSchema, SearchResultItem, SearchResponse, NegotiateRequest, NegotiateResponse, NegotiateResponseSchema } from './aura/negotiation/v1/negotiation_pb'
+import {
+  SearchResponseSchema,
+  SearchResponse,
+  NegotiateResponse,
+  NegotiateResponseSchema
+} from '../../lib/aura/negotiation/v1/negotiation_pb'
+import { Connector, Observation } from '../dna';
 
-export class BrowserAgentWallet {
+export class AgentWallet implements Connector {
   private keyPair: nacl.SignKeyPair
   private agentId: string
   private readonly GATEWAY_URL: string
 
   constructor(gatewayUrl?: string) {
-    // Configure API Gateway URL from environment or parameter
     this.GATEWAY_URL = gatewayUrl ||
-      process.env.NEXT_PUBLIC_API_GATEWAY_URL ||
+      (import.meta.env.VITE_API_GATEWAY_URL) ||
       'http://localhost:8000/v1'
 
-    // Generate Ed25519 key pair
     this.keyPair = nacl.sign.keyPair()
-    // Create agent ID from public key (did:key format with full hex)
     this.agentId = `did:key:${Array.from(this.keyPair.publicKey).map(b => b.toString(16).padStart(2, '0')).join('')}`
   }
 
-  /**
-   * Get the agent's decentralized identifier
-   */
   getAgentId(): string {
     return this.agentId
   }
 
-  /**
-   * Get the public key for verification
-   */
-  getPublicKey(): Uint8Array {
-    return this.keyPair.publicKey
+  async act(action: string, params: unknown): Promise<Observation> {
+    try {
+      switch (action) {
+        case 'search': {
+          if (!params || typeof params !== 'object' || !('query' in params)) {
+            return { success: false, error: 'Invalid params for search: missing query' };
+          }
+          const p = params as { query: string; limit?: number };
+          const searchResult = await this.search(p.query, p.limit);
+          return { success: true, data: searchResult };
+        }
+        case 'negotiate': {
+          if (!params || typeof params !== 'object' || !('itemId' in params) || !('bidAmount' in params)) {
+            return { success: false, error: 'Invalid params for negotiate: missing itemId or bidAmount' };
+          }
+          const p = params as { itemId: string; bidAmount: number; currency?: string };
+          const negotiateResult = await this.negotiate(p.itemId, p.bidAmount, p.currency);
+          return { success: true, data: negotiateResult };
+        }
+        default:
+          return { success: false, error: `Unknown action: ${action}` };
+      }
+    } catch (error) {
+      return { success: false, error: error instanceof Error ? error.message : String(error) };
+    }
   }
 
-  /**
-   * Hash the request body to create a consistent signature
-   * Returns SHA-256 hash as hex string to match backend format
-   */
   private async hashBody(body: unknown): Promise<string> {
-    // Recursively sort object keys to ensure a canonical JSON representation
-    // that matches the backend's implementation.
-    const deepSort = (obj: any): any => {
+    const deepSort = (obj: unknown): unknown => {
       if (Array.isArray(obj)) {
         return obj.map(v => deepSort(v));
       }
       if (obj !== null && typeof obj === 'object') {
         return Object.keys(obj).sort().reduce((result, key) => {
-          result[key] = deepSort(obj[key]);
+          (result as Record<string, unknown>)[key] = deepSort((obj as Record<string, unknown>)[key]);
           return result;
-        }, {} as Record<string, any>);
+        }, {} as Record<string, unknown>);
       }
       return obj;
     };
 
-    // Prepare data for hashing: empty array for no body, or encoded canonical JSON
     const dataToHash = !body
       ? new Uint8Array(0)
       : new TextEncoder().encode(JSON.stringify(deepSort(body)));
 
-    // Calculate SHA-256 hash
     const hashBuffer = await crypto.subtle.digest('SHA-256', dataToHash);
 
-    // Convert to hex string (matches Python hashlib.sha256().hexdigest())
     return Array.from(new Uint8Array(hashBuffer))
         .map(b => b.toString(16).padStart(2, '0'))
         .join('')
   }
 
-  /**
-   * Sign a request with Ed25519 and return authentication headers
-   * Format matches backend: METHOD + PATH + TIMESTAMP + BODY_HASH (no separators)
-   */
   async signRequest(method: string, path: string, body: unknown = null): Promise<Record<string, string>> {
-    // 1. Timestamp in SECONDS (not milliseconds)
     const timestamp = Math.floor(Date.now() / 1000).toString()
-
-    // 2. Hash body as HEX
     const bodyHash = await this.hashBody(body)
-
-    // 3. Create canonical request: METHOD + PATH + TIMESTAMP + BODY_HASH
-    // Direct concatenation, no separators
-    // Uppercase method for HTTP standard compliance (backend receives uppercase)
     const canonicalRequest = `${method.toUpperCase()}${path}${timestamp}${bodyHash}`
 
-    // 4. Sign with Ed25519
     const signature = nacl.sign.detached(
       new TextEncoder().encode(canonicalRequest),
       this.keyPair.secretKey
     )
 
-    // 5. Return headers with HEX-encoded signature (not base64)
     return {
       'X-Agent-ID': this.agentId,
       'X-Timestamp': timestamp,
@@ -97,11 +95,7 @@ export class BrowserAgentWallet {
     }
   }
 
-  /**
-   * Make an authenticated API request
-   */
   async fetchWithAuth(path: string, method: string = 'GET', body: unknown = null): Promise<Response> {
-    // signRequest is now async, so await it
     const headers = await this.signRequest(method, path, body)
 
     const response = await fetch(`${this.GATEWAY_URL}${path}`, {
@@ -120,10 +114,7 @@ export class BrowserAgentWallet {
     return response
   }
 
-  /**
-   * Search for items using the API
-   */
-  async search(query: string, limit: number = 3): Promise<SearchResponse> {
+  private async search(query: string, limit: number = 3): Promise<SearchResponse> {
     const response = await this.fetchWithAuth('/search', 'POST', {
       query,
       limit
@@ -132,20 +123,13 @@ export class BrowserAgentWallet {
     return fromJson(SearchResponseSchema, json)
   }
 
-  /**
-   * Submit a negotiation request
-   */
-  async negotiate(itemId: string, bidAmount: number, currency: string = 'USD'): Promise<NegotiateResponse> {
+  private async negotiate(itemId: string, bidAmount: number, currency: string = 'USD'): Promise<NegotiateResponse> {
     const response = await this.fetchWithAuth('/negotiate', 'POST', {
       request_id: `req_${Date.now()}`,
       item_id: itemId,
       bid_amount: bidAmount,
       currency_code: currency,
       agent_did: this.agentId,
-      // agent: {
-      //   did: this.agentId,
-      //   reputation_score: 0.8 // Default reputation score
-      // }
     })
     const json = await response.json()
     return fromJson(NegotiateResponseSchema, json)

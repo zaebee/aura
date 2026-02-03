@@ -1,18 +1,23 @@
-'use client'
-
-import { useState, useEffect } from 'react'
-import { BrowserAgentWallet } from '@/lib/agent-wallet'
+import { useState, useMemo } from 'react'
 import { Search, MessageCircle, Wallet } from 'lucide-react'
-import { SearchResultItem, SearchResponse, NegotiateResponse, JitUiRequest } from '@/lib/aura/negotiation/v1/negotiation_pb'
+import type {
+  SearchResultItem,
+  SearchResponse,
+  NegotiateResponse,
+  JitUiRequest
+} from '@/lib/aura/negotiation/v1/negotiation_pb'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { Badge } from '@/components/ui/badge'
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
-import { JITRenderer } from '@/components/JITRenderer'
 
-// Using proto-generated SearchResultItem type
+// Hive Modules
+import { AgentWallet } from '@/hive/connector/wallet'
+import { SearchAggregator } from '@/hive/aggregator/search'
+import { WalletMembrane } from '@/hive/membrane/validator'
+import { JITRenderer } from '@/hive/transformer/engine'
 
 interface NegotiationEntry {
   type: 'bid' | 'counter' | 'accept' | 'reject' | 'jit_approved' | 'jit_rejected';
@@ -25,35 +30,34 @@ interface NegotiationEntry {
 }
 
 export default function AgentConsole() {
-  const [wallet, setWallet] = useState<BrowserAgentWallet | null>(null)
+  const [wallet] = useState(() => new AgentWallet())
+  const aggregator = useMemo(() => new SearchAggregator(wallet), [wallet])
+  const membrane = useMemo(() => new WalletMembrane(), [])
+
   const [searchQuery, setSearchQuery] = useState('')
   const [searchResults, setSearchResults] = useState<SearchResultItem[]>([])
   const [selectedItem, setSelectedItem] = useState<SearchResultItem | null>(null)
   const [bidAmount, setBidAmount] = useState('')
   const [negotiationHistory, setNegotiationHistory] = useState<NegotiationEntry[]>([])
   const [jitManifest, setJitManifest] = useState<JitUiRequest | null>(null)
-  const [currentStatus, setCurrentStatus] = useState<string | null>(null)
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
-  // Initialize wallet on component mount
-  useEffect(() => {
-    const walletInstance = new BrowserAgentWallet()
-    setWallet(walletInstance)
-  }, [])
-
   const handleSearch = async () => {
-    if (!wallet || !searchQuery.trim()) return
+    if (!searchQuery.trim()) return
     
     setIsLoading(true)
     setError(null)
     
     try {
-      const results: SearchResponse = await wallet.search(searchQuery, 5)
-      setSearchResults(results.results)
+      const results = await aggregator.perceive({ query: searchQuery, limit: 5 });
+      if (results && typeof results === 'object' && 'results' in results) {
+        setSearchResults((results as SearchResponse).results)
+      } else {
+        throw new Error('Invalid search response format');
+      }
       setSelectedItem(null)
       setNegotiationHistory([])
-      setCurrentStatus(null)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Search failed')
       console.error('Search error:', err)
@@ -66,37 +70,52 @@ export default function AgentConsole() {
     setSelectedItem(item)
     setBidAmount(item.basePrice ? (item.basePrice * 0.8).toFixed(2) : '')
     setNegotiationHistory([])
-    setCurrentStatus(null)
   }
 
   const handleNegotiate = async () => {
-    if (!wallet || !selectedItem || !bidAmount) return
+    if (!selectedItem || !bidAmount) return
     
     setIsLoading(true)
     setError(null)
     
     try {
-      const bidValue = parseFloat(bidAmount)
-      if (isNaN(bidValue) || bidValue <= 0) {
-        setError('Please enter a valid bid amount')
-        return
+      // Use Membrane for validation
+      const validation = membrane.validate({ amount: bidAmount }, 'bid');
+      if (!validation.success) {
+        setError(validation.error || 'Invalid bid');
+        setIsLoading(false);
+        return;
       }
 
-      const result: NegotiateResponse = await wallet.negotiate(selectedItem.itemId, bidValue)
+      const bidValue = validation.data;
+
+      const observation = await wallet.act('negotiate', {
+        itemId: selectedItem.itemId,
+        bidAmount: bidValue
+      });
+
+      if (!observation.success) {
+        throw new Error(observation.error || 'Negotiation failed');
+      }
+
+      const result = observation.data;
+      if (!result || typeof result !== 'object' || !('result' in result)) {
+        throw new Error('Invalid negotiation response format');
+      }
+
+      const negotiateRes = result as NegotiateResponse;
       
       // Add to negotiation history
       setNegotiationHistory(prev => [...prev, {
         type: 'bid',
-        amount: bidValue,
+        amount: bidValue as number,
         timestamp: new Date().toISOString()
       }])
 
       // Handle different response types using proto discriminated union
-      if (result.result.case === 'accepted') {
-        const accepted = result.result.value
-        setCurrentStatus('accepted')
+      if (negotiateRes.result.case === 'accepted') {
+        const accepted = negotiateRes.result.value
 
-        // Handle oneof reveal_method (reservationCode or cryptoPayment)
         const reservationCode = accepted.revealMethod?.case === 'reservationCode'
           ? accepted.revealMethod.value
           : undefined
@@ -107,22 +126,19 @@ export default function AgentConsole() {
           reservationCode: reservationCode,
           timestamp: new Date().toISOString()
         }])
-      } else if (result.result.case === 'countered') {
-        const countered = result.result.value
-        setCurrentStatus('countered')
+      } else if (negotiateRes.result.case === 'countered') {
+        const countered = negotiateRes.result.value
         setNegotiationHistory(prev => [...prev, {
           type: 'counter',
           amount: countered.proposedPrice,
           message: countered.humanMessage,
           timestamp: new Date().toISOString()
         }])
-      } else if (result.result.case === 'uiRequired') {
-        const uiRequest = result.result.value
-        setCurrentStatus('ui_required')
+      } else if (negotiateRes.result.case === 'uiRequired') {
+        const uiRequest = negotiateRes.result.value
         setJitManifest(uiRequest)
-      } else if (result.result.case === 'rejected') {
-        const rejected = result.result.value
-        setCurrentStatus('rejected')
+      } else if (negotiateRes.result.case === 'rejected') {
+        const rejected = negotiateRes.result.value
         setNegotiationHistory(prev => [...prev, {
           type: 'reject',
           reason: rejected.reasonCode,
@@ -139,14 +155,12 @@ export default function AgentConsole() {
   }
 
   const handleJITResponse = async (approved: boolean) => {
-    if (!jitManifest || !wallet) return
+    if (!jitManifest) return
     
     setIsLoading(true)
     setError(null)
 
     try {
-      // For now, we'll just close the JIT dialog
-      // In a real implementation, this would send an approval/rejection to the backend
       setJitManifest(null)
       setNegotiationHistory(prev => [...prev, {
         type: approved ? 'jit_approved' : 'jit_rejected',
@@ -165,13 +179,11 @@ export default function AgentConsole() {
   return (
     <div className="max-w-7xl mx-auto space-y-6 p-4">
       <header className="flex justify-between items-center py-6 border-b border-gray-700 animate-fade-in">
-        <h1 className="h1 bg-cyberpunk-gradient bg-clip-text text-transparent">Aura Agent Console</h1>
-        {wallet && (
-          <div className="flex items-center space-x-3 bg-gray-800 px-4 py-2 rounded-lg border border-gray-700">
-            <Wallet className="text-cyberpunk-purple" size={18} />
-            <span className="body-text-sm">Agent: {wallet.getAgentId()}</span>
-          </div>
-        )}
+        <h1 className="h1 bg-gradient-to-r from-[#00f2ff] to-[#bc13fe] bg-clip-text text-transparent">Aura Agent Console</h1>
+        <div className="flex items-center space-x-3 bg-gray-800 px-4 py-2 rounded-lg border border-gray-700">
+          <Wallet className="text-cyberpunk-purple" size={18} />
+          <span className="body-text-sm">Agent: {wallet.getAgentId()}</span>
+        </div>
       </header>
 
       {/* Search Section */}
@@ -326,7 +338,7 @@ export default function AgentConsole() {
       {/* JIT Renderer */}
       {jitManifest && (
         <JITRenderer 
-          manifest={jitManifest} 
+          request={jitManifest}
           onApprove={() => handleJITResponse(true)} 
           onReject={() => handleJITResponse(false)} 
         />
