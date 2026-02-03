@@ -73,16 +73,26 @@ data:
           }
         },
         {
-          "title": "Latest Traces (Jaeger)",
-          "type": "jaeger",
+          "title": "Latest Traces ($service)",
+          "type": "traces",
           "gridPos": { "h": 12, "w": 12, "x": 0, "y": 16 },
           "datasource": { "type": "jaeger", "uid": "Jaeger" },
           "targets": [
             {
+              "service": "$service",
               "queryType": "search",
-              "service": "{{ .Release.Name }}-core"
+              "refId": "A",
+              "limit": 20
             }
-          ]
+          ],
+          "options": {
+            "showFilters": false,
+            "showTable": true,
+            "showTraceTimeline": true,
+            "tableColumnSettings": [
+              { "column": "Duration", "unit": "ms" }
+            ]
+          }
         },
         {
           "title": "Decision Logs (Loki)",
@@ -108,7 +118,7 @@ data:
       ],
       "schemaVersion": 38,
       "style": "dark",
-      "tags": ["aura", "metabolism"],
+      "tags": ["{{ .Release.Name }}", "metabolism"],
       "templating": {
         "list": [
           {
@@ -123,6 +133,19 @@ data:
             "refresh": 1,
             "sort": 1,
             "current": { "text": "{{ .Release.Namespace }}", "value": "{{ .Release.Namespace }}" }
+          },
+          {
+            "name": "service",
+            "type": "query",
+            "datasource": { "type": "jaeger", "uid": "Jaeger" },
+            "definition": "services()",
+            "hide": 0,
+            "includeAll": false,
+            "multi": false,
+            "query": "services()",
+            "refresh": 1,
+            "sort": 1,
+            "current": { "text": "{{ .Release.Name }}-core", "value": "{{ .Release.Name }}-core" }
           }
         ]
       },
