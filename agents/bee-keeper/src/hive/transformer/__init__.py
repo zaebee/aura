@@ -7,19 +7,20 @@ import structlog
 import yaml  # type: ignore
 
 from config import KeeperSettings
-from aura_core.dna import (
+from aura_core import (
     ALLOWED_CHAMBERS,
     ALLOWED_ROOT_FILES,
     MACRO_ATCG_FOLDERS,
     AuditObservation,
     BeeContext,
+    Transformer,
     find_hive_root,
 )
 
 logger = structlog.get_logger(__name__)
 
 
-class BeeTransformer:
+class BeeTransformer(Transformer[BeeContext, AuditObservation]):
     """T - Transformer: Analyzes purity and generates audit observations."""
 
     def __init__(self, settings: KeeperSettings) -> None:
@@ -42,6 +43,9 @@ class BeeTransformer:
                 self.manifest = yaml.safe_load(f)
         else:
             self.manifest = {}
+
+    async def think(self, context: BeeContext, **kwargs: Any) -> AuditObservation:
+        return await self.reflect(context)
 
     async def reflect(self, context: BeeContext) -> AuditObservation:
         logger.info("bee_transformer_reflect_started")
@@ -174,6 +178,30 @@ class BeeTransformer:
                     heresies.append(
                         f"Pattern Heresy: Raw 'os.getenv()' detected in diff: `{added_code}`. Use `settings` instead."
                     )
+
+                # 5. Protocol Enforcement (Ensure classes in ATCG folders implement generic protocols)
+                if "class " in added_code and ":" in added_code:
+                    # Check if it's in an ATCG nucleotide
+                    is_atcg_file = any(
+                        n in current_file
+                        for n in ["aggregator", "transformer", "connector", "generator"]
+                    )
+                    if is_atcg_file and "src/hive" in current_file:
+                        # Ensure it implements the generic protocol (e.g., Aggregator[...) or Skill
+                        has_protocol = any(
+                            p in added_code
+                            for p in [
+                                "Aggregator[",
+                                "Transformer[",
+                                "Connector[",
+                                "Generator[",
+                                "(Skill)",
+                            ]
+                        )
+                        if not has_protocol:
+                            heresies.append(
+                                f"Protocol Heresy: Class `{added_code}` in `{current_file}` does not implement a Generic ATCG Protocol or Skill. Architecture purity is compromised."
+                            )
 
         return heresies
 

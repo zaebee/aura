@@ -1,7 +1,7 @@
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
-from aura_core.dna import HiveContext, IntentAction, NegotiationOffer
+from aura_core import HiveContext, IntentAction, NegotiationOffer
 from hive.aggregator import HiveAggregator
 from hive.membrane import HiveMembrane
 

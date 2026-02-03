@@ -1,14 +1,14 @@
 from typing import Any
 
 import structlog
-from aura_core.dna import (
+from aura_core import (
     Aggregator,
     Connector,
     Generator,
     Membrane,
     Transformer,
 )
-from aura_core.dna import (
+from aura_core import (
     MetabolicLoop as BaseMetabolicLoop,
 )
 from opentelemetry import trace
@@ -27,11 +27,11 @@ class MetabolicLoop(BaseMetabolicLoop):
 
     def __init__(
         self,
-        aggregator: Aggregator,
-        transformer: Transformer,
-        connector: Connector,
-        generator: Generator,
-        membrane: Membrane,
+        aggregator: Aggregator[Any, Any],
+        transformer: Transformer[Any, Any],
+        connector: Connector[Any, Any],
+        generator: Generator[Any, Any],
+        membrane: Membrane[Any, Any, Any],
     ):
         super().__init__(aggregator, transformer, connector, generator, membrane)
 

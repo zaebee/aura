@@ -1,5 +1,5 @@
 import pytest
-from aura_core.dna import HiveContext, IntentAction, NegotiationOffer
+from aura_core import HiveContext, IntentAction, NegotiationOffer
 from hive.membrane import HiveMembrane
 
 

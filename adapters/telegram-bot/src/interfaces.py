@@ -1,6 +1,6 @@
 from typing import Protocol
 
-from aura_core.dna import NegotiationResult, SearchResult
+from aura_core import NegotiationResult, SearchResult
 
 
 class NegotiationProvider(Protocol):

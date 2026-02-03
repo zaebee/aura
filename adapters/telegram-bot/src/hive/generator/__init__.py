@@ -3,14 +3,14 @@ import time
 from typing import Any
 
 import structlog
-from aura_core.dna import Event, Observation
+from aura_core import Event, Generator, Observation
 from opentelemetry import trace
 
 logger = structlog.get_logger(__name__)
 tracer = trace.get_tracer(__name__)
 
 
-class TelegramGenerator:
+class TelegramGenerator(Generator[Observation, Event]):
     """G - Generator: Emits events to NATS blood stream."""
 
     def __init__(self, nats_client: Any = None):

@@ -8,7 +8,7 @@ from datetime import UTC, datetime
 from typing import Any
 
 import httpx
-from aura_core.dna import Observation, SkillProtocol
+from aura_core import Observation, Skill
 from solders.keypair import Keypair  # type: ignore
 from solders.pubkey import Pubkey  # type: ignore
 
@@ -27,7 +27,7 @@ ASSOCIATED_TOKEN_PROGRAM_ID = "ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL"  # 
 AMOUNT_TOLERANCE = 0.0001
 
 
-class SolanaProvider(SkillProtocol):
+class SolanaProvider(Skill):
     """
     Solana blockchain payment verification provider.
 

@@ -2,13 +2,13 @@ from typing import Any
 
 import structlog
 from aiogram.types import Message
-from aura_core.dna import (
+from aura_core import (
+    Aggregator,
+    Connector,
+    Generator,
     MetabolicLoop,
     Observation,
-    TelegramAggregator,
-    TelegramConnector,
-    TelegramGenerator,
-    TelegramTransformer,
+    Transformer,
 )
 from opentelemetry import trace
 
@@ -24,16 +24,16 @@ class TelegramMetabolism(MetabolicLoop):
 
     def __init__(
         self,
-        aggregator: TelegramAggregator,
-        transformer: TelegramTransformer,
-        connector: TelegramConnector,
-        generator: TelegramGenerator,
+        aggregator: Aggregator[Any, Any],
+        transformer: Transformer[Any, Any],
+        connector: Connector[Any, Any],
+        generator: Generator[Any, Any],
     ):
         super().__init__(aggregator, transformer, connector, generator)
-        self.aggregator: TelegramAggregator = aggregator
-        self.transformer: TelegramTransformer = transformer
-        self.connector: TelegramConnector = connector
-        self.generator: TelegramGenerator = generator
+        self.aggregator: Aggregator[Any, Any] = aggregator
+        self.transformer: Transformer[Any, Any] = transformer
+        self.connector: Connector[Any, Any] = connector
+        self.generator: Generator[Any, Any] = generator
 
     async def execute_search(self, query: str, message: Message) -> Observation:
         """Execute a search metabolic cycle."""
@@ -42,7 +42,7 @@ class TelegramMetabolism(MetabolicLoop):
             span.set_attribute("query", query)
 
             # A: Perceive (Get context from message)
-            context = await self.aggregator.perceive(message, {})
+            context = await self.aggregator.perceive(message, state_data={})
 
             # C: Call Core Search
             results = await self.connector.search_core(query)
@@ -72,7 +72,7 @@ class TelegramMetabolism(MetabolicLoop):
             logger.info("negotiation_cycle_started")
 
             # A: Perceive (Get context from message and state)
-            context = await self.aggregator.perceive(signal, state_data)
+            context = await self.aggregator.perceive(signal, state_data=state_data)
 
             if context.hive_context:
                 span.set_attribute("item_id", context.hive_context.item_id)

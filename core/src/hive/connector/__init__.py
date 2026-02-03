@@ -4,7 +4,7 @@ import uuid
 from typing import Any
 
 import structlog
-from aura_core.dna import HiveContext, IntentAction, Observation
+from aura_core import Connector, HiveContext, IntentAction, Observation
 from sqlalchemy.exc import SQLAlchemyError
 
 from config import get_settings
@@ -16,14 +16,14 @@ from .proteins.pricing import PriceConverter
 logger = structlog.get_logger(__name__)
 
 
-class HiveConnector:
+class HiveConnector(Connector[IntentAction, Observation]):
     """C - Connector: Maps internal IntentAction to gRPC responses and external systems."""
 
     def __init__(self, market_service: Any = None) -> None:
         self.market_service = market_service
         self.settings = get_settings()
 
-    async def act(self, action: IntentAction, context: HiveContext) -> Observation:
+    async def act(self, action: IntentAction, context: Any = None) -> Observation:
         """
         Execute the decision and produce an observation (the gRPC response).
         """
@@ -31,7 +31,7 @@ class HiveConnector:
 
         # 1. Map IntentAction to Protobuf NegotiateResponse
         response = negotiation_pb2.NegotiateResponse()
-        response.session_token = "sess_" + (context.request_id or str(uuid.uuid4()))
+        response.session_token = "sess_" + (getattr(context, "request_id", None) or str(uuid.uuid4()))
         response.valid_until_timestamp = int(time.time() + 600)
 
         if action.action == "accept":

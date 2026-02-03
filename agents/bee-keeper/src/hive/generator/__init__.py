@@ -3,18 +3,20 @@ import litellm
 import structlog
 
 from config import KeeperSettings
-from aura_core.dna import (
+from aura_core import (
     ALLOWED_CHAMBERS,
     AuditObservation,
     BeeContext,
     BeeObservation,
+    Event,
+    Generator,
     find_hive_root,
 )
 
 logger = structlog.get_logger(__name__)
 
 
-class BeeGenerator:
+class BeeGenerator(Generator[BeeObservation, Event]):
     """G - Generator: Updates documentation and chronicles."""
 
     def __init__(self, settings: KeeperSettings) -> None:
@@ -28,6 +30,11 @@ class BeeGenerator:
             if prompt_path.exists()
             else "You are bee.Keeper, guardian of the Aura Hive."
         )
+
+    async def pulse(self, observation: BeeObservation) -> list[Event]:
+        # Base pulse for BeeKeeper - currently generate handles the heavy lifting
+        # but we implement this to satisfy the protocol.
+        return []
 
     async def generate(
         self,
