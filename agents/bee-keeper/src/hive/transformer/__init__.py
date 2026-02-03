@@ -195,7 +195,7 @@ class BeeTransformer(Transformer[BeeContext, AuditObservation]):
                                 "Transformer[",
                                 "Connector[",
                                 "Generator[",
-                                "(Skill)",
+                                "Skill",
                             ]
                         )
                         if not has_protocol:

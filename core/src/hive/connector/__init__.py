@@ -27,6 +27,10 @@ class HiveConnector(Connector[IntentAction, Observation]):
         """
         Execute the decision and produce an observation (the gRPC response).
         """
+        if context is not None and not isinstance(context, HiveContext):
+            logger.error("invalid_context_type", expected="HiveContext", actual=type(context).__name__)
+            # We continue but some fields might be missing
+
         logger.debug("connector_act_started", action=action.action)
 
         # 1. Map IntentAction to Protobuf NegotiateResponse

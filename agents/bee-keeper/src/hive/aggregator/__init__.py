@@ -42,10 +42,6 @@ class BeeAggregator(Aggregator[Any, BeeContext]):
             metadata={"brain_status": self.brain_status},
         )
 
-    # Alias for backward compatibility if needed, though we'll update metabolism
-    async def sense(self, event_name: str = "manual") -> BeeContext:
-        return await self.perceive(None, event_name=event_name)
-
     async def _get_git_diff(self) -> str:
         try:
             # Try to get diff between HEAD~1 and HEAD, excluding meta files
