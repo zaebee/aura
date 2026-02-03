@@ -13,8 +13,8 @@ from pathlib import Path
 import dspy
 import structlog
 from dspy.teleprompt import BootstrapFewShot
-from src.hive.transformer.llm.engine import AuraNegotiator
-from src.hive.transformer.llm.prepare.clean import clean_and_parse_json
+from hive.transformer.llm.engine import AuraNegotiator
+from hive.transformer.llm.prepare.clean import clean_and_parse_json
 
 # Configure logging
 structlog.configure(
