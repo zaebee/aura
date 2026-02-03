@@ -10,6 +10,7 @@ ENV UV_COMPILE_BYTECODE=1
 ENV UV_LINK_MODE=copy
 
 # Copy dependency files
+COPY pyproject.toml /app/
 COPY packages/aura-core /app/packages/aura-core
 COPY api-gateway/pyproject.toml api-gateway/uv.lock /app/api-gateway/
 

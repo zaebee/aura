@@ -14,6 +14,7 @@ ENV UV_LINK_MODE=copy
 
 # Copy dependency files
 # We need aura-core because it's a local dependency
+COPY pyproject.toml /app/
 COPY packages/aura-core /app/packages/aura-core
 COPY adapters/telegram-bot/pyproject.toml adapters/telegram-bot/uv.lock /app/adapters/telegram-bot/
 
@@ -44,6 +45,7 @@ ENV UV_COMPILE_BYTECODE=1
 ENV UV_LINK_MODE=copy
 
 # Copy dependency files
+COPY pyproject.toml /app/
 COPY packages/aura-core /app/packages/aura-core
 COPY adapters/telegram-bot/pyproject.toml adapters/telegram-bot/uv.lock /app/adapters/telegram-bot/
 
