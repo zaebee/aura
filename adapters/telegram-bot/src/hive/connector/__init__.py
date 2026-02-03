@@ -1,3 +1,5 @@
+from typing import Any
+
 import structlog
 from aura_core import (
     Connector,
@@ -23,12 +25,12 @@ class TelegramConnector(Connector[UIAction, Observation]):
         self.telegram = telegram
         self.aura = aura
 
-    async def act(self, action: UIAction, context: TelegramContext) -> Observation:
+    async def act(self, action: UIAction, context: Any = None) -> Observation:
         with tracer.start_as_current_span("connector_act") as span:
             span.set_attribute("action_type", action.action_type)
             if action.action_type == "send_message":
                 params = {
-                    "chat_id": context.chat_id,
+                    "chat_id": getattr(context, "chat_id", 0) if context else 0,
                     "text": action.text,
                     "reply_markup": action.reply_markup,
                     "parse_mode": action.parse_mode,

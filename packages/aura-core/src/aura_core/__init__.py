@@ -3,7 +3,6 @@ from .dna import (
     ALLOWED_ROOT_FILES,
     MACRO_ATCG_FOLDERS,
     Aggregator,
-    BeeDNA,
     Connector,
     Generator,
     Membrane,
@@ -42,7 +41,6 @@ __all__ = [
     "Generator",
     "Membrane",
     "Skill",
-    "BeeDNA",
     # Logic
     "MetabolicLoop",
     # Types

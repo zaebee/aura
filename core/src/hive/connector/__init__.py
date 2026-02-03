@@ -31,14 +31,15 @@ class HiveConnector(Connector[IntentAction, Observation]):
 
         # 1. Map IntentAction to Protobuf NegotiateResponse
         response = negotiation_pb2.NegotiateResponse()
-        response.session_token = "sess_" + (getattr(context, "request_id", None) or str(uuid.uuid4()))
+        request_id = getattr(context, "request_id", None) if context else None
+        response.session_token = "sess_" + (request_id or str(uuid.uuid4()))
         response.valid_until_timestamp = int(time.time() + 600)
 
         if action.action == "accept":
             response.accepted.final_price = action.price
             response.accepted.reservation_code = f"HIVE-{uuid.uuid4()}"
 
-            if self.settings.crypto.enabled and self.market_service:
+            if self.settings.crypto.enabled and self.market_service and context:
                 await self._handle_crypto_lock(response, action, context)
 
         elif action.action == "counter":

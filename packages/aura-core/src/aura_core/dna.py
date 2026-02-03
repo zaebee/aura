@@ -2,14 +2,12 @@ import time
 from pathlib import Path
 from typing import Any, Generic, Protocol, TypeVar, runtime_checkable
 
-from .types import Event, HiveContext, IntentAction, Observation, Signal
-
 # 1. Define TypeVars for the metabolic steps
-S_inv = TypeVar("S_inv", bound=Signal, contravariant=True)  # Input Signal
-C_cov = TypeVar("C_cov", bound=HiveContext, covariant=True)  # Output Context
-I_inv = TypeVar("I_inv", bound=IntentAction, contravariant=True)  # Input Intent
-O_cov = TypeVar("O_cov", bound=Observation, covariant=True)  # Output Observation
-E_cov = TypeVar("E_cov", bound=Event, covariant=True)  # Output Event
+S_inv = TypeVar("S_inv", contravariant=True)  # Input Signal
+C_cov = TypeVar("C_cov", covariant=True)  # Output Context
+I_inv = TypeVar("I_inv", contravariant=True)  # Input Intent
+O_cov = TypeVar("O_cov", covariant=True)  # Output Observation
+E_cov = TypeVar("E_cov", covariant=True)  # Output Event
 
 
 def find_hive_root() -> Path:
@@ -132,14 +130,7 @@ class Skill(Protocol):
 
     async def initialize(self) -> bool: ...
 
-    async def execute(self, intent: str, params: dict[str, Any]) -> Observation: ...
-
-
-@runtime_checkable
-class BeeDNA(Protocol):
-    """Protocol for the Hive components."""
-
-    pass
+    async def execute(self, intent: str, params: dict[str, Any]) -> Any: ...
 
 
 class MetabolicLoop:
@@ -162,7 +153,7 @@ class MetabolicLoop:
         self.generator = generator
         self.membrane = membrane
 
-    async def execute(self, signal: Any, **kwargs: Any) -> Observation:
+    async def execute(self, signal: Any, **kwargs: Any) -> Any:
         """
         Execute one full metabolic cycle:
         Signal -> [Membrane In] -> Aggregator -> Transformer -> [Membrane Out] -> Connector -> Generator
@@ -183,7 +174,7 @@ class MetabolicLoop:
             decision = await self.membrane.inspect_outbound(decision, context)
 
         # 5. Connector (C)
-        observation: Observation = await self.connector.act(decision, context)
+        observation = await self.connector.act(decision, context)
 
         # 6. Generator (G)
         await self.generator.pulse(observation)
