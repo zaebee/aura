@@ -6,8 +6,10 @@ from aura_core.dna import (
     Connector,
     Generator,
     Membrane,
-    MetabolicLoop as BaseMetabolicLoop,
     Transformer,
+)
+from aura_core.dna import (
+    MetabolicLoop as BaseMetabolicLoop,
 )
 from opentelemetry import trace
 

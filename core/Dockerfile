@@ -36,7 +36,7 @@ COPY core/src /app/core/src
 COPY core/alembic.ini /app/core/alembic.ini
 COPY core/migrations /app/core/migrations
 COPY core/data /app/core/data
-COPY core/train_dspy.py /app/core/train_dspy.py
+# COPY core/scripts/training/train_dspy.py /app/core/train_dspy.py
 
 WORKDIR /app/core
 

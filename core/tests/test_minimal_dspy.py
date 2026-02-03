@@ -4,6 +4,8 @@ Minimal DSPy test to isolate the issue.
 """
 
 import json
+import sys
+
 import dspy
 import structlog
 from src.hive.transformer.llm.engine import AuraNegotiator

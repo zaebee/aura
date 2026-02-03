@@ -12,7 +12,6 @@ from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 import structlog
-
 from src.hive.transformer.llm.dspy_strategy import DSPyStrategy
 from src.hive.transformer.llm.engine import AuraNegotiator
 from src.hive.transformer.llm.signatures import Negotiate

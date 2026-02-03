@@ -1,5 +1,6 @@
 from prometheus_client import REGISTRY, Counter
 
+
 # Negotiation Metrics
 def _get_counter(name, documentation, labelnames):
     """Safely get or create a counter to avoid duplication errors during reloads."""

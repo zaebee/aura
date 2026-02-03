@@ -4,10 +4,8 @@ Simple test for DSPy integration - tests basic functionality.
 """
 
 import sys
-from pathlib import Path
 
 import structlog
-
 from src.hive.transformer.llm.dspy_strategy import DSPyStrategy
 from src.hive.transformer.llm.engine import AuraNegotiator
 from src.hive.transformer.llm.signatures import Negotiate
