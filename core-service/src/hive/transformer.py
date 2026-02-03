@@ -168,17 +168,18 @@ class AuraTransformer:
             )
 
         try:
+            economic_context = await self._aggregate("economic", context)
+
             # Use dspy.context for request-scoped model configuration
             with dspy.context(lm=dspy.LM(model, temperature=temperature)):
                 result = await asyncio.to_thread(
                     self.negotiator,
                     input_bid=context.offer.bid_amount,
-                    context=await self._aggregate("economic", context),
+                    context=economic_context,
                     history=[],  # History tracking planned for future iterations
                 )
 
             action_data = result["action"]
-            economic_context = await self._aggregate("economic", context)
 
             # Deterministic safety layer (Membrane Pattern)
             try:

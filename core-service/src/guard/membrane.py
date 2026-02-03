@@ -48,7 +48,7 @@ class OutputGuard:
                     margin=margin,
                     min_margin=settings.safety.min_profit_margin,
                 )
-                raise SafetyViolation("Economic suicide attempt")
+                raise SafetyViolation("Minimum profit margin violation")
         elif action in ["accept", "counter"]:
             logger.warning("invalid_offered_price", price=offered_price)
             raise SafetyViolation("Invalid offered price")
@@ -61,7 +61,7 @@ class OutputGuard:
                 offered_price=offered_price,
                 floor_price=floor_price,
             )
-            raise SafetyViolation("Floor price breach")
+            raise SafetyViolation("Floor price violation")
 
         # 4. Max Discount Violation
         base_price = context.get("base_price", 0.0)
