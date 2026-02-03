@@ -7,9 +7,10 @@ import dspy
 import structlog
 from aura_core.dna import FailureIntent, HiveContext, IntentAction
 
-from ...config import get_settings
-from ..aggregator import InventoryItem, SessionLocal
-from ..metabolism.logging_config import bind_request_id
+from config import get_settings
+from hive.aggregator import InventoryItem, SessionLocal
+from hive.metabolism.logging_config import bind_request_id
+
 from .llm.engine import AuraNegotiator
 
 logger = structlog.get_logger(__name__)

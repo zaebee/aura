@@ -6,7 +6,7 @@ import litellm
 import structlog
 import yaml  # type: ignore
 
-from ...config import KeeperSettings
+from config import KeeperSettings
 from aura_core.dna import (
     ALLOWED_CHAMBERS,
     ALLOWED_ROOT_FILES,
@@ -78,9 +78,7 @@ class BeeTransformer:
 
     def _deterministic_audit(self, context: BeeContext) -> list[str]:
         heresies = []
-        core_path = self.manifest.get("hive", {}).get(
-            "core_path", "core/src/hive"
-        )
+        core_path = self.manifest.get("hive", {}).get("core_path", "core/src/hive")
         allowed_files = self.manifest.get("hive", {}).get("allowed_files", [])
 
         # 1. Macro-ATCG (Root) Check

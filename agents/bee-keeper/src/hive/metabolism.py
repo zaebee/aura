@@ -1,7 +1,7 @@
 import time
 import structlog
 
-from ..config import KeeperSettings
+from config import KeeperSettings
 from .aggregator import BeeAggregator
 from .connector import BeeConnector
 from .transformer import BeeTransformer

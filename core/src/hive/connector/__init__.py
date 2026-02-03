@@ -7,9 +7,10 @@ import structlog
 from aura_core.dna import HiveContext, IntentAction, Observation
 from sqlalchemy.exc import SQLAlchemyError
 
-from ...config import get_settings
-from ..aggregator import SessionLocal
-from ..proto.aura.negotiation.v1 import negotiation_pb2
+from config import get_settings
+from hive.aggregator import SessionLocal
+from hive.proto.aura.negotiation.v1 import negotiation_pb2
+
 from .proteins.pricing import PriceConverter
 
 logger = structlog.get_logger(__name__)

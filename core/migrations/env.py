@@ -1,9 +1,10 @@
 from logging.config import fileConfig
 
 from alembic import context
+from hive.aggregator import Base  # noqa: E402
 from sqlalchemy import engine_from_config, pool
-from src.config import settings
-from src.hive.aggregator import Base  # noqa: E402
+
+from config import settings
 
 config = context.config
 
