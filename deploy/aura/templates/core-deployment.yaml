@@ -26,9 +26,9 @@ spec:
             grpc:
               port: 50051
             initialDelaySeconds: {{ .Values.core.livenessProbe.initialDelaySeconds }}
-            periodSeconds: {{ .Values.core.periodSeconds }}
-            timeoutSeconds: {{ .Values.core.timeoutSeconds }}
-            failureThreshold: {{ .Values.core.failureThreshold }}
+            periodSeconds: {{ .Values.core.livenessProbe.periodSeconds }}
+            timeoutSeconds: {{ .Values.core.livenessProbe.timeoutSeconds }}
+            failureThreshold: {{ .Values.core.livenessProbe.failureThreshold }}
           readinessProbe:
             grpc:
               port: 50051
