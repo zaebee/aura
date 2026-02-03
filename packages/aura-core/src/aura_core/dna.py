@@ -51,9 +51,10 @@ ALLOWED_ROOT_FILES = [
 ALLOWED_CHAMBERS = {
     "core/migrations": "HiveEvolutionaryScrolls",
     "core/tests": "ValidationPollen",
+    "core/scripts": "WorkerDirectives",
     "api-gateway": "HiveGate",
     "core/src/config": "SacredCodex",
-    "core/src/hive/services": "WorkerDirectives",
+    "core/src/hive/services": "LegacyChamber",
     "core/src/hive/transformer": "ReasoningNucleus",
     "core/src/hive/connector/proteins": "SecurityCitadel",
     "core/src/hive/membrane": "HiveMembrane",
@@ -64,6 +65,7 @@ ALLOWED_CHAMBERS = {
     "proto": "SacredScrolls",
     "docs": "ChroniclersArchive",
     "agents": "WorkerCells",
+    "agents/bee-keeper/src/hive/": "KeeperNucleus",
     "adapters": "HiveExtensions",
     "frontend": "HiveWindow",
     "tools": "ToolShed",
@@ -355,3 +357,52 @@ class TelegramGenerator(Protocol):
     """G - Generator: Emits events to NATS."""
 
     async def pulse(self, observation: Observation) -> list[Event]: ...
+
+
+class MetabolicLoop:
+    """
+    Generic ATCG Metabolic Loop.
+    Can be used by both core and adapters.
+    """
+
+    def __init__(
+        self,
+        aggregator: Any,
+        transformer: Any,
+        connector: Any,
+        generator: Any,
+        membrane: Any = None,
+    ):
+        self.aggregator = aggregator
+        self.transformer = transformer
+        self.connector = connector
+        self.generator = generator
+        self.membrane = membrane
+
+    async def execute(self, signal: Any, **kwargs: Any) -> Observation:
+        """
+        Execute one full metabolic cycle:
+        Signal -> [Membrane In] -> Aggregator -> Transformer -> [Membrane Out] -> Connector -> Generator
+        """
+        # 1. Inbound Membrane
+        if self.membrane and hasattr(self.membrane, "inspect_inbound"):
+            signal = await self.membrane.inspect_inbound(signal)
+
+        # 2. Aggregator (A)
+        context = await self.aggregator.perceive(signal, **kwargs)
+
+        # 3. Transformer (T)
+        # Note: Some transformers might need extra data passed in via kwargs
+        decision = await self.transformer.think(context, **kwargs)
+
+        # 4. Outbound Membrane
+        if self.membrane and hasattr(self.membrane, "inspect_outbound"):
+            decision = await self.membrane.inspect_outbound(decision, context)
+
+        # 5. Connector (C)
+        observation = await self.connector.act(decision, context)
+
+        # 6. Generator (G)
+        await self.generator.pulse(observation)
+
+        return observation

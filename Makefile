@@ -2,7 +2,7 @@
 
 # Makefile for Aura Project
 TAG ?= latest
-REGISTRY ?= ghcr.io/myuser
+REGISTRY ?= ghcr.io/zaebee
 PLATFORM ?= linux/amd64
 
 # --- 1. CODE QUALITY ---
@@ -29,17 +29,17 @@ setup-hooks:
 # Run tests
 test:
 	# Run core tests
-	PYTHONPATH=core/src uv run pytest core/tests/ -v
+	PYTHONPATH=core:core/src uv run pytest core/tests/ -v
 	# Run telegram-bot tests with isolated path to avoid 'src' collision
 	PYTHONPATH=adapters/telegram-bot/src:adapters/telegram-bot/src/proto uv run pytest adapters/telegram-bot/tests/ -v
 
 # Run tests with coverage report
 test-cov:
-	PYTHONPATH=core/src uv run pytest core/tests/ -v --cov=core/src --cov-report=term-missing
+	PYTHONPATH=core:core/src uv run pytest core/tests/ -v --cov=core/src --cov-report=term-missing
 
 # Run tests with verbose output
 test-verbose:
-	PYTHONPATH=core/src uv run pytest core/tests/ -vv -s
+	PYTHONPATH=core:core/src uv run pytest core/tests/ -vv -s
 
 # Test health endpoints
 test-health:
@@ -76,6 +76,18 @@ push-tg:
 	docker push $(REGISTRY)/aura-telegram-bot:$(TAG)
 
 # --- 5. DEV TASKS ---
+seed:
+	# Seed the database with initial inventory
+	PYTHONPATH=core:core/src uv run python core/scripts/seed.py
+
+train:
+	# Train the DSPy negotiation engine
+	PYTHONPATH=core:core/src uv run python core/scripts/training/train_dspy.py
+
+pulse:
+	# Trigger a manual NegotiationAccepted event
+	PYTHONPATH=core:core/src uv run python core/scripts/trigger_pulse.py
+
 install-dev:
 	# Install development dependencies
 	uv sync --group dev

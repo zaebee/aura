@@ -4,15 +4,9 @@ Minimal DSPy test to isolate the issue.
 """
 
 import json
-import sys
-from pathlib import Path
-
-# Add src to path
-sys.path.append(str(Path(__file__).parent / "src"))
-
 import dspy
 import structlog
-from llm.engine import AuraNegotiator
+from src.hive.transformer.llm.engine import AuraNegotiator
 
 # Configure logging
 structlog.configure(

@@ -14,11 +14,8 @@ import dspy
 import structlog
 from dspy.teleprompt import BootstrapFewShot
 
-# Add src to path for imports
-sys.path.append(str(Path(__file__).parent / "src"))
-
-from llm.engine import AuraNegotiator
-from llm.prepare.clean import clean_and_parse_json
+from src.hive.transformer.llm.engine import AuraNegotiator
+from src.hive.transformer.llm.prepare.clean import clean_and_parse_json
 
 # Configure logging
 structlog.configure(
@@ -33,7 +30,13 @@ logger = structlog.get_logger(__name__)
 
 def load_training_data() -> list[dict]:
     """Load and flatten training data from JSON file."""
-    data_path = Path(__file__).parent / "data" / "negotiation_training.json"
+    # Find core data directory relative to the repository root
+    # This assumes the script is run from the repo root via Makefile
+    data_path = Path("core/data/negotiation_training.json")
+
+    if not data_path.exists():
+        # Fallback to relative path if not run from root
+        data_path = Path(__file__).parent.parent.parent / "data" / "negotiation_training.json"
 
     if not data_path.exists():
         raise FileNotFoundError(f"Training data not found at {data_path}")
@@ -174,7 +177,10 @@ def train_negotiator():
         compiled_negotiator = negotiator
 
     # Save compiled program
-    output_path = Path(__file__).parent / "data" / "aura_brain.json"
+    output_path = Path("core/data/aura_brain.json")
+    if not output_path.parent.exists():
+        output_path = Path(__file__).parent.parent.parent / "data" / "aura_brain.json"
+
     compiled_negotiator.save(str(output_path))
 
     logger.info("training_complete", saved_to=str(output_path))

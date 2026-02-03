@@ -1,5 +1,5 @@
-from hive.aggregator import InventoryItem, SessionLocal, generate_embedding
-from hive.metabolism.logging_config import configure_logging, get_logger
+from src.hive.aggregator import InventoryItem, SessionLocal, generate_embedding
+from src.hive.metabolism.logging_config import configure_logging, get_logger
 
 # Configure structured logging on startup
 configure_logging()
