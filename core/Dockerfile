@@ -1,8 +1,8 @@
-FROM ghcr.io/astral-sh/uv:python3.12-bookworm-slim
+FROM ghcr.io/astral-sh/uv:python3.12-bookworm-slim AS builder
 
 WORKDIR /app
 
-# Install curl and download grpc_health_probe for health checks
+# Install system dependencies for health probe and health checks
 RUN apt-get update && \
     apt-get install -y --no-install-recommends curl ca-certificates && \
     curl -fsSL -o /bin/grpc_health_probe https://github.com/grpc-ecosystem/grpc-health-probe/releases/download/v0.4.44/grpc_health_probe-linux-amd64 && \
@@ -12,30 +12,40 @@ RUN apt-get update && \
 ENV UV_COMPILE_BYTECODE=1
 ENV UV_LINK_MODE=copy
 
-# Copy dependency files
-COPY pyproject.toml /app/
+# Copy workspace and dependency files
+COPY pyproject.toml uv.lock /app/
 COPY packages/aura-core /app/packages/aura-core
 COPY core/pyproject.toml core/uv.lock /app/core/
 
+# Install dependencies non-editable and scoped to the package, without installing the project itself
+RUN uv sync --frozen --no-dev --no-editable --package core --no-install-project
+
+# Final stage
+FROM python:3.12-slim-bookworm AS runtime
+
+WORKDIR /app
+
+# Copy grpc_health_probe from builder
+COPY --from=builder /bin/grpc_health_probe /bin/grpc_health_probe
+
+# Copy virtual environment from builder (workspace root .venv)
+COPY --from=builder /app/.venv /app/.venv
+
+# Copy source code and other artifacts to the same relative path as builder
+COPY core/src /app/core/src
+COPY core/alembic.ini /app/core/alembic.ini
+COPY core/migrations /app/core/migrations
+COPY core/data /app/core/data
+COPY core/train_dspy.py /app/core/train_dspy.py
+
 WORKDIR /app/core
 
-RUN uv sync --frozen --no-dev --no-install-project
-
-ENV PATH="/app/core/.venv/bin:$PATH"
+# Set PATH to use the virtual environment
+ENV PATH="/app/.venv/bin:$PATH"
+ENV PYTHONPATH=/app/core:/app/core/src:/app/core/src/hive/proto
 
 # Verify critical packages installed
 RUN python -c "import grpc_health.v1.health_pb2"
-
-COPY core/src ./src
-
-COPY core/alembic.ini .
-COPY core/migrations ./migrations
-
-# Copy the compiled brain (aura_brain.json) and training data
-COPY core/data ./data
-COPY core/train_dspy.py .
-
-ENV PYTHONPATH=/app/core:/app/core/src:/app/core/src/hive/proto
 
 EXPOSE 50051
 EXPOSE 9091
