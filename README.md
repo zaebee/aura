@@ -75,7 +75,7 @@ graph TD
 
 4. **Train the Brain (DSPy):**
    ```bash
-   uv run core/train_dspy.py
+   make train
    ```
 
 5. **Generate Protocol Buffer code:**
