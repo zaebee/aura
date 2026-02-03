@@ -80,7 +80,13 @@ class OutputGuard:
                 raise SafetyViolation("Maximum discount exceeded")
 
         # 5. Addons Validation
-        addons = set(decision.get("addons", []))
+        raw_addons = decision.get("addons")
+        if raw_addons is not None and not isinstance(raw_addons, list):
+            logger.warning("malformed_addons_format", addons=raw_addons)
+            addons = set()
+        else:
+            addons = set(raw_addons or [])
+
         unauthorized_addons = sorted(addons - self.allowed_addons)
         if unauthorized_addons:
             logger.warning("unauthorized_addons_detected", addons=unauthorized_addons)

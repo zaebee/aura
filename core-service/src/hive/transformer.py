@@ -112,7 +112,7 @@ class AuraTransformer:
             logger.error("failed_to_load_dspy_program", error=str(e))
             return AuraNegotiator()
 
-    async def _aggregate(self, mode: str, context: HiveContext) -> dict:
+    def _aggregate(self, mode: str, context: HiveContext) -> dict:
         """
         Internal ATCG aggregation: prepare context for transformation.
         Currently supports 'economic' mode.
@@ -173,7 +173,7 @@ class AuraTransformer:
             )
 
         try:
-            economic_context = await self._aggregate("economic", context)
+            economic_context = self._aggregate("economic", context)
 
             # Use dspy.context for request-scoped model configuration
             with dspy.context(lm=dspy.LM(model, temperature=temperature)):
