@@ -179,7 +179,7 @@ def train_negotiator():
     # Save compiled program
     output_path = Path("core/data/aura_brain.json")
     if not output_path.parent.exists():
-         output_path = Path(__file__).parent.parent.parent / "data" / "aura_brain.json"
+        output_path = Path(__file__).parent.parent.parent / "data" / "aura_brain.json"
 
     compiled_negotiator.save(str(output_path))
 

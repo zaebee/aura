@@ -27,7 +27,14 @@ async def main():
         "session_token": "manual-pulse-token"
     }
 
-    logger.info("connecting_to_nats", url=nats_url)
+    # Redact credentials for safe logging
+    safe_url = nats_url
+    if "@" in nats_url:
+        parts = nats_url.split("@")
+        protocol_parts = parts[0].split("//")
+        safe_url = f"{protocol_parts[0]}//****@{parts[1]}"
+
+    logger.info("connecting_to_nats", url=safe_url)
     try:
         nc = await nats.connect(nats_url)
         logger.info("publishing_to_nats", topic=topic)

@@ -393,7 +393,7 @@ class MetabolicLoop:
 
         # 3. Transformer (T)
         # Note: Some transformers might need extra data passed in via kwargs
-        decision = await self.transformer.think(context)
+        decision = await self.transformer.think(context, **kwargs)
 
         # 4. Outbound Membrane
         if self.membrane and hasattr(self.membrane, "inspect_outbound"):

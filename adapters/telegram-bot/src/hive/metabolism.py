@@ -48,6 +48,12 @@ class TelegramMetabolism(MetabolicLoop):
         observation = await self.connector.act(action, context)
 
         # G: Pulse
+        observation.event_type = "user_searched"
+        observation.metadata = {
+            "query": query,
+            "results_count": len(results),
+            "user_id": context.user_id,
+        }
         await self.generator.pulse(observation)
 
         return observation
@@ -67,6 +73,21 @@ class TelegramMetabolism(MetabolicLoop):
 
         # C: Act (Send Message)
         observation = await self.connector.act(action, context)
+
+        # Enrich observation for G
+        if "accepted" in core_result and core_result["accepted"]:
+            observation.event_type = "deal_accepted"
+            observation.metadata = {
+                "item_id": context.hive_context.item_id if context.hive_context else "",
+                "price": core_result["accepted"].get("final_price", 0),
+                "user_id": context.user_id,
+            }
+        elif "error" in core_result:
+            observation.event_type = "error"
+            observation.metadata = {
+                "error": core_result["error"],
+                "user_id": context.user_id,
+            }
 
         # G: Pulse
         await self.generator.pulse(observation)
