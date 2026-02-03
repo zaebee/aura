@@ -6,26 +6,26 @@ from typing import Any
 import grpc
 from fastapi import Depends, FastAPI, Header, HTTPException, Request, Response
 from grpc_health.v1 import health_pb2_grpc
-from opentelemetry.instrumentation.fastapi import FastAPIInstrumentor
-from opentelemetry.instrumentation.grpc import GrpcInstrumentorClient
-from pydantic import BaseModel
-from starlette.middleware.cors import CORSMiddleware
-
-from src.config import get_settings
-from src.health import register_health_endpoints
-from src.logging_config import (
+from health import register_health_endpoints
+from logging_config import (
     bind_request_id,
     clear_request_context,
     configure_logging,
     get_current_request_id,
     get_logger,
 )
-from src.proto.aura.negotiation.v1 import (
+from opentelemetry.instrumentation.fastapi import FastAPIInstrumentor
+from opentelemetry.instrumentation.grpc import GrpcInstrumentorClient
+from pydantic import BaseModel
+from security import verify_signature
+from starlette.middleware.cors import CORSMiddleware
+from telemetry import init_telemetry
+
+from config import get_settings
+from proto.aura.negotiation.v1 import (
     negotiation_pb2,  # type: ignore
     negotiation_pb2_grpc,  # type: ignore
 )
-from src.security import verify_signature
-from src.telemetry import init_telemetry
 
 # Configure structured logging on startup
 configure_logging()
@@ -174,7 +174,7 @@ async def negotiate(
         bid_amount=payload.bid_amount,
         currency_code=payload.currency,
         agent=negotiation_pb2.AgentIdentity(
-            did=agent_did,  # Use the verified agent_did from src.security headers
+            did=agent_did,  # Use the verified agent_did from security headers
             reputation_score=1.0,
         ),
     )

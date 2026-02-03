@@ -5,14 +5,10 @@ Minimal DSPy test to isolate the issue.
 
 import json
 import sys
-from pathlib import Path
-
-# Add src to path
-sys.path.append(str(Path(__file__).parent / "src"))
 
 import dspy
 import structlog
-from llm.engine import AuraNegotiator
+from src.hive.transformer.llm.engine import AuraNegotiator
 
 # Configure logging
 structlog.configure(
@@ -64,19 +60,17 @@ def test_minimal_dspy():
 
         logger.info(
             "prediction_successful",
-            response_type=str(type(prediction["response"])),
-            response_value=prediction["response"],
-            reasoning=prediction["reasoning"][:50],
+            response_type=str(type(prediction["action"])),
+            response_value=prediction["action"],
+            reasoning=prediction["thought"][:50],
         )
-
-        return True
 
     except Exception as e:
         logger.error("prediction_failed", error=str(e))
         import traceback
 
         traceback.print_exc()
-        return False
+        raise e
 
 
 if __name__ == "__main__":

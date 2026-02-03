@@ -31,6 +31,6 @@ spec:
             - name: AURA_TG__CORE_URL
               value: "{{ .Release.Name }}-core:50051"
             - name: OTEL_EXPORTER_OTLP_ENDPOINT
-              value: "{{ .Values.monitoring.jaeger.collectorUrl }}"
+              value: {{ .Values.monitoring.jaeger.collectorUrl | default (include "aura.jaeger.collectorUrl" .) | quote }}
             - name: LOG_LEVEL
               value: "{{ .Values.telegram.env.LOG_LEVEL }}"

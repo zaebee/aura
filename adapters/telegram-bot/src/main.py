@@ -4,21 +4,21 @@ import os
 import nats
 import structlog
 from aiogram import Bot, Dispatcher
+from bot import router
+from hive.aggregator import TelegramAggregator
+from hive.connector import TelegramConnector
+from hive.connector.proteins.aura_client import GRPCNegotiationClient
+from hive.connector.proteins.telegram_api import TelegramProtein
+from hive.generator import TelegramGenerator
+from hive.metabolism import TelegramMetabolism
+from hive.transformer import TelegramTransformer
 from opentelemetry import trace
 from opentelemetry.exporter.otlp.proto.grpc.trace_exporter import OTLPSpanExporter
 from opentelemetry.sdk.resources import SERVICE_NAME, Resource
 from opentelemetry.sdk.trace import TracerProvider
 from opentelemetry.sdk.trace.export import BatchSpanProcessor
 
-from src.bot import router
-from src.config import settings
-from src.hive.aggregator import TelegramAggregator
-from src.hive.connector import TelegramConnector
-from src.hive.connector.proteins.aura_client import GRPCNegotiationClient
-from src.hive.connector.proteins.telegram_api import TelegramProtein
-from src.hive.generator import TelegramGenerator
-from src.hive.metabolism import TelegramMetabolism
-from src.hive.transformer import TelegramTransformer
+from config import settings
 
 # Setup logging
 structlog.configure(

@@ -3,8 +3,8 @@ import sys
 
 import structlog
 
-from src.config import KeeperSettings
-from src.hive.metabolism import BeeMetabolism
+from config import KeeperSettings
+from hive.metabolism import BeeMetabolism
 
 # Configure logging
 structlog.configure(
