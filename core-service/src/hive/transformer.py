@@ -202,6 +202,7 @@ class AuraTransformer:
                         "cannot_fallback_no_floor_price",
                         error=str(e),
                         action=action_data.get("action"),
+                        price=action_data.get("price"),
                     )
                     return FailureIntent(
                         error="Safety violation with no valid floor price for fallback."

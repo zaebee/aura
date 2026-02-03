@@ -64,7 +64,10 @@ def test_max_discount_violation():
         guard.validate_decision(decision, context)
 
 
-def test_unauthorized_addon():
+def test_unauthorized_addon(monkeypatch):
+    monkeypatch.setattr(
+        "src.guard.membrane.settings.safety.allowed_addons", ["Valid Addon"]
+    )
     guard = OutputGuard()
     context = {"base_price": 1000.0, "floor_price": 600.0, "internal_cost": 500.0}
     decision = {
@@ -72,11 +75,16 @@ def test_unauthorized_addon():
         "price": 800.0,
         "addons": ["Free Helicopter Ride"],
     }
-    with pytest.raises(SafetyViolation, match="Unauthorized addons: Free Helicopter Ride"):
+    with pytest.raises(
+        SafetyViolation, match="Unauthorized addons: Free Helicopter Ride"
+    ):
         guard.validate_decision(decision, context)
 
 
-def test_multiple_unauthorized_addons():
+def test_multiple_unauthorized_addons(monkeypatch):
+    monkeypatch.setattr(
+        "src.guard.membrane.settings.safety.allowed_addons", ["Valid Addon"]
+    )
     guard = OutputGuard()
     context = {"base_price": 1000.0, "floor_price": 600.0, "internal_cost": 500.0}
     decision = {
