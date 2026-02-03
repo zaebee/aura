@@ -61,8 +61,8 @@ services:
       dockerfile: api-gateway/Dockerfile
     restart: on-failure
     environment:
-      CORE_SERVICE_HOST: core:50051
-      OTEL_SERVICE_NAME: "aura-gateway"
+      AURA_GATEWAY__CORE_HOST: core:50051
+      AURA_GATEWAY__OTEL_SERVICE_NAME: "aura-gateway"
       OTEL_EXPORTER_OTLP_ENDPOINT: "http://jaeger:4317"
       CORS_ORIGINS: "http://localhost:3000,http://127.0.0.1:3000"
     ports:

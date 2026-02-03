@@ -8,13 +8,13 @@ import secrets
 import uuid
 from datetime import UTC, datetime, timedelta
 
+from aura_core.dna import CryptoProvider
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from hive.aggregator import DealStatus, LockedDeal
-from hive.connector.proteins.encryption import SecretEncryption
-from hive.connector.proteins.interfaces import CryptoProvider
-from hive.proto.aura.negotiation.v1 import negotiation_pb2
+from ..aggregator import DealStatus, LockedDeal
+from ..connector.proteins.encryption import SecretEncryption
+from ..proto.aura.negotiation.v1 import negotiation_pb2
 
 logger = logging.getLogger(__name__)
 

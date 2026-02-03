@@ -2,7 +2,7 @@ import re
 import litellm
 import structlog
 
-from config import KeeperSettings
+from ...config import KeeperSettings
 from aura_core.dna import (
     ALLOWED_CHAMBERS,
     AuditObservation,

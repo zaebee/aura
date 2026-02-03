@@ -6,26 +6,26 @@ from typing import Any
 import grpc
 from fastapi import Depends, FastAPI, Header, HTTPException, Request, Response
 from grpc_health.v1 import health_pb2_grpc
-from health import register_health_endpoints
-from logging_config import (
+from opentelemetry.instrumentation.fastapi import FastAPIInstrumentor
+from opentelemetry.instrumentation.grpc import GrpcInstrumentorClient
+from pydantic import BaseModel
+from starlette.middleware.cors import CORSMiddleware
+
+from src.config import get_settings
+from src.health import register_health_endpoints
+from src.logging_config import (
     bind_request_id,
     clear_request_context,
     configure_logging,
     get_current_request_id,
     get_logger,
 )
-from opentelemetry.instrumentation.fastapi import FastAPIInstrumentor
-from opentelemetry.instrumentation.grpc import GrpcInstrumentorClient
-from pydantic import BaseModel
-from security import verify_signature
-from starlette.middleware.cors import CORSMiddleware
-from telemetry import init_telemetry
-
-from config import get_settings
-from proto.aura.negotiation.v1 import (
+from src.proto.aura.negotiation.v1 import (
     negotiation_pb2,  # type: ignore
     negotiation_pb2_grpc,  # type: ignore
 )
+from src.security import verify_signature
+from src.telemetry import init_telemetry
 
 # Configure structured logging on startup
 configure_logging()
@@ -64,7 +64,7 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None]:
 
     # --- Startup ---
     logger.info("startup_begin", service="api-gateway")
-    channel = grpc.aio.insecure_channel(settings.core_service_host)
+    channel = grpc.aio.insecure_channel(settings.core_host)
     stub = negotiation_pb2_grpc.NegotiationServiceStub(channel)
     health_stub = health_pb2_grpc.HealthStub(channel)
 
@@ -78,7 +78,7 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None]:
 
     logger.info(
         "startup_complete",
-        grpc_target=settings.core_service_host,
+        grpc_target=settings.core_host,
         health_endpoints_registered=True,
     )
 
@@ -174,7 +174,7 @@ async def negotiate(
         bid_amount=payload.bid_amount,
         currency_code=payload.currency,
         agent=negotiation_pb2.AgentIdentity(
-            did=agent_did,  # Use the verified agent_did from security headers
+            did=agent_did,  # Use the verified agent_did from src.security headers
             reputation_score=1.0,
         ),
     )

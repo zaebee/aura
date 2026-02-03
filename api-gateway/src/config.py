@@ -1,6 +1,6 @@
 from functools import lru_cache
 
-from pydantic import HttpUrl, model_validator
+from pydantic import AliasChoices, Field, HttpUrl, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -8,11 +8,12 @@ class Settings(BaseSettings):
     model_config = SettingsConfigDict(
         env_file=".env",
         env_file_encoding="utf-8",
+        env_prefix="AURA_GATEWAY__",
         extra="ignore",
     )
 
     # gRPC Core Service Connection
-    core_service_host: str = "localhost:50051"
+    core_host: str = Field("localhost:50051", validation_alias=AliasChoices("AURA_GATEWAY__CORE_HOST", "CORE_HOST", "CORE_SERVICE_HOST"))
     negotiation_timeout: float = 60.0
 
     # HTTP Server

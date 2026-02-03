@@ -1,0 +1,21 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "aura-protein-observability"
+version = "0.1.0"
+description = "Observability Organ for Aura Hive"
+requires-python = ">=3.12"
+dependencies = [
+    "opentelemetry-api",
+    "opentelemetry-sdk",
+    "prometheus-client",
+    "aura-core",
+]
+
+[tool.uv.sources]
+aura-core = { workspace = true }
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/aura_protein_observability"]

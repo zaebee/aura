@@ -9,6 +9,8 @@ members = [
     "aura-core",
     "aura-keeper",
     "aura-mcp",
+    "aura-protein-observability",
+    "aura-protein-solana",
     "core",
     "telegram-bot",
 ]
@@ -385,6 +387,44 @@ requires-dist = [
     { name = "httpx" },
     { name = "pynacl" },
     { name = "python-dotenv" },
+]
+
+[[package]]
+name = "aura-protein-observability"
+version = "0.1.0"
+source = { editable = "components/proteins/observability" }
+dependencies = [
+    { name = "aura-core" },
+    { name = "opentelemetry-api" },
+    { name = "opentelemetry-sdk" },
+    { name = "prometheus-client" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "aura-core", editable = "packages/aura-core" },
+    { name = "opentelemetry-api" },
+    { name = "opentelemetry-sdk" },
+    { name = "prometheus-client" },
+]
+
+[[package]]
+name = "aura-protein-solana"
+version = "0.1.0"
+source = { editable = "components/proteins/solana" }
+dependencies = [
+    { name = "aura-core" },
+    { name = "httpx" },
+    { name = "solana" },
+    { name = "solders" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "aura-core", editable = "packages/aura-core" },
+    { name = "httpx", specifier = ">=0.27.0" },
+    { name = "solana", specifier = ">=0.34.0" },
+    { name = "solders", specifier = ">=0.21.0" },
 ]
 
 [[package]]

@@ -7,7 +7,7 @@ hive:
     C: "src/hive/connector/__init__.py"
     G: "src/hive/generator/__init__.py"
   core_path: "core/src/hive"
-  dna_path: "core/src/hive/dna.py"
+  dna_path: "packages/aura-core/src/aura_core/dna.py"
   allowed_files:
     - "__init__.py"
     - "aggregator.py"
@@ -24,10 +24,9 @@ hive:
   sanctified_chambers:
     core/migrations: "HiveEvolutionaryScrolls"
     core/tests: "ValidationPollen"
-    core/scripts: "WorkerDirectives"
     api-gateway: "HiveGate"
     core/src/config: "SacredCodex"
-    core/src/hive/services: "LegacyChamber"
+    core/src/hive/services: "WorkerDirectives"
     core/src/hive/transformer: "ReasoningNucleus"
     core/src/hive/connector/proteins: "SecurityCitadel"
     core/src/hive/membrane: "HiveMembrane"

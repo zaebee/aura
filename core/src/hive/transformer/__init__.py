@@ -7,10 +7,9 @@ import dspy
 import structlog
 from aura_core.dna import FailureIntent, HiveContext, IntentAction
 
-from config import get_settings
-from hive.aggregator import InventoryItem, SessionLocal
-from hive.metabolism.logging_config import bind_request_id
-
+from ...config import get_settings
+from ..aggregator import InventoryItem, SessionLocal
+from ..metabolism.logging_config import bind_request_id
 from .llm.engine import AuraNegotiator
 
 logger = structlog.get_logger(__name__)
@@ -114,12 +113,16 @@ class AuraTransformer:
         if hasattr(self.settings.llm, "compiled_program_path"):
             search_paths.append(Path(self.settings.llm.compiled_program_path))
 
+        # Sovereign Architecture: The brain is a core asset of the Nucleus.
+        # It should be found in data/ or src/ within the Nucleus.
         search_paths.extend(
             [
                 Path("/app/core/data/aura_brain.json"),
-                Path("/app/data/aura_brain.json"),
                 Path("./data/aura_brain.json"),
+                Path("./core/data/aura_brain.json"),
+                Path("/app/data/aura_brain.json"),
                 Path("/app/core/src/aura_brain.json"),
+                Path(__file__).parent.parent.parent.parent / "data" / "aura_brain.json",
                 Path(__file__).parent.parent / "aura_brain.json",
             ]
         )
@@ -165,7 +168,7 @@ class AuraTransformer:
         Reason about the negotiation using self-reflective tuning.
         Returns a strictly typed IntentAction.
         """
-        # モード check: Deterministic Rule mode
+        # Mode check: Deterministic Rule mode
         if self.settings.llm.model == "rule" or self.negotiator is None:
             strategy = RuleBasedStrategy()
             return strategy.evaluate(
