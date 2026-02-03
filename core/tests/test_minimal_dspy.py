@@ -3,11 +3,7 @@
 Minimal DSPy test to isolate the issue.
 """
 
-import json
 import os
-import sys
-from contextlib import nullcontext
-from unittest.mock import MagicMock, patch
 
 import dspy
 import structlog
@@ -24,59 +20,46 @@ structlog.configure(
 logger = structlog.get_logger(__name__)
 
 
-def test_minimal_dspy():
+def test_minimal_dspy(monkeypatch):
     """Test minimal DSPy functionality."""
     logger.info("testing_minimal_dspy")
 
-    # Check for API key to decide whether to mock or call real API
     api_key = os.environ.get("MISTRAL_API_KEY")
+    negotiator = AuraNegotiator()
 
-    # Configure DSPy
     if api_key:
-        dspy.configure(lm=dspy.LM(model="mistral/mistral-large-latest"))
+        # Temporarily configure DSPy for this test, ensuring cleanup.
+        lm = dspy.LM(model="mistral/mistral-large-latest")
+        monkeypatch.setattr(dspy.settings, "lm", lm)
     else:
         logger.info("no_api_key_found_using_mock")
+        # Mock the internal dspy call to avoid network requests.
+        mock_prediction = dspy.Prediction(
+            thought="Mocked: Bid is below floor price, but let's test the flow.",
+            action='{"action": "counter", "price": 160.0, "message": "We can offer 160."}',
+        )
+        monkeypatch.setattr(negotiator, "negotiate", lambda **kwargs: mock_prediction)
 
-    # Create a simple example
-    _simple_example = dspy.Example(
-        input_bid="100",
-        context=json.dumps(
-            {
+    # Execute the negotiator
+    try:
+        prediction = negotiator(
+            input_bid=100.0,
+            context={
                 "base_price": 200,
                 "floor_price": 150,
                 "occupancy": "high",
                 "value_add_inventory": [],
-            }
-        ),
-        history="[]",
-    ).with_inputs("input_bid", "context", "history")
+            },
+            history=[],
+        )
 
-    # Create negotiator
-    negotiator = AuraNegotiator()
-
-    # Test prediction
-    try:
-        # Use a context manager to conditionally mock the internal DSPy call
-        # This avoids network requests in CI when MISTRAL_API_KEY is missing
-        cm = patch.object(negotiator, "negotiate") if not api_key else nullcontext()
-
-        with cm as mock_predict:
-            if not api_key:
-                mock_predict.return_value = MagicMock(
-                    thought="Mocked: Bid is below floor price, but let's test the flow.",
-                    action='{"action": "counter", "price": 160.0, "message": "We can offer 160."}',
-                )
-
-            prediction = negotiator(
-                input_bid="100",
-                context={
-                    "base_price": 200,
-                    "floor_price": 150,
-                    "occupancy": "high",
-                    "value_add_inventory": [],
-                },
-                history=[],
-            )
+        # Assertions are crucial for verifying test behavior.
+        assert prediction is not None
+        assert "thought" in prediction
+        assert isinstance(prediction["action"], dict)
+        assert prediction["action"]["action"] == "counter"
+        if not api_key:
+            assert prediction["thought"].startswith("Mocked:")
 
         logger.info(
             "prediction_successful",
@@ -84,15 +67,6 @@ def test_minimal_dspy():
             response_value=prediction["action"],
             reasoning=prediction["thought"][:50],
         )
-
     except Exception as e:
         logger.error("prediction_failed", error=str(e))
-        import traceback
-
-        traceback.print_exc()
-        raise e
-
-
-if __name__ == "__main__":
-    success = test_minimal_dspy()
-    sys.exit(0 if success else 1)
+        raise
