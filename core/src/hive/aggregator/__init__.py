@@ -8,7 +8,7 @@ from typing import Any
 
 import httpx
 import structlog
-from aura_core.dna import HiveContext, NegotiationOffer
+from aura_core import Aggregator, HiveContext, NegotiationOffer
 from langchain_mistralai import MistralAIEmbeddings
 from pgvector.sqlalchemy import Vector
 from sqlalchemy import (
@@ -143,7 +143,7 @@ class MetricsCache:
 # --- 4. The Aggregator Bee ---
 
 
-class HiveAggregator:
+class HiveAggregator(Aggregator[Any, HiveContext]):
     """A - Aggregator: Consolidates database and system health signals."""
 
     def __init__(self) -> None:
@@ -248,7 +248,7 @@ class HiveAggregator:
             errors.append(f"{metric_name}_fetch_error")
         return 0.0, False
 
-    async def perceive(self, signal: Any) -> HiveContext:
+    async def perceive(self, signal: Any, **kwargs: Any) -> HiveContext:
         item_id = signal.item_id
         request_id = getattr(signal, "request_id", "")
         offer = NegotiationOffer(

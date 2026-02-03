@@ -2,19 +2,20 @@ from typing import Any
 
 import structlog
 from aiogram.types import CallbackQuery, Message
-from aura_core.dna import HiveContext, NegotiationOffer, TelegramContext
+from aura_core import Aggregator, HiveContext, NegotiationOffer, TelegramContext
 from opentelemetry import trace
 
 logger = structlog.get_logger(__name__)
 tracer = trace.get_tracer(__name__)
 
 
-class TelegramAggregator:
+class TelegramAggregator(Aggregator[Any, TelegramContext]):
     """A - Aggregator: Extracts Telegram signals into context."""
 
     async def perceive(
-        self, signal: Any, state_data: dict[str, Any]
+        self, signal: Any, **kwargs: Any
     ) -> TelegramContext:
+        state_data = kwargs.get("state_data", {})
         with tracer.start_as_current_span("aggregator_perceive") as span:
             user_id = 0
             chat_id = 0

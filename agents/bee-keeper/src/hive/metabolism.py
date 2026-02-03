@@ -1,12 +1,22 @@
 import time
+from typing import Any
+
 import structlog
 
 from config import KeeperSettings
+from aura_core import (
+    Aggregator,
+    AuditObservation,
+    BeeContext,
+    BeeObservation,
+    Connector,
+    Generator,
+    Transformer,
+)
 from .aggregator import BeeAggregator
 from .connector import BeeConnector
-from .transformer import BeeTransformer
-from aura_core.dna import BeeContext, AuditObservation
 from .generator import BeeGenerator
+from .transformer import BeeTransformer
 
 logger = structlog.get_logger(__name__)
 
@@ -16,10 +26,14 @@ class BeeMetabolism:
 
     def __init__(self, settings: KeeperSettings) -> None:
         self.settings = settings
-        self.aggregator = BeeAggregator(settings)
-        self.transformer = BeeTransformer(settings)
-        self.connector = BeeConnector(settings)
-        self.generator = BeeGenerator(settings)
+        self.aggregator: Aggregator[Any, BeeContext] = BeeAggregator(settings)
+        self.transformer: Transformer[BeeContext, AuditObservation] = BeeTransformer(
+            settings
+        )
+        self.connector: Connector[AuditObservation, BeeObservation, BeeContext] = (
+            BeeConnector(settings)
+        )
+        self.generator: Generator[BeeObservation, Any] = BeeGenerator(settings)
 
     async def execute(self, event_name: str = "scheduled_pulse") -> None:
         """Execute one complete metabolic cycle."""
@@ -27,11 +41,9 @@ class BeeMetabolism:
         start_time = time.time()
 
         # 1. Aggregator (A) - Senses the environment
-        context: BeeContext = await self.aggregator.sense(event_name)
+        context: BeeContext = await self.aggregator.perceive(None, event_name=event_name)
 
         # 2. Transformer (T) - Reasons and audits
-        # Optimization: Skip LLM audit on scheduled heartbeats unless heresy is suspected?
-        # Actually, let's honor the original skip logic if event is "schedule"
         if event_name == "schedule":
             logger.info("scheduled_heartbeat_detected_skipping_llm_audit")
             report = AuditObservation(
@@ -42,15 +54,19 @@ class BeeMetabolism:
             )
         else:
             # T now performs deterministic regex audit + reflective LLM analysis
-            report = await self.transformer.reflect(context)
+            report = await self.transformer.think(context)
 
         report.execution_time = time.time() - start_time
 
         # 3. Connector (C) - Interacts with the outer world (GitHub)
-        observation = await self.connector.interact(report, context)
+        observation: BeeObservation = await self.connector.act(report, context=context)
+
+        # Enrich observation with context and report for the Generator
+        observation.context = context
+        observation.report = report
 
         # 4. Generator (G) - Updates records and chronicles
-        await self.generator.generate(report, context, observation)
+        await self.generator.pulse(observation)
 
         logger.info(
             "bee_metabolism_completed",

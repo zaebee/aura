@@ -8,12 +8,12 @@ import litellm
 import structlog
 
 from config import KeeperSettings
-from aura_core.dna import BeeContext, find_hive_root
+from aura_core import Aggregator, BeeContext, find_hive_root
 
 logger = structlog.get_logger(__name__)
 
 
-class BeeAggregator:
+class BeeAggregator(Aggregator[Any, BeeContext]):
     """A - Aggregator: Gathers signals from Git, Prometheus, and Filesystem."""
 
     def __init__(self, settings: KeeperSettings) -> None:
@@ -23,8 +23,9 @@ class BeeAggregator:
         self.event_path = settings.github_event_path
         self.brain_status: dict[str, bool] = {}
 
-    async def sense(self, event_name: str = "manual") -> BeeContext:
-        logger.info("bee_aggregator_sense_started", trigger_event=event_name)
+    async def perceive(self, signal: Any, **kwargs: Any) -> BeeContext:
+        event_name = kwargs.get("event_name", "manual")
+        logger.info("bee_aggregator_perceive_started", trigger_event=event_name)
 
         git_diff = await self._get_git_diff()
         hive_metrics = await self._get_hive_metrics()

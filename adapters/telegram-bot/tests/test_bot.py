@@ -2,7 +2,7 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 from aiogram.filters import CommandObject
-from aura_core.dna import Observation
+from aura_core import Observation
 from bot import (
     NegotiationStates,
     cmd_search,

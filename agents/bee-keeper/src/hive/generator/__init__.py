@@ -1,20 +1,24 @@
 import re
+from datetime import datetime
+
 import litellm
 import structlog
 
 from config import KeeperSettings
-from aura_core.dna import (
+from aura_core import (
     ALLOWED_CHAMBERS,
     AuditObservation,
     BeeContext,
     BeeObservation,
+    Event,
+    Generator,
     find_hive_root,
 )
 
 logger = structlog.get_logger(__name__)
 
 
-class BeeGenerator:
+class BeeGenerator(Generator[BeeObservation, Event]):
     """G - Generator: Updates documentation and chronicles."""
 
     def __init__(self, settings: KeeperSettings) -> None:
@@ -29,21 +33,24 @@ class BeeGenerator:
             else "You are bee.Keeper, guardian of the Aura Hive."
         )
 
-    async def generate(
-        self,
-        report: AuditObservation,
-        context: BeeContext,
-        observation: BeeObservation,
-    ) -> None:
-        logger.info("bee_generator_generate_started")
+    async def pulse(self, observation: BeeObservation) -> list[Event]:
+        """G - Generator: Standard pulse organ. Turns Observation into Events."""
+        logger.info("bee_generator_pulse_started")
 
-        # 1. Update llms.txt if needed
-        if ".proto" in context.git_diff:
-            logger.info("proto_changes_detected_updating_llms_txt")
-            await self._update_llms_txt(context)
+        if observation.report and observation.context:
+            # 1. Update llms.txt if needed
+            if ".proto" in observation.context.git_diff:
+                logger.info("proto_changes_detected_updating_llms_txt")
+                await self._update_llms_txt(observation.context)
 
-        # 2. Update HIVE_STATE.md
-        await self._update_hive_state(report, context, observation)
+            # 2. Update HIVE_STATE.md
+            await self._update_hive_state(
+                observation.report, observation.context, observation
+            )
+        else:
+            logger.warning("bee_generator_pulse_missing_context_or_report")
+
+        return []
 
     async def _update_llms_txt(self, context: BeeContext) -> None:
         root = find_hive_root()
@@ -93,8 +100,6 @@ class BeeGenerator:
         root = find_hive_root()
         state_path = root / "HIVE_STATE.md"
         current_content = state_path.read_text() if state_path.exists() else ""
-
-        from datetime import datetime
 
         now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 

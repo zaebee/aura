@@ -1,6 +1,8 @@
+from typing import Any
+
 import structlog
 from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup
-from aura_core.dna import TelegramContext, UIAction
+from aura_core import TelegramContext, Transformer, UIAction
 from interfaces import NegotiationResult, SearchResult
 from opentelemetry import trace
 
@@ -8,15 +10,16 @@ logger = structlog.get_logger(__name__)
 tracer = trace.get_tracer(__name__)
 
 
-class TelegramTransformer:
+class TelegramTransformer(Transformer[TelegramContext, UIAction]):
     """T - Transformer: Decides on UI actions."""
 
     async def think(
         self,
         context: TelegramContext,
-        core_response: NegotiationResult | None = None,
-        search_results: list[SearchResult] | None = None,
+        **kwargs: Any,
     ) -> UIAction:
+        core_response = kwargs.get("core_response")
+        search_results = kwargs.get("search_results")
         with tracer.start_as_current_span("transformer_think") as span:
             # Handle Search results
             if search_results is not None:

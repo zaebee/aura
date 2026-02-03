@@ -1,5 +1,8 @@
+from typing import Any
+
 import structlog
-from aura_core.dna import (
+from aura_core import (
+    Connector,
     NegotiationResult,
     Observation,
     SearchResult,
@@ -15,7 +18,7 @@ logger = structlog.get_logger(__name__)
 tracer = trace.get_tracer(__name__)
 
 
-class TelegramConnector:
+class TelegramConnector(Connector[UIAction, Observation, TelegramContext]):
     """C - Connector: Executes UI actions and gRPC calls via Proteins."""
 
     def __init__(self, telegram: TelegramProtein, aura: GRPCNegotiationClient):

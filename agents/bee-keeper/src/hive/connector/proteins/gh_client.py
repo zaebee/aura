@@ -4,12 +4,12 @@ from typing import Any, Optional
 
 import httpx
 import structlog
-from aura_core.dna import Observation, SkillProtocol
+from aura_core import Observation, Skill
 
 logger = structlog.get_logger(__name__)
 
 
-class GitHubClient(SkillProtocol):
+class GitHubClient(Skill):
     """Async GitHub client protein for BeeKeeper."""
 
     def __init__(self, token: str) -> None:

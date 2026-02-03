@@ -1,7 +1,7 @@
 from typing import Any
 
 import structlog
-from aura_core.dna import FailureIntent, HiveContext, IntentAction
+from aura_core import FailureIntent, HiveContext, IntentAction, Membrane
 
 from config import get_settings, settings
 
@@ -54,7 +54,7 @@ class OutputGuard:
         return True
 
 
-class HiveMembrane:
+class HiveMembrane(Membrane[Any, IntentAction, HiveContext]):
     """The Immune System: Deterministic Guardrails for Inbound/Outbound signals."""
 
     def __init__(self) -> None:

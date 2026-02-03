@@ -1,11 +1,11 @@
 import asyncio
 import time
 from pathlib import Path
-from typing import Protocol
+from typing import Any, Protocol
 
 import dspy
 import structlog
-from aura_core.dna import FailureIntent, HiveContext, IntentAction
+from aura_core import FailureIntent, HiveContext, IntentAction, Transformer
 
 from config import get_settings
 from hive.aggregator import InventoryItem, SessionLocal
@@ -94,7 +94,7 @@ class RuleBasedStrategy:
 # --- 2. Aura Transformer (The Sovereign Brain) ---
 
 
-class AuraTransformer:
+class AuraTransformer(Transformer[HiveContext, IntentAction]):
     """T - Transformer: Pure reasoning engine using DSPy or deterministic rules."""
 
     def __init__(self, compiled_program_path: str | None = None):
@@ -160,7 +160,7 @@ class AuraTransformer:
             "meta": context.item_data.get("meta", {}),
         }
 
-    async def think(self, context: HiveContext) -> IntentAction:
+    async def think(self, context: HiveContext, **kwargs: Any) -> IntentAction:
         """
         Reason about the negotiation using self-reflective tuning.
         Returns a strictly typed IntentAction.

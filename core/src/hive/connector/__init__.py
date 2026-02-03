@@ -4,7 +4,7 @@ import uuid
 from typing import Any
 
 import structlog
-from aura_core.dna import HiveContext, IntentAction, Observation
+from aura_core import Connector, HiveContext, IntentAction, Observation
 from sqlalchemy.exc import SQLAlchemyError
 
 from config import get_settings
@@ -16,7 +16,7 @@ from .proteins.pricing import PriceConverter
 logger = structlog.get_logger(__name__)
 
 
-class HiveConnector:
+class HiveConnector(Connector[IntentAction, Observation, HiveContext]):
     """C - Connector: Maps internal IntentAction to gRPC responses and external systems."""
 
     def __init__(self, market_service: Any = None) -> None:
@@ -27,6 +27,7 @@ class HiveConnector:
         """
         Execute the decision and produce an observation (the gRPC response).
         """
+        # Type safety is now enforced by the generic protocol and static analysis
         logger.debug("connector_act_started", action=action.action)
 
         # 1. Map IntentAction to Protobuf NegotiateResponse

@@ -4,14 +4,14 @@ from typing import Any
 
 import nats.errors
 import structlog
-from aura_core.dna import Event, Observation
+from aura_core import Event, Generator, Observation
 
 from config import get_settings
 
 logger = structlog.get_logger(__name__)
 
 
-class HiveGenerator:
+class HiveGenerator(Generator[Observation, Event]):
     """G - Generator: Emits events (heartbeats, transactions) to NATS."""
 
     def __init__(self, nats_client: Any = None) -> None:

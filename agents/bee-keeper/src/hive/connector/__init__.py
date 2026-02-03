@@ -1,18 +1,25 @@
 import asyncio
 import json
+from typing import Any
 
 import nats
 import nats.errors
 import structlog
 
 from config import KeeperSettings
-from aura_core.dna import AuditObservation, BeeContext, BeeObservation, find_hive_root
+from aura_core import (
+    AuditObservation,
+    BeeContext,
+    BeeObservation,
+    Connector,
+    find_hive_root,
+)
 from .proteins.gh_client import GitHubClient
 
 logger = structlog.get_logger(__name__)
 
 
-class BeeConnector:
+class BeeConnector(Connector[AuditObservation, BeeObservation, BeeContext]):
     """C - Connector: Interacts with GitHub and NATS."""
 
     def __init__(self, settings: KeeperSettings) -> None:
@@ -29,6 +36,12 @@ class BeeConnector:
         """Cleanup resources."""
         if self.gh:
             await self.gh.close()
+
+    async def act(
+        self, action: AuditObservation, context: BeeContext
+    ) -> BeeObservation:
+        # Context here is expected to be BeeContext
+        return await self.interact(action, context)
 
     async def interact(
         self, report: AuditObservation, context: BeeContext

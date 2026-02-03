@@ -2,21 +2,27 @@ from typing import Any
 
 import structlog
 from aiogram.types import Message
-from aura_core.dna import (
+from aura_core import (
+    Aggregator,
+    Connector,
+    Generator,
     MetabolicLoop,
     Observation,
-    TelegramAggregator,
-    TelegramConnector,
-    TelegramGenerator,
-    TelegramTransformer,
+    TelegramContext,
+    Transformer,
+    UIAction,
 )
 from opentelemetry import trace
+
+from .connector import TelegramConnector
 
 logger = structlog.get_logger(__name__)
 tracer = trace.get_tracer(__name__)
 
 
-class TelegramMetabolism(MetabolicLoop):
+class TelegramMetabolism(
+    MetabolicLoop[Any, TelegramContext, UIAction, Observation, Any]
+):
     """
     Orchestrates the ATCG flow for Telegram:
     Aggregator -> Connector (Core) -> Transformer -> Connector (UI) -> Generator
@@ -24,16 +30,16 @@ class TelegramMetabolism(MetabolicLoop):
 
     def __init__(
         self,
-        aggregator: TelegramAggregator,
-        transformer: TelegramTransformer,
-        connector: TelegramConnector,
-        generator: TelegramGenerator,
+        aggregator: Aggregator[Any, TelegramContext],
+        transformer: Transformer[TelegramContext, UIAction],
+        connector: Connector[UIAction, Observation, TelegramContext],
+        generator: Generator[Observation, Any],
     ):
         super().__init__(aggregator, transformer, connector, generator)
-        self.aggregator: TelegramAggregator = aggregator
-        self.transformer: TelegramTransformer = transformer
-        self.connector: TelegramConnector = connector
-        self.generator: TelegramGenerator = generator
+        self.aggregator: Aggregator[Any, TelegramContext] = aggregator
+        self.transformer: Transformer[TelegramContext, UIAction] = transformer
+        self.connector: Connector[UIAction, Observation, TelegramContext] = connector
+        self.generator: Generator[Observation, Any] = generator
 
     async def execute_search(self, query: str, message: Message) -> Observation:
         """Execute a search metabolic cycle."""
@@ -42,10 +48,15 @@ class TelegramMetabolism(MetabolicLoop):
             span.set_attribute("query", query)
 
             # A: Perceive (Get context from message)
-            context = await self.aggregator.perceive(message, {})
+            context = await self.aggregator.perceive(message, state_data={})
 
             # C: Call Core Search
-            results = await self.connector.search_core(query)
+            if isinstance(self.connector, TelegramConnector):
+                results = await self.connector.search_core(query)
+            else:
+                raise TypeError(
+                    f"Expected TelegramConnector, but got {type(self.connector).__name__}"
+                )
 
             # T: Think (Decide on UI based on results)
             action = await self.transformer.think(context, search_results=results)
@@ -72,14 +83,19 @@ class TelegramMetabolism(MetabolicLoop):
             logger.info("negotiation_cycle_started")
 
             # A: Perceive (Get context from message and state)
-            context = await self.aggregator.perceive(signal, state_data)
+            context = await self.aggregator.perceive(signal, state_data=state_data)
 
             if context.hive_context:
                 span.set_attribute("item_id", context.hive_context.item_id)
                 span.set_attribute("bid_amount", context.hive_context.offer.bid_amount)
 
             # C: Call Core Negotiation
-            core_result = await self.connector.call_core(context)
+            if isinstance(self.connector, TelegramConnector):
+                core_result = await self.connector.call_core(context)
+            else:
+                raise TypeError(
+                    f"Expected TelegramConnector, but got {type(self.connector).__name__}"
+                )
 
             # T: Think (Decide on UI based on core result)
             action = await self.transformer.think(context, core_response=core_result)
