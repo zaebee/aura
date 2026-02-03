@@ -4,7 +4,10 @@ Minimal DSPy test to isolate the issue.
 """
 
 import json
+import os
 import sys
+from contextlib import nullcontext
+from unittest.mock import MagicMock, patch
 
 import dspy
 import structlog
@@ -25,8 +28,14 @@ def test_minimal_dspy():
     """Test minimal DSPy functionality."""
     logger.info("testing_minimal_dspy")
 
-    # Configure DSPy with proper LM object
-    dspy.configure(lm=dspy.LM(model="mistral/mistral-large-latest"))
+    # Check for API key to decide whether to mock or call real API
+    api_key = os.environ.get("MISTRAL_API_KEY")
+
+    # Configure DSPy
+    if api_key:
+        dspy.configure(lm=dspy.LM(model="mistral/mistral-large-latest"))
+    else:
+        logger.info("no_api_key_found_using_mock")
 
     # Create a simple example
     _simple_example = dspy.Example(
@@ -47,16 +56,27 @@ def test_minimal_dspy():
 
     # Test prediction
     try:
-        prediction = negotiator(
-            input_bid="100",
-            context={
-                "base_price": 200,
-                "floor_price": 150,
-                "occupancy": "high",
-                "value_add_inventory": [],
-            },
-            history=[],
-        )
+        # Use a context manager to conditionally mock the internal DSPy call
+        # This avoids network requests in CI when MISTRAL_API_KEY is missing
+        cm = patch.object(negotiator, "negotiate") if not api_key else nullcontext()
+
+        with cm as mock_predict:
+            if not api_key:
+                mock_predict.return_value = MagicMock(
+                    thought="Mocked: Bid is below floor price, but let's test the flow.",
+                    action='{"action": "counter", "price": 160.0, "message": "We can offer 160."}',
+                )
+
+            prediction = negotiator(
+                input_bid="100",
+                context={
+                    "base_price": 200,
+                    "floor_price": 150,
+                    "occupancy": "high",
+                    "value_add_inventory": [],
+                },
+                history=[],
+            )
 
         logger.info(
             "prediction_successful",
