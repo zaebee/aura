@@ -1,21 +1,22 @@
 import time
-import structlog
 from typing import Any
 
+import structlog
+
 from config import KeeperSettings
+from aura_core import (
+    Aggregator,
+    AuditObservation,
+    BeeContext,
+    BeeObservation,
+    Connector,
+    Generator,
+    Transformer,
+)
 from .aggregator import BeeAggregator
 from .connector import BeeConnector
-from .transformer import BeeTransformer
-from aura_core import (
-    BeeContext,
-    AuditObservation,
-    BeeObservation,
-    Aggregator,
-    Transformer,
-    Connector,
-    Generator
-)
 from .generator import BeeGenerator
+from .transformer import BeeTransformer
 
 logger = structlog.get_logger(__name__)
 
@@ -26,8 +27,12 @@ class BeeMetabolism:
     def __init__(self, settings: KeeperSettings) -> None:
         self.settings = settings
         self.aggregator: Aggregator[Any, BeeContext] = BeeAggregator(settings)
-        self.transformer: Transformer[BeeContext, AuditObservation] = BeeTransformer(settings)
-        self.connector: Connector[AuditObservation, BeeObservation, BeeContext] = BeeConnector(settings)
+        self.transformer: Transformer[BeeContext, AuditObservation] = BeeTransformer(
+            settings
+        )
+        self.connector: Connector[AuditObservation, BeeObservation, BeeContext] = (
+            BeeConnector(settings)
+        )
         self.generator: Generator[BeeObservation, Any] = BeeGenerator(settings)
 
     async def execute(self, event_name: str = "scheduled_pulse") -> None:
@@ -56,15 +61,15 @@ class BeeMetabolism:
         # 3. Connector (C) - Interacts with the outer world (GitHub)
         observation: BeeObservation = await self.connector.act(report, context=context)
 
+        # Enrich observation with context and report for the Generator
+        observation.context = context
+        observation.report = report
+
         # 4. Generator (G) - Updates records and chronicles
-        # We still use the specialized generate method for bee-keeper as it needs more context
-        if hasattr(self.generator, "generate"):
-            await self.generator.generate(report, context, observation)
-        else:
-            await self.generator.pulse(observation)
+        await self.generator.pulse(observation)
 
         logger.info(
-            "bee_metabolism_started",
+            "bee_metabolism_completed",
             pure=report.is_pure,
             heresies=len(report.heresies),
             execution_time=f"{report.execution_time:.2f}s",

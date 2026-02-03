@@ -122,6 +122,8 @@ class BeeObservation:
     github_comment_url: str = ""
     nats_event_sent: bool = False
     injuries: list[str] = field(default_factory=list)
+    report: "AuditObservation | None" = None
+    context: "BeeContext | None" = None
     metadata: dict[str, Any] = field(default_factory=dict)
 
 

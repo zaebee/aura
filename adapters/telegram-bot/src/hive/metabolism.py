@@ -14,11 +14,15 @@ from aura_core import (
 )
 from opentelemetry import trace
 
+from .connector import TelegramConnector
+
 logger = structlog.get_logger(__name__)
 tracer = trace.get_tracer(__name__)
 
 
-class TelegramMetabolism(MetabolicLoop[Any, TelegramContext, UIAction, Observation, Any]):
+class TelegramMetabolism(
+    MetabolicLoop[Any, TelegramContext, UIAction, Observation, Any]
+):
     """
     Orchestrates the ATCG flow for Telegram:
     Aggregator -> Connector (Core) -> Transformer -> Connector (UI) -> Generator
@@ -47,14 +51,12 @@ class TelegramMetabolism(MetabolicLoop[Any, TelegramContext, UIAction, Observati
             context = await self.aggregator.perceive(message, state_data={})
 
             # C: Call Core Search
-            # Note: We use the specialized methods on the concrete instance if needed,
-            # or rely on the execute method of the skill if it were wrapped.
-            # For now we cast or rely on the implementation having these methods.
-            from .connector import TelegramConnector
             if isinstance(self.connector, TelegramConnector):
                 results = await self.connector.search_core(query)
             else:
-                results = []
+                raise TypeError(
+                    f"Expected TelegramConnector, but got {type(self.connector).__name__}"
+                )
 
             # T: Think (Decide on UI based on results)
             action = await self.transformer.think(context, search_results=results)
@@ -88,11 +90,12 @@ class TelegramMetabolism(MetabolicLoop[Any, TelegramContext, UIAction, Observati
                 span.set_attribute("bid_amount", context.hive_context.offer.bid_amount)
 
             # C: Call Core Negotiation
-            from .connector import TelegramConnector
             if isinstance(self.connector, TelegramConnector):
                 core_result = await self.connector.call_core(context)
             else:
-                core_result = {"error": "Invalid connector type"}
+                raise TypeError(
+                    f"Expected TelegramConnector, but got {type(self.connector).__name__}"
+                )
 
             # T: Think (Decide on UI based on core result)
             action = await self.transformer.think(context, core_response=core_result)
