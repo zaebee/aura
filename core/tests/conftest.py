@@ -12,9 +12,9 @@ os.environ.setdefault(
 )
 os.environ.setdefault("AURA_LLM__API_KEY", "test-api-key")
 
-# Add the src directory to the Python path
-src_path = Path(__file__).parent.parent / "src"
-sys.path.insert(0, str(src_path))
+# Add the core directory to the Python path
+core_path = Path(__file__).parent.parent
+sys.path.insert(0, str(core_path))
 
 
 class MockInventoryItem:

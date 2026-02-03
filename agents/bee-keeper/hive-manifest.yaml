@@ -24,9 +24,10 @@ hive:
   sanctified_chambers:
     core/migrations: "HiveEvolutionaryScrolls"
     core/tests: "ValidationPollen"
+    core/scripts: "WorkerDirectives"
     api-gateway: "HiveGate"
     core/src/config: "SacredCodex"
-    core/src/hive/services: "WorkerDirectives"
+    core/src/hive/services: "LegacyChamber"
     core/src/hive/transformer: "ReasoningNucleus"
     core/src/hive/connector/proteins: "SecurityCitadel"
     core/src/hive/membrane: "HiveMembrane"
