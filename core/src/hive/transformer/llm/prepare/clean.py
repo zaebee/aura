@@ -47,4 +47,4 @@ def clean_and_parse_json(text: str) -> dict[str, Any]:
         except json.JSONDecodeError:
             pass
 
-    raise ValueError(f"Failed to parse valid JSON from ....response: {text[:100]}...")
+    raise ValueError(f"Failed to parse valid JSON from response: {text[:100]}...")

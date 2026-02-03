@@ -7,6 +7,26 @@ import grpc
 import grpc.aio
 import nats
 from grpc_health.v1 import health_pb2, health_pb2_grpc
+from hive.aggregator import (
+    HiveAggregator,
+    InventoryItem,
+    SessionLocal,
+    engine,
+    generate_embedding,
+)
+from hive.connector import HiveConnector
+from hive.generator import HiveGenerator
+from hive.membrane import HiveMembrane
+from hive.metabolism import MetabolicLoop
+from hive.metabolism.logging_config import (
+    bind_request_id,
+    clear_request_context,
+    configure_logging,
+    get_logger,
+)
+from hive.metabolism.telemetry import init_telemetry
+from hive.proto.aura.negotiation.v1 import negotiation_pb2, negotiation_pb2_grpc
+from hive.transformer import AuraTransformer
 from opentelemetry import trace
 from opentelemetry.instrumentation.grpc import GrpcInstrumentorServer
 from opentelemetry.instrumentation.langchain import LangchainInstrumentor
@@ -14,28 +34,8 @@ from opentelemetry.instrumentation.sqlalchemy import SQLAlchemyInstrumentor
 from prometheus_client import start_http_server
 from sqlalchemy import text
 
-from src.config import settings
-from src.config.llm import get_raw_key
-from src.hive.aggregator import (
-    HiveAggregator,
-    InventoryItem,
-    SessionLocal,
-    engine,
-    generate_embedding,
-)
-from src.hive.connector import HiveConnector
-from src.hive.generator import HiveGenerator
-from src.hive.membrane import HiveMembrane
-from src.hive.metabolism import MetabolicLoop
-from src.hive.metabolism.logging_config import (
-    bind_request_id,
-    clear_request_context,
-    configure_logging,
-    get_logger,
-)
-from src.hive.metabolism.telemetry import init_telemetry
-from src.hive.proto.aura.negotiation.v1 import negotiation_pb2, negotiation_pb2_grpc
-from src.hive.transformer import AuraTransformer
+from config import settings
+from config.llm import get_raw_key
 
 # Configure structured logging on startup
 configure_logging(log_level=settings.server.log_level)
@@ -288,7 +288,7 @@ def create_crypto_provider() -> Any:
             network=settings.crypto.solana_network,
             currency=settings.crypto.currency,
         )
-        from src.hive.connector.proteins.solana_provider import SolanaProvider
+        from hive.connector.proteins.solana_provider import SolanaProvider
 
         return SolanaProvider(
             private_key_base58=get_raw_key(settings.crypto.solana_private_key),
@@ -361,8 +361,8 @@ async def serve() -> None:
     crypto_provider = create_crypto_provider()
     market_service = None
     if crypto_provider:
-        from src.hive.connector.proteins.encryption import SecretEncryption
-        from src.hive.services.market import MarketService
+        from hive.connector.proteins.encryption import SecretEncryption
+        from hive.services.market import MarketService
 
         encryption = SecretEncryption(
             get_raw_key(settings.crypto.secret_encryption_key)
