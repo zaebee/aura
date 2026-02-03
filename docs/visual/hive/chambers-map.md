@@ -11,7 +11,7 @@
 **Sacred Chambers** are specially designated directories with **poetic metaphorical names** that communicate their architectural role. Defined in `packages/aura-core/src/aura_core/dna.py:50-75`, these chambers are enforced by the **bee-keeper** auditor to prevent architectural drift.
 
 Each chamber has:
-- A **filesystem path** (e.g., `core-service/migrations`)
+- A **filesystem path** (e.g., `core/migrations`)
 - A **sacred name** (e.g., "HiveEvolutionaryScrolls")
 - An **ontological role** (Genome, Nucleus, Organs, or Citizens)
 
@@ -25,7 +25,7 @@ flowchart TB
         SharedNucleotides["packages/<br/>━━━━━━━━━━━━━━━━<br/>SharedNucleotides<br/>━━━━━━━━━━━━━━━━<br/>Immutable Protocols"]
     end
 
-    subgraph Nucleus["🧠 NUCLEUS LAYER (core-service/)"]
+    subgraph Nucleus["🧠 NUCLEUS LAYER (core/)"]
         direction TB
         EvolutionaryScrolls["migrations/<br/>━━━━━━━━━━━━━━━━<br/>HiveEvolutionaryScrolls<br/>━━━━━━━━━━━━━━━━<br/>Database migrations"]
         ValidationPollen["tests/<br/>━━━━━━━━━━━━━━━━<br/>ValidationPollen<br/>━━━━━━━━━━━━━━━━<br/>Test suites"]
@@ -78,7 +78,7 @@ flowchart TB
 
 ---
 
-### 🧠 Nucleus Level (core-service/)
+### 🧠 Nucleus Level (core/)
 
 | Path | Sacred Name | Purpose | Enforced By |
 |------|------------|---------|-------------|
@@ -174,18 +174,19 @@ The **bee-keeper** agent audits code for Sacred Chamber violations:
 ### ✅ Allowed: Creating files in sacred chambers
 ```bash
 # Creating a new migration (HiveEvolutionaryScrolls)
-touch core-service/migrations/versions/001_add_user_table.py  # ✅ ALLOWED
+touch core/migrations/versions/001_add_user_table.py  # ✅ ALLOWED
 ```
 
 ### ❌ Forbidden: Creating directories outside sacred chambers
 ```bash
 # Creating a random directory
-mkdir core-service/random_stuff/  # ❌ HERESY! Not in ALLOWED_CHAMBERS
+mkdir core/random_stuff/  # ❌ HERESY! Not in ALLOWED_CHAMBERS
 ```
 
-**bee-keeper detection:**
+**bee-keeper detection (example logic from transformer):**
 ```python
-# From bee-keeper/src/hive/aggregator.py
+# Conceptual example from bee-keeper/src/hive/transformer.py
+# (Audit reasoning belongs in Transformer, not Aggregator)
 def audit_filesystem():
     for path in repo.glob("**/*"):
         if path.is_dir() and path not in ALLOWED_CHAMBERS:
@@ -200,7 +201,7 @@ def audit_filesystem():
 aura-hive/
 ├── 🧬 packages/              [SharedNucleotides]
 │   └── aura-core/
-├── 🧠 core-service/          [Nucleus]
+├── 🧠 core/          [Nucleus]
 │   ├── migrations/           [HiveEvolutionaryScrolls]
 │   ├── tests/                [ValidationPollen]
 │   ├── scripts/              [HiveAutomationScrolls]
@@ -245,7 +246,7 @@ git commit -m "Update HiveEvolutionaryScrolls: add users table schema"
 
 **Before (generic):**
 ```
-# Add a test to core-service/tests/
+# Add a test to core/tests/
 ```
 
 **After (sacred language):**

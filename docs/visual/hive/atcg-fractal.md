@@ -67,7 +67,7 @@ flowchart TB
         T2["🧠 T (Transformer)<br/>transformer.py<br/>LLM negotiation strategy<br/>via litellm/DSPy"]
         M2_out["🛡️ M (Membrane)<br/>Business rule guards,<br/>FailureIntent handling"]
         C2["⚡ C (Connector)<br/>connector.py<br/>PostgreSQL writes,<br/>gRPC responses"]
-        G2["📜 G (Generator)<br/>generator.py<br/>NATS events:<br/>aura.negotiation.*"]
+        G2["📜 G (Generator)<br/>generator.py<br/>NATS events:<br/>aura.hive.events.*"]
 
         M2_in --> A2 --> T2 --> M2_out --> C2 --> G2
     end
@@ -139,16 +139,16 @@ This fractal pattern means:
 ## Implementation References
 
 ### bee-keeper ATCG-M
-- **A:** `agents/bee-keeper/src/hive/aggregator.py` — `aggregate()` method
-- **T:** `agents/bee-keeper/src/hive/transformer.py` — `reflect()` method
-- **C:** `agents/bee-keeper/src/hive/connector.py` — `act()` method
-- **G:** `agents/bee-keeper/src/hive/generator.py` — `pulse()` method
+- **A:** `agents/bee-keeper/src/hive/aggregator.py` — `BeeAggregator.sense()` (implements Aggregator protocol)
+- **T:** `agents/bee-keeper/src/hive/transformer.py` — `BeeTransformer.reflect()` (implements Transformer protocol)
+- **C:** `agents/bee-keeper/src/hive/connector.py` — `BeeConnector.act()` (implements Connector protocol)
+- **G:** `agents/bee-keeper/src/hive/generator.py` — `BeeGenerator.pulse()` (implements Generator protocol)
 - **M:** Implicit in input validation (prompts, file access). *Note: bee-keeper is an advisory-only service without economic decisions, so deterministic guards are minimal. Future enhancement: extract to explicit `membrane.py` for consistency.*
 
-### core-service ATCG-M
-- **A:** `core-service/src/hive/aggregator.py` — Data collection layer
-- **T:** `core-service/src/hive/transformer.py` — LLM strategy layer
-- **C:** `core-service/src/hive/connector.py` — Database/gRPC action layer
+### core ATCG-M
+- **A:** `core/src/hive/aggregator.py` — Data collection layer
+- **T:** `core/src/hive/transformer.py` — LLM strategy layer
+- **C:** `core/src/hive/connector.py` — Database/gRPC action layer
 - **G:** `core-service/src/hive/generator.py` — Event emission layer
 - **M:** `core-service/src/hive/membrane.py` — **Explicit dual-gate implementation**
 

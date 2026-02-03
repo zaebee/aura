@@ -8,7 +8,7 @@
 
 ## What is the NATS Bloodstream?
 
-From `FOUNDATION.md:14`, the Nucleus (core-service) **"Communicates via NATS 'Bloodstream'"**.
+From `FOUNDATION.md:14`, the Nucleus (core) **"Communicates via NATS 'Bloodstream'"**.
 
 **NATS** (Neural Autonomic Transport System, via https://nats.io) is the **pub/sub message bus** that enables:
 - **Asynchronous choreography** — Bees coordinate without direct coupling
@@ -49,7 +49,7 @@ flowchart TB
     subgraph Bees["Autonomous Bees (Services)"]
         direction TB
         BeeKeeper["🐝 bee-keeper<br/>(Agent)"]
-        CoreService["🧠 core-service<br/>(Nucleus)"]
+        CoreService["🧠 core<br/>(Nucleus)"]
         TelegramBot["📱 telegram-bot<br/>(Adapter)"]
     end
 
@@ -103,7 +103,7 @@ flowchart TB
   "violations": [
     {
       "severity": "critical",
-      "file": "core-service/src/unauthorized_dir/hack.py",
+      "file": "core/src/unauthorized_dir/hack.py",
       "rule": "FOUNDATION.md ontological hierarchy",
       "message": "File in unauthorized chamber"
     }
@@ -137,7 +137,7 @@ await nc.publish("aura.hive.audit", json.dumps(payload).encode())
 {
   "timestamp": 1735920000.456,
   "injury_type": "unauthorized_directory",
-  "affected_path": "core-service/src/random_stuff/",
+  "affected_path": "core/src/random_stuff/",
   "severity": "high",
   "recommended_action": "delete_directory",
   "auto_heal": false
@@ -159,7 +159,7 @@ await nc.publish("aura.hive.injury", json.dumps(injury_payload).encode())
 
 ### 3. `aura.hive.events.*` — Domain Events
 
-**Publisher:** `core-service/src/hive/generator.py:42`
+**Publisher:** `core/src/hive/generator.py:42`
 
 **Purpose:** Broadcast negotiation outcomes for audit trails, analytics, and downstream reactions.
 
@@ -193,7 +193,7 @@ await nc.publish("aura.hive.injury", json.dumps(injury_payload).encode())
 
 **Example Usage:**
 ```python
-# core-service/src/hive/generator.py:40-46
+# core/src/hive/generator.py:40-46
 Event(
     topic=f"aura.hive.events.{observation.event_type}",
     payload={"success": True, "event_type": "negotiation_accepted", ...},
@@ -205,7 +205,7 @@ Event(
 
 ### 4. `aura.hive.heartbeat` — Service Liveness
 
-**Publisher:** `core-service/src/hive/generator.py:51`
+**Publisher:** `core/src/hive/generator.py:51`
 
 **Purpose:** Periodic liveness signals from each Bee to prove it's operational.
 
@@ -214,7 +214,7 @@ Event(
 {
   "status": "active",
   "timestamp": 1735920001.012,
-  "service": "core-service",
+  "service": "core",
   "metadata": {
     "cpu_percent": 23.5,
     "memory_mb": 512,
@@ -231,10 +231,10 @@ Event(
 
 **Example Usage:**
 ```python
-# core-service/src/hive/generator.py:49-58
+# core/src/hive/generator.py:49-58
 Event(
     topic="aura.hive.heartbeat",
-    payload={"status": "active", "timestamp": now, "service": "core-service"},
+    payload={"status": "active", "timestamp": now, "service": "core"},
     timestamp=now,
 )
 ```
@@ -243,7 +243,7 @@ Event(
 
 ### 5. `aura.core.brain_dead` — Critical LLM Failures
 
-**Publisher:** `core-service/src/hive/transformer.py:71`
+**Publisher:** `core/src/hive/transformer.py:71`
 
 **Purpose:** Signal catastrophic LLM failures (API down, timeout, hallucination detection) that require human intervention.
 
@@ -269,7 +269,7 @@ Event(
 
 **Example Usage:**
 ```python
-# core-service/src/hive/transformer.py:64-71
+# core/src/hive/transformer.py:64-71
 event = {
     "timestamp": time.time(),
     "error": str(e),
@@ -286,7 +286,7 @@ await nc.publish("aura.core.brain_dead", json.dumps(event).encode())
 sequenceDiagram
     participant Agent as External Agent
     participant Gateway as api-gateway
-    participant Core as core-service
+    participant Core as core
     participant NATS as NATS Bloodstream
     participant Keeper as bee-keeper
     participant Monitor as Prometheus
@@ -315,8 +315,8 @@ sequenceDiagram
 
 **Flow:**
 1. External agent negotiates via HTTP → gRPC
-2. **core-service** processes, emits `negotiation_accepted` event
-3. **core-service** emits heartbeat every 60s
+2. **core** processes, emits `negotiation_accepted` event
+3. **core** emits heartbeat every 60s
 4. **Prometheus** collects heartbeat for uptime tracking
 5. **bee-keeper** (separate flow) audits code, emits `audit` + `injury` events
 6. **Prometheus** alerts on injuries
@@ -330,7 +330,7 @@ sequenceDiagram
 **Use Case:** Non-critical telemetry (heartbeats, low-priority events)
 
 ```python
-# core-service/src/hive/generator.py:65-66
+# core/src/hive/generator.py:65-66
 await self.nc.publish(event.topic, json.dumps(event.payload).encode())
 ```
 
@@ -343,7 +343,7 @@ await self.nc.publish(event.topic, json.dumps(event.payload).encode())
 **Use Case:** Important events that shouldn't crash the service
 
 ```python
-# core-service/src/hive/generator.py:64-74
+# core/src/hive/generator.py:64-74
 try:
     await self.nc.publish(event.topic, json.dumps(event.payload).encode())
 except (nats.errors.ConnectionClosedError, nats.errors.TimeoutError) as e:
@@ -421,7 +421,7 @@ await js.subscribe(
 
 **Environment Variables:**
 ```bash
-# core-service/.env
+# core/.env
 NATS_URL=nats://localhost:4222
 
 # agents/bee-keeper/.env
@@ -525,7 +525,7 @@ authorization {
     {user: "bee-keeper", password: "secret", permissions: {
       publish: ["aura.hive.audit", "aura.hive.injury"]
     }},
-    {user: "core-service", password: "secret2", permissions: {
+    {user: "core", password: "secret2", permissions: {
       publish: ["aura.hive.events.*", "aura.hive.heartbeat"]
     }}
   ]
@@ -553,15 +553,15 @@ This event system implements the "Bloodstream" communication pattern defined in:
 
 - `docs/FOUNDATION.md` line 14 (NATS Bloodstream)
 - `packages/aura-core/src/aura_core/dna.py` lines 174-177 (Generator protocol)
-- `core-service/src/hive/generator.py` (G nucleotide implementation)
+- `core/src/hive/generator.py` (G nucleotide implementation)
 - `agents/bee-keeper/src/hive/connector.py` (Audit event emission)
 
 **NATS Topics Used:**
 - `aura.hive.audit` — bee-keeper audits
 - `aura.hive.injury` — bee-keeper self-healing triggers
-- `aura.hive.events.*` — core-service domain events
-- `aura.hive.heartbeat` — core-service liveness
-- `aura.core.brain_dead` — core-service LLM failures
+- `aura.hive.events.*` — core domain events
+- `aura.hive.heartbeat` — core liveness
+- `aura.core.brain_dead` — core LLM failures
 
 ---
 

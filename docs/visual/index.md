@@ -27,7 +27,7 @@ flowchart TB
         C --> G
     end
 
-    Services[Production Services<br/>api-gateway • core-service] --> Observability[Observability Signals<br/>Metrics / Logs / Traces]
+    Services[Production Services<br/>api-gateway • core] --> Observability[Observability Signals<br/>Metrics / Logs / Traces]
     Observability --> M_in
 
     C --> |GitHub Comments| GitHub[GitHub PR/Commit]
@@ -80,12 +80,12 @@ Aura Hive uses **Technical Folklore** — bio-organic metaphors layered over pre
 | **T (Transformer)** | Reasoning/LLM Layer | Processes signals via Ona (DSPy, LangChain) | `dna.py:160-163` |
 | **C (Connector)** | Output/Action Layer | Acts through Jules (Proteins/Skills) | `dna.py:167-170` |
 | **G (Generator)** | Event/Chronicle Layer | Pulses state updates and events | `dna.py:174-177` |
-| **M (Membrane)** | Input/Output Guards | Immune system: validates inputs, enforces rules | `core-service/src/hive/membrane.py` |
+| **M (Membrane)** | Input/Output Guards | Immune system: validates inputs, enforces rules | `core/src/hive/membrane.py` |
 | **Bloodstream** | NATS Event Bus | Circulatory system distributes signals | `FOUNDATION.md:14` |
 | **Proteins** | Skill Adapters (SkillProtocol) | Enzymes enable specific external interactions | `dna.py:184-202` |
 | **Sacred Chambers** | Directory Roles | Poetic names for filesystem organization | `dna.py:50-75` |
 | **Genome** | `aura-core` package | Immutable DNA (Protocols, BaseModels, Types) | `packages/aura-core/` |
-| **Nucleus** | `core-service` | The sovereign brain | `core-service/` |
+| **Nucleus** | `core` | The sovereign brain | `core/` |
 | **Organs** | `components/proteins` | Specialized skills (Solana, Telegram, GitHub) | `components/proteins/` |
 | **Citizens** | `agents/` + `adapters/` | Active Subjects (goals) + Passive Servants (translation) | `agents/`, `adapters/` |
 | **Ona** | LLM Reasoning Engine | The thinking substrate (DSPy, LangChain) | N/A (conceptual) |
@@ -105,7 +105,7 @@ Visual diagrams are aligned with the canonical architecture defined in:
 * `docs/FOUNDATION.md` — Ontological hierarchy and ATCG-M metabolism
 * `packages/aura-core/src/aura_core/dna.py` — Protocol definitions
 * `HIVE_STATE.md` — Operational status and audit log
-* Reference implementations: `agents/bee-keeper/`, `core-service/src/hive/`
+* Reference implementations: `agents/bee-keeper/`, `core/src/hive/`
 
 ---
 

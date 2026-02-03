@@ -111,31 +111,7 @@ Aura Hive follows that philosophy, with each Bee implementing the **ATCG-M metab
 
 ---
 
-## 📚 Layers and Contracts
-
-Aura Hive is structured into five layers – Docs, Visual, Advisory, Control, and Runtime – each with a clear domain of responsibility:
-
-### Docs Layer
-
-The outermost layer containing documentation, standards, and specifications. Here live the governance documents, protocols, issue templates, and contribution guides. Docs are read by and help all other layers, but do not execute logic.
-
-### Visual Layer
-
-A thin layer of static documentation (Markdown files, Mermaid diagrams in `docs/visual/`) that presents architectural concepts and reasoning flows. It provides visual representations of the system for human understanding. **The Visual layer is informed by concepts from the Advisory layer** (showing how advisors reason and observe) but is not a dynamic component—it consists of static artifacts that document the architecture.
-
-### Advisory Layer
-
-Houses the advisor agents and analytics. It consumes metrics, logs, and data from below (Control and Runtime) and produces insights. Its output is passed to humans or to Control (as suggestions). For instance, an Advisor Bee might raise an issue in the system based on its analysis. Importantly, it never side-steps the Control layer to change the running system.
-
-### Control Layer
-
-The orchestrator and policy engine. It manages workflows, schedules tasks on the Runtime, and enforces protocol rules. It may call services in the Runtime layer and ingest feedback from the Advisory layer, but its primary job is coordination. For example, a Control Bee might read an FR-xxx specification (feature request) and spin up CI/CD pipelines or enact the described workflow.
-
-### Runtime Layer
-
-The innermost core, containing Worker Bees and the application logic. This is where actual computation and data handling happen. It only exposes well-defined interfaces (e.g. APIs or message queues) upward. It should not assume anything about higher layers; for instance, it does not know if a trigger came from a user in the Visual layer or an automated Control workflow.
-
----
+## 📚 Layer Contracts and Communication
 
 These layers adhere to the layered (n-tier) architecture pattern. Each layer has a distinct set of responsibilities, and layers only communicate with their immediate neighbors[7]. In practice, this means we define contracts (APIs, schemas, protocols) for every layer boundary. For example, the Control → Runtime contract might be a REST or message interface where control-plane code can launch jobs. The Advisory → Control contract might be a monitored log or an events stream. Crucially, higher layers depend on lower ones, not vice versa[7]. The Runtime layer does not call the Control layer; it only implements the contract the Control layer uses. The Visual layer only reads data from the Advisory layer (for display) and never writes back. By following this one-way dependency rule and the adjacent-only communication principle, we prevent cyclic dependencies and keep the design clean and maintainable[7].
 

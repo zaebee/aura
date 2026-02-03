@@ -19,7 +19,7 @@ flowchart TB
 
     subgraph Level2["🧠 Level 2: The Nucleus"]
         direction TB
-        Nucleus["core-service/<br/>━━━━━━━━━━━━━━━━<br/>ATCG-M Metabolism<br/>NATS Bloodstream<br/>━━━━━━━━━━━━━━━━<br/>SOVEREIGN BRAIN"]
+        Nucleus["core/<br/>━━━━━━━━━━━━━━━━<br/>ATCG-M Metabolism<br/>NATS Bloodstream<br/>━━━━━━━━━━━━━━━━<br/>SOVEREIGN BRAIN"]
     end
 
     subgraph Level3["🔬 Level 3: The Organs"]
@@ -83,7 +83,7 @@ grep -r "async def.*http" packages/aura-core/ # Should return nothing
 
 ---
 
-### 🧠 Level 2: The Nucleus (`/core-service`)
+### 🧠 Level 2: The Nucleus (`/core`)
 
 **Status:** The Sovereign Brain
 
@@ -97,7 +97,7 @@ grep -r "async def.*http" packages/aura-core/ # Should return nothing
 
 **Directory Structure:**
 ```
-core-service/
+core/
 ├── src/
 │   ├── hive/                   # Sacred ATCG-M implementation
 │   │   ├── aggregator.py       # A nucleotide
@@ -122,7 +122,7 @@ The Nucleus makes **decisions**. It has agency. It reasons via LLMs, enforces bu
 **Verification:**
 ```bash
 # Nucleus MUST import from Genome, not the other way around
-grep -r "from packages.aura_core" core-service/src/  # Should succeed
+grep -r "from packages.aura_core" core/src/  # Should succeed
 grep -r "from core_service" packages/aura-core/      # Should return nothing
 ```
 
@@ -274,7 +274,7 @@ from proteins.github import GitHubSkill  # ✅ Organ skills
 ```mermaid
 flowchart TB
     Genome["🧬 GENOME<br/>(aura-core)"]
-    Nucleus["🧠 NUCLEUS<br/>(core-service)"]
+    Nucleus["🧠 NUCLEUS<br/>(core)"]
     Organs["🔬 ORGANS<br/>(proteins)"]
     Citizens["👥 CITIZENS<br/>(agents + adapters)"]
 
@@ -303,7 +303,7 @@ flowchart TD
     Start([New Code]) --> Q1{Does it define<br/>types/protocols<br/>ONLY?}
     Q1 -->|Yes| Genome["🧬 GENOME<br/>packages/aura-core/"]
     Q1 -->|No| Q2{Does it make<br/>decisions via<br/>LLM?}
-    Q2 -->|Yes| Nucleus["🧠 NUCLEUS<br/>core-service/"]
+    Q2 -->|Yes| Nucleus["🧠 NUCLEUS<br/>core/"]
     Q2 -->|No| Q3{Does it interact<br/>with external<br/>APIs?}
     Q3 -->|Yes| Organs["🔬 ORGANS<br/>components/proteins/"]
     Q3 -->|No| Q4{Does it have<br/>goals/agency?}
@@ -325,7 +325,7 @@ This diagram implements the ontological hierarchy defined in:
 
 - `docs/FOUNDATION.md` lines 3-24 (Four Levels)
 - `packages/aura-core/src/aura_core/dna.py` (Genome implementation)
-- `core-service/src/hive/` (Nucleus implementation)
+- `core/src/hive/` (Nucleus implementation)
 - `components/proteins/` (Organs implementation)
 - `agents/`, `adapters/` (Citizens implementation)
 

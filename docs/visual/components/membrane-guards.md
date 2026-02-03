@@ -17,7 +17,7 @@ Unlike the LLM-based Transformer (T) which uses probabilistic reasoning, the Mem
 - **Dual-gate:** Protects both inbound (inputs) and outbound (outputs)
 - **Self-healing:** Handles failures gracefully via FailureIntent
 
-**Implementation:** `core-service/src/hive/membrane.py:14-117` (HiveMembrane class)
+**Implementation:** `core/src/hive/membrane.py:14-117` (HiveMembrane class)
 
 ---
 
@@ -59,7 +59,7 @@ flowchart TB
 
 ## Inbound Membrane: Guard Against Poison
 
-**Location:** `core-service/src/hive/membrane.py:20-64` (`inspect_inbound()`)
+**Location:** `core/src/hive/membrane.py:20-64` (`inspect_inbound()`)
 
 **Threats Defended:**
 
@@ -137,7 +137,7 @@ elif field_name == "agent.did":
 
 ## Outbound Membrane: Enforce Business Rules
 
-**Location:** `core-service/src/hive/membrane.py:66-117` (`inspect_outbound()`)
+**Location:** `core/src/hive/membrane.py:66-117` (`inspect_outbound()`)
 
 **Rules Enforced:**
 
@@ -315,7 +315,7 @@ if isinstance(decision, FailureIntent):
     )
 ```
 
-**Implementation:** `core-service/src/hive/membrane.py:134-148`
+**Implementation:** `core/src/hive/membrane.py:134-148`
 
 ---
 
@@ -351,7 +351,7 @@ flowchart LR
 
 ### Unit Tests
 
-**Location:** `core-service/tests/test_membrane.py` (if exists, otherwise should be created)
+**Location:** `core/tests/test_membrane.py` (if exists, otherwise should be created)
 
 **Test Cases:**
 ```python
@@ -411,8 +411,8 @@ This pattern implements the Membrane (M) nucleotide defined in:
 
 - `docs/FOUNDATION.md` line 32 (Membrane as "Deterministic safety guards")
 - `packages/aura-core/src/aura_core/dna.py` (Membrane protocol definition — if exists)
-- `core-service/src/hive/membrane.py` (Reference implementation)
-- Used by: `core-service/src/hive/metabolism.py` (ATCG-M orchestration)
+- `core/src/hive/membrane.py` (Reference implementation)
+- Used by: `core/src/hive/metabolism.py` (ATCG-M orchestration)
 
 ---
 
