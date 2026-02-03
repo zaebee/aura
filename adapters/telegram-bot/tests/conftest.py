@@ -2,7 +2,7 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 from aiogram import types
-from interfaces import NegotiationProvider, NegotiationResult, SearchResult
+from src.interfaces import NegotiationProvider, NegotiationResult, SearchResult
 
 
 class MockNegotiationProvider(NegotiationProvider):

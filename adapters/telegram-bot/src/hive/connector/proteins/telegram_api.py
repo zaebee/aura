@@ -6,7 +6,6 @@ from aura_core.dna import Observation, SkillProtocol
 
 logger = structlog.get_logger(__name__)
 
-
 class TelegramProtein(SkillProtocol):
     """Protein for Telegram API interactions."""
 
@@ -31,11 +30,7 @@ class TelegramProtein(SkillProtocol):
                     reply_markup=params.get("reply_markup"),
                     parse_mode=params.get("parse_mode"),
                 )
-                return Observation(
-                    success=True,
-                    data={"message_id": msg.message_id},
-                    message_id=msg.message_id,
-                )
+                return Observation(success=True, data={"message_id": msg.message_id}, message_id=msg.message_id)
             except Exception as e:
                 logger.error("telegram_protein_error", error=str(e))
                 return Observation(success=False, error=str(e))

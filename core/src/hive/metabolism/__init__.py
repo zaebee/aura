@@ -1,16 +1,7 @@
 from typing import Any
 
 import structlog
-from aura_core.dna import (
-    Aggregator,
-    Connector,
-    Generator,
-    Membrane,
-    Transformer,
-)
-from aura_core.dna import (
-    MetabolicLoop as BaseMetabolicLoop,
-)
+from aura_core.dna import Aggregator, Connector, Generator, Membrane, Transformer
 from opentelemetry import trace
 
 from .metrics import negotiation_accepted_total, negotiation_total
@@ -19,9 +10,9 @@ logger = structlog.get_logger(__name__)
 tracer = trace.get_tracer(__name__)
 
 
-class MetabolicLoop(BaseMetabolicLoop):
+class MetabolicLoop:
     """
-    Orchestrates the ATCG flow with core-specific telemetry:
+    Orchestrates the ATCG flow:
     Signal -> Membrane(In) -> Aggregator -> Transformer -> Membrane(Out) -> Connector -> Generator
     """
 
@@ -33,9 +24,13 @@ class MetabolicLoop(BaseMetabolicLoop):
         generator: Generator,
         membrane: Membrane,
     ):
-        super().__init__(aggregator, transformer, connector, generator, membrane)
+        self.aggregator = aggregator
+        self.transformer = transformer
+        self.connector = connector
+        self.generator = generator
+        self.membrane = membrane
 
-    async def execute(self, signal: Any, **kwargs: Any) -> Any:
+    async def execute(self, signal: Any) -> Any:
         """
         Execute one full metabolic cycle.
         """

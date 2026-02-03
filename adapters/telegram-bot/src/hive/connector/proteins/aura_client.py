@@ -6,7 +6,8 @@ import structlog
 from aura.negotiation.v1 import negotiation_pb2, negotiation_pb2_grpc
 from aura_core.dna import Observation, SkillProtocol
 from google.protobuf.json_format import MessageToDict
-from interfaces import NegotiationProvider, NegotiationResult, SearchResult
+
+from ....interfaces import NegotiationProvider, NegotiationResult, SearchResult
 
 logger = structlog.get_logger()
 

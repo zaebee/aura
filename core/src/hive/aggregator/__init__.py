@@ -23,8 +23,8 @@ from sqlalchemy import (
 from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, sessionmaker
 
-from config import get_settings
-from config.llm import get_raw_key
+from ...config import get_settings
+from ...config.llm import get_raw_key
 
 logger = structlog.get_logger(__name__)
 

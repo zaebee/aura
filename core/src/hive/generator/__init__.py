@@ -6,7 +6,7 @@ import nats.errors
 import structlog
 from aura_core.dna import Event, Observation
 
-from config import get_settings
+from ...config import get_settings
 
 logger = structlog.get_logger(__name__)
 

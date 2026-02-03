@@ -1,39 +1,130 @@
 {
-  "negotiate": {
+  "negotiate_chain.predict": {
     "traces": [],
     "train": [],
     "demos": [
       {
-        "augmented": true,
         "input_bid": "600",
-        "context": "{\"base_price\": 1000, \"floor_price\": 800, \"occupancy\": \"high\", \"value_add_inventory\": [{\"item\": \"Breakfast for two\", \"internal_cost\": 20, \"perceived_value\": 60}, {\"item\": \"Late checkout\", \"internal_cost\": 0, \"perceived_value\": 40}, {\"item\": \"Room upgrade\", \"internal_cost\": 30, \"perceived_value\": 120}]}",
-        "history": "[]",
-        "thought": "**Strategic Analysis:**\n1. **Margin Assessment**: The buyer's initial bid of $600 is significantly below the floor price of $800, leaving no margin for profitability. The base price is $1000, and with high occupancy, there is no economic pressure to accept low offers.\n2. **Occupancy Context**: High occupancy means demand is strong, and we can afford to hold firm on pricing or even push closer to the base price. Rejecting or countering aggressively is justified.\n3. **Value-Add Leverage**: The available perks (e.g., room upgrade, breakfast) have high perceived value ($120, $60) but low internal costs ($30, $20). These can be used to sweeten a counteroffer without eroding margin.\n4. **System Constraints**: None are present, so no operational limitations affect the negotiation.\n5. **History**: No prior bids or concessions, so the buyer has not demonstrated flexibility. A strong counter is warranted to anchor expectations.\n\n**Optimal Strategy**:\n- **Counter** with a price closer to the base ($900–$950) while bundling a high-value, low-cost perk (e.g., room upgrade) to justify the increase. This maintains profitability while offering tangible value to the buyer.\n- **Message Tone**: Professional but firm, emphasizing the high demand (occupancy) and the added value of the perk to justify the counter.\n\n---",
-        "action": "```json\n{\n    \"action\": \"counter\",\n    \"price\": 920,\n    \"message\": \"Thank you for your offer. Given the high demand for our rooms, we’re unable to accept $600, but we’d be happy to accommodate you at $920 with a complimentary room upgrade included. This upgrade offers significant additional value at no extra cost to you.\"\n}\n```"
+        "context": {
+          "base_price": 1000,
+          "floor_price": 800,
+          "occupancy": "high",
+          "value_add_inventory": [
+            {
+              "item": "Breakfast for two",
+              "internal_cost": 20,
+              "perceived_value": 60
+            },
+            {
+              "item": "Late checkout",
+              "internal_cost": 0,
+              "perceived_value": 40
+            },
+            {
+              "item": "Room upgrade",
+              "internal_cost": 30,
+              "perceived_value": 120
+            }
+          ]
+        },
+        "history": [],
+        "reasoning": "Offer is far below acceptable range. High occupancy allows firm pricing with value substitution.",
+        "response": {
+          "action": "counter",
+          "price": 980,
+          "message": "We can’t accommodate $600 due to strong demand. I can offer $980 and include complimentary breakfast for two."
+        }
       },
       {
-        "augmented": true,
         "input_bid": "700",
-        "context": "{\"base_price\": 1000, \"floor_price\": 800, \"occupancy\": \"high\", \"value_add_inventory\": [{\"item\": \"Breakfast for two\", \"internal_cost\": 20, \"perceived_value\": 60}, {\"item\": \"Late checkout\", \"internal_cost\": 0, \"perceived_value\": 40}, {\"item\": \"Room upgrade\", \"internal_cost\": 30, \"perceived_value\": 120}]}",
-        "history": "[]",
-        "thought": "**Strategic Analysis:**\n1. **Margin Assessment**: The buyer's initial bid of $700 is below the floor price of $800, which is unacceptable. However, the base price is $1000, and occupancy is \"high,\" indicating strong demand. This suggests we have leverage to negotiate upward.\n2. **Occupancy Context**: High occupancy means we can afford to be firm on price, as alternative buyers are likely available. However, we should avoid outright rejection to keep the buyer engaged.\n3. **Value-Add Leverage**: The available perks (e.g., breakfast, late checkout, room upgrade) can be used to justify a higher price or sweeten a counteroffer. For example:\n   - \"Breakfast for two\" has a perceived value of $60 but costs us $20.\n   - \"Late checkout\" is cost-free but valued at $40.\n   - \"Room upgrade\" offers high perceived value ($120) at a moderate cost ($30).\n4. **Counteroffer Strategy**: A counteroffer slightly above the floor price ($800) with added perks could bridge the gap while maintaining profitability. For instance, bundling late checkout (cost-free) or breakfast (low cost) could make the offer more appealing without significantly impacting margins.\n5. **System Constraints**: None are present, so no adjustments are needed for operational limitations.\n\n**Optimal Move**: Counter with $850 + a low-cost perk (e.g., late checkout) to justify the increase and test the buyer's flexibility.\n\n---",
-        "action": "```json\n{\n    \"action\": \"counter\",\n    \"price\": 850,\n    \"message\": \"Thank you for your offer. Given the high demand, we can counter at $850 with complimentary late checkout included. This adds value while reflecting current occupancy levels.\"\n}\n```"
+        "context": {
+          "base_price": 1000,
+          "floor_price": 800,
+          "occupancy": "high",
+          "value_add_inventory": [
+            {
+              "item": "Breakfast for two",
+              "internal_cost": 20,
+              "perceived_value": 60
+            },
+            {
+              "item": "Late checkout",
+              "internal_cost": 0,
+              "perceived_value": 40
+            },
+            {
+              "item": "Room upgrade",
+              "internal_cost": 30,
+              "perceived_value": 120
+            }
+          ]
+        },
+        "history": [],
+        "reasoning": "User improves but still below floor. Maintain price discipline and add another low-cost perk.",
+        "response": {
+          "action": "counter",
+          "price": 950,
+          "message": "I can’t go that low, but I can do $950 and include breakfast plus late checkout."
+        }
       },
       {
-        "augmented": true,
         "input_bid": "900",
-        "context": "{\"base_price\": 1000, \"floor_price\": 800, \"occupancy\": \"high\", \"value_add_inventory\": [{\"item\": \"Breakfast for two\", \"internal_cost\": 20, \"perceived_value\": 60}, {\"item\": \"Late checkout\", \"internal_cost\": 0, \"perceived_value\": 40}, {\"item\": \"Room upgrade\", \"internal_cost\": 30, \"perceived_value\": 120}]}",
-        "history": "[]",
-        "thought": "**Strategic Analysis:**\n1. **Margin & Floor Price:** The buyer's initial bid of $900 is $100 below the base price ($1000) but $100 above the floor price ($800). This leaves room for negotiation, but the high occupancy context suggests we can hold firm or counter strategically.\n2. **Occupancy:** \"High\" occupancy means demand is strong, reducing the need to concede on price. We can leverage value-added perks to justify a counteroffer closer to the base price.\n3. **Value-Add Inventory:** The available perks (e.g., room upgrade, breakfast) have low internal costs but high perceived value. Offering these can sweeten the deal without significantly impacting margin.\n4. **History:** No prior negotiation history, so the buyer has no leverage from past concessions. This is an opportunity to set the tone for a firm but flexible negotiation.\n5. **Optimal Strategy:** Counter with a price slightly below base ($950–$980) and include a high-value, low-cost perk (e.g., room upgrade) to justify the adjustment. This maintains profitability while appearing accommodating.",
-        "action": "```json\n{\n    \"action\": \"counter\",\n    \"price\": 960,\n    \"message\": \"Thank you for your offer. Given current demand, we can counter at $960 with a complimentary room upgrade included. This provides added value while reflecting our high occupancy period.\"\n}\n```"
+        "context": {
+          "base_price": 1000,
+          "floor_price": 800,
+          "occupancy": "high",
+          "value_add_inventory": [
+            {
+              "item": "Breakfast for two",
+              "internal_cost": 20,
+              "perceived_value": 60
+            },
+            {
+              "item": "Late checkout",
+              "internal_cost": 0,
+              "perceived_value": 40
+            },
+            {
+              "item": "Room upgrade",
+              "internal_cost": 30,
+              "perceived_value": 120
+            }
+          ]
+        },
+        "history": [],
+        "reasoning": "User is now within acceptable range. Close the deal while preserving margin.",
+        "response": {
+          "action": "accept",
+          "price": 900,
+          "message": "That works. I’ll confirm your stay at $900 with breakfast and late checkout included."
+        }
       },
       {
-        "augmented": true,
         "input_bid": "680",
-        "context": "{\"base_price\": 850, \"floor_price\": 700, \"occupancy\": \"low\", \"value_add_inventory\": [{\"item\": \"Breakfast for two\", \"internal_cost\": 20, \"perceived_value\": 60}, {\"item\": \"Late checkout\", \"internal_cost\": 0, \"perceived_value\": 40}]}",
-        "history": "[]",
-        "thought": "**Strategic Analysis:**\n1. **Margin Assessment**: The buyer's initial bid of $680 is below the floor price of $700, but only by $20. This is a narrow gap, suggesting the buyer may be testing flexibility rather than making a lowball offer.\n2. **Occupancy Context**: Occupancy is \"low,\" which increases the urgency to secure a booking. The cost of leaving the room unoccupied outweighs the marginal loss of accepting a price slightly below the floor.\n3. **Value-Add Inventory**: The available perks (\"Breakfast for two\" and \"Late checkout\") have high perceived value ($100 total) with minimal internal cost ($20). These can be used to justify a counteroffer at or near the floor price while enhancing the buyer's perceived value.\n4. **System Constraints**: No constraints are present, so there’s no need to prioritize rapid closure or other tactical adjustments.\n5. **Negotiation Leverage**: Since this is the first bid and no history exists, the buyer may not yet be anchored to their offer. A counteroffer slightly above the floor price ($710–$720) with added perks could shift their perception of value while preserving margin.\n\n**Optimal Strategy**:\n- Counter with a price of **$710** (just above floor) and include one or both perks to justify the increase. This balances urgency (low occupancy) with profitability.\n- Frame the perks as a \"limited-time offer\" to create a sense of exclusivity and urgency.\n\n---",
-        "action": "```json\n{\n    \"action\": \"counter\",\n    \"price\": 710,\n    \"message\": \"Thank you for your offer of $680. Given current availability, we can accommodate your request at $710 with complimentary breakfast for two and late checkout—an added value of $100. This reflects our best rate for the dates you’ve selected.\"\n}\n```"
+        "context": {
+          "base_price": 850,
+          "floor_price": 700,
+          "occupancy": "low",
+          "value_add_inventory": [
+            {
+              "item": "Breakfast for two",
+              "internal_cost": 20,
+              "perceived_value": 60
+            },
+            {
+              "item": "Late checkout",
+              "internal_cost": 0,
+              "perceived_value": 40
+            }
+          ]
+        },
+        "history": [],
+        "reasoning": "Bid is slightly below floor. Low occupancy allows a near-floor counter to encourage booking.",
+        "response": {
+          "action": "counter",
+          "price": 730,
+          "message": "I can’t do $680, but I can offer $730 and include late checkout."
+        }
       },
       {
         "input_bid": "710",
@@ -60,6 +151,60 @@
           "action": "accept",
           "price": 710,
           "message": "That works. I’ll confirm the room at $710 with late checkout included."
+        }
+      },
+      {
+        "input_bid": "1300",
+        "context": {
+          "base_price": 1200,
+          "floor_price": 900,
+          "occupancy": "high",
+          "value_add_inventory": [
+            {
+              "item": "Suite upgrade",
+              "internal_cost": 40,
+              "perceived_value": 200
+            },
+            {
+              "item": "Welcome champagne",
+              "internal_cost": 25,
+              "perceived_value": 100
+            }
+          ]
+        },
+        "history": [],
+        "reasoning": "Buyer exceeds asking price. Accept immediately and reinforce premium experience.",
+        "response": {
+          "action": "accept",
+          "price": 1300,
+          "message": "Absolutely. I’ll confirm your stay at $1300 and include a complimentary suite upgrade and welcome champagne."
+        }
+      },
+      {
+        "input_bid": "750",
+        "context": {
+          "base_price": 950,
+          "floor_price": 780,
+          "occupancy": "high",
+          "value_add_inventory": [
+            {
+              "item": "Breakfast for two",
+              "internal_cost": 20,
+              "perceived_value": 60
+            },
+            {
+              "item": "Room upgrade",
+              "internal_cost": 30,
+              "perceived_value": 120
+            }
+          ]
+        },
+        "history": [],
+        "reasoning": "Offer is below floor and likely an anchoring tactic. Respond firmly without revealing constraints.",
+        "response": {
+          "action": "counter",
+          "price": 920,
+          "message": "I can’t go to $750, but I can offer $920 and include complimentary breakfast."
         }
       },
       {
@@ -112,60 +257,6 @@
         }
       },
       {
-        "input_bid": "750",
-        "context": {
-          "base_price": 950,
-          "floor_price": 780,
-          "occupancy": "high",
-          "value_add_inventory": [
-            {
-              "item": "Breakfast for two",
-              "internal_cost": 20,
-              "perceived_value": 60
-            },
-            {
-              "item": "Room upgrade",
-              "internal_cost": 30,
-              "perceived_value": 120
-            }
-          ]
-        },
-        "history": [],
-        "reasoning": "Offer is below floor and likely an anchoring tactic. Respond firmly without revealing constraints.",
-        "response": {
-          "action": "counter",
-          "price": 920,
-          "message": "I can’t go to $750, but I can offer $920 and include complimentary breakfast."
-        }
-      },
-      {
-        "input_bid": "1300",
-        "context": {
-          "base_price": 1200,
-          "floor_price": 900,
-          "occupancy": "high",
-          "value_add_inventory": [
-            {
-              "item": "Suite upgrade",
-              "internal_cost": 40,
-              "perceived_value": 200
-            },
-            {
-              "item": "Welcome champagne",
-              "internal_cost": 25,
-              "perceived_value": 100
-            }
-          ]
-        },
-        "history": [],
-        "reasoning": "Buyer exceeds asking price. Accept immediately and reinforce premium experience.",
-        "response": {
-          "action": "accept",
-          "price": 1300,
-          "message": "Absolutely. I’ll confirm your stay at $1300 and include a complimentary suite upgrade and welcome champagne."
-        }
-      },
-      {
         "input_bid": "1000",
         "context": {
           "base_price": 1100,
@@ -197,19 +288,19 @@
         },
         {
           "prefix": "Context:",
-          "description": "Economic context as JSON string containing:\n        {\n            base_price: float,        # Standard listing price\n            floor_price: float,       # Minimum acceptable price (hidden)\n            occupancy: str,           # Current occupancy level (high/medium/low)\n            value_add_inventory: List[Dict[str, Any]], # Available perks\n            system_constraints: List[str] # Real-time system constraints (e.g. HIGH_LOAD)\n        }"
+          "description": "Economic context as JSON string containing:\n        {\n            base_price: float,        # Standard listing price\n            floor_price: float,       # Minimum acceptable price (hidden)\n            occupancy: str,           # Current occupancy level (high/medium/low)\n            value_add_inventory: List[Dict[str, Any]]  # Available perks with cost/value\n        }"
         },
         {
           "prefix": "History:",
           "description": "Previous negotiation turns as JSON list of {bid, response} pairs"
         },
         {
-          "prefix": "Thought:",
-          "description": "Ona's internal strategic analysis (monologue).\n        Analyzes margin, occupancy, and system constraints to derive the best strategy.\n        This is NOT shown to the user."
+          "prefix": "Reasoning:",
+          "description": "Strategic reasoning about the decision, including:\n        - Margin analysis\n        - Occupancy considerations\n        - Value-add utilization strategy\n        - Competitive positioning"
         },
         {
-          "prefix": "Action:",
-          "description": "Jules' external action. MUST be a JSON-formatted string:\n        {\n            \"action\": str,              # One of: 'accept', 'counter', 'reject', 'ui_required'\n            \"price\": float,             # Final price or counter offer\n            \"message\": str              # Professional message to buyer agent\n        }"
+          "prefix": "Response:",
+          "description": "JSON-formatted action response containing:\n        {\n            action: str,              # One of: 'accept', 'counter', 'reject'\n            price: float,             # Final price (accept) or counter offer (counter)\n            message: str              # Professional message to buyer agent\n        }"
         }
       ]
     },
