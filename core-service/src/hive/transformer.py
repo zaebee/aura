@@ -109,8 +109,14 @@ class AuraTransformer:
             logger.error("failed_to_load_dspy_program", error=str(e))
             return AuraNegotiator()
 
-    def _build_economic_context(self, context: HiveContext) -> dict:
-        """Construct pure economic context without infrastructure leakage."""
+    async def _aggregate(self, mode: str, context: HiveContext) -> dict:
+        """
+        Internal ATCG aggregation: prepare context for transformation.
+        Currently supports 'economic' mode.
+        """
+        if mode != "economic":
+            logger.warning("unknown_aggregation_mode", mode=mode)
+
         cpu_load = context.system_health.get("cpu_usage_percent", 0.0)
         constraints = []
         if cpu_load > 80.0:
@@ -167,12 +173,12 @@ class AuraTransformer:
                 result = await asyncio.to_thread(
                     self.negotiator,
                     input_bid=context.offer.bid_amount,
-                    context=self._build_economic_context(context),
+                    context=await self._aggregate("economic", context),
                     history=[],  # History tracking planned for future iterations
                 )
 
             action_data = result["action"]
-            economic_context = self._build_economic_context(context)
+            economic_context = await self._aggregate("economic", context)
 
             # Deterministic safety layer (Membrane Pattern)
             try:

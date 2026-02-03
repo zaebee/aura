@@ -25,12 +25,13 @@ def test_floor_price_violation_on_accept():
         guard.validate_decision(decision, context)
 
 
-def test_floor_price_pass_on_counter():
+def test_floor_price_violation_on_counter():
     guard = OutputGuard()
     context = {"floor_price": 850.0, "internal_cost": 500.0}
-    # Counter offer below floor price but above margin should pass according to new logic
+    # Counter offer should also respect floor price
     decision = {"action": "counter", "price": 840.0}
-    assert guard.validate_decision(decision, context) is True
+    with pytest.raises(SafetyViolation, match="Floor price breach"):
+        guard.validate_decision(decision, context)
 
 
 def test_safe_decision():
@@ -49,8 +50,7 @@ def test_invalid_price():
     context = {"floor_price": 800.0, "internal_cost": 700.0}
 
     decision = {"action": "accept", "price": 0.0}
-    # Price 0.0 will trigger margin violation: (0 - 700) / 700 = -1.0 < 0.10
-    with pytest.raises(SafetyViolation, match="Economic suicide attempt"):
+    with pytest.raises(SafetyViolation, match="Invalid offered price"):
         guard.validate_decision(decision, context)
 
 

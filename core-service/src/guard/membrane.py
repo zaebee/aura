@@ -38,8 +38,8 @@ class OutputGuard:
         internal_cost = context.get("internal_cost", 0.0)
 
         # 2. Margin Check
-        if internal_cost > 0:
-            margin = (offered_price - internal_cost) / internal_cost
+        if offered_price > 0:
+            margin = (offered_price - internal_cost) / offered_price
             if margin < settings.safety.min_profit_margin:
                 logger.warning(
                     "safety_margin_violation",
@@ -50,11 +50,11 @@ class OutputGuard:
                 )
                 raise SafetyViolation("Economic suicide attempt")
         elif action in ["accept", "counter"]:
-            logger.warning("invalid_internal_cost", internal_cost=internal_cost)
-            raise SafetyViolation("Invalid economic context")
+            logger.warning("invalid_offered_price", price=offered_price)
+            raise SafetyViolation("Invalid offered price")
 
         # 3. Floor Price Violation
-        if action == "accept" and offered_price < floor_price:
+        if action in ["accept", "counter"] and offered_price < floor_price:
             logger.warning(
                 "safety_floor_violation",
                 action=action,
