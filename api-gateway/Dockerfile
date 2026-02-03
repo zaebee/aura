@@ -8,7 +8,7 @@ ENV UV_LINK_MODE=copy
 # Copy workspace and dependency files
 COPY pyproject.toml uv.lock /app/
 COPY packages/aura-core /app/packages/aura-core
-COPY api-gateway/pyproject.toml api-gateway/uv.lock /app/api-gateway/
+COPY api-gateway/pyproject.toml /app/api-gateway/
 
 # Install dependencies non-editable and scoped to the package, without installing the project itself
 RUN uv sync --frozen --no-dev --no-editable --package api-gateway --no-install-project

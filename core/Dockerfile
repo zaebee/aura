@@ -15,7 +15,7 @@ ENV UV_LINK_MODE=copy
 # Copy workspace and dependency files
 COPY pyproject.toml uv.lock /app/
 COPY packages/aura-core /app/packages/aura-core
-COPY core/pyproject.toml core/uv.lock /app/core/
+COPY core/pyproject.toml /app/core/
 
 # Install dependencies non-editable and scoped to the package, without installing the project itself
 RUN uv sync --frozen --no-dev --no-editable --package core --no-install-project
