@@ -9,8 +9,12 @@ async def test_membrane_rule1_floor_price_override():
     """
     Rule 1: If price < floor_price, override to counter-offer at floor_price + 5%.
     """
+    from config.policy import SafetySettings
+
     registry = SkillRegistry()
-    registry.register("guard", GuardSkill())
+    guard = GuardSkill()
+    await guard.initialize(SafetySettings())
+    registry.register("guard", guard)
     membrane = HiveMembrane(registry=registry)
     context = HiveContext(
         item_id="item1",
@@ -35,8 +39,12 @@ async def test_membrane_rule2_data_leak_prevention():
     """
     Rule 2: Block any response containing "floor_price" in the human message.
     """
+    from config.policy import SafetySettings
+
     registry = SkillRegistry()
-    registry.register("guard", GuardSkill())
+    guard = GuardSkill()
+    await guard.initialize(SafetySettings())
+    registry.register("guard", guard)
     membrane = HiveMembrane(registry=registry)
     context = HiveContext(
         item_id="item1",
@@ -62,8 +70,12 @@ async def test_membrane_combined_violations():
     """
     Test both Rule 1 and Rule 2 triggered at once.
     """
+    from config.policy import SafetySettings
+
     registry = SkillRegistry()
-    registry.register("guard", GuardSkill())
+    guard = GuardSkill()
+    await guard.initialize(SafetySettings())
+    registry.register("guard", guard)
     membrane = HiveMembrane(registry=registry)
     context = HiveContext(
         item_id="item1",

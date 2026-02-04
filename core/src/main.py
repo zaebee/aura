@@ -338,18 +338,18 @@ async def serve() -> None:
 
     # 7. Initialize and Verify Skills
     await storage_protein.execute("init_db", {})
-    if await storage_protein.initialize():
+    if await storage_protein.initialize(settings.database):
         health_servicer.set("", health_pb2.HealthCheckResponse.SERVING)
         logger.info("db_verified_health_serving")
     else:
         logger.error("db_verification_failed")
 
-    await pulse_protein.initialize()
-    await reasoning_protein.initialize()
-    await monitor_protein.initialize()
-    await guard_protein.initialize()
+    await pulse_protein.initialize(settings.server)
+    await reasoning_protein.initialize(settings.llm)
+    await monitor_protein.initialize(settings.server)
+    await guard_protein.initialize(settings.safety)
     if crypto_protein:
-        await crypto_protein.initialize()
+        await crypto_protein.initialize(settings.crypto)
 
     # 8. Initialize Nucleotides
     aggregator = HiveAggregator(registry=registry)

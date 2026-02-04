@@ -3,7 +3,7 @@ from typing import Any
 
 from aura_core import Observation, SkillProtocol
 
-from config import get_settings
+from config.crypto import CryptoSettings
 
 from ._internal import PriceConverter, SecretEncryption, SolanaProvider
 from .schema import PaymentProof, PaymentVerificationParams
@@ -18,18 +18,10 @@ class CryptoSkill(SkillProtocol[dict[str, Any], Observation]):
     """
 
     def __init__(self) -> None:
-        from config.llm import get_raw_key
-
-        self.settings = get_settings()
-        self.provider = SolanaProvider(
-            private_key_base58=get_raw_key(self.settings.crypto.solana_private_key),
-            rpc_url=str(self.settings.crypto.solana_rpc_url),
-            usdc_mint=self.settings.crypto.solana_usdc_mint,
-        )
-        self.encryption = SecretEncryption(
-            get_raw_key(self.settings.crypto.secret_encryption_key)
-        )
-        self.converter = PriceConverter()
+        self.settings: CryptoSettings | None = None
+        self.provider: SolanaProvider | None = None
+        self.encryption: SecretEncryption | None = None
+        self.converter: PriceConverter | None = None
 
     def get_name(self) -> str:
         return "crypto"
@@ -43,10 +35,25 @@ class CryptoSkill(SkillProtocol[dict[str, Any], Observation]):
             "convert_price",
         ]
 
-    async def initialize(self) -> bool:
+    async def initialize(self, settings: CryptoSettings | None = None) -> bool:
+        self.settings = settings
+        if self.settings:
+            from aura_core import get_raw_key
+
+            self.provider = SolanaProvider(
+                private_key_base58=get_raw_key(self.settings.solana_private_key),
+                rpc_url=str(self.settings.solana_rpc_url),
+                usdc_mint=self.settings.solana_usdc_mint,
+            )
+            self.encryption = SecretEncryption(
+                get_raw_key(self.settings.secret_encryption_key)
+            )
+            self.converter = PriceConverter()
         return True
 
     async def execute(self, intent: str, params: dict[str, Any]) -> Observation:
+        if not self.provider or not self.encryption or not self.converter or not self.settings:
+            return Observation(success=False, error="crypto_not_initialized")
         try:
             if intent == "verify_payment":
                 p = PaymentVerificationParams(**params)
@@ -68,7 +75,7 @@ class CryptoSkill(SkillProtocol[dict[str, Any], Observation]):
             elif intent == "convert_price":
                 amount = self.converter.convert_usd_to_crypto(
                     params["usd_amount"],
-                    params.get("currency", self.settings.crypto.currency),
+                    params.get("currency", self.settings.currency),
                 )
                 return Observation(success=True, data=amount)
 
@@ -81,4 +88,5 @@ class CryptoSkill(SkillProtocol[dict[str, Any], Observation]):
             return Observation(success=False, error=str(e))
 
     async def close(self) -> None:
-        await self.provider.close()
+        if self.provider:
+            await self.provider.close()

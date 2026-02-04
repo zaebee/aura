@@ -1,6 +1,5 @@
 import logging
-
-from config import settings
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
@@ -16,6 +15,9 @@ class OutputGuard:
     Deterministic safety layer for Aura Core.
     Protects against economic hallucinations and floor price breaches.
     """
+
+    def __init__(self, safety_settings: Any = None):
+        self.settings = safety_settings
 
     def validate_decision(self, decision: dict, context: dict) -> bool:
         action = decision.get("action")
@@ -45,14 +47,23 @@ class OutputGuard:
 
         # 3. Margin violation
         margin = (offered_price - internal_cost) / offered_price
-        if margin < settings.safety.min_profit_margin:
+
+        # DNA Rule: Safety Guard must "Fail-Closed" if misconfigured.
+        if not self.settings:
+            logger.error("guard_settings_missing_fail_closed")
+            raise SafetyViolation(
+                "Cannot validate margin: safety settings not provided."
+            )
+
+        min_margin = self.settings.min_profit_margin
+        if margin < min_margin:
             logger.warning(
                 "safety_margin_violation",
                 extra={
                     "offered_price": offered_price,
                     "internal_cost": internal_cost,
                     "margin": margin,
-                    "min_margin": settings.safety.min_profit_margin,
+                    "min_margin": min_margin,
                 },
             )
             raise SafetyViolation("Minimum profit margin violation")

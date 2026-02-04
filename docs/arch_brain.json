@@ -96,9 +96,9 @@
       {
         "settings_class": "ServerSettings",
         "settings_path": "src/config/server.py",
-        "protein_path": "src/hive/proteins/telemetry/",
-        "skill_name": "TelemetrySkill",
-        "capabilities": ["fetch_metrics", "health_check", "trace_span"],
+        "protein_path": "src/hive/proteins/monitor/",
+        "skill_name": "MonitorSkill",
+        "capabilities": ["fetch_metrics", "health_check", "increment_counter"],
         "absorbs": ["aggregator/vitals.py", "metabolism/metrics.py", "metabolism/telemetry.py"]
       },
       {
@@ -119,14 +119,14 @@
       "A": {
         "name": "Aggregator",
         "role": "Senses",
-        "implementation": "Calls StorageSkill and TelemetrySkill via SkillRegistry",
+        "implementation": "Calls StorageSkill and MonitorSkill via SkillRegistry",
         "contains": "ZERO database code. Only orchestration."
       },
       "T": {
         "name": "Transformer",
         "role": "Mind",
         "implementation": "Calls ReasoningSkill via SkillRegistry",
-        "contains": "ZERO LLM code. Only <think> block orchestration."
+        "contains": "ZERO LLM code. Only <think> block orchestration. Rules-based fallback hidden in _internal.py"
       },
       "C": {
         "name": "Connector",

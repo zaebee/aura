@@ -6,7 +6,7 @@ from typing import Any
 from aura_core import Observation, SkillProtocol
 from sqlalchemy import text
 
-from config import get_settings
+from config.database import DatabaseSettings
 
 from ._internal import (
     Base,
@@ -28,7 +28,7 @@ class StorageSkill(SkillProtocol[dict[str, Any], Observation]):
     """
 
     def __init__(self) -> None:
-        self.settings = get_settings()
+        self.settings: DatabaseSettings | None = None
 
     def get_name(self) -> str:
         return "storage"
@@ -47,7 +47,22 @@ class StorageSkill(SkillProtocol[dict[str, Any], Observation]):
             "get_first_item",
         ]
 
-    async def initialize(self) -> bool:
+    async def initialize(self, settings: DatabaseSettings | None = None) -> bool:
+        self.settings = settings
+        if self.settings:
+            from pgvector.sqlalchemy import Vector
+            from sqlalchemy import create_engine
+
+            from . import _internal
+
+            _internal.engine = create_engine(str(self.settings.url))
+            _internal.SessionLocal.configure(bind=_internal.engine)
+
+            # DNA Rule: Dynamic configuration of vector dimension
+            InventoryItem.__table__.c.embedding.type = Vector(
+                self.settings.vector_dimension
+            )
+
         try:
 
             def check() -> bool:

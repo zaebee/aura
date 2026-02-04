@@ -11,7 +11,6 @@ from sqlalchemy import (
     Float,
     LargeBinary,
     String,
-    create_engine,
 )
 from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import (
@@ -21,13 +20,13 @@ from sqlalchemy.orm import (
     sessionmaker,
 )
 
-from config import get_settings
-
-settings = get_settings()
+# DNA Rule: Proteins must not import global settings.
+# Models will be initialized during Skill.initialize()
 
 # 1. Implementation Details: SQLAlchemy Setup
-engine = create_engine(str(settings.database.url))
-SessionLocal = sessionmaker(bind=engine)
+# These will be initialized properly during Skill.initialize()
+engine = None
+SessionLocal = sessionmaker()
 
 
 class Base(DeclarativeBase):
@@ -46,9 +45,7 @@ class InventoryItem(Base):
     floor_price: Mapped[float] = mapped_column(Float, nullable=False)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
     meta: Mapped[dict[str, Any]] = mapped_column(JSONB, default={})
-    embedding: Mapped[Any] = mapped_column(
-        Vector(settings.database.vector_dimension), nullable=True
-    )
+    embedding: Mapped[Any] = mapped_column(Vector, nullable=True)
 
 
 class DealStatus(enum.Enum):

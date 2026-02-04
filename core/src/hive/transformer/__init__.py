@@ -1,3 +1,3 @@
-from .transformer import AuraTransformer, RuleBasedStrategy
+from .main import AuraTransformer
 
-__all__ = ["AuraTransformer", "RuleBasedStrategy"]
+__all__ = ["AuraTransformer"]

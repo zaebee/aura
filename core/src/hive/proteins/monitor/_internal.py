@@ -81,9 +81,20 @@ async def fetch_vitals(metrics_cache: MetricsCache, settings: Any) -> SystemVita
     cpu_q = 'avg(rate(container_cpu_usage_seconds_total{namespace="default"}[5m])) * 100'
     mem_q = 'avg(container_memory_working_set_bytes{namespace="default"}) / 1024 / 1024'
 
+    # DNA Rule: Proteins must not import global settings.
+    if not settings:
+        raise ValueError("SystemVitals fetch failed: settings not provided")
+
     try:
         async with httpx.AsyncClient(timeout=5.0) as client:
-            base_url = str(settings.server.prometheus_url).rstrip("/")
+            # Handle both global settings and sub-config (for flexibility)
+            if hasattr(settings, "prometheus_url"):
+                base_url = str(settings.prometheus_url).rstrip("/")
+            elif hasattr(settings, "server"):
+                base_url = str(settings.server.prometheus_url).rstrip("/")
+            else:
+                raise ValueError("Settings object missing prometheus_url")
+
             resps = await asyncio.gather(
                 client.get(f"{base_url}/api/v1/query", params={"query": cpu_q}),
                 client.get(f"{base_url}/api/v1/query", params={"query": mem_q}),

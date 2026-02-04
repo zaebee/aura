@@ -3,11 +3,11 @@ import logging
 from typing import Any
 
 import dspy
-from aura_core import Observation, SkillProtocol
+from aura_core import Observation, SkillProtocol, get_raw_key
 
-from config import get_settings
+from config.llm import LLMSettings
 
-from ._internal import generate_embedding, load_brain
+from ._internal import get_embedding_model, load_brain
 from .schema import EmbeddingParams, NegotiationParams, NegotiationResult
 
 logger = logging.getLogger(__name__)
@@ -20,16 +20,9 @@ class ReasoningSkill(SkillProtocol[dict[str, Any], Observation]):
     """
 
     def __init__(self) -> None:
-        self.settings = get_settings()
+        self.settings: LLMSettings | None = None
         self.negotiator = None
-        if self.settings.llm.model != "rule":
-            try:
-                dspy.configure(lm=dspy.LM(self.settings.llm.model))
-                self.negotiator = load_brain(
-                    getattr(self.settings.llm, "compiled_program_path", None)
-                )
-            except Exception as e:
-                logger.error(f"Failed to configure DSPy: {e}")
+        self._embed_model = None
 
     def get_name(self) -> str:
         return "reasoning"
@@ -37,7 +30,20 @@ class ReasoningSkill(SkillProtocol[dict[str, Any], Observation]):
     def get_capabilities(self) -> list[str]:
         return ["negotiate", "generate_embedding"]
 
-    async def initialize(self) -> bool:
+    async def initialize(self, settings: LLMSettings | None = None) -> bool:
+        self.settings = settings
+        if self.settings and self.settings.model != "rule":
+            try:
+                dspy.configure(lm=dspy.LM(self.settings.model))
+                self.negotiator = load_brain(
+                    getattr(self.settings, "compiled_program_path", None)
+                )
+                self._embed_model = get_embedding_model(
+                    get_raw_key(self.settings.api_key)
+                )
+            except Exception as e:
+                logger.error(f"Failed to configure DSPy: {e}")
+                return False
         return True
 
     async def execute(self, intent: str, params: dict[str, Any]) -> Observation:
@@ -49,12 +55,16 @@ class ReasoningSkill(SkillProtocol[dict[str, Any], Observation]):
 
                 def call() -> dict[str, Any]:
                     from typing import cast
+
                     neg = cast(Any, self.negotiator)
-                    return cast(dict[str, Any], neg(
-                        input_bid=p_neg.bid,
-                        context=p_neg.context,
-                        history=p_neg.history,
-                    ))
+                    return cast(
+                        dict[str, Any],
+                        neg(
+                            input_bid=p_neg.bid,
+                            context=p_neg.context,
+                            history=p_neg.history,
+                        ),
+                    )
 
                 result = await asyncio.to_thread(call)
                 data = {
@@ -69,8 +79,14 @@ class ReasoningSkill(SkillProtocol[dict[str, Any], Observation]):
                 )
 
             elif intent == "generate_embedding":
+                if not self._embed_model:
+                    return Observation(success=False, error="embed_model_not_ready")
                 p_emb = EmbeddingParams(**params)
-                emb = await asyncio.to_thread(generate_embedding, p_emb.text)
+                from ._internal import generate_embedding
+
+                emb = await asyncio.to_thread(
+                    generate_embedding, p_emb.text, self._embed_model
+                )
                 return Observation(success=True, data=emb)
 
             return Observation(success=False, error=f"Unknown intent: {intent}")

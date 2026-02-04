@@ -122,7 +122,9 @@ class SolanaProvider:
     ) -> tuple[bool, str]:
         # Simple memo check
         has_memo = False
-        for instr in tx.get("transaction", {}).get("message", {}).get("instructions", []):
+        for instr in (
+            tx.get("transaction", {}).get("message", {}).get("instructions", [])
+        ):
             if instr.get("program") == "spl-memo" and instr.get("parsed") == memo:
                 has_memo = True
                 break
@@ -152,14 +154,14 @@ class SolanaProvider:
                         d = pre[j] - post[j]
                         if d > max_d:
                             max_d = d
-                            sender = (
-                                k2 if isinstance(k2, str) else k2.get("pubkey", "")
-                            )
+                            sender = k2 if isinstance(k2, str) else k2.get("pubkey", "")
                     return True, sender
         return False, ""
 
     def _check_usdc(self, tx: dict, amt: float) -> tuple[bool, str]:
-        for instr in tx.get("transaction", {}).get("message", {}).get("instructions", []):
+        for instr in (
+            tx.get("transaction", {}).get("message", {}).get("instructions", [])
+        ):
             if (
                 instr.get("program") == "spl-token"
                 and instr.get("parsed", {}).get("type") == "transfer"

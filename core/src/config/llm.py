@@ -2,16 +2,6 @@ from pydantic import AliasChoices, Field, SecretStr, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
-def get_raw_key(key_field: SecretStr | str) -> str:
-    """
-    Safely retrieve the raw string value from a SecretStr or a plain string.
-    Fixes AttributeError: 'str' object has no attribute 'get_secret_value'.
-    """
-    if isinstance(key_field, SecretStr):
-        return key_field.get_secret_value()
-    return key_field  # It's already a string
-
-
 class LLMSettings(BaseSettings):
     model_config = SettingsConfigDict(
         env_prefix="AURA_LLM__",

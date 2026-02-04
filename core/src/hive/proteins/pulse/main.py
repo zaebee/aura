@@ -3,7 +3,7 @@ from typing import Any
 
 from aura_core import Observation, SkillProtocol
 
-from config import get_settings
+from config.server import ServerSettings
 
 from ._internal import NatsProvider
 from .schema import EventParams
@@ -16,8 +16,8 @@ class PulseSkill(SkillProtocol[dict[str, Any], Observation]):
     """
 
     def __init__(self) -> None:
-        self.settings = get_settings()
-        self.provider = NatsProvider(self.settings.server.nats_url)
+        self.settings: ServerSettings | None = None
+        self.provider: NatsProvider | None = None
 
     def get_name(self) -> str:
         return "pulse"
@@ -25,10 +25,16 @@ class PulseSkill(SkillProtocol[dict[str, Any], Observation]):
     def get_capabilities(self) -> list[str]:
         return ["emit_event", "emit_heartbeat"]
 
-    async def initialize(self) -> bool:
+    async def initialize(self, settings: ServerSettings | None = None) -> bool:
+        self.settings = settings
+        if not self.settings:
+            return False
+        self.provider = NatsProvider(self.settings.nats_url)
         return await self.provider.connect()
 
     async def execute(self, intent: str, params: dict[str, Any]) -> Observation:
+        if not self.provider:
+            return Observation(success=False, error="provider_not_initialized")
         try:
             if intent == "emit_event":
                 p = EventParams(**params)
@@ -49,4 +55,5 @@ class PulseSkill(SkillProtocol[dict[str, Any], Observation]):
             return Observation(success=False, error=str(e))
 
     async def close(self) -> None:
-        await self.provider.close()
+        if self.provider:
+            await self.provider.close()

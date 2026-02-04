@@ -73,7 +73,9 @@ def test_dspy_strategy_initialization():
         with patch("src.hive.proteins.reasoning._internal.dspy.load") as mock_load:
             mock_load.return_value = AuraNegotiator()
 
-            strategy = DSPyStrategy(compiled_program_path=tmp_path)
+            strategy = DSPyStrategy(
+                model="gpt-3.5-turbo", compiled_program_path=tmp_path
+            )
             assert strategy is not None
             assert strategy.negotiator is not None
 
@@ -87,7 +89,7 @@ def test_strategy_fallback():
     """Test fallback mechanism."""
     logger.info("testing_fallback_mechanism")
 
-    strategy = DSPyStrategy()
+    strategy = DSPyStrategy(model="gpt-3.5-turbo")
 
     # Test that fallback strategy can be obtained
     fallback = strategy._get_fallback_strategy()
@@ -100,7 +102,7 @@ def test_context_creation():
     """Test context creation for DSPy module."""
     logger.info("testing_context_creation")
 
-    strategy = DSPyStrategy()
+    strategy = DSPyStrategy(model="gpt-3.5-turbo")
 
     # Create a mock item
     mock_item = MagicMock()
