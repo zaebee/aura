@@ -1,7 +1,11 @@
 from pathlib import Path
 from typing import Any, Protocol, TypeVar, runtime_checkable
 
+import opentelemetry.trace as trace
+
 from .types import Observation
+
+tracer = trace.get_tracer(__name__)
 
 # 1. Define TypeVars for the metabolic steps
 S_inv = TypeVar("S_inv", contravariant=True)  # Input Signal
@@ -100,10 +104,97 @@ class Transformer[C_inv, I_inv](Protocol):
 
 
 @runtime_checkable
+class Skill(Protocol):
+    """Protocol for specialized Proteins used by the Connector."""
+
+    def get_name(self) -> str: ...
+
+    def get_capabilities(self) -> list[str]: ...
+
+    async def initialize(self) -> bool: ...
+
+    async def execute(self, intent: str, params: dict[str, Any]) -> Observation: ...
+
+
+class SkillRegistry:
+    """Registry for Proteins (Skills) used by the Connector."""
+
+    def __init__(self) -> None:
+        self._skills: dict[str, Skill] = {}
+
+    def register(self, name: str, skill: Skill) -> None:
+        self._skills[name] = skill
+
+    def get(self, name: str) -> Skill | None:
+        return self._skills.get(name)
+
+    def list_skills(self) -> list[str]:
+        return list(self._skills.keys())
+
+
+@runtime_checkable
 class Connector[I_inv, O_cov, C_inv](Protocol):
     """Standard motor organ. Turns Intent into Observation."""
 
+    registry: SkillRegistry
+
     async def act(self, action: I_inv, context: C_inv) -> O_cov: ...
+
+
+class BaseConnector(Connector[Any, Observation, Any]):
+    """
+    Composite Connector implementation.
+    Handles sequential skill execution defined in IntentAction steps.
+    """
+
+    def __init__(self, registry: SkillRegistry) -> None:
+        self.registry = registry
+
+    async def act(self, action: Any, context: Any) -> Observation:
+        # 1. Check if we have steps
+        steps = getattr(action, "steps", [])
+        if not steps:
+            # Fallback for single action or legacy support
+            return await self._handle_legacy(action, context)
+
+        last_observation = Observation(success=True)
+
+        for i, step in enumerate(steps):
+            skill_name = step.get("skill")
+            intent = step.get("intent")
+            params = step.get("params", {}).copy()
+
+            # Pass context and previous results to the next step
+            params["_context"] = context
+            if i > 0:
+                params["_previous_observation"] = last_observation
+
+            skill = self.registry.get(skill_name)
+            if not skill:
+                return Observation(
+                    success=False, error=f"Skill '{skill_name}' not found in registry"
+                )
+
+            # Trace individual skill execution
+            with tracer.start_as_current_span(f"skill:{skill_name}") as span:
+                span.set_attribute("intent", intent)
+                span.set_attribute("step_index", i)
+
+                try:
+                    last_observation = await skill.execute(intent, params)
+                    span.set_attribute("success", last_observation.success)
+                except Exception as e:
+                    span.record_exception(e)
+                    return Observation(success=False, error=str(e))
+
+            if not last_observation.success:
+                break
+
+        return last_observation
+
+    async def _handle_legacy(self, action: Any, context: Any) -> Observation:
+        """Override this for specific connector logic if no steps are provided."""
+        return Observation(success=False, error="No steps defined in IntentAction")
 
 
 @runtime_checkable
@@ -120,19 +211,6 @@ class Membrane[S_inv, I_inv, C_inv](Protocol):
     async def inspect_inbound(self, signal: S_inv) -> S_inv: ...
 
     async def inspect_outbound(self, decision: I_inv, context: C_inv) -> I_inv: ...
-
-
-@runtime_checkable
-class Skill(Protocol):
-    """Protocol for specialized Proteins used by the Connector."""
-
-    def get_name(self) -> str: ...
-
-    def get_capabilities(self) -> list[str]: ...
-
-    async def initialize(self) -> bool: ...
-
-    async def execute(self, intent: str, params: dict[str, Any]) -> Observation: ...
 
 
 class MetabolicLoop[S_inv, C_cov, I_inv, O_cov, E_cov]:
@@ -160,25 +238,32 @@ class MetabolicLoop[S_inv, C_cov, I_inv, O_cov, E_cov]:
         Execute one full metabolic cycle:
         Signal -> [Membrane In] -> Aggregator -> Transformer -> [Membrane Out] -> Connector -> Generator
         """
-        # 1. Inbound Membrane
-        if self.membrane and hasattr(self.membrane, "inspect_inbound"):
-            signal = await self.membrane.inspect_inbound(signal)
+        with tracer.start_as_current_span("metabolic_loop") as span:
+            # 1. Inbound Membrane
+            with tracer.start_as_current_span("nucleotide_membrane_in"):
+                if self.membrane and hasattr(self.membrane, "inspect_inbound"):
+                    signal = await self.membrane.inspect_inbound(signal)
 
-        # 2. Aggregator (A)
-        context = await self.aggregator.perceive(signal, **kwargs)
+            # 2. Aggregator (A)
+            with tracer.start_as_current_span("nucleotide_aggregator"):
+                context = await self.aggregator.perceive(signal, **kwargs)
 
-        # 3. Transformer (T)
-        # Note: Some transformers might need extra data passed in via kwargs
-        decision = await self.transformer.think(context, **kwargs)
+            # 3. Transformer (T)
+            # Note: Some transformers might need extra data passed in via kwargs
+            with tracer.start_as_current_span("nucleotide_transformer"):
+                decision = await self.transformer.think(context, **kwargs)
 
-        # 4. Outbound Membrane
-        if self.membrane and hasattr(self.membrane, "inspect_outbound"):
-            decision = await self.membrane.inspect_outbound(decision, context)
+            # 4. Outbound Membrane
+            with tracer.start_as_current_span("nucleotide_membrane_out"):
+                if self.membrane and hasattr(self.membrane, "inspect_outbound"):
+                    decision = await self.membrane.inspect_outbound(decision, context)
 
-        # 5. Connector (C)
-        observation = await self.connector.act(decision, context)
+            # 5. Connector (C)
+            with tracer.start_as_current_span("nucleotide_connector"):
+                observation = await self.connector.act(decision, context)
 
-        # 6. Generator (G)
-        await self.generator.pulse(observation)
+            # 6. Generator (G)
+            with tracer.start_as_current_span("nucleotide_generator"):
+                await self.generator.pulse(observation)
 
-        return observation
+            return observation

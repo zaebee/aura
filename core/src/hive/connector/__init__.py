@@ -4,7 +4,13 @@ import uuid
 from typing import Any
 
 import structlog
-from aura_core import Connector, HiveContext, IntentAction, Observation
+from aura_core import (
+    BaseConnector,
+    HiveContext,
+    IntentAction,
+    Observation,
+    SkillRegistry,
+)
 from sqlalchemy.exc import SQLAlchemyError
 
 from config import get_settings
@@ -16,16 +22,20 @@ from .proteins.pricing import PriceConverter
 logger = structlog.get_logger(__name__)
 
 
-class HiveConnector(Connector[IntentAction, Observation, HiveContext]):
+class HiveConnector(BaseConnector):
     """C - Connector: Maps internal IntentAction to gRPC responses and external systems."""
 
-    def __init__(self, market_service: Any = None) -> None:
+    def __init__(self, registry: SkillRegistry, market_service: Any = None) -> None:
+        super().__init__(registry)
         self.market_service = market_service
         self.settings = get_settings()
 
-    async def act(self, action: IntentAction, context: HiveContext) -> Observation:
+    async def _handle_legacy(
+        self, action: IntentAction, context: HiveContext
+    ) -> Observation:
         """
-        Execute the decision and produce an observation (the gRPC response).
+        Handle legacy IntentActions that do not have steps.
+        This executes the decision and produces an observation (the gRPC response).
         """
         # Type safety is now enforced by the generic protocol and static analysis
         logger.debug("connector_act_started", action=action.action)
