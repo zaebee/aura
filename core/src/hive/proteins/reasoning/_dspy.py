@@ -12,9 +12,8 @@ import dspy
 import structlog
 
 from config import get_settings
-from hive.membrane import OutputGuard, SafetyViolation
 from hive.proto.aura.negotiation.v1 import negotiation_pb2
-from hive.transformer.llm.engine import AuraNegotiator
+from ._engine import AuraNegotiator
 
 logger = structlog.get_logger(__name__)
 
@@ -35,7 +34,6 @@ class DSPyStrategy:
         self.compiled_program_path = compiled_program_path
         self.settings = get_settings()
         self.negotiator: Any = self._load_compiled_program()
-        self.guard = OutputGuard()
         self.fallback_strategy: Any = None
 
         # Configure DSPy with litellm backend
@@ -181,18 +179,6 @@ class DSPyStrategy:
             )
 
             response_data = result["action"]
-
-            # Validate decision through the Membrane
-            try:
-                self.guard.validate_decision(response_data, context)
-            except SafetyViolation as e:
-                logger.warning(
-                    "safety_guard_triggered",
-                    item_id=getattr(item, "id", "unknown"),
-                    error=str(e),
-                    llm_price=response_data.get("price"),
-                )
-                return self.create_safe_counter_offer(item, bid)
 
             action = response_data["action"]
             price = response_data["price"]
