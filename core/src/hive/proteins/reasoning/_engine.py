@@ -14,8 +14,8 @@ import litellm
 import structlog
 from pydantic import BaseModel
 
-from hive.transformer.llm.prepare.clean import clean_and_parse_json
-from hive.transformer.llm.signatures import Negotiate
+from ._prepare.clean import clean_and_parse_json
+from ._signatures import Negotiate
 
 logger = structlog.get_logger(__name__)
 

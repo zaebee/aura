@@ -5,13 +5,9 @@ from typing import Any
 
 import grpc
 import grpc.aio
-import nats
 from aura_core import SkillRegistry
 from grpc_health.v1 import health_pb2, health_pb2_grpc
-from hive.aggregator import (
-    HiveAggregator,
-    generate_embedding,
-)
+from hive.aggregator import HiveAggregator
 from hive.connector import HiveConnector
 from hive.generator import HiveGenerator
 from hive.membrane import HiveMembrane
@@ -31,7 +27,6 @@ from opentelemetry.instrumentation.langchain import LangchainInstrumentor
 from prometheus_client import start_http_server
 
 from config import settings
-from config.llm import get_raw_key
 
 # Configure structured logging on startup
 configure_logging(log_level=settings.server.log_level)
@@ -128,23 +123,32 @@ class NegotiationService(negotiation_pb2_grpc.NegotiationServiceServicer):
         try:
             logger.info("search_started", query=request.query, limit=request.limit)
 
-            # Generate query vector
-            query_vector = generate_embedding(request.query)
-            if not query_vector:
-                logger.error("embedding_generation_failed", query=request.query)
+            # Generate query vector via Reasoning Protein
+            registry = self.metabolism.aggregator.registry
+            reasoning = registry.get("reasoning")
+            if not reasoning:
+                context.set_code(grpc.StatusCode.INTERNAL)
+                context.set_details("Reasoning protein not available")
+                return negotiation_pb2.SearchResponse()
+
+            embed_obs = await reasoning.execute("generate_embedding", {"text": request.query})
+            if not embed_obs.success:
+                logger.error("embedding_generation_failed", query=request.query, error=embed_obs.error)
                 context.set_code(grpc.StatusCode.INTERNAL)
                 context.set_details("Failed to generate embeddings")
                 return negotiation_pb2.SearchResponse()
 
+            query_vector = embed_obs.data
+
             # Vector search via Storage Protein
-            storage = self.metabolism.aggregator.registry.get("storage")
+            storage = registry.get("storage")
             if not storage:
                 context.set_code(grpc.StatusCode.INTERNAL)
                 context.set_details("Storage protein not available")
                 return negotiation_pb2.SearchResponse()
 
             obs = await storage.execute(
-                "list_items_semantic_search",
+                "vector_search",
                 {
                     "query_vector": query_vector,
                     "limit": request.limit or 5,
@@ -261,36 +265,6 @@ class NegotiationService(negotiation_pb2_grpc.NegotiationServiceServicer):
                 clear_request_context()
 
 
-def create_crypto_protein() -> Any:
-    """Create crypto payment provider if enabled.
-
-    Returns:
-        CryptoProtein instance or None if crypto disabled
-    """
-    if not settings.crypto.enabled:
-        logger.info("crypto_disabled", feature="crypto_payments")
-        return None
-
-    if settings.crypto.provider == "solana":
-        logger.info(
-            "crypto_protein_initialized",
-            provider="solana",
-            network=settings.crypto.solana_network,
-            currency=settings.crypto.currency,
-        )
-        from hive.proteins.crypto import CryptoProtein
-
-        return CryptoProtein(
-            private_key_base58=get_raw_key(settings.crypto.solana_private_key),
-            rpc_url=str(settings.crypto.solana_rpc_url),
-            network=settings.crypto.solana_network,
-            usdc_mint=settings.crypto.solana_usdc_mint,
-        )
-    else:
-        logger.warning("unknown_crypto_provider", provider=settings.crypto.provider)
-        return None
-
-
 async def serve() -> None:
     from grpc_health.v1 import health
 
@@ -304,7 +278,6 @@ async def serve() -> None:
     health_pb2_grpc.add_HealthServicer_to_server(health_servicer, server)
 
     # 3. Register Negotiation Service with placeholder components
-    # This allows the server to start even while heavy LLM components are loading.
     negotiation_service = NegotiationService(metabolism=None, market_service=None)
     negotiation_pb2_grpc.add_NegotiationServiceServicer_to_server(
         negotiation_service, server
@@ -317,35 +290,41 @@ async def serve() -> None:
         "server_started_early",
         port=settings.server.port,
         status="INITIALIZING",
-        note="Health checks active, main logic loading...",
     )
 
-    # 5. Verify Database Connection (via Storage Protein later)
-    # Placeholder for health servicer, will be updated after proteins initialization
-
-    # 6. Start Prometheus metrics server
+    # 5. Start Prometheus metrics server
     try:
         start_http_server(9091)
         logger.info("metrics_server_started", port=9091)
     except Exception as e:
         logger.error("metrics_server_failed", error=str(e))
 
-    # 7. Initialize Heavy Components (NATS, AI Models, Crypto)
-    nc = None
-    try:
-        nc = await nats.connect(settings.server.nats_url)
-        logger.info("nats_connected", url=settings.server.nats_url)
-    except Exception as e:
-        logger.warning(
-            "nats_connection_failed", url=settings.server.nats_url, error=str(e)
-        )
+    # 6. Initialize Skills (Proteins)
+    registry = SkillRegistry()
 
-    from hive.proteins.storage import StorageProtein
+    from hive.proteins.storage import StorageSkill
+    from hive.proteins.crypto import CryptoSkill
+    from hive.proteins.reasoning import ReasoningSkill
+    from hive.proteins.telemetry import TelemetrySkill
+    from hive.proteins.pulse import PulseSkill
+    from hive.proteins.guard import GuardSkill
 
-    storage_protein = StorageProtein()
-    crypto_protein = create_crypto_protein()
+    storage_protein = StorageSkill()
+    crypto_protein = CryptoSkill() if settings.crypto.enabled else None
+    reasoning_protein = ReasoningSkill()
+    telemetry_protein = TelemetrySkill()
+    pulse_protein = PulseSkill()
+    guard_protein = GuardSkill()
 
-    # Initialize Proteins and Database
+    registry.register("storage", storage_protein)
+    if crypto_protein:
+        registry.register("crypto", crypto_protein)
+    registry.register("reasoning", reasoning_protein)
+    registry.register("telemetry", telemetry_protein)
+    registry.register("pulse", pulse_protein)
+    registry.register("guard", guard_protein)
+
+    # 7. Initialize and Verify Skills
     await storage_protein.execute("init_db", {})
     if await storage_protein.initialize():
         health_servicer.set("", health_pb2.HealthCheckResponse.SERVING)
@@ -353,30 +332,26 @@ async def serve() -> None:
     else:
         logger.error("db_verification_failed")
 
+    await pulse_protein.initialize()
+    await reasoning_protein.initialize()
+    await telemetry_protein.initialize()
+    await guard_protein.initialize()
+    if crypto_protein:
+        await crypto_protein.initialize()
+
+    # 8. Initialize Nucleotides
+    aggregator = HiveAggregator(registry=registry)
+    transformer = AuraTransformer(registry=registry)
+
     market_service = None
     if crypto_protein:
-        from hive.connector.proteins.encryption import SecretEncryption
         from hive.services.market import MarketService
-
-        encryption = SecretEncryption(
-            get_raw_key(settings.crypto.secret_encryption_key)
-        )
-        market_service = MarketService(
-            storage=storage_protein, crypto=crypto_protein, encryption=encryption
-        )
+        market_service = MarketService(storage=storage_protein, crypto=crypto_protein)
         logger.info("market_service_initialized")
 
-    # Initialize Hive components (Aggregator, Transformer/LLM, etc.)
-    registry = SkillRegistry()
-    registry.register("storage", storage_protein)
-    if crypto_protein:
-        registry.register("crypto", crypto_protein)
-
-    aggregator = HiveAggregator(registry=registry)
-    transformer = AuraTransformer()  # Heavy: Loads DSPy/LLM
     connector = HiveConnector(registry=registry, market_service=market_service)
-    generator = HiveGenerator(nats_client=nc)
-    membrane = HiveMembrane()
+    generator = HiveGenerator(registry=registry)
+    membrane = HiveMembrane(registry=registry)
 
     metabolism = MetabolicLoop(
         aggregator=aggregator,
@@ -384,27 +359,24 @@ async def serve() -> None:
         connector=connector,
         generator=generator,
         membrane=membrane,
+        registry=registry,
     )
 
-    # 8. Wire fully initialized components into the NegotiationService
+    # 9. Wire fully initialized components into the NegotiationService
     negotiation_service.metabolism = metabolism
     negotiation_service.market_service = market_service
 
-    # 9. Start Heartbeat Deal (Honey Stimulus)
+    # 10. Start Heartbeat Deal (Honey Stimulus)
     async def heartbeat_deal_loop() -> None:
         """Trigger a mock successful negotiation periodically."""
-        # Initial wait to allow system to warm up
         await asyncio.sleep(60)
         while True:
             try:
                 logger.info("triggering_heartbeat_deal")
-
-                # Fetch a valid item for the mock deal via Storage Protein
                 obs = await storage_protein.execute("get_first_item", {})
 
                 if obs.success and obs.data:
                     item = obs.data
-                    # Use real protobuf types for the heartbeat signal
                     mock_signal = negotiation_pb2.NegotiateRequest(
                         item_id=item["id"],
                         bid_amount=item["base_price"] * settings.heartbeat.bid_multiplier,
@@ -436,12 +408,8 @@ async def serve() -> None:
     try:
         await server.wait_for_termination()
     finally:
-        if nc:
-            await nc.close()
-            logger.info("nats_connection_closed")
-        if crypto_protein:
-            await crypto_protein.close()
-            logger.info("crypto_protein_closed")
+        await registry.close()
+        logger.info("all_skills_closed")
 
 
 if __name__ == "__main__":

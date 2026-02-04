@@ -1,6 +1,7 @@
 import pytest
-from aura_core import HiveContext, IntentAction, NegotiationOffer
+from aura_core import HiveContext, IntentAction, NegotiationOffer, SkillRegistry
 from hive.membrane import HiveMembrane
+from hive.proteins.guard import GuardSkill
 
 
 @pytest.mark.asyncio
@@ -8,7 +9,9 @@ async def test_membrane_rule1_floor_price_override():
     """
     Rule 1: If price < floor_price, override to counter-offer at floor_price + 5%.
     """
-    membrane = HiveMembrane()
+    registry = SkillRegistry()
+    registry.register("guard", GuardSkill())
+    membrane = HiveMembrane(registry=registry)
     context = HiveContext(
         item_id="item1",
         offer=NegotiationOffer(bid_amount=50.0, agent_did="did1", reputation=0.9),
@@ -32,7 +35,9 @@ async def test_membrane_rule2_data_leak_prevention():
     """
     Rule 2: Block any response containing "floor_price" in the human message.
     """
-    membrane = HiveMembrane()
+    registry = SkillRegistry()
+    registry.register("guard", GuardSkill())
+    membrane = HiveMembrane(registry=registry)
     context = HiveContext(
         item_id="item1",
         offer=NegotiationOffer(bid_amount=150.0, agent_did="did1", reputation=0.9),
@@ -57,7 +62,9 @@ async def test_membrane_combined_violations():
     """
     Test both Rule 1 and Rule 2 triggered at once.
     """
-    membrane = HiveMembrane()
+    registry = SkillRegistry()
+    registry.register("guard", GuardSkill())
+    membrane = HiveMembrane(registry=registry)
     context = HiveContext(
         item_id="item1",
         offer=NegotiationOffer(bid_amount=50.0, agent_did="did1", reputation=0.9),
@@ -84,7 +91,7 @@ async def test_membrane_inbound_validation():
     """
     Verify inbound sanitization.
     """
-    membrane = HiveMembrane()
+    membrane = HiveMembrane()  # No registry needed for inbound currently
 
     class Signal:
         def __init__(self, item_id, bid_amount, did):

@@ -1,10 +1,8 @@
-import json
 import time
 from typing import Any
 
-import nats.errors
 import structlog
-from aura_core import Event, Generator, Observation
+from aura_core import Event, Generator, Observation, SkillRegistry
 
 from config import get_settings
 
@@ -12,15 +10,15 @@ logger = structlog.get_logger(__name__)
 
 
 class HiveGenerator(Generator[Observation, Event]):
-    """G - Generator: Emits events (heartbeats, transactions) to NATS."""
+    """G - Generator: Emits events (heartbeats, transactions) via Pulse Protein."""
 
-    def __init__(self, nats_client: Any = None) -> None:
-        self.nc = nats_client
+    def __init__(self, registry: SkillRegistry) -> None:
+        self.registry = registry
         self.settings = get_settings()
 
     async def pulse(self, observation: Observation) -> list[Event]:
         """
-        Generate events based on the observation and emit them.
+        Generate events based on the observation and emit them via Pulse Protein.
         """
         events = []
         now = time.time()
@@ -36,38 +34,37 @@ class HiveGenerator(Generator[Observation, Event]):
             if hasattr(observation.data, "session_token"):
                 payload["session_token"] = observation.data.session_token
 
+            topic = f"aura.hive.events.{observation.event_type}"
             events.append(
                 Event(
-                    topic=f"aura.hive.events.{observation.event_type}",
+                    topic=topic,
                     payload=payload,
                     timestamp=now,
                 )
             )
 
+            # Emit via Pulse Protein
+            await self.registry.execute("pulse", "emit_event", {
+                "topic": topic,
+                "payload": payload
+            })
+
         # 2. System Heartbeat
+        heartbeat_topic = "aura.hive.heartbeat"
+        heartbeat_payload = {
+            "status": "active",
+            "timestamp": now,
+            "service": "core",
+        }
         events.append(
             Event(
-                topic="aura.hive.heartbeat",
-                payload={
-                    "status": "active",
-                    "timestamp": now,
-                    "service": "core",
-                },
+                topic=heartbeat_topic,
+                payload=heartbeat_payload,
                 timestamp=now,
             )
         )
 
-        # 3. Emit to NATS
-        if self.nc and self.nc.is_connected:
-            for event in events:
-                try:
-                    await self.nc.publish(
-                        event.topic, json.dumps(event.payload).encode()
-                    )
-                except (
-                    nats.errors.ConnectionClosedError,
-                    nats.errors.TimeoutError,
-                ) as e:
-                    logger.error("nats_publish_failed", topic=event.topic, error=str(e))
+        # Emit heartbeat via Pulse Protein
+        await self.registry.execute("pulse", "emit_heartbeat", {})
 
         return events

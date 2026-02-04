@@ -4,6 +4,7 @@ import httpx
 import pytest
 from aura_core import SkillRegistry
 from hive.aggregator import HiveAggregator
+from hive.proteins.telemetry import TelemetrySkill
 
 
 @pytest.mark.asyncio
@@ -12,6 +13,7 @@ async def test_aggregator_healing_on_prometheus_timeout(mocker):
     Verify that the Aggregator returns UNKNOWN status when Prometheus times out.
     """
     registry = SkillRegistry()
+    registry.register("telemetry", TelemetrySkill())
     aggregator = HiveAggregator(registry=registry)
     mocker.patch(
         "httpx.AsyncClient.get", side_effect=httpx.TimeoutException("Timeout!")
@@ -27,6 +29,7 @@ async def test_aggregator_healing_on_prometheus_connection_error(mocker):
     Verify that the Aggregator returns UNKNOWN status on connection error.
     """
     registry = SkillRegistry()
+    registry.register("telemetry", TelemetrySkill())
     aggregator = HiveAggregator(registry=registry)
     mocker.patch(
         "httpx.AsyncClient.get", side_effect=httpx.ConnectError("Connection refused")
@@ -42,6 +45,8 @@ async def test_aggregator_healing_with_cache_fallback(mocker):
     Verify that the Aggregator returns cached data even if Prometheus fails.
     """
     registry = SkillRegistry()
+    telemetry = TelemetrySkill()
+    registry.register("telemetry", telemetry)
     aggregator = HiveAggregator(registry=registry)
 
     # 1. Prime the cache with Mock objects that pass isinstance(..., httpx.Response)
@@ -70,7 +75,7 @@ async def test_aggregator_healing_with_cache_fallback(mocker):
     mock_get.side_effect = httpx.ConnectError("Failed now")
 
     # Manually expire the cache to trigger fetch and then failure fallback
-    aggregator._metrics_cache._timestamp = 0
+    telemetry._metrics_cache._timestamp = 0
 
     metrics = await aggregator.get_system_metrics()
 

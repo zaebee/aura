@@ -10,13 +10,12 @@ from aura_core import (
     Membrane,
     Observation,
     Transformer,
+    SkillRegistry,
 )
 from aura_core import (
     MetabolicLoop as BaseMetabolicLoop,
 )
 from opentelemetry import trace
-
-from .metrics import negotiation_accepted_total, negotiation_total
 
 logger = structlog.get_logger(__name__)
 tracer = trace.get_tracer(__name__)
@@ -26,8 +25,7 @@ class MetabolicLoop(
     BaseMetabolicLoop[Any, HiveContext, IntentAction, Observation, Any]
 ):
     """
-    Orchestrates the ATCG flow with core-specific telemetry:
-    Signal -> Membrane(In) -> Aggregator -> Transformer -> Membrane(Out) -> Connector -> Generator
+    Orchestrates the ATCG flow with core-specific telemetry via Telemetry Protein.
     """
 
     def __init__(
@@ -37,20 +35,31 @@ class MetabolicLoop(
         connector: Connector[IntentAction, Observation, HiveContext],
         generator: Generator[Observation, Any],
         membrane: Membrane[Any, IntentAction, HiveContext],
+        registry: SkillRegistry | None = None,
     ):
         super().__init__(aggregator, transformer, connector, generator, membrane)
+        self.registry = registry
 
     async def execute(self, signal: Any, **kwargs: Any) -> Any:
         """
         Execute one full metabolic cycle.
         """
-        negotiation_total.labels(service="core").inc()
+        if self.registry:
+            await self.registry.execute("telemetry", "increment_counter", {
+                "name": "negotiation_total",
+                "labels": {"service": "core"}
+            })
+
         logger.info("metabolism_cycle_started")
 
         observation = await super().execute(signal, **kwargs)
 
         if observation.success and observation.event_type == "negotiation_accept":
-            negotiation_accepted_total.labels(service="core").inc()
+            if self.registry:
+                await self.registry.execute("telemetry", "increment_counter", {
+                    "name": "negotiation_accepted_total",
+                    "labels": {"service": "core"}
+                })
 
         logger.info(
             "metabolism_cycle_completed",
