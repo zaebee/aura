@@ -34,8 +34,30 @@ class SkillRegistry:
     def get(self, name: str) -> SkillProtocol[Any, Any] | None:
         return self._skills.get(name)
 
+    async def execute(self, skill_name: str, intent: str, params: Any) -> Observation:
+        """Helper to execute a skill by name with tracing."""
+        skill = self.get(skill_name)
+        if not skill:
+            return Observation(success=False, error=f"Skill '{skill_name}' not found")
+
+        with tracer.start_as_current_span(f"skill:{skill_name}") as span:
+            span.set_attribute("intent", intent)
+            try:
+                result = await skill.execute(intent, params)
+                span.set_attribute("success", result.success)
+                return result
+            except Exception as e:
+                span.record_exception(e)
+                return Observation(success=False, error=str(e))
+
     def list_skills(self) -> list[str]:
         return list(self._skills.keys())
+
+    async def close(self) -> None:
+        """Close all registered skills."""
+        for skill in self._skills.values():
+            if hasattr(skill, "close") and callable(skill.close):
+                await skill.close()
 
 
 class BaseConnector(Connector[Any, Observation, Any]):
@@ -66,23 +88,8 @@ class BaseConnector(Connector[Any, Observation, Any]):
             if i > 0:
                 params["_previous_observation"] = last_observation
 
-            skill = self.registry.get(skill_name)
-            if not skill:
-                return Observation(
-                    success=False, error=f"Skill '{skill_name}' not found in registry"
-                )
-
-            # Trace individual skill execution
-            with tracer.start_as_current_span(f"skill:{skill_name}") as span:
-                span.set_attribute("intent", intent)
-                span.set_attribute("step_index", i)
-
-                try:
-                    last_observation = await skill.execute(intent, params)
-                    span.set_attribute("success", last_observation.success)
-                except Exception as e:
-                    span.record_exception(e)
-                    return Observation(success=False, error=str(e))
+            # Use registry.execute for tracing and consistency
+            last_observation = await self.registry.execute(skill_name, intent, params)
 
             if not last_observation.success:
                 break
