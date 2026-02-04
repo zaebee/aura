@@ -3,35 +3,13 @@ from typing import Any
 import structlog
 from aura_core import FailureIntent, HiveContext, IntentAction, Membrane, SkillRegistry
 
-from config import get_settings, settings
+from config import get_settings
 
 logger = structlog.get_logger(__name__)
 
-class SafetyViolation(Exception):
-    """Raised when a negotiation decision violates safety guardrails."""
-    pass
-
-class OutputGuard:
-    """
-    Legacy safety layer wrapper for Aura Core.
-    Points to the new Guard Protein logic when possible.
-    """
-    def validate_decision(self, decision: dict, context: dict) -> bool:
-        action = decision.get("action")
-        offered_price = decision.get("price", 0.0)
-        floor_price = context.get("floor_price", 0.0)
-        internal_cost = context.get("internal_cost", 0.0)
-
-        if offered_price > 0:
-            margin = (offered_price - internal_cost) / offered_price
-            if margin < settings.safety.min_profit_margin:
-                raise SafetyViolation("Minimum profit margin violation")
-        elif action in ["accept", "counter"]:
-            raise SafetyViolation("Invalid offered price")
-
-        if action in ["accept", "counter"] and offered_price < floor_price:
-            raise SafetyViolation("Floor price violation")
-        return True
+# Re-exporting from Guard Protein for backward compatibility
+from hive.proteins.guard import GuardProtein, SafetyViolation
+from hive.proteins.guard._output_guard import OutputGuard
 
 class HiveMembrane(Membrane[Any, IntentAction, HiveContext]):
     """The Immune System: Deterministic Guardrails via Guard Protein."""
@@ -41,6 +19,7 @@ class HiveMembrane(Membrane[Any, IntentAction, HiveContext]):
         self.registry = registry or SkillRegistry()
 
     async def inspect_inbound(self, signal: Any) -> Any:
+        # Sacred Rule: Positive bid amounts only
         if hasattr(signal, "bid_amount") and signal.bid_amount <= 0:
              raise ValueError("Bid amount must be positive")
 
@@ -69,7 +48,7 @@ class HiveMembrane(Membrane[Any, IntentAction, HiveContext]):
     ) -> IntentAction:
         floor_price = context.item_data.get("floor_price", 0.0)
 
-        # Legacy Rule 2: DLP block
+        # Redact floor price mentions (Sacred Rule)
         if "floor_price" in decision.message.lower():
             decision.message = "I cannot disclose internal pricing details."
             decision.thought += " [MEMBRANE: DLP block]"
@@ -77,14 +56,12 @@ class HiveMembrane(Membrane[Any, IntentAction, HiveContext]):
         guard = self.registry.get("guard")
         if not guard:
             # Legacy fallback for tests
-            if decision.action not in ["accept", "counter"]:
-                return decision
-            if decision.price < floor_price:
+            if decision.action in ["accept", "counter"] and decision.price < floor_price:
                  return self._override_with_safe_offer(decision, floor_price * 1.05, "FLOOR_PRICE_VIOLATION")
 
             min_margin = getattr(self.settings.logic, "min_margin", 0.1)
             required_min_price = floor_price / (1 - min_margin)
-            if decision.price < required_min_price:
+            if decision.action in ["accept", "counter"] and decision.price < required_min_price:
                 return self._override_with_safe_offer(decision, required_min_price, "MIN_MARGIN_VIOLATION")
 
             return decision

@@ -1,10 +1,8 @@
-import json
 import time
 from typing import Any
 
-import nats.errors
 import structlog
-from aura_core import Event, Generator, Observation
+from aura_core import Event, Generator, Observation, SkillRegistry
 
 from config import get_settings
 
@@ -12,15 +10,15 @@ logger = structlog.get_logger(__name__)
 
 
 class HiveGenerator(Generator[Observation, Event]):
-    """G - Generator: Emits events (heartbeats, transactions) to NATS."""
+    """G - Generator: Emits events (heartbeats, transactions) via Pulse Protein."""
 
-    def __init__(self, nats_client: Any = None) -> None:
-        self.nc = nats_client
+    def __init__(self, registry: SkillRegistry) -> None:
+        self.registry = registry
         self.settings = get_settings()
 
     async def pulse(self, observation: Observation) -> list[Event]:
         """
-        Generate events based on the observation and emit them.
+        Generate events based on the observation and emit them via Pulse Protein.
         """
         events = []
         now = time.time()
@@ -57,17 +55,15 @@ class HiveGenerator(Generator[Observation, Event]):
             )
         )
 
-        # 3. Emit to NATS
-        if self.nc and self.nc.is_connected:
+        # 3. Emit via Pulse Protein
+        pulse_protein = self.registry.get("pulse")
+        if pulse_protein:
             for event in events:
-                try:
-                    await self.nc.publish(
-                        event.topic, json.dumps(event.payload).encode()
-                    )
-                except (
-                    nats.errors.ConnectionClosedError,
-                    nats.errors.TimeoutError,
-                ) as e:
-                    logger.error("nats_publish_failed", topic=event.topic, error=str(e))
+                await pulse_protein.execute("emit_event", {
+                    "topic": event.topic,
+                    "payload": event.payload
+                })
+        else:
+            logger.warning("pulse_protein_missing")
 
         return events

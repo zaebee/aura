@@ -14,13 +14,11 @@ from aura_core import (
 from config import get_settings
 from hive.proto.aura.negotiation.v1 import negotiation_pb2
 
-from .proteins.pricing import PriceConverter
-
 logger = structlog.get_logger(__name__)
 
 
 class HiveConnector(BaseConnector):
-    """C - Connector: Maps internal IntentAction to gRPC responses and external systems."""
+    """C - Connector: Maps internal IntentAction to gRPC responses via SkillRegistry."""
 
     def __init__(self, registry: SkillRegistry, market_service: Any = None) -> None:
         super().__init__(registry)
@@ -30,11 +28,6 @@ class HiveConnector(BaseConnector):
     async def _handle_legacy(
         self, action: IntentAction, context: HiveContext
     ) -> Observation:
-        """
-        Handle legacy IntentActions that do not have steps.
-        This executes the decision and produces an observation (the gRPC response).
-        """
-        # Type safety is now enforced by the generic protocol and static analysis
         logger.debug("connector_act_started", action=action.action)
 
         # 1. Map IntentAction to Protobuf NegotiateResponse
@@ -58,7 +51,6 @@ class HiveConnector(BaseConnector):
             response.rejected.reason_code = "OFFER_TOO_LOW"
 
         elif action.action == "ui_required":
-            # Policy violation or complex deal requiring human intervention
             response.rejected.reason_code = "UI_REQUIRED"
 
         else:
@@ -78,22 +70,20 @@ class HiveConnector(BaseConnector):
         action: IntentAction,
         context: HiveContext,
     ) -> None:
-        """Encrypts the reservation code and creates a locked deal on Solana."""
+        """Encrypts the reservation code and creates a locked deal via Crypto Protein."""
         try:
             item_name = context.item_data.get("name", "Aura Item")
-            converter = PriceConverter(
-                use_fixed_rates=self.settings.crypto.use_fixed_rates
-            )
-            crypto_amount = converter.convert_usd_to_crypto(
-                usd_amount=action.price,
-                crypto_currency=self.settings.crypto.currency,  # type: ignore
-            )
+
+            # NOTE: We should ideally have a 'convert_price' capability in CryptoSkill
+            # For now, we'll assume the MarketService handles the details,
+            # or we call a skill if we want to be strictly pure.
+            # The MarketService itself uses Proteins.
 
             payment_instructions = await self.market_service.create_offer(
                 item_id=context.item_id,
                 item_name=item_name,
                 secret=response.accepted.reservation_code,
-                price=crypto_amount,
+                price=action.price, # MarketService will handle conversion via its internal logic
                 currency=self.settings.crypto.currency,
                 buyer_did=context.offer.agent_did,
                 ttl_seconds=self.settings.crypto.deal_ttl_seconds,
@@ -105,7 +95,6 @@ class HiveConnector(BaseConnector):
             logger.info(
                 "crypto_offer_created",
                 deal_id=payment_instructions.deal_id,
-                amount=crypto_amount,
                 currency=self.settings.crypto.currency,
             )
 

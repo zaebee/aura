@@ -50,7 +50,7 @@ class HiveAggregator(Aggregator[Any, HiveContext]):
             if obs.success and isinstance(obs.data, SystemVitals):
                 return obs.data
 
-        # Fallback to direct fetch if protein not registered (for tests)
+        # Fallback for tests if telemetry skill not registered
         from .vitals import MetricsCache, fetch_vitals
         if not hasattr(self, "_metrics_cache"):
             self._metrics_cache = MetricsCache(ttl_seconds=30)
@@ -69,24 +69,20 @@ class HiveAggregator(Aggregator[Any, HiveContext]):
             reputation=signal.agent.reputation_score,
             agent_did=signal.agent.did,
         )
+
+        storage = self.registry.get("storage")
         item_data = {}
-        try:
-            storage = self.registry.get("storage")
-            if storage:
-                obs = await storage.execute("read_item", {"item_id": item_id})
-                if obs.success and obs.data:
-                    item = obs.data
-                    item_data = {
-                        "id": item["id"],
-                        "name": item["name"],
-                        "base_price": item["base_price"],
-                        "floor_price": item["floor_price"],
-                        "meta": item["meta"] or {},
-                    }
-            else:
-                logger.error("storage_protein_not_found")
-        except Exception as e:
-            logger.error("aggregator_storage_error", error=str(e))
+        if storage:
+            obs = await storage.execute("read_item", {"item_id": item_id})
+            if obs.success and obs.data:
+                item = obs.data
+                item_data = {
+                    "id": item["id"],
+                    "name": item["name"],
+                    "base_price": item["base_price"],
+                    "floor_price": item["floor_price"],
+                    "meta": item["meta"] or {},
+                }
 
         return HiveContext(
             item_id=item_id,

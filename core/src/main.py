@@ -184,36 +184,35 @@ async def serve() -> None:
     except Exception:
         pass
 
-    # NATS
-    nc = None
-    try:
-        nc = await nats.connect(settings.server.nats_url)
-    except Exception:
-        logger.warning("nats_failed")
-
     # Proteins
     registry = SkillRegistry()
     from hive.proteins.storage import StorageProtein
     from hive.proteins.reasoning import ReasoningProtein
     from hive.proteins.telemetry import TelemetryProtein
     from hive.proteins.guard import GuardProtein
+    from hive.proteins.pulse import PulseProtein
 
     storage = StorageProtein()
     reasoning = ReasoningProtein()
     telemetry = TelemetryProtein()
     guard = GuardProtein()
+    pulse = PulseProtein()
     crypto = create_crypto_protein()
 
     await storage.execute("init_db", {})
     await asyncio.gather(
-        storage.initialize(), reasoning.initialize(),
-        telemetry.initialize(), guard.initialize()
+        storage.initialize(),
+        reasoning.initialize(),
+        telemetry.initialize(),
+        guard.initialize(),
+        pulse.initialize()
     )
 
     registry.register("storage", storage)
     registry.register("reasoning", reasoning)
     registry.register("telemetry", telemetry)
     registry.register("guard", guard)
+    registry.register("pulse", pulse)
     if crypto:
         registry.register("crypto", crypto)
 
@@ -222,6 +221,9 @@ async def serve() -> None:
     if crypto:
         from hive.connector.proteins.encryption import SecretEncryption
         from hive.services.market import MarketService
+        # Use re-exported encryption if available or use the protein's internal one
+        # To be "pure" we should maybe have an encryption skill, but for now let's use the logic
+        from hive.proteins.crypto._encryption import SecretEncryption
         encryption = SecretEncryption(get_raw_key(settings.crypto.secret_encryption_key))
         market_service = MarketService(storage=storage, crypto=crypto, encryption=encryption)
 
@@ -229,7 +231,7 @@ async def serve() -> None:
     aggregator = HiveAggregator(registry=registry)
     transformer = AuraTransformer(registry=registry)
     connector = HiveConnector(registry=registry, market_service=market_service)
-    generator = HiveGenerator(nats_client=nc)
+    generator = HiveGenerator(registry=registry)
     membrane = HiveMembrane(registry=registry)
 
     metabolism = MetabolicLoop(
@@ -270,7 +272,7 @@ async def serve() -> None:
     try:
         await server.wait_for_termination()
     finally:
-        if nc: await nc.close()
+        await pulse.close()
         if crypto: await crypto.close()
 
 if __name__ == "__main__":

@@ -1,6 +1,5 @@
 from .aggregator import (
     HiveAggregator as HiveAggregator,
-    generate_embedding as generate_embedding,
 )
 from .connector import HiveConnector as HiveConnector
 from .generator import HiveGenerator as HiveGenerator
