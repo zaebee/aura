@@ -71,17 +71,20 @@ def _load_manifest() -> dict[str, Any]:
 
 def get_macro_atcg_folders() -> list[str]:
     """Get the list of macro ATCG folders."""
-    return _load_manifest().get("macro_atcg_folders", [])
+    result: list[str] = _load_manifest().get("macro_atcg_folders", [])
+    return result
 
 
 def get_allowed_root_files() -> list[str]:
     """Get the list of allowed root files."""
-    return _load_manifest().get("allowed_root_files", [])
+    result: list[str] = _load_manifest().get("allowed_root_files", [])
+    return result
 
 
 def get_allowed_chambers() -> dict[str, str]:
     """Get the mapping of paths to chamber names."""
-    return _load_manifest().get("allowed_chambers", {})
+    result: dict[str, str] = _load_manifest().get("allowed_chambers", {})
+    return result
 
 
 # Backward-compatible aliases (call functions to get values)
