@@ -1,7 +1,7 @@
 import asyncio
 import uuid
 from concurrent import futures
-from typing import Any, cast
+from typing import Any
 
 import grpc
 import grpc.aio
@@ -200,15 +200,14 @@ class NegotiationService(negotiation_pb2_grpc.NegotiationServiceServicer):
             return negotiation_pb2.GetSystemStatusResponse(status="initializing")
 
         try:
-            # Cast to HiveAggregator to access core-specific monitoring methods
-            aggregator = cast(HiveAggregator, self.metabolism.aggregator)
-            metrics = await aggregator.get_system_metrics()
+            # Use standardized get_vitals() from the Aggregator protocol
+            vitals = await self.metabolism.aggregator.get_vitals()
             return negotiation_pb2.GetSystemStatusResponse(
-                status=metrics["status"],
-                cpu_usage_percent=metrics.get("cpu_usage_percent", 0.0),
-                memory_usage_mb=metrics.get("memory_usage_mb", 0.0),
-                timestamp=metrics.get("timestamp", ""),
-                cached=metrics.get("cached", False),
+                status=vitals.status,
+                cpu_usage_percent=vitals.cpu_usage_percent,
+                memory_usage_mb=vitals.memory_usage_mb,
+                timestamp=vitals.timestamp,
+                cached=vitals.cached,
             )
         except Exception as e:
             logger.error("system_status_error", error=str(e), exc_info=True)

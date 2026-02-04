@@ -5,7 +5,13 @@ from typing import Any, Protocol
 
 import dspy
 import structlog
-from aura_core import FailureIntent, HiveContext, IntentAction, Transformer
+from aura_core import (
+    FailureIntent,
+    HiveContext,
+    IntentAction,
+    SystemVitals,
+    Transformer,
+)
 
 from config import get_settings
 from hive.aggregator import InventoryItem, SessionLocal
@@ -145,9 +151,16 @@ class AuraTransformer(Transformer[HiveContext, IntentAction]):
             logger.error("failed_to_load_dspy_program", error=str(e))
             return AuraNegotiator()
 
+    def _get_cpu_load(self, system_health: SystemVitals | dict[str, Any]) -> float:
+        """Safely extracts CPU load from either SystemVitals or a dictionary."""
+        if isinstance(system_health, SystemVitals):
+            return system_health.cpu_usage_percent
+        return float(system_health.get("cpu_usage_percent", 0.0))
+
     def _build_economic_context(self, context: HiveContext) -> dict:
         """Construct pure economic context without infrastructure leakage."""
-        cpu_load = context.system_health.get("cpu_usage_percent", 0.0)
+        cpu_load = self._get_cpu_load(context.system_health)
+
         constraints = []
         if cpu_load > 80.0:
             constraints.append("SYSTEM_LOAD_HIGH: Be extremely concise.")
@@ -175,7 +188,7 @@ class AuraTransformer(Transformer[HiveContext, IntentAction]):
                 context.request_id,
             )
 
-        cpu_load = context.system_health.get("cpu_usage_percent", 0.0)
+        cpu_load = self._get_cpu_load(context.system_health)
 
         # Self-reflective tuning: adjust model and temperature based on system health
         model = self.settings.llm.model

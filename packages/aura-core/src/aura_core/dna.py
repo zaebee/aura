@@ -3,7 +3,7 @@ from typing import Any, Protocol, TypeVar, runtime_checkable
 
 import opentelemetry.trace as trace
 
-from .types import Observation
+from .types import Observation, SystemVitals
 
 tracer = trace.get_tracer(__name__)
 
@@ -94,6 +94,8 @@ class Aggregator[S_inv, C_cov](Protocol):
     """Standard sensory organ. Turns Signal into Context."""
 
     async def perceive(self, signal: S_inv, **kwargs: Any) -> C_cov: ...
+
+    async def get_vitals(self) -> SystemVitals: ...
 
 
 @runtime_checkable
@@ -247,6 +249,17 @@ class MetabolicLoop[S_inv, C_cov, I_inv, O_cov, E_cov]:
             # 2. Aggregator (A)
             with tracer.start_as_current_span("nucleotide_aggregator"):
                 context = await self.aggregator.perceive(signal, **kwargs)
+
+                # Internal Proprioception: Inject system vitals into context
+                try:
+                    vitals = await self.aggregator.get_vitals()
+                    if hasattr(context, "system_health"):
+                        context.system_health = vitals
+                    elif isinstance(context, dict) and "system_health" in context:
+                        context["system_health"] = vitals
+                except Exception as e:
+                    # Proprioception should not crash the main loop
+                    trace.get_current_span().record_exception(e)
 
             # 3. Transformer (T)
             # Note: Some transformers might need extra data passed in via kwargs

@@ -15,8 +15,8 @@ async def test_aggregator_healing_on_prometheus_timeout(mocker):
         "httpx.AsyncClient.get", side_effect=httpx.TimeoutException("Timeout!")
     )
     metrics = await aggregator.get_system_metrics()
-    assert metrics["status"] == "UNKNOWN"
-    assert "TimeoutException" in metrics["error"] or "fetch_error" in metrics["error"]
+    assert metrics["status"] == "unstable"
+    assert "Timeout" in metrics["error"] or "fetch_error" in metrics["error"]
 
 
 @pytest.mark.asyncio
@@ -29,7 +29,7 @@ async def test_aggregator_healing_on_prometheus_connection_error(mocker):
         "httpx.AsyncClient.get", side_effect=httpx.ConnectError("Connection refused")
     )
     metrics = await aggregator.get_system_metrics()
-    assert metrics["status"] == "UNKNOWN"
+    assert metrics["status"] == "unstable"
     assert "ConnectError" in metrics["error"] or "fetch_error" in metrics["error"]
 
 
@@ -73,4 +73,4 @@ async def test_aggregator_healing_with_cache_fallback(mocker):
     # Should return cached data
     assert metrics["cpu_usage_percent"] == 42.0
     assert metrics["cached"] is True
-    assert metrics["warning"] == "stale_data"
+    assert "Stale data" in metrics["error"]

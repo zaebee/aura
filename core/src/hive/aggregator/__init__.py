@@ -8,7 +8,7 @@ from typing import Any
 
 import httpx
 import structlog
-from aura_core import Aggregator, HiveContext, NegotiationOffer
+from aura_core import Aggregator, HiveContext, NegotiationOffer, SystemVitals
 from langchain_mistralai import MistralAIEmbeddings
 from pgvector.sqlalchemy import Vector
 from sqlalchemy import (
@@ -169,11 +169,11 @@ class HiveAggregator(Aggregator[Any, HiveContext]):
                 continue
         return "UNKNOWN"
 
-    async def get_system_metrics(self) -> dict[str, Any]:
-        """Queries Prometheus with self-healing (formerly monitor.py logic)."""
+    async def get_vitals(self) -> SystemVitals:
+        """Standardized proprioception (self-healing metrics)."""
         cached = self._metrics_cache.get()
         if cached:
-            return {**cached, "cached": True}
+            return SystemVitals(**{**cached, "cached": True})
 
         cpu_query = 'avg(rate(container_cpu_usage_seconds_total{namespace="default"}[5m])) * 100'
         mem_query = (
@@ -195,11 +195,26 @@ class HiveAggregator(Aggregator[Any, HiveContext]):
                 mem_usage, mem_success = self._process_metric_response(
                     responses[1], "mem", errors
                 )
+
                 if not (cpu_success or mem_success):
-                    raise httpx.ConnectError(
-                        f"All metric fetches failed: {', '.join(errors)}"
+                    # Self-Healing: If Prometheus is down, try to fallback to stale cache
+                    error_msg = f"All metric fetches failed: {', '.join(errors)}"
+                    cached_dict = self._metrics_cache.get(ignore_ttl=True)
+                    if cached_dict:
+                        return SystemVitals(
+                            **{
+                                **cached_dict,
+                                "cached": True,
+                                "error": f"Stale data due to: {error_msg}",
+                            }
+                        )
+                    return SystemVitals(
+                        status="unstable",
+                        timestamp=datetime.now(UTC).isoformat(),
+                        error=error_msg,
                     )
-                metrics = {
+
+                metrics_dict = {
                     "status": "ok",
                     "cpu_usage_percent": round(cpu_usage, 2),
                     "memory_usage_mb": round(mem_usage, 2),
@@ -207,28 +222,34 @@ class HiveAggregator(Aggregator[Any, HiveContext]):
                     "cached": False,
                 }
                 if errors:
-                    metrics["status"] = "PARTIAL"
-                    metrics["warnings"] = errors
-                self._metrics_cache.set(metrics)
-                return metrics
+                    metrics_dict["status"] = "PARTIAL"
+                    metrics_dict["warnings"] = errors
+
+                self._metrics_cache.set(metrics_dict)
+                return SystemVitals(**metrics_dict)
+
         except Exception as e:
             error_msg = f"{type(e).__name__}: {str(e)}"
             logger.error("monitoring_failure", error=error_msg)
-            cached = self._metrics_cache.get(ignore_ttl=True)
-            if cached:
-                return {
-                    **cached,
-                    "cached": True,
-                    "warning": "stale_data",
-                    "error": error_msg,
-                }
-            return {
-                "status": "UNKNOWN",
-                "cpu_usage_percent": 0.0,
-                "memory_usage_mb": 0.0,
-                "timestamp": datetime.now(UTC).isoformat(),
-                "error": error_msg,
-            }
+            cached_dict = self._metrics_cache.get(ignore_ttl=True)
+            if cached_dict:
+                return SystemVitals(
+                    **{
+                        **cached_dict,
+                        "cached": True,
+                        "error": f"Stale data due to: {error_msg}",
+                    }
+                )
+            return SystemVitals(
+                status="unstable",
+                timestamp=datetime.now(UTC).isoformat(),
+                error=error_msg,
+            )
+
+    async def get_system_metrics(self) -> dict[str, Any]:
+        """Backward compatibility for legacy status calls."""
+        vitals = await self.get_vitals()
+        return vitals.model_dump()
 
     def _process_metric_response(
         self, response: Any, metric_name: str, errors: list[str]
@@ -274,12 +295,11 @@ class HiveAggregator(Aggregator[Any, HiveContext]):
         except Exception as e:
             logger.error("aggregator_db_error", error=str(e))
 
-        system_health = await self.get_system_metrics()
         return HiveContext(
             item_id=item_id,
             offer=offer,
             item_data=item_data,
-            system_health=system_health,
+            # system_health will be automatically injected by MetabolicLoop
             request_id=request_id,
             metadata={"brain_path": self._resolve_brain_path()},
         )

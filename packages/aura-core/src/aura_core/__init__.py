@@ -26,6 +26,7 @@ from .types import (
     Observation,
     SearchResult,
     Signal,
+    SystemVitals,
     TelegramContext,
     UIAction,
 )
@@ -56,6 +57,7 @@ __all__ = [
     "Observation",
     "Event",
     "SearchResult",
+    "SystemVitals",
     "NegotiationResult",
     "BeeContext",
     "AuditObservation",

@@ -2,6 +2,7 @@
 __pycache__/
 .ruff_cache/
 .pytest_cache/
+.coverage
 .claude/
 *.py[oc]
 build/

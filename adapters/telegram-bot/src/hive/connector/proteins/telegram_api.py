@@ -32,6 +32,8 @@ class TelegramProtein(Skill):
                 chat_id = context.chat_id
 
         if intent == "send_message":
+            if not chat_id:
+                return Observation(success=False, error="chat_id is missing")
             try:
                 msg = await self.bot.send_message(
                     chat_id=chat_id,

@@ -12,6 +12,7 @@ from aura_core import (
     BeeContext,
     BeeObservation,
     Connector,
+    SkillRegistry,
     find_hive_root,
 )
 from .proteins.gh_client import GitHubClient
@@ -23,6 +24,7 @@ class BeeConnector(Connector[AuditObservation, BeeObservation, BeeContext]):
     """C - Connector: Interacts with GitHub and NATS."""
 
     def __init__(self, settings: KeeperSettings) -> None:
+        self.registry = SkillRegistry()
         self.settings = settings
         self.github_token = settings.github_token
         self.repo_name = settings.github_repository
