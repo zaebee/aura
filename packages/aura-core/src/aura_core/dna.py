@@ -238,7 +238,7 @@ class MetabolicLoop[S_inv, C_cov, I_inv, O_cov, E_cov]:
         Execute one full metabolic cycle:
         Signal -> [Membrane In] -> Aggregator -> Transformer -> [Membrane Out] -> Connector -> Generator
         """
-        with tracer.start_as_current_span("metabolic_loop") as span:
+        with tracer.start_as_current_span("metabolic_loop") as _span:
             # 1. Inbound Membrane
             with tracer.start_as_current_span("nucleotide_membrane_in"):
                 if self.membrane and hasattr(self.membrane, "inspect_inbound"):

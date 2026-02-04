@@ -6,8 +6,8 @@ from typing import Any, cast
 import grpc
 import grpc.aio
 import nats
-from grpc_health.v1 import health_pb2, health_pb2_grpc
 from aura_core import SkillRegistry
+from grpc_health.v1 import health_pb2, health_pb2_grpc
 from hive.aggregator import (
     HiveAggregator,
     InventoryItem,

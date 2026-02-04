@@ -5,7 +5,6 @@ Implements the Connector component for Telegram Metabolism.
 import structlog
 from aura_core import (
     BaseConnector,
-    Observation,
     SkillRegistry,
 )
 from opentelemetry import trace

@@ -4,8 +4,8 @@ import os
 import nats
 import structlog
 from aiogram import Bot, Dispatcher
-from bot import router
 from aura_core import MetabolicLoop, SkillRegistry
+from bot import router
 from hive.aggregator import TelegramAggregator
 from hive.connector import TelegramConnector
 from hive.connector.proteins.aura_client import GRPCNegotiationClient
