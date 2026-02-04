@@ -11,7 +11,6 @@ from sqlalchemy import (
     Float,
     LargeBinary,
     String,
-    create_engine,
 )
 from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import (
@@ -22,8 +21,7 @@ from sqlalchemy.orm import (
 )
 
 # DNA Rule: Proteins must not import global settings.
-# Default vector dimension for Aura Hive (can be overridden if needed)
-DEFAULT_VECTOR_DIM = 1024
+# Models will be initialized during Skill.initialize()
 
 # 1. Implementation Details: SQLAlchemy Setup
 # These will be initialized properly during Skill.initialize()
@@ -47,7 +45,7 @@ class InventoryItem(Base):
     floor_price: Mapped[float] = mapped_column(Float, nullable=False)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
     meta: Mapped[dict[str, Any]] = mapped_column(JSONB, default={})
-    embedding: Mapped[Any] = mapped_column(Vector(DEFAULT_VECTOR_DIM), nullable=True)
+    embedding: Mapped[Any] = mapped_column(Vector, nullable=True)
 
 
 class DealStatus(enum.Enum):

@@ -48,10 +48,12 @@ class OutputGuard:
         # 3. Margin violation
         margin = (offered_price - internal_cost) / offered_price
 
-        # Must have settings to validate margin
+        # DNA Rule: Safety Guard must "Fail-Closed" if misconfigured.
         if not self.settings:
-            logger.warning("guard_settings_missing_skipping_margin_check")
-            return True
+            logger.error("guard_settings_missing_fail_closed")
+            raise SafetyViolation(
+                "Cannot validate margin: safety settings not provided."
+            )
 
         min_margin = self.settings.min_profit_margin
         if margin < min_margin:

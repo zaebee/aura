@@ -11,12 +11,9 @@ from jinja2 import Template
 from langchain_mistralai import MistralAIEmbeddings
 from pydantic import BaseModel
 
-from config import get_settings
-from config.llm import get_raw_key
 from hive.proto.aura.negotiation.v1 import negotiation_pb2
 
 logger = structlog.get_logger(__name__)
-settings = get_settings()
 
 # --- JSON Cleaning Implementation ---
 
@@ -83,14 +80,16 @@ class AuraNegotiator(dspy.Module):
 
 # --- Embeddings Implementation ---
 
-_embed_model = MistralAIEmbeddings(
-    model="mistral-embed",
-    mistral_api_key=get_raw_key(settings.llm.api_key),
-)
+
+def get_embedding_model(api_key: str) -> MistralAIEmbeddings:
+    return MistralAIEmbeddings(
+        model="mistral-embed",
+        mistral_api_key=api_key,
+    )
 
 
-def generate_embedding(text: str) -> list[float]:
-    return cast(list[float], _embed_model.embed_query(text))
+def generate_embedding(text: str, model: MistralAIEmbeddings) -> list[float]:
+    return cast(list[float], model.embed_query(text))
 
 
 # --- Brain Loading Helper ---
@@ -166,8 +165,11 @@ class LiteLLMStrategy:
             / "prompts"
             / "system.md"
         )
-        with open(template_path) as f:
-            self.prompt_template = Template(f.read())
+        if template_path.exists():
+            with open(template_path) as f:
+                self.prompt_template = Template(f.read())
+        else:
+            self.prompt_template = Template("Item: {{item_name}}, Bid: {{bid}}")
 
     def evaluate(
         self, item: Any, bid: float, reputation: float, request_id: str | None = None
@@ -230,15 +232,16 @@ class LiteLLMStrategy:
 
 
 class DSPyStrategy:
-    def __init__(self, compiled_program_path: str = "aura_brain.json"):
+    def __init__(self, model: str, compiled_program_path: str = "aura_brain.json"):
         self.negotiator = load_brain(compiled_program_path)
-        self.settings = get_settings()
         self.fallback_strategy: Any = None
-        dspy.configure(lm=dspy.LM(model=self.settings.llm.model))
+        dspy.configure(lm=dspy.LM(model=model))
 
     def _get_fallback_strategy(self) -> Any:
         if self.fallback_strategy is None:
-            self.fallback_strategy = LiteLLMStrategy(model=self.settings.llm.model)
+            # Note: This strategy needs an API key which is not passed here.
+            # Legacy code, keeping for compatibility.
+            self.fallback_strategy = LiteLLMStrategy(model="gpt-3.5-turbo")
         return self.fallback_strategy
 
     def _create_standard_context(self, item: Any) -> dict[str, Any]:

@@ -81,10 +81,13 @@ async def fetch_vitals(metrics_cache: MetricsCache, settings: Any) -> SystemVita
     cpu_q = 'avg(rate(container_cpu_usage_seconds_total{namespace="default"}[5m])) * 100'
     mem_q = 'avg(container_memory_working_set_bytes{namespace="default"}) / 1024 / 1024'
 
+    # DNA Rule: Proteins must not import global settings.
+    if not settings:
+        raise ValueError("SystemVitals fetch failed: settings not provided")
+
     try:
         async with httpx.AsyncClient(timeout=5.0) as client:
-            # Handle both global settings and sub-config
-            # DNA Rule: No global settings imports in internal logic.
+            # Handle both global settings and sub-config (for flexibility)
             if hasattr(settings, "prometheus_url"):
                 base_url = str(settings.prometheus_url).rstrip("/")
             elif hasattr(settings, "server"):

@@ -38,7 +38,7 @@ class CryptoSkill(SkillProtocol[dict[str, Any], Observation]):
     async def initialize(self, settings: CryptoSettings | None = None) -> bool:
         self.settings = settings
         if self.settings:
-            from config.llm import get_raw_key
+            from aura_core import get_raw_key
 
             self.provider = SolanaProvider(
                 private_key_base58=get_raw_key(self.settings.solana_private_key),

@@ -50,10 +50,18 @@ class StorageSkill(SkillProtocol[dict[str, Any], Observation]):
     async def initialize(self, settings: DatabaseSettings | None = None) -> bool:
         self.settings = settings
         if self.settings:
+            from pgvector.sqlalchemy import Vector
             from sqlalchemy import create_engine
+
             from . import _internal
+
             _internal.engine = create_engine(str(self.settings.url))
             _internal.SessionLocal.configure(bind=_internal.engine)
+
+            # DNA Rule: Dynamic configuration of vector dimension
+            InventoryItem.__table__.c.embedding.type = Vector(
+                self.settings.vector_dimension
+            )
 
         try:
 
