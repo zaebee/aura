@@ -139,6 +139,17 @@ python -m tools.simulators.agent_sim
 python -m tools.simulators.autonomous_buyer
 ```
 
+## 🩹 Trauma Log
+
+Lessons learned in blood. Do NOT repeat these mistakes.
+
+| Wound | Symptom | Cause | Solution |
+| :--- | :--- | :--- | :--- |
+| **The Slash Trap** | 301 Redirects breaking Prometheus queries | Pydantic HttpUrl forces trailing slashes | `.rstrip('/')` |
+| **The Key Mismatch** | Configuration not loading | Variable name misalignment between Helm and Pydantic | Strict alignment: `AURA_DB__URL` in both |
+| **The Helm Thrombosis** | Deployments stuck in pending-upgrade | Interrupted Helm upgrades create orphan secrets | Manual deletion of Helm secrets before retry |
+| **The Shadow Artery** | gRPC connections hanging in CI | `KUBECONFIG` pointing to local clusters | `export KUBECONFIG=/dev/null` in CI scripts |
+
 ## 📂 Project Structure
 
 ```

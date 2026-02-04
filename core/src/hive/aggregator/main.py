@@ -13,18 +13,15 @@ from aura_core import (
 
 from config import get_settings
 
-from .vitals import MetricsCache, fetch_vitals
-
 logger = structlog.get_logger(__name__)
 
 
 class HiveAggregator(Aggregator[Any, HiveContext]):
-    """A - Aggregator: Consolidates database and system health signals."""
+    """A - Aggregator: Consolidates database and system health signals via SkillRegistry."""
 
-    def __init__(self, registry: SkillRegistry) -> None:
+    def __init__(self, registry: SkillRegistry | None = None) -> None:
         self.settings = get_settings()
-        self.registry = registry
-        self._metrics_cache = MetricsCache(ttl_seconds=30)
+        self.registry = registry or SkillRegistry()
 
     def _resolve_brain_path(self) -> str:
         search_paths = []
@@ -46,7 +43,17 @@ class HiveAggregator(Aggregator[Any, HiveContext]):
         return "UNKNOWN"
 
     async def get_vitals(self) -> SystemVitals:
-        """Standardized proprioception (self-healing metrics)."""
+        """Standardized proprioception via Telemetry Protein."""
+        telemetry = self.registry.get("telemetry")
+        if telemetry:
+            obs = await telemetry.execute("get_vitals", {})
+            if obs.success and isinstance(obs.data, SystemVitals):
+                return obs.data
+
+        # Fallback to direct fetch if protein not registered (for tests)
+        from .vitals import MetricsCache, fetch_vitals
+        if not hasattr(self, "_metrics_cache"):
+            self._metrics_cache = MetricsCache(ttl_seconds=30)
         return await fetch_vitals(self._metrics_cache, self.settings)
 
     async def get_system_metrics(self) -> dict[str, Any]:
@@ -85,7 +92,6 @@ class HiveAggregator(Aggregator[Any, HiveContext]):
             item_id=item_id,
             offer=offer,
             item_data=item_data,
-            # system_health will be automatically injected by MetabolicLoop
             request_id=request_id,
             metadata={"brain_path": self._resolve_brain_path()},
         )
