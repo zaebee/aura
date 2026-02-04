@@ -91,13 +91,26 @@ redis:
 
 # Frontnend Configuration
 frontend:
+  livenessProbe:
+    path: /
+    initialDelaySeconds: 5
+    periodSeconds: 10
+    timeoutSeconds: 2
+    failureThreshold: 3
+  readinessProbe:
+    path: /
+    initialDelaySeconds: 5
+    periodSeconds: 10
+    timeoutSeconds: 2
+    failureThreshold: 3
   image:
     repository: ghcr.io/zaebee/aura-frontend
     tag: latest
     pullPolicy: IfNotPresent
   service:
     type: LoadBalancer
-    port: 3000
+    port: 80
+    targetPort: 80
   replicaCount: 1
   resources:
     limits:

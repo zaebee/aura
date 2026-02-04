@@ -19,8 +19,8 @@ data:
     [[proxies]]
     name = "frontend"
     type = "tcp"
-    localIP = "aura-frontend"
-    localPort = 3000
+    localIP = "{{ .Release.Name }}-frontend"
+    localPort = {{ .Values.frontend.service.port }}
     remotePort = 8081
 
     [[proxies]]
