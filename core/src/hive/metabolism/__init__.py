@@ -45,14 +45,15 @@ class MetabolicLoop(
         Execute one full metabolic cycle.
         """
         negotiation_total.labels(service="core").inc()
-        if kwargs.get("is_heartbeat"):
+        is_heartbeat = kwargs.get("is_heartbeat", False)
+        if is_heartbeat:
             heartbeat_total.labels(service="core").inc()
 
         logger.info("metabolism_cycle_started")
 
         observation = await super().execute(signal, **kwargs)
 
-        if kwargs.get("is_heartbeat"):
+        if is_heartbeat:
             observation.metadata["is_heartbeat"] = True
 
         if observation.success and observation.event_type == "negotiation_accept":

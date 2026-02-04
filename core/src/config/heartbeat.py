@@ -14,7 +14,7 @@ class HeartbeatSettings(BaseSettings):
 
     interval_seconds: int = Field(
         default=60,  # Default 60 seconds for health visibility
-        description="Interval between heartbeat deals. Set to 60 for testing.",
+        description="Interval in seconds between heartbeat deals for system health visibility.",
     )
     bid_multiplier: float = Field(
         default=1.2,
