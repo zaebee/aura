@@ -13,12 +13,12 @@ class HeartbeatSettings(BaseSettings):
     )
 
     interval_seconds: int = Field(
-        default=12 * 3600,  # Default 12 hours
-        description="Interval between heartbeat deals. Set to 60 for testing.",
+        default=60,  # Default 60 seconds for health visibility
+        description="Interval in seconds between heartbeat deals for system health visibility.",
     )
     bid_multiplier: float = Field(
-        default=1.1,
-        description="Multiplier applied to base_price for heartbeat bids.",
+        default=1.2,
+        description="Multiplier applied to base_price for heartbeat bids. Must exceed (1/(1-min_margin)) for acceptance.",
     )
     agent_did: str = Field(
         default="did:aura:heartbeat",
