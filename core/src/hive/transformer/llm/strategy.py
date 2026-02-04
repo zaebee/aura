@@ -6,12 +6,12 @@ Supports any LLM provider (OpenAI, Mistral, Anthropic, Ollama, etc.) via litellm
 
 import time
 from pathlib import Path
+from typing import Any
 
 import structlog
 from jinja2 import Template
 from pydantic import BaseModel, Field
 
-from hive.aggregator import InventoryItem, SessionLocal
 from hive.metabolism.logging_config import bind_request_id
 from hive.proto.aura.negotiation.v1 import negotiation_pb2
 from hive.transformer.llm.engine import LLMEngine
@@ -68,17 +68,9 @@ class LiteLLMStrategy:
             trigger_price=trigger_price,
         )
 
-    def _get_item(self, item_id: str) -> InventoryItem | None:
-        """Fetch item from database."""
-        session = SessionLocal()
-        try:
-            return session.query(InventoryItem).filter_by(id=item_id).first()
-        finally:
-            session.close()
-
     def evaluate(
         self,
-        item_id: str,
+        item: Any,  # Expected to be an object with name, base_price, floor_price
         bid: float,
         reputation: float,
         request_id: str | None = None,
@@ -98,19 +90,22 @@ class LiteLLMStrategy:
         if request_id:
             bind_request_id(request_id)
 
-        item = self._get_item(item_id)
         if not item:
-            logger.info("item_not_found", item_id=item_id)
+            logger.info("item_not_found")
             return negotiation_pb2.NegotiateResponse(
                 rejected=negotiation_pb2.OfferRejected(reason_code="ITEM_NOT_FOUND")
             )
 
         # Render system prompt with item data
+        item_name = item.get("name", "unknown") if isinstance(item, dict) else getattr(item, "name", "unknown")
+        base_price = item.get("base_price", 0.0) if isinstance(item, dict) else getattr(item, "base_price", 0.0)
+        floor_price = item.get("floor_price", 0.0) if isinstance(item, dict) else getattr(item, "floor_price", 0.0)
+
         system_prompt = self.prompt_template.render(
             business_type="hotel",
-            item_name=item.name,
-            base_price=item.base_price,
-            floor_price=item.floor_price,
+            item_name=item_name,
+            base_price=base_price,
+            floor_price=floor_price,
             market_load="High",
             trigger_price=self.trigger_price,
             bid=bid,
@@ -119,10 +114,10 @@ class LiteLLMStrategy:
 
         logger.info(
             "llm_evaluation_started",
-            item_id=item_id,
+            item_id=item.get("id", "unknown") if isinstance(item, dict) else getattr(item, "id", "unknown"),
             bid_amount=bid,
-            item_name=item.name,
-            base_price=item.base_price,
+            item_name=item.get("name", "unknown") if isinstance(item, dict) else getattr(item, "name", "unknown"),
+            base_price=item.get("base_price", 0.0) if isinstance(item, dict) else getattr(item, "base_price", 0.0),
             model=self.engine.model,
         )
 

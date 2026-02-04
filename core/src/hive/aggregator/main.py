@@ -3,11 +3,16 @@ from pathlib import Path
 from typing import Any
 
 import structlog
-from aura_core import Aggregator, HiveContext, NegotiationOffer, SystemVitals
+from aura_core import (
+    Aggregator,
+    HiveContext,
+    NegotiationOffer,
+    SkillRegistry,
+    SystemVitals,
+)
 
 from config import get_settings
 
-from .db import InventoryItem, SessionLocal
 from .vitals import MetricsCache, fetch_vitals
 
 logger = structlog.get_logger(__name__)
@@ -16,8 +21,9 @@ logger = structlog.get_logger(__name__)
 class HiveAggregator(Aggregator[Any, HiveContext]):
     """A - Aggregator: Consolidates database and system health signals."""
 
-    def __init__(self) -> None:
+    def __init__(self, registry: SkillRegistry) -> None:
         self.settings = get_settings()
+        self.registry = registry
         self._metrics_cache = MetricsCache(ttl_seconds=30)
 
     def _resolve_brain_path(self) -> str:
@@ -58,21 +64,22 @@ class HiveAggregator(Aggregator[Any, HiveContext]):
         )
         item_data = {}
         try:
-
-            def fetch() -> InventoryItem | None:
-                with SessionLocal() as session:
-                    return session.query(InventoryItem).filter_by(id=item_id).first()
-
-            item = await asyncio.to_thread(fetch)
-            if item:
-                item_data = {
-                    "name": item.name,
-                    "base_price": item.base_price,
-                    "floor_price": item.floor_price,
-                    "meta": item.meta or {},
-                }
+            storage = self.registry.get("storage")
+            if storage:
+                obs = await storage.execute("read_item", {"item_id": item_id})
+                if obs.success and obs.data:
+                    item = obs.data
+                    item_data = {
+                        "id": item["id"],
+                        "name": item["name"],
+                        "base_price": item["base_price"],
+                        "floor_price": item["floor_price"],
+                        "meta": item["meta"] or {},
+                    }
+            else:
+                logger.error("storage_protein_not_found")
         except Exception as e:
-            logger.error("aggregator_db_error", error=str(e))
+            logger.error("aggregator_storage_error", error=str(e))
 
         return HiveContext(
             item_id=item_id,

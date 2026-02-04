@@ -1,22 +1,38 @@
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
-from aura_core import HiveContext, IntentAction, NegotiationOffer, SystemVitals
+from aura_core import (
+    HiveContext,
+    IntentAction,
+    NegotiationOffer,
+    Observation,
+    SkillRegistry,
+    SystemVitals,
+)
 from hive.aggregator import HiveAggregator
 from hive.membrane import HiveMembrane
 
 
 @pytest.mark.asyncio
 async def test_aggregator_perceive(mocker):
-    # Mock DB and monitor
-    mock_session_factory = mocker.patch("hive.aggregator.main.SessionLocal")
-    mock_session = mock_session_factory.return_value.__enter__.return_value
-    mock_query = mock_session.query.return_value.filter_by.return_value.first
-    mock_query.return_value = MagicMock(
-        name="Item", id="item1", base_price=150.0, floor_price=100.0, meta={}
+    # Mock Storage Protein
+    registry = SkillRegistry()
+    mock_storage = MagicMock()
+    mock_storage.execute = AsyncMock(
+        return_value=Observation(
+            success=True,
+            data={
+                "id": "item1",
+                "name": "Test Item",
+                "base_price": 150.0,
+                "floor_price": 100.0,
+                "meta": {},
+            },
+        )
     )
+    registry.register("storage", mock_storage)
 
-    aggregator = HiveAggregator()
+    aggregator = HiveAggregator(registry=registry)
     mocker.patch.object(
         aggregator,
         "get_vitals",

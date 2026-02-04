@@ -8,12 +8,8 @@ import secrets
 import uuid
 from datetime import UTC, datetime, timedelta
 
-from sqlalchemy import select
-from sqlalchemy.orm import Session
-
-from hive.aggregator import DealStatus, LockedDeal
+from aura_core import SkillProtocol
 from hive.connector.proteins.encryption import SecretEncryption
-from hive.connector.proteins.interfaces import CryptoProvider
 from hive.proto.aura.negotiation.v1 import negotiation_pb2
 
 logger = logging.getLogger(__name__)
@@ -31,20 +27,26 @@ class MarketService:
     - Managing deal expiration
     """
 
-    def __init__(self, crypto_provider: CryptoProvider, encryption: SecretEncryption):
+    def __init__(
+        self,
+        storage: SkillProtocol,
+        crypto: SkillProtocol,
+        encryption: SecretEncryption,
+    ):
         """
         Initialize market service.
 
         Args:
-            crypto_provider: Blockchain payment provider (e.g., SolanaProvider)
+            storage: Storage Protein for database operations
+            crypto: Crypto Protein for blockchain verification
             encryption: Secret encryption handler for encrypting/decrypting reservation codes
         """
-        self.provider = crypto_provider
+        self.storage = storage
+        self.crypto = crypto
         self.encryption = encryption
 
-    def create_offer(
+    async def create_offer(
         self,
-        db: Session,
         item_id: str,
         item_name: str,
         secret: str,
@@ -84,30 +86,30 @@ class MarketService:
         # Encrypt secret before storing
         encrypted_secret = self.encryption.encrypt(secret)
 
-        # Create locked deal record
-        deal = LockedDeal(
-            id=uuid.uuid4(),
-            item_id=item_id,
-            item_name=item_name,
-            final_price=price,
-            currency=currency,
-            payment_memo=memo,
-            secret_content=encrypted_secret,  # Encrypted with Fernet
-            status=DealStatus.PENDING,
-            buyer_did=buyer_did,
-            created_at=now,
-            expires_at=expires_at,
-            updated_at=now,
+        deal_id = uuid.uuid4()
+        # Create locked deal record via Storage Protein
+        obs = await self.storage.execute(
+            "create_deal",
+            {
+                "id": deal_id,
+                "item_id": item_id,
+                "item_name": item_name,
+                "final_price": price,
+                "currency": currency,
+                "payment_memo": memo,
+                "secret_content": encrypted_secret,
+                "buyer_did": buyer_did,
+                "expires_at": expires_at,
+            },
         )
 
-        db.add(deal)
-        db.commit()
-        db.refresh(deal)
+        if not obs.success:
+            raise ValueError(f"Failed to create deal: {obs.error}")
 
         logger.info(
             "deal_created",
             extra={
-                "deal_id": str(deal.id),
+                "deal_id": str(deal_id),
                 "item_id": item_id,
                 "item_name": item_name,
                 "price": price,
@@ -118,19 +120,23 @@ class MarketService:
             },
         )
 
+        # Get crypto provider info
+        addr_obs = await self.crypto.execute("get_address", {})
+        network_obs = await self.crypto.execute("get_network_name", {})
+
         # Return payment instructions
         return negotiation_pb2.CryptoPaymentInstructions(
-            deal_id=str(deal.id),
-            wallet_address=self.provider.get_address(),
+            deal_id=str(deal_id),
+            wallet_address=addr_obs.data if addr_obs.success else "unknown",
             amount=price,
             currency=currency,
             memo=memo,
-            network=self.provider.get_network_name(),
+            network=network_obs.data if network_obs.success else "unknown",
             expires_at=int(expires_at.timestamp()),
         )
 
     async def check_status(
-        self, db: Session, deal_id: str
+        self, deal_id: str
     ) -> negotiation_pb2.CheckDealStatusResponse:
         """
         Checks the payment status of a locked deal.
@@ -154,68 +160,82 @@ class MarketService:
         # Parse UUID (already validated at API boundary)
         deal_uuid = uuid.UUID(deal_id)
 
-        # Query deal from database with row-level lock to prevent race conditions
-        stmt = select(LockedDeal).where(LockedDeal.id == deal_uuid).with_for_update()
-        deal = db.scalars(stmt).first()
+        # Query deal from Storage Protein
+        obs = await self.storage.execute("get_deal_by_id", {"deal_id": deal_uuid})
 
-        if not deal:
+        if not obs.success or not obs.data:
             logger.info("Deal not found", extra={"deal_id": deal_id})
             return negotiation_pb2.CheckDealStatusResponse(status="NOT_FOUND")
 
+        deal = obs.data
         # Check if deal expired
         now = datetime.now(UTC)
-        if deal.status == DealStatus.PENDING and now > deal.expires_at:
-            deal.status = DealStatus.EXPIRED
-            deal.updated_at = now
-            db.commit()
-
+        if deal["status"] == "PENDING" and now > deal["expires_at"]:
+            await self.storage.execute(
+                "update_deal_status", {"deal_id": deal_uuid, "status": "EXPIRED"}
+            )
             logger.info(
                 "deal_expired",
                 extra={
                     "deal_id": deal_id,
-                    "expires_at": deal.expires_at.isoformat(),
+                    "expires_at": deal["expires_at"].isoformat(),
                 },
             )
             return negotiation_pb2.CheckDealStatusResponse(status="EXPIRED")
 
         # If already paid, return cached secret (idempotent)
-        if deal.status == DealStatus.PAID:
+        if deal["status"] == "PAID":
             logger.info(
                 "deal_already_paid",
                 extra={
                     "deal_id": deal_id,
-                    "paid_at": deal.paid_at.isoformat() if deal.paid_at else None,
+                    "paid_at": deal["paid_at"].isoformat() if deal["paid_at"] else None,
                 },
             )
             return self._build_paid_response(deal)
 
         # If pending, verify payment on-chain
-        if deal.status == DealStatus.PENDING:
-            proof = await self.provider.verify_payment(
-                amount=deal.final_price,
-                memo=deal.payment_memo,
-                currency=deal.currency,
+        if deal["status"] == "PENDING":
+            proof_obs = await self.crypto.execute(
+                "verify_payment",
+                {
+                    "amount": deal["final_price"],
+                    "memo": deal["payment_memo"],
+                    "currency": deal["currency"],
+                },
             )
 
-            if proof:
-                # Payment confirmed! Update database
-                deal.status = DealStatus.PAID
-                deal.transaction_hash = proof.transaction_hash
-                deal.block_number = proof.block_number
-                deal.from_address = proof.from_address
-                deal.paid_at = proof.confirmed_at
-                deal.updated_at = now
-                db.commit()
+            if proof_obs.success and proof_obs.data:
+                proof = proof_obs.data
+                # Payment confirmed! Update Storage
+                await self.storage.execute(
+                    "update_deal_status",
+                    {
+                        "deal_id": deal_uuid,
+                        "status": "PAID",
+                        "transaction_hash": proof["transaction_hash"],
+                        "block_number": proof["block_number"],
+                        "from_address": proof["from_address"],
+                        "paid_at": proof["confirmed_at"],
+                    },
+                )
+
+                # Update local deal dict for response building
+                deal["status"] = "PAID"
+                deal["transaction_hash"] = proof["transaction_hash"]
+                deal["block_number"] = proof["block_number"]
+                deal["from_address"] = proof["from_address"]
+                deal["paid_at"] = proof["confirmed_at"]
 
                 logger.info(
                     "payment_verified",
                     extra={
                         "deal_id": deal_id,
-                        "transaction_hash": proof.transaction_hash,
-                        "block_number": proof.block_number,
-                        "from_address": proof.from_address,
-                        "amount": deal.final_price,
-                        "currency": deal.currency,
+                        "transaction_hash": proof["transaction_hash"],
+                        "block_number": proof["block_number"],
+                        "from_address": proof["from_address"],
+                        "amount": deal["final_price"],
+                        "currency": deal["currency"],
                     },
                 )
 
@@ -226,12 +246,12 @@ class MarketService:
                     "payment_pending",
                     extra={
                         "deal_id": deal_id,
-                        "memo": deal.payment_memo,
-                        "amount": deal.final_price,
-                        "currency": deal.currency,
+                        "memo": deal["payment_memo"],
+                        "amount": deal["final_price"],
+                        "currency": deal["currency"],
                     },
                 )
-                return self._build_pending_response(deal)
+                return await self._build_pending_response(deal)
 
         # Handle unexpected status
         logger.warning(
@@ -251,32 +271,25 @@ class MarketService:
         return secrets.token_urlsafe(6)[:8]  # 6 bytes = 8 base64 chars
 
     def _build_paid_response(
-        self, deal: LockedDeal
+        self, deal: dict[str, Any]
     ) -> negotiation_pb2.CheckDealStatusResponse:
         """
         Builds response for PAID deals with decrypted secret and proof.
-
-        Args:
-            deal: LockedDeal record with payment confirmed
-
-        Returns:
-            CheckDealStatusResponse with status="PAID"
         """
-        # Decrypt secret before revealing
-        decrypted_secret = self.encryption.decrypt(deal.secret_content)
+        decrypted_secret = self.encryption.decrypt(deal["secret_content"])
 
         secret = negotiation_pb2.DealSecret(
             reservation_code=decrypted_secret,
-            item_name=deal.item_name,
-            final_price=deal.final_price,
-            paid_at=int(deal.paid_at.timestamp()) if deal.paid_at else 0,
+            item_name=deal["item_name"],
+            final_price=deal["final_price"],
+            paid_at=int(deal["paid_at"].timestamp()) if deal["paid_at"] else 0,
         )
 
         proof = negotiation_pb2.PaymentProof(
-            transaction_hash=deal.transaction_hash or "",
-            block_number=deal.block_number or "",
-            from_address=deal.from_address or "",
-            confirmed_at=int(deal.paid_at.timestamp()) if deal.paid_at else 0,
+            transaction_hash=deal["transaction_hash"] or "",
+            block_number=deal["block_number"] or "",
+            from_address=deal["from_address"] or "",
+            confirmed_at=int(deal["paid_at"].timestamp()) if deal["paid_at"] else 0,
         )
 
         return negotiation_pb2.CheckDealStatusResponse(
@@ -285,26 +298,23 @@ class MarketService:
             proof=proof,
         )
 
-    def _build_pending_response(
-        self, deal: LockedDeal
+    async def _build_pending_response(
+        self, deal: dict[str, Any]
     ) -> negotiation_pb2.CheckDealStatusResponse:
         """
         Builds response for PENDING deals with payment instructions.
-
-        Args:
-            deal: LockedDeal record awaiting payment
-
-        Returns:
-            CheckDealStatusResponse with status="PENDING"
         """
+        addr_obs = await self.crypto.execute("get_address", {})
+        network_obs = await self.crypto.execute("get_network_name", {})
+
         instructions = negotiation_pb2.CryptoPaymentInstructions(
-            deal_id=str(deal.id),
-            wallet_address=self.provider.get_address(),
-            amount=deal.final_price,
-            currency=deal.currency,
-            memo=deal.payment_memo,
-            network=self.provider.get_network_name(),
-            expires_at=int(deal.expires_at.timestamp()),
+            deal_id=str(deal["id"]),
+            wallet_address=addr_obs.data if addr_obs.success else "unknown",
+            amount=deal["final_price"],
+            currency=deal["currency"],
+            memo=deal["payment_memo"],
+            network=network_obs.data if network_obs.success else "unknown",
+            expires_at=int(deal["expires_at"].timestamp()),
         )
 
         return negotiation_pb2.CheckDealStatusResponse(

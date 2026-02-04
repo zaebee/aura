@@ -14,7 +14,6 @@ from aura_core import (
 )
 
 from config import get_settings
-from hive.aggregator import InventoryItem, SessionLocal
 from hive.metabolism.logging_config import bind_request_id
 
 from .llm.engine import AuraNegotiator
@@ -22,23 +21,6 @@ from .llm.engine import AuraNegotiator
 logger = structlog.get_logger(__name__)
 
 # --- 1. Rule-Based Strategy (The Hive's Instincts) ---
-
-
-class ItemRepository(Protocol):
-    """Protocol for item repository to enable dependency injection."""
-
-    def get_item(self, item_id: str) -> InventoryItem | None: ...
-
-
-class DatabaseItemRepository:
-    """Default repository implementation using the database."""
-
-    def get_item(self, item_id: str) -> InventoryItem | None:
-        session = SessionLocal()
-        try:
-            return session.query(InventoryItem).filter_by(id=item_id).first()
-        finally:
-            session.close()
 
 
 class RuleBasedStrategy:
@@ -49,20 +31,21 @@ class RuleBasedStrategy:
 
     def __init__(
         self,
-        repository: ItemRepository | None = None,
         trigger_price: float = 1000.0,
     ):
-        self.repository = repository or DatabaseItemRepository()
         self.trigger_price = trigger_price
 
     def evaluate(
-        self, item_id: str, bid: float, reputation: float, request_id: str | None = None
+        self,
+        item_data: dict[str, Any],
+        bid: float,
+        reputation: float,
+        request_id: str | None = None,
     ) -> IntentAction:
         if request_id:
             bind_request_id(request_id)
 
-        item = self.repository.get_item(item_id)
-        if not item:
+        if not item_data:
             return IntentAction(
                 action="reject",
                 price=0.0,
@@ -79,12 +62,13 @@ class RuleBasedStrategy:
                 metadata={"template_id": "high_value_confirm"},
             )
 
+        floor_price = item_data.get("floor_price", 0.0)
         # Rule: Bid below floor price - counter with floor price
-        if bid < item.floor_price:
+        if bid < floor_price:
             return IntentAction(
                 action="counter",
-                price=item.floor_price,
-                message=f"We cannot accept less than ${item.floor_price}.",
+                price=floor_price,
+                message=f"We cannot accept less than ${floor_price}.",
                 metadata={"reason_code": "BELOW_FLOOR"},
             )
 
@@ -182,7 +166,7 @@ class AuraTransformer(Transformer[HiveContext, IntentAction]):
         if self.settings.llm.model == "rule" or self.negotiator is None:
             strategy = RuleBasedStrategy()
             return strategy.evaluate(
-                context.item_id,
+                context.item_data,
                 context.offer.bid_amount,
                 context.offer.reputation,
                 context.request_id,

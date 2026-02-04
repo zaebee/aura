@@ -9,7 +9,14 @@ from typing import Any
 
 import opentelemetry.trace as trace
 
-from .dna import Aggregator, Connector, Generator, Membrane, Skill, Transformer
+from .dna import (
+    Aggregator,
+    Connector,
+    Generator,
+    Membrane,
+    SkillProtocol,
+    Transformer,
+)
 from .types import Observation
 
 tracer = trace.get_tracer(__name__)
@@ -19,12 +26,12 @@ class SkillRegistry:
     """Registry for Proteins (Skills) used by the Connector."""
 
     def __init__(self) -> None:
-        self._skills: dict[str, Skill] = {}
+        self._skills: dict[str, SkillProtocol[Any, Any]] = {}
 
-    def register(self, name: str, skill: Skill) -> None:
+    def register(self, name: str, skill: SkillProtocol[Any, Any]) -> None:
         self._skills[name] = skill
 
-    def get(self, name: str) -> Skill | None:
+    def get(self, name: str) -> SkillProtocol[Any, Any] | None:
         return self._skills.get(name)
 
     def list_skills(self) -> list[str]:

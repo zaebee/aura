@@ -30,7 +30,6 @@ class TestLiteLLMStrategy:
             patch("builtins.open"),
         ):
             strategy = LiteLLMStrategy(model="openai/gpt-4o", temperature=0.7)
-            strategy._get_item = MagicMock(return_value=mock_item)
             return strategy
 
     def test_accept_response_parsing(self, mock_strategy, mock_item):
@@ -45,7 +44,7 @@ class TestLiteLLMStrategy:
 
         with patch.object(mock_strategy.engine, "complete", return_value=decision):
             response = mock_strategy.evaluate(
-                item_id=mock_item.id,
+                item=mock_item,
                 bid=250.0,
                 reputation=0.8,
                 request_id="test-req-1",
@@ -67,7 +66,7 @@ class TestLiteLLMStrategy:
 
         with patch.object(mock_strategy.engine, "complete", return_value=decision):
             response = mock_strategy.evaluate(
-                item_id=mock_item.id,
+                item=mock_item,
                 bid=150.0,
                 reputation=0.8,
                 request_id="test-req-2",
@@ -93,7 +92,7 @@ class TestLiteLLMStrategy:
 
         with patch.object(mock_strategy.engine, "complete", return_value=decision):
             response = mock_strategy.evaluate(
-                item_id=mock_item.id,
+                item=mock_item,
                 bid=1.0,
                 reputation=0.8,
                 request_id="test-req-3",
@@ -114,7 +113,7 @@ class TestLiteLLMStrategy:
 
         with patch.object(mock_strategy.engine, "complete", return_value=decision):
             response = mock_strategy.evaluate(
-                item_id=mock_item.id,
+                item=mock_item,
                 bid=1500.0,
                 reputation=0.8,
                 request_id="test-req-4",
@@ -126,10 +125,8 @@ class TestLiteLLMStrategy:
 
     def test_item_not_found(self, mock_strategy):
         """Test handling of non-existent item."""
-        mock_strategy._get_item = MagicMock(return_value=None)
-
         response = mock_strategy.evaluate(
-            item_id="non-existent",
+            item=None,
             bid=100.0,
             reputation=0.8,
             request_id="test-req-5",
@@ -145,7 +142,7 @@ class TestLiteLLMStrategy:
             mock_strategy.engine, "complete", side_effect=Exception("LLM API Error")
         ):
             response = mock_strategy.evaluate(
-                item_id=mock_item.id,
+                item=mock_item,
                 bid=200.0,
                 reputation=0.8,
                 request_id="test-req-6",
