@@ -34,7 +34,9 @@ class Negotiate(dspy.Signature):
         This is NOT shown to the user."""
     )
     action = dspy.OutputField(
-        desc="""Jules' external action. MUST be a JSON-formatted string:
+        desc="""Jules' external action. MUST be a JSON-formatted string.
+        DO NOT use markdown code blocks (like ```json).
+        Output structure:
         {
             "action": str,              # One of: 'accept', 'counter', 'reject', 'ui_required'
             "price": float,             # Final price or counter offer

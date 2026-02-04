@@ -82,10 +82,11 @@ class AuraNegotiator(dspy.Module):
                 thought_length=len(prediction.thought),
             )
 
-            # 4. Return clean dictionary
+            # 4. Return clean dictionary with raw action for training/metrics
             return {
                 "thought": prediction.thought,
                 "action": action_data,
+                "raw_action": raw_action,
             }
 
         except Exception as e:
