@@ -5,16 +5,10 @@ Tests telemetry initialization, error handling, and integration.
 """
 
 import os
-import sys
 import unittest
 from unittest.mock import MagicMock, patch
 
 import structlog
-
-# Add src paths for imports
-sys.path.insert(0, "api-gateway/src")
-sys.path.insert(0, "core/src")
-
 from telemetry import init_telemetry
 
 
@@ -79,8 +73,6 @@ class TestConfigurationValidation(unittest.TestCase):
 
     def test_valid_config(self):
         """Test valid configuration."""
-        # Import core Settings for this test
-        sys.path.insert(0, "core/src")
         from config import Settings as CoreServiceSettings
 
         settings = CoreServiceSettings(
@@ -94,7 +86,6 @@ class TestConfigurationValidation(unittest.TestCase):
 
     def test_empty_service_name(self):
         """Test validation of empty service name."""
-        sys.path.insert(0, "core/src")
         from config import Settings as CoreServiceSettings
 
         with self.assertRaises(ValueError) as context:
@@ -109,7 +100,6 @@ class TestConfigurationValidation(unittest.TestCase):
 
     def test_invalid_otlp_endpoint(self):
         """Test validation of invalid OTLP endpoint."""
-        sys.path.insert(0, "core/src")
         from config import Settings as CoreServiceSettings
 
         with self.assertRaises(ValueError) as context:
@@ -214,7 +204,6 @@ class TestEnvironmentVariables(unittest.TestCase):
         os.environ["OTEL_EXPORTER_OTLP_ENDPOINT"] = "http://env-jaeger:4317"
 
         # Import core Settings for this test
-        sys.path.insert(0, "core/src")
         from config import Settings as CoreServiceSettings
 
         settings = CoreServiceSettings(
@@ -232,10 +221,6 @@ class TestEnvironmentVariables(unittest.TestCase):
             del os.environ["OTEL_SERVICE_NAME"]
         if "OTEL_EXPORTER_OTLP_ENDPOINT" in os.environ:
             del os.environ["OTEL_EXPORTER_OTLP_ENDPOINT"]
-
-        # Clean up sys.path to avoid conflicts
-        sys.path = [p for p in sys.path if "core/src" not in p]
-        sys.path.insert(0, "api-gateway/src")
 
         # Import API Gateway Settings specifically for this test
         from config import Settings as ApiGatewaySettings

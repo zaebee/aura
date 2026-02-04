@@ -50,6 +50,11 @@ simulate:
 	# Run agent negotiation simulation
 	uv run python tools/simulators/agent_sim.py
 
+
+telemetry:
+	# Trigger a manual NegotiationAccepted event
+	PYTHONPATH=core:core/src uv run python core/scripts/trigger_pulse.py
+
 # --- 2. BUILD ---
 build: generate build-tg
 	# Build Docker images for all services
