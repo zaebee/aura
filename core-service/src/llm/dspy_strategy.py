@@ -188,7 +188,7 @@ class DSPyStrategy:
 
             response_data = result["action"]
 
-            # Validate decision through the Membrane
+            # Validate decision through the Membrane (Deterministic Safety Layer)
             try:
                 self.guard.validate_decision(response_data, context)
             except SafetyViolation as e:
@@ -198,6 +198,7 @@ class DSPyStrategy:
                     error=str(e),
                     llm_price=response_data.get("price"),
                 )
+                # Fallback strategy: Force a counter-offer at floor price
                 return self.create_safe_counter_offer(item, bid)
 
             action = response_data["action"]
