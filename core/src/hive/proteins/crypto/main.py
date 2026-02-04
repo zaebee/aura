@@ -35,7 +35,13 @@ class CryptoSkill(SkillProtocol[dict[str, Any], Observation]):
         return "crypto"
 
     def get_capabilities(self) -> list[str]:
-        return ["verify_payment", "encrypt_secret", "decrypt_secret", "get_address"]
+        return [
+            "verify_payment",
+            "encrypt_secret",
+            "decrypt_secret",
+            "get_address",
+            "convert_price",
+        ]
 
     async def initialize(self) -> bool:
         return True
@@ -52,17 +58,22 @@ class CryptoSkill(SkillProtocol[dict[str, Any], Observation]):
                 return Observation(success=False, error="payment_not_found")
 
             elif intent == "encrypt_secret":
-                encrypted = self.encryption.encrypt(params["text"])
-                return Observation(success=True, data={"encrypted": encrypted})
+                encrypted = self.encryption.encrypt(params["secret"])
+                return Observation(success=True, data=encrypted)
 
             elif intent == "decrypt_secret":
-                decrypted = self.encryption.decrypt(params["encrypted"])
-                return Observation(success=True, data={"decrypted": decrypted})
+                decrypted = self.encryption.decrypt(params["encrypted_secret"])
+                return Observation(success=True, data=decrypted)
+
+            elif intent == "convert_price":
+                amount = self.converter.convert_usd_to_crypto(
+                    params["usd_amount"],
+                    params.get("currency", self.settings.crypto.currency),
+                )
+                return Observation(success=True, data=amount)
 
             elif intent == "get_address":
-                return Observation(
-                    success=True, data={"address": str(self.provider.keypair.pubkey())}
-                )
+                return Observation(success=True, data=str(self.provider.keypair.pubkey()))
 
             return Observation(success=False, error=f"Unknown intent: {intent}")
         except Exception as e:

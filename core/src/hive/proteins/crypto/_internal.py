@@ -17,7 +17,7 @@ class SecretEncryption:
     def __init__(self, encryption_key: str):
         try:
             self.fernet = Fernet(encryption_key.encode())
-        except Exception as e:
+        except (ValueError, TypeError) as e:
             raise ValueError(f"Invalid encryption key: {e}") from e
 
     def encrypt(self, plaintext: str) -> bytes:
