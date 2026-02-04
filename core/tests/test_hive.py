@@ -11,6 +11,7 @@ from aura_core import (
 )
 from hive.aggregator import HiveAggregator
 from hive.membrane import HiveMembrane
+from hive.proteins.guard import GuardSkill
 
 
 @pytest.mark.asyncio
@@ -59,7 +60,9 @@ async def test_aggregator_perceive(mocker):
 
 @pytest.mark.asyncio
 async def test_membrane_outbound_override(mocker):
-    membrane = HiveMembrane()
+    registry = SkillRegistry()
+    registry.register("guard", GuardSkill())
+    membrane = HiveMembrane(registry=registry)
     # Mock settings via mocker
     mocker.patch.object(membrane.settings.logic, "min_margin", 0.1)
 
@@ -114,7 +117,9 @@ async def test_membrane_inbound_invalid_bid():
 
 @pytest.mark.asyncio
 async def test_membrane_invalid_min_margin(mocker):
-    membrane = HiveMembrane()
+    registry = SkillRegistry()
+    registry.register("guard", GuardSkill())
+    membrane = HiveMembrane(registry=registry)
     # Mock settings with invalid margin
     mocker.patch.object(membrane.settings.logic, "min_margin", 1.5)
 

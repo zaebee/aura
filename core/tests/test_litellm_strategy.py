@@ -3,7 +3,7 @@
 from unittest.mock import MagicMock, patch
 
 import pytest
-from hive.transformer.llm.strategy import AI_Decision, LiteLLMStrategy
+from src.hive.proteins.reasoning._strategy import AI_Decision, LiteLLMStrategy
 
 
 class TestLiteLLMStrategy:
@@ -26,7 +26,7 @@ class TestLiteLLMStrategy:
         """Create a LiteLLMStrategy with mocked dependencies."""
         # Use a mock Template to avoid loading the real file
         with (
-            patch("hive.transformer.llm.strategy.Template"),
+            patch("src.hive.proteins.reasoning._strategy.Template"),
             patch("builtins.open"),
         ):
             strategy = LiteLLMStrategy(model="openai/gpt-4o", temperature=0.7)
