@@ -7,6 +7,7 @@ from config import get_settings
 
 logger = structlog.get_logger(__name__)
 
+
 class HiveMembrane(Membrane[Any, IntentAction, HiveContext]):
     """The Immune System: Deterministic Guardrails using Guard Protein."""
 
@@ -55,10 +56,14 @@ class HiveMembrane(Membrane[Any, IntentAction, HiveContext]):
         if isinstance(decision, FailureIntent) or decision.action == "error":
             safe_price = floor_price * 1.05
             if self.registry:
-                obs_safe = await self.registry.execute("guard", "get_safe_price", {
-                    "context": {"floor_price": floor_price},
-                    "reason": "FAILURE_RECOVERY"
-                })
+                obs_safe = await self.registry.execute(
+                    "guard",
+                    "get_safe_price",
+                    {
+                        "context": {"floor_price": floor_price},
+                        "reason": "FAILURE_RECOVERY",
+                    },
+                )
                 if obs_safe.success:
                     safe_price = obs_safe.data["safe_price"]
 
@@ -76,21 +81,21 @@ class HiveMembrane(Membrane[Any, IntentAction, HiveContext]):
 
         # 3. Call Guard Protein for validation
         if not self.registry:
-             return decision
+            return decision
 
-        internal_cost = context.item_data.get("meta", {}).get("internal_cost", floor_price)
-        guard_context = {
-            "floor_price": floor_price,
-            "internal_cost": internal_cost
-        }
+        internal_cost = context.item_data.get("meta", {}).get(
+            "internal_cost", floor_price
+        )
+        guard_context = {"floor_price": floor_price, "internal_cost": internal_cost}
 
-        obs = await self.registry.execute("guard", "validate_decision", {
-            "decision": {
-                "action": decision.action,
-                "price": decision.price
+        obs = await self.registry.execute(
+            "guard",
+            "validate_decision",
+            {
+                "decision": {"action": decision.action, "price": decision.price},
+                "context": guard_context,
             },
-            "context": guard_context
-        })
+        )
 
         if not obs.success:
             # Determine reason for logging/override using structured error code

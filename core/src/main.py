@@ -18,7 +18,7 @@ from hive.metabolism.logging_config import (
     configure_logging,
     get_logger,
 )
-from hive.metabolism.telemetry import init_telemetry
+from hive.proteins.monitor._internal import init_telemetry
 from hive.proto.aura.negotiation.v1 import negotiation_pb2, negotiation_pb2_grpc
 from hive.transformer import AuraTransformer
 from opentelemetry import trace
@@ -114,7 +114,9 @@ class NegotiationService(negotiation_pb2_grpc.NegotiationServiceServicer):
         finally:
             clear_request_context()
 
-    async def Search(self, request: Any, context: Any) -> negotiation_pb2.SearchResponse:
+    async def Search(
+        self, request: Any, context: Any
+    ) -> negotiation_pb2.SearchResponse:
         """Semantic search implementation."""
         request_id = extract_request_id(context)
         if request_id:
@@ -124,16 +126,28 @@ class NegotiationService(negotiation_pb2_grpc.NegotiationServiceServicer):
             logger.info("search_started", query=request.query, limit=request.limit)
 
             # Generate query vector via Reasoning Protein
-            registry = self.metabolism.aggregator.registry
+            aggregator = getattr(self.metabolism, "aggregator", None)
+            registry = getattr(aggregator, "registry", None) if aggregator else None
+            if not registry:
+                context.set_code(grpc.StatusCode.INTERNAL)
+                context.set_details("Skill Registry not available")
+                return negotiation_pb2.SearchResponse()
+
             reasoning = registry.get("reasoning")
             if not reasoning:
                 context.set_code(grpc.StatusCode.INTERNAL)
                 context.set_details("Reasoning protein not available")
                 return negotiation_pb2.SearchResponse()
 
-            embed_obs = await reasoning.execute("generate_embedding", {"text": request.query})
+            embed_obs = await reasoning.execute(
+                "generate_embedding", {"text": request.query}
+            )
             if not embed_obs.success:
-                logger.error("embedding_generation_failed", query=request.query, error=embed_obs.error)
+                logger.error(
+                    "embedding_generation_failed",
+                    query=request.query,
+                    error=embed_obs.error,
+                )
                 context.set_code(grpc.StatusCode.INTERNAL)
                 context.set_details("Failed to generate embeddings")
                 return negotiation_pb2.SearchResponse()
@@ -239,9 +253,7 @@ class NegotiationService(negotiation_pb2_grpc.NegotiationServiceServicer):
             logger.info("check_deal_status_started", deal_id=request.deal_id)
 
             # Check payment status via MarketService
-            response = await self.market_service.check_status(
-                deal_id=request.deal_id
-            )
+            response = await self.market_service.check_status(deal_id=request.deal_id)
 
             logger.info(
                 "check_deal_status_completed",
@@ -304,15 +316,15 @@ async def serve() -> None:
 
     from hive.proteins.crypto import CryptoSkill
     from hive.proteins.guard import GuardSkill
+    from hive.proteins.monitor import MonitorSkill
     from hive.proteins.pulse import PulseSkill
     from hive.proteins.reasoning import ReasoningSkill
     from hive.proteins.storage import StorageSkill
-    from hive.proteins.telemetry import TelemetrySkill
 
     storage_protein = StorageSkill()
     crypto_protein = CryptoSkill() if settings.crypto.enabled else None
     reasoning_protein = ReasoningSkill()
-    telemetry_protein = TelemetrySkill()
+    monitor_protein = MonitorSkill()
     pulse_protein = PulseSkill()
     guard_protein = GuardSkill()
 
@@ -320,7 +332,7 @@ async def serve() -> None:
     if crypto_protein:
         registry.register("crypto", crypto_protein)
     registry.register("reasoning", reasoning_protein)
-    registry.register("telemetry", telemetry_protein)
+    registry.register("monitor", monitor_protein)
     registry.register("pulse", pulse_protein)
     registry.register("guard", guard_protein)
 
@@ -334,7 +346,7 @@ async def serve() -> None:
 
     await pulse_protein.initialize()
     await reasoning_protein.initialize()
-    await telemetry_protein.initialize()
+    await monitor_protein.initialize()
     await guard_protein.initialize()
     if crypto_protein:
         await crypto_protein.initialize()
@@ -346,6 +358,7 @@ async def serve() -> None:
     market_service = None
     if crypto_protein:
         from hive.services.market import MarketService
+
         market_service = MarketService(storage=storage_protein, crypto=crypto_protein)
         logger.info("market_service_initialized")
 
@@ -379,7 +392,8 @@ async def serve() -> None:
                     item = obs.data
                     mock_signal = negotiation_pb2.NegotiateRequest(
                         item_id=item["id"],
-                        bid_amount=item["base_price"] * settings.heartbeat.bid_multiplier,
+                        bid_amount=item["base_price"]
+                        * settings.heartbeat.bid_multiplier,
                         currency_code="USD",
                         agent=negotiation_pb2.AgentIdentity(
                             did=settings.heartbeat.agent_did,

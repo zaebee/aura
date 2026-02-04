@@ -45,8 +45,8 @@ class HiveAggregator(Aggregator[Any, HiveContext]):
     async def get_vitals(self) -> SystemVitals:
         """Standardized proprioception (self-healing metrics)."""
         try:
-            # Call Telemetry Protein via SkillRegistry
-            obs = await self.registry.execute("telemetry", "fetch_metrics", {})
+            # Call Monitor Protein via SkillRegistry
+            obs = await self.registry.execute("monitor", "fetch_metrics", {})
             if obs.success:
                 return SystemVitals(**obs.data)
             return SystemVitals(status="unstable", timestamp="", error=obs.error)
@@ -73,7 +73,9 @@ class HiveAggregator(Aggregator[Any, HiveContext]):
         item_data = {}
         try:
             # Call Storage Protein via SkillRegistry
-            obs = await self.registry.execute("storage", "read_item", {"item_id": item_id})
+            obs = await self.registry.execute(
+                "storage", "read_item", {"item_id": item_id}
+            )
             if obs.success and obs.data:
                 item = obs.data
                 item_data = {

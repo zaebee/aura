@@ -1,0 +1,10 @@
+name: pulse
+role: PulseOrgan
+description: >
+  The Hive's internal communication system.
+  Emits events to NATS topics to synchronize other services and adapters.
+  Ensures economic heartbeat signals are broadcasted throughout the hive.
+capabilities:
+  - emit_event: Publish a structured payload to a specific NATS topic.
+  - emit_heartbeat: Broadcast the system's operational heartbeat.
+manifest_version: 1.0

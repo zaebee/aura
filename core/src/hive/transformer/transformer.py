@@ -15,6 +15,7 @@ from config import get_settings
 
 logger = structlog.get_logger(__name__)
 
+
 class RuleBasedStrategy:
     """
     Rule-based pricing strategy that doesn't require an LLM.
@@ -40,7 +41,7 @@ class RuleBasedStrategy:
                 price=0.0,
                 message="Item not found",
                 metadata={"reason_code": "ITEM_NOT_FOUND"},
-                thought="<think>Item not found. Rejecting.</think>"
+                thought="<think>Item not found. Rejecting.</think>",
             )
 
         # Rule: High-value bids require UI confirmation
@@ -50,7 +51,7 @@ class RuleBasedStrategy:
                 price=bid,
                 message=f"Bid of ${bid} exceeds security threshold",
                 metadata={"template_id": "high_value_confirm"},
-                thought="<think>Bid exceeds security threshold. UI confirmation required.</think>"
+                thought="<think>Bid exceeds security threshold. UI confirmation required.</think>",
             )
 
         floor_price = item_data.get("floor_price", 0.0)
@@ -61,7 +62,7 @@ class RuleBasedStrategy:
                 price=floor_price,
                 message=f"We cannot accept less than ${floor_price}.",
                 metadata={"reason_code": "BELOW_FLOOR"},
-                thought=f"<think>Bid {bid} below floor {floor_price}. Countering.</think>"
+                thought=f"<think>Bid {bid} below floor {floor_price}. Countering.</think>",
             )
 
         # Rule: Bid at or above floor price - accept
@@ -70,8 +71,9 @@ class RuleBasedStrategy:
             price=bid,
             message="Offer accepted.",
             metadata={"reservation_code": f"RULE-{int(time.time())}"},
-            thought="<think>Bid at or above floor price. Accepting.</think>"
+            thought="<think>Bid at or above floor price. Accepting.</think>",
         )
+
 
 class AuraTransformer(Transformer[HiveContext, IntentAction]):
     """T - Transformer: Pure reasoning engine calling Reasoning Protein."""
@@ -109,20 +111,24 @@ class AuraTransformer(Transformer[HiveContext, IntentAction]):
                 context.item_data,
                 context.offer.bid_amount,
                 context.offer.reputation,
-                context.request_id
+                context.request_id,
             )
 
         try:
             # Call Reasoning Protein
-            obs = await self.registry.execute("reasoning", "negotiate", {
-                "bid": context.offer.bid_amount,
-                "context": self._build_economic_context(context),
-                "history": []
-            })
+            obs = await self.registry.execute(
+                "reasoning",
+                "negotiate",
+                {
+                    "bid": context.offer.bid_amount,
+                    "context": self._build_economic_context(context),
+                    "history": [],
+                },
+            )
 
             if not obs.success:
                 logger.error("reasoning_protein_failed", error=obs.error)
-                return FailureIntent(error=obs.error)
+                return FailureIntent(error=obs.error or "unknown_error")
 
             result = obs.data
 
@@ -135,7 +141,7 @@ class AuraTransformer(Transformer[HiveContext, IntentAction]):
                 price=result["price"],
                 message=result["message"],
                 thought=wrapped_thought,
-                metadata=result.get("metadata", {})
+                metadata=result.get("metadata", {}),
             )
 
         except Exception as e:

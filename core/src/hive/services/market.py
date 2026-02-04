@@ -189,7 +189,9 @@ class MarketService:
         """
         Builds response for PAID deals with decrypted secret via Crypto Protein.
         """
-        decrypt_obs = await self.crypto.execute("decrypt_secret", {"encrypted_secret": deal["secret_content"]})
+        decrypt_obs = await self.crypto.execute(
+            "decrypt_secret", {"encrypted_secret": deal["secret_content"]}
+        )
         if not decrypt_obs.success:
             raise ValueError(f"Decryption failed: {decrypt_obs.error}")
         decrypted_secret = decrypt_obs.data

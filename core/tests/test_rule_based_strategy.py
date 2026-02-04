@@ -16,7 +16,10 @@ class TestRuleBasedStrategy:
 
         # Bid below floor price (floor_price=150)
         response = strategy.evaluate(
-            item_data={"floor_price": mock_item.floor_price, "base_price": mock_item.base_price},
+            item_data={
+                "floor_price": mock_item.floor_price,
+                "base_price": mock_item.base_price,
+            },
             bid=100.0,
             reputation=0.8,
             request_id="test-request-1",
@@ -28,9 +31,7 @@ class TestRuleBasedStrategy:
         assert response.metadata["reason_code"] == "BELOW_FLOOR"
         assert "150" in response.message
 
-    def test_bid_above_trigger_price_should_ui_request(
-        self, mock_item
-    ):
+    def test_bid_above_trigger_price_should_ui_request(self, mock_item):
         """Test case: Bid > Trigger Price (Should UI Request).
 
         When a bid exceeds the trigger price (security threshold),
@@ -40,7 +41,10 @@ class TestRuleBasedStrategy:
 
         # Bid above trigger price
         response = strategy.evaluate(
-            item_data={"floor_price": mock_item.floor_price, "base_price": mock_item.base_price},
+            item_data={
+                "floor_price": mock_item.floor_price,
+                "base_price": mock_item.base_price,
+            },
             bid=1500.0,
             reputation=0.9,
             request_id="test-request-2",
@@ -56,7 +60,10 @@ class TestRuleBasedStrategy:
         strategy = RuleBasedStrategy()
 
         response = strategy.evaluate(
-            item_data={"floor_price": mock_item.floor_price, "base_price": mock_item.base_price},
+            item_data={
+                "floor_price": mock_item.floor_price,
+                "base_price": mock_item.base_price,
+            },
             bid=150.0,  # Exactly at floor price
             reputation=0.8,
             request_id="test-request-3",
@@ -71,7 +78,10 @@ class TestRuleBasedStrategy:
         strategy = RuleBasedStrategy()
 
         response = strategy.evaluate(
-            item_data={"floor_price": mock_item.floor_price, "base_price": mock_item.base_price},
+            item_data={
+                "floor_price": mock_item.floor_price,
+                "base_price": mock_item.base_price,
+            },
             bid=175.0,  # Between floor (150) and base (200)
             reputation=0.8,
             request_id="test-request-4",
@@ -85,7 +95,10 @@ class TestRuleBasedStrategy:
         strategy = RuleBasedStrategy()
 
         response = strategy.evaluate(
-            item_data={"floor_price": mock_item.floor_price, "base_price": mock_item.base_price},
+            item_data={
+                "floor_price": mock_item.floor_price,
+                "base_price": mock_item.base_price,
+            },
             bid=250.0,  # Above base price (200)
             reputation=0.8,
             request_id="test-request-5",
@@ -114,7 +127,10 @@ class TestRuleBasedStrategy:
         strategy = RuleBasedStrategy(trigger_price=500.0)
 
         response = strategy.evaluate(
-            item_data={"floor_price": mock_item.floor_price, "base_price": mock_item.base_price},
+            item_data={
+                "floor_price": mock_item.floor_price,
+                "base_price": mock_item.base_price,
+            },
             bid=600.0,  # Above custom trigger (500)
             reputation=0.8,
             request_id="test-request-7",
@@ -127,7 +143,10 @@ class TestRuleBasedStrategy:
         strategy = RuleBasedStrategy(trigger_price=1000.0)
 
         response = strategy.evaluate(
-            item_data={"floor_price": mock_item.floor_price, "base_price": mock_item.base_price},
+            item_data={
+                "floor_price": mock_item.floor_price,
+                "base_price": mock_item.base_price,
+            },
             bid=999.0,  # Just below trigger
             reputation=0.8,
             request_id="test-request-8",
@@ -141,7 +160,10 @@ class TestRuleBasedStrategy:
         strategy = RuleBasedStrategy(trigger_price=1000.0)
 
         response = strategy.evaluate(
-            item_data={"floor_price": mock_item.floor_price, "base_price": mock_item.base_price},
+            item_data={
+                "floor_price": mock_item.floor_price,
+                "base_price": mock_item.base_price,
+            },
             bid=1000.0,  # Exactly at trigger
             reputation=0.8,
             request_id="test-request-9",

@@ -5,7 +5,7 @@ This module contains the executable machinery that powers the Hive's metabolism.
 The Protocols (the "Law") live in dna.py; this module provides the "Engine".
 """
 
-from typing import Any
+from typing import Any, cast
 
 import opentelemetry.trace as trace
 
@@ -44,8 +44,9 @@ class SkillRegistry:
             span.set_attribute("intent", intent)
             try:
                 result = await skill.execute(intent, params)
-                span.set_attribute("success", result.success)
-                return result
+                obs = cast(Observation, result)
+                span.set_attribute("success", obs.success)
+                return obs
             except Exception as e:
                 span.record_exception(e)
                 return Observation(success=False, error=str(e))
