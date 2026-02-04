@@ -152,7 +152,7 @@
   "the_membrane_law": {
     "purpose": "Deterministic guardrails separating Celestial thought from Terrestrial bytes",
     "rules": [
-      "Floor price is NEVER exposed to external agents",
+"Floor price is NEVER exposed to external agents, and all accept/counter actions are validated against it",
       "Minimum margin (10%) is enforced on ALL accept/counter actions",
       "Prompt injection patterns are sanitized on inbound signals",
       "Internal pricing details are redacted from outbound messages"
