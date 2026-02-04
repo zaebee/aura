@@ -42,7 +42,20 @@ class HiveGenerator(Generator[Observation, Event]):
                 )
             )
 
-        # 2. System Heartbeat
+        # 2. Economic Heartbeat (if applicable)
+        if observation.metadata.get("is_heartbeat"):
+            events.append(
+                Event(
+                    topic="aura.hive.heartbeat.economic",
+                    payload={
+                        "success": observation.success,
+                        "timestamp": now,
+                    },
+                    timestamp=now,
+                )
+            )
+
+        # 3. System Heartbeat
         events.append(
             Event(
                 topic="aura.hive.heartbeat",
