@@ -1,9 +1,10 @@
 import pytest
+from config.policy import SafetySettings
 from src.hive.proteins.guard._internal import OutputGuard, SafetyViolation
 
 
 def test_margin_violation():
-    guard = OutputGuard()
+    guard = OutputGuard(safety_settings=SafetySettings(min_profit_margin=0.1))
     context = {"floor_price": 800.0, "internal_cost": 750.0}
     # New Margin = (offered - 750) / offered
     # 0.10 margin requires offered >= 750 / 0.9 = 833.33
@@ -15,7 +16,7 @@ def test_margin_violation():
 
 
 def test_floor_price_violation_on_accept():
-    guard = OutputGuard()
+    guard = OutputGuard(safety_settings=SafetySettings(min_profit_margin=0.1))
     context = {"floor_price": 850.0, "internal_cost": 500.0}
     # Margin is (840 - 500) / 840 = 0.40 (Good)
     # But price < floor_price
@@ -26,7 +27,7 @@ def test_floor_price_violation_on_accept():
 
 
 def test_floor_price_violation_on_counter():
-    guard = OutputGuard()
+    guard = OutputGuard(safety_settings=SafetySettings(min_profit_margin=0.1))
     context = {"floor_price": 850.0, "internal_cost": 500.0}
     # Counter offer should also respect floor price
     decision = {"action": "counter", "price": 840.0}
@@ -35,7 +36,7 @@ def test_floor_price_violation_on_counter():
 
 
 def test_safe_decision():
-    guard = OutputGuard()
+    guard = OutputGuard(safety_settings=SafetySettings(min_profit_margin=0.1))
     context = {"floor_price": 800.0, "internal_cost": 700.0}
     # min_margin is 0.10.
     # (850 - 700) / 850 = 0.176 > 0.10 (Good)
@@ -46,7 +47,7 @@ def test_safe_decision():
 
 
 def test_invalid_price():
-    guard = OutputGuard()
+    guard = OutputGuard(safety_settings=SafetySettings(min_profit_margin=0.1))
     context = {"floor_price": 800.0, "internal_cost": 700.0}
 
     decision = {"action": "accept", "price": 0.0}

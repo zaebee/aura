@@ -5,7 +5,7 @@ from typing import Any
 import dspy
 from aura_core import Observation, SkillProtocol
 
-from config import get_settings
+from config.llm import LLMSettings
 
 from ._internal import generate_embedding, load_brain
 from .schema import EmbeddingParams, NegotiationParams, NegotiationResult
@@ -20,16 +20,8 @@ class ReasoningSkill(SkillProtocol[dict[str, Any], Observation]):
     """
 
     def __init__(self) -> None:
-        self.settings = get_settings()
+        self.settings: LLMSettings | None = None
         self.negotiator = None
-        if self.settings.llm.model != "rule":
-            try:
-                dspy.configure(lm=dspy.LM(self.settings.llm.model))
-                self.negotiator = load_brain(
-                    getattr(self.settings.llm, "compiled_program_path", None)
-                )
-            except Exception as e:
-                logger.error(f"Failed to configure DSPy: {e}")
 
     def get_name(self) -> str:
         return "reasoning"
@@ -37,7 +29,17 @@ class ReasoningSkill(SkillProtocol[dict[str, Any], Observation]):
     def get_capabilities(self) -> list[str]:
         return ["negotiate", "generate_embedding"]
 
-    async def initialize(self) -> bool:
+    async def initialize(self, settings: LLMSettings | None = None) -> bool:
+        self.settings = settings
+        if self.settings and self.settings.model != "rule":
+            try:
+                dspy.configure(lm=dspy.LM(self.settings.model))
+                self.negotiator = load_brain(
+                    getattr(self.settings, "compiled_program_path", None)
+                )
+            except Exception as e:
+                logger.error(f"Failed to configure DSPy: {e}")
+                return False
         return True
 
     async def execute(self, intent: str, params: dict[str, Any]) -> Observation:

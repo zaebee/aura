@@ -83,7 +83,15 @@ async def fetch_vitals(metrics_cache: MetricsCache, settings: Any) -> SystemVita
 
     try:
         async with httpx.AsyncClient(timeout=5.0) as client:
-            base_url = str(settings.server.prometheus_url).rstrip("/")
+            # Handle both global settings and sub-config
+            # DNA Rule: No global settings imports in internal logic.
+            if hasattr(settings, "prometheus_url"):
+                base_url = str(settings.prometheus_url).rstrip("/")
+            elif hasattr(settings, "server"):
+                base_url = str(settings.server.prometheus_url).rstrip("/")
+            else:
+                raise ValueError("Settings object missing prometheus_url")
+
             resps = await asyncio.gather(
                 client.get(f"{base_url}/api/v1/query", params={"query": cpu_q}),
                 client.get(f"{base_url}/api/v1/query", params={"query": mem_q}),

@@ -71,7 +71,11 @@ class AuraNegotiator(dspy.Module):
             action_data = clean_and_parse_json(pred.action)
             return cast(
                 dict[str, Any],
-                {"thought": pred.thought, "action": action_data, "raw_action": pred.action},
+                {
+                    "thought": pred.thought,
+                    "action": action_data,
+                    "raw_action": pred.action,
+                },
             )
         except Exception as e:
             raise ValueError(f"Negotiator parsing failed: {e}") from e
@@ -113,7 +117,9 @@ def load_brain(compiled_path: str | None = None) -> Any:
 
 
 class LLMEngine:
-    def __init__(self, model: str, temperature: float = 0.7, api_key: str | None = None):
+    def __init__(
+        self, model: str, temperature: float = 0.7, api_key: str | None = None
+    ):
         self.model = model
         self.temperature = temperature
         self.api_key = api_key
@@ -155,7 +161,10 @@ class LiteLLMStrategy:
         self.engine = LLMEngine(model=model, temperature=temperature, api_key=api_key)
         self.trigger_price = trigger_price
         template_path = (
-            Path(__file__).parent.parent.parent / "transformer" / "prompts" / "system.md"
+            Path(__file__).parent.parent.parent
+            / "transformer"
+            / "prompts"
+            / "system.md"
         )
         with open(template_path) as f:
             self.prompt_template = Template(f.read())
@@ -234,7 +243,9 @@ class DSPyStrategy:
 
     def _create_standard_context(self, item: Any) -> dict[str, Any]:
         meta = (
-            item.get("meta", {}) if isinstance(item, dict) else getattr(item, "meta", {})
+            item.get("meta", {})
+            if isinstance(item, dict)
+            else getattr(item, "meta", {})
         )
         item_id = (
             item.get("id", "unknown")

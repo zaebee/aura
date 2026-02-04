@@ -3,7 +3,7 @@ from typing import Any
 
 from aura_core import Observation, SkillProtocol
 
-from config import settings
+from config.policy import SafetySettings
 
 from ._internal import OutputGuard, SafetyViolation
 from .schema import SafePriceParams, ValidationParams
@@ -20,6 +20,7 @@ class GuardSkill(SkillProtocol[dict[str, Any], Observation]):
     """
 
     def __init__(self) -> None:
+        self.settings: SafetySettings | None = None
         self.guard = OutputGuard()
 
     def get_name(self) -> str:
@@ -28,7 +29,9 @@ class GuardSkill(SkillProtocol[dict[str, Any], Observation]):
     def get_capabilities(self) -> list[str]:
         return ["validate_decision", "get_safe_price"]
 
-    async def initialize(self) -> bool:
+    async def initialize(self, settings: SafetySettings | None = None) -> bool:
+        self.settings = settings
+        self.guard = OutputGuard(safety_settings=self.settings)
         return True
 
     async def execute(self, intent: str, params: dict[str, Any]) -> Observation:
@@ -64,7 +67,10 @@ class GuardSkill(SkillProtocol[dict[str, Any], Observation]):
     def _calculate_safe_price(self, context: dict, reason: str) -> float:
         floor = float(context.get("floor_price", 0.0))
         if "margin" in reason.lower():
-            min_m = float(getattr(settings.logic, "min_margin", DEFAULT_MIN_MARGIN))
+            min_m = DEFAULT_MIN_MARGIN
+            if self.settings:
+                min_m = float(self.settings.min_profit_margin)
+
             if min_m >= 1.0:
                 min_m = DEFAULT_MIN_MARGIN
             return float(round(floor / (1 - min_m), 2))

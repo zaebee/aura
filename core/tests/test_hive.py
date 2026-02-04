@@ -60,11 +60,13 @@ async def test_aggregator_perceive(mocker):
 
 @pytest.mark.asyncio
 async def test_membrane_outbound_override(mocker):
+    from config.policy import SafetySettings
+
     registry = SkillRegistry()
-    registry.register("guard", GuardSkill())
+    guard = GuardSkill()
+    await guard.initialize(SafetySettings(min_profit_margin=0.1))
+    registry.register("guard", guard)
     membrane = HiveMembrane(registry=registry)
-    # Mock settings via mocker
-    mocker.patch.object(membrane.settings.logic, "min_margin", 0.1)
 
     context = HiveContext(
         item_id="item1",
@@ -117,11 +119,13 @@ async def test_membrane_inbound_invalid_bid():
 
 @pytest.mark.asyncio
 async def test_membrane_invalid_min_margin(mocker):
+    from config.policy import SafetySettings
+
     registry = SkillRegistry()
-    registry.register("guard", GuardSkill())
+    guard = GuardSkill()
+    await guard.initialize(SafetySettings(min_profit_margin=1.5))
+    registry.register("guard", guard)
     membrane = HiveMembrane(registry=registry)
-    # Mock settings with invalid margin
-    mocker.patch.object(membrane.settings.logic, "min_margin", 1.5)
 
     context = HiveContext(
         item_id="item1",
@@ -130,7 +134,8 @@ async def test_membrane_invalid_min_margin(mocker):
     )
 
     decision = IntentAction(action="accept", price=200.0, message="OK")
-    # Should fallback to DEFAULT_MIN_MARGIN (0.1) and log a warning
+    # Strict behavior: 1.5 margin is impossible to meet, so it should trigger a violation
+    # even if the price is otherwise high.
     safe_decision = await membrane.inspect_outbound(decision, context)
-    # required = 100 / (1 - 0.1) = 111.11. 200 > 111.11 so it's fine.
-    assert safe_decision.price == 200.0
+    assert safe_decision.action == "counter"
+    assert safe_decision.metadata["override_reason"] == "MIN_MARGIN_VIOLATION"

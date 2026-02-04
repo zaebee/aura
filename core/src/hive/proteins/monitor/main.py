@@ -3,7 +3,7 @@ from typing import Any
 
 from aura_core import Observation, SkillProtocol
 
-from config import get_settings
+from config.server import ServerSettings
 
 from ._internal import (
     MetricsCache,
@@ -23,7 +23,7 @@ class MonitorSkill(SkillProtocol[dict[str, Any], Observation]):
     """
 
     def __init__(self) -> None:
-        self.settings = get_settings()
+        self.settings: ServerSettings | None = None
         self._metrics_cache = MetricsCache(ttl_seconds=30)
 
     def get_name(self) -> str:
@@ -32,7 +32,8 @@ class MonitorSkill(SkillProtocol[dict[str, Any], Observation]):
     def get_capabilities(self) -> list[str]:
         return ["fetch_metrics", "health_check", "increment_counter"]
 
-    async def initialize(self) -> bool:
+    async def initialize(self, settings: ServerSettings | None = None) -> bool:
+        self.settings = settings
         return True
 
     async def execute(self, intent: str, params: dict[str, Any]) -> Observation:
