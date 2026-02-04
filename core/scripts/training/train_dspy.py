@@ -54,8 +54,8 @@ def load_training_data() -> list[dict]:
                     "input_bid": turn["input_bid"],
                     "context": context,
                     "history": [],  # Would be populated with previous turns in multi-turn scenarios
-                    "reasoning": turn["reasoning"],
-                    "response": turn["ideal_response"],
+                    "thought": turn["thought"],
+                    "action": turn["action"],
                 }
             )
 
@@ -70,9 +70,10 @@ def economic_metric(gold, pred, trace=None):
     - Action correctness
     - Reasoning quality
     - Value-add utilization
+    - Constraint: No markdown tags in response
     """
     # 1. Expected answer
-    gold_resp = gold.response
+    gold_resp = gold.action
     if isinstance(gold_resp, str):
         try:
             gold_resp = json.loads(gold_resp)
@@ -87,11 +88,17 @@ def economic_metric(gold, pred, trace=None):
         except json.JSONDecodeError:
             gold_ctx = {}
 
-    # 3. Predicted answer (AuraNegotiator now returns a dict)
+    # 3. Predicted answer (AuraNegotiator returns a dict)
     if isinstance(pred, dict):
-        pred_resp = pred.get("response", {})
+        pred_resp = pred.get("action", {})
+        raw_action = pred.get("raw_action", "")
     else:
-        pred_resp = getattr(pred, "response", {})
+        pred_resp = getattr(pred, "action", {})
+        raw_action = getattr(pred, "raw_action", "")
+
+    # Constraint: No Markdown tags in raw output
+    if isinstance(raw_action, str) and "```" in raw_action:
+        return 0
 
     if isinstance(pred_resp, str):
         try:
@@ -137,15 +144,15 @@ def train_negotiator():
     logger.info("training_data_loaded", count=len(training_examples))
 
     # Create DSPy examples
-    # Note: inputs and response are passed as dicts/lists to ensure clean saved JSON
+    # Note: inputs and action are passed as dicts/lists to ensure clean saved JSON
     # and consistent comparison in metrics. AuraNegotiator handles string conversion.
     dspy_examples = [
         dspy.Example(
             input_bid=str(item["input_bid"]),
             context=item["context"],
             history=item["history"],
-            reasoning=item["reasoning"],
-            response=item["response"],
+            thought=item["thought"],
+            action=item["action"],
         ).with_inputs("input_bid", "context", "history")
         for item in training_examples
     ]
@@ -199,8 +206,8 @@ def train_negotiator():
         logger.info(
             "test_prediction",
             input_bid=test_example.input_bid,
-            response=prediction["response"],
-            reasoning=prediction["reasoning"][:100],
+            action=prediction["action"],
+            thought=prediction["thought"][:100],
         )
     except Exception as e:
         logger.info("skipping_test", error=str(e))
