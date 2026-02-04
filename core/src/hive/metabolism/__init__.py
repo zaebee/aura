@@ -9,14 +9,13 @@ from aura_core import (
     IntentAction,
     Membrane,
     Observation,
+    SkillRegistry,
     Transformer,
 )
 from aura_core import (
     MetabolicLoop as BaseMetabolicLoop,
 )
 from opentelemetry import trace
-
-from .metrics import heartbeat_total, negotiation_accepted_total, negotiation_total
 
 logger = structlog.get_logger(__name__)
 tracer = trace.get_tracer(__name__)
@@ -26,8 +25,7 @@ class MetabolicLoop(
     BaseMetabolicLoop[Any, HiveContext, IntentAction, Observation, Any]
 ):
     """
-    Orchestrates the ATCG flow with core-specific telemetry:
-    Signal -> Membrane(In) -> Aggregator -> Transformer -> Membrane(Out) -> Connector -> Generator
+    Orchestrates the ATCG flow with core-specific monitoring via Monitor Protein.
     """
 
     def __init__(
@@ -37,27 +35,36 @@ class MetabolicLoop(
         connector: Connector[IntentAction, Observation, HiveContext],
         generator: Generator[Observation, Any],
         membrane: Membrane[Any, IntentAction, HiveContext],
+        registry: SkillRegistry | None = None,
     ):
         super().__init__(aggregator, transformer, connector, generator, membrane)
+        self.registry = registry
 
     async def execute(self, signal: Any, **kwargs: Any) -> Any:
         """
         Execute one full metabolic cycle.
         """
-        negotiation_total.labels(service="core").inc()
-        is_heartbeat = kwargs.get("is_heartbeat", False)
-        if is_heartbeat:
-            heartbeat_total.labels(service="core").inc()
+        if self.registry:
+            await self.registry.execute(
+                "monitor",
+                "increment_counter",
+                {"name": "negotiation_total", "labels": {"service": "core"}},
+            )
 
         logger.info("metabolism_cycle_started")
 
         observation = await super().execute(signal, **kwargs)
 
-        if is_heartbeat:
-            observation.metadata["is_heartbeat"] = True
-
         if observation.success and observation.event_type == "negotiation_accept":
-            negotiation_accepted_total.labels(service="core").inc()
+            if self.registry:
+                await self.registry.execute(
+                    "monitor",
+                    "increment_counter",
+                    {
+                        "name": "negotiation_accepted_total",
+                        "labels": {"service": "core"},
+                    },
+                )
 
         logger.info(
             "metabolism_cycle_completed",

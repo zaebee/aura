@@ -1,14 +1,17 @@
-import asyncio
 from pathlib import Path
 from typing import Any
 
+import httpx
 import structlog
-from aura_core import Aggregator, HiveContext, NegotiationOffer, SystemVitals
+from aura_core import (
+    Aggregator,
+    HiveContext,
+    NegotiationOffer,
+    SkillRegistry,
+    SystemVitals,
+)
 
 from config import get_settings
-
-from .db import InventoryItem, SessionLocal
-from .vitals import MetricsCache, fetch_vitals
 
 logger = structlog.get_logger(__name__)
 
@@ -16,9 +19,9 @@ logger = structlog.get_logger(__name__)
 class HiveAggregator(Aggregator[Any, HiveContext]):
     """A - Aggregator: Consolidates database and system health signals."""
 
-    def __init__(self) -> None:
+    def __init__(self, registry: SkillRegistry) -> None:
         self.settings = get_settings()
-        self._metrics_cache = MetricsCache(ttl_seconds=30)
+        self.registry = registry
 
     def _resolve_brain_path(self) -> str:
         search_paths = []
@@ -41,7 +44,18 @@ class HiveAggregator(Aggregator[Any, HiveContext]):
 
     async def get_vitals(self) -> SystemVitals:
         """Standardized proprioception (self-healing metrics)."""
-        return await fetch_vitals(self._metrics_cache, self.settings)
+        try:
+            # Call Monitor Protein via SkillRegistry
+            obs = await self.registry.execute("monitor", "fetch_metrics", {})
+            if obs.success:
+                return SystemVitals(**obs.data)
+            return SystemVitals(status="unstable", timestamp="", error=obs.error)
+        except (httpx.TimeoutException, httpx.ConnectError) as http_err:
+            logger.warning("aggregator_vitals_http_error", error=str(http_err))
+            return SystemVitals(status="unstable", timestamp="", error=str(http_err))
+        except Exception as e:
+            logger.error("aggregator_vitals_unexpected_error", error=str(e))
+            return SystemVitals(status="error", timestamp="", error=str(e))
 
     async def get_system_metrics(self) -> dict[str, Any]:
         """Backward compatibility for legacy status calls."""
@@ -58,21 +72,21 @@ class HiveAggregator(Aggregator[Any, HiveContext]):
         )
         item_data = {}
         try:
-
-            def fetch() -> InventoryItem | None:
-                with SessionLocal() as session:
-                    return session.query(InventoryItem).filter_by(id=item_id).first()
-
-            item = await asyncio.to_thread(fetch)
-            if item:
+            # Call Storage Protein via SkillRegistry
+            obs = await self.registry.execute(
+                "storage", "read_item", {"item_id": item_id}
+            )
+            if obs.success and obs.data:
+                item = obs.data
                 item_data = {
-                    "name": item.name,
-                    "base_price": item.base_price,
-                    "floor_price": item.floor_price,
-                    "meta": item.meta or {},
+                    "id": item["id"],
+                    "name": item["name"],
+                    "base_price": item["base_price"],
+                    "floor_price": item["floor_price"],
+                    "meta": item["meta"] or {},
                 }
         except Exception as e:
-            logger.error("aggregator_db_error", error=str(e))
+            logger.error("aggregator_storage_error", error=str(e))
 
         return HiveContext(
             item_id=item_id,

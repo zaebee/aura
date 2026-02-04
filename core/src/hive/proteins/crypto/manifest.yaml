@@ -1,0 +1,11 @@
+name: crypto
+role: TreasuryVault
+description: >
+  Manages blockchain interactions, currency conversion, and sensitive data encryption.
+  Provides payment verification on Solana and secure storage for deal secrets.
+capabilities:
+  - verify_payment: Confirm receipt of SOL or USDC with matching memo.
+  - encrypt_secret: Secure a deal secret before database storage.
+  - decrypt_secret: Reveal secret after verified payment.
+  - get_address: Retrieve the Hive's public treasury address.
+manifest_version: 1.0

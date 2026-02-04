@@ -5,11 +5,18 @@ This module contains the executable machinery that powers the Hive's metabolism.
 The Protocols (the "Law") live in dna.py; this module provides the "Engine".
 """
 
-from typing import Any
+from typing import Any, cast
 
 import opentelemetry.trace as trace
 
-from .dna import Aggregator, Connector, Generator, Membrane, Skill, Transformer
+from .dna import (
+    Aggregator,
+    Connector,
+    Generator,
+    Membrane,
+    SkillProtocol,
+    Transformer,
+)
 from .types import Observation
 
 tracer = trace.get_tracer(__name__)
@@ -19,16 +26,39 @@ class SkillRegistry:
     """Registry for Proteins (Skills) used by the Connector."""
 
     def __init__(self) -> None:
-        self._skills: dict[str, Skill] = {}
+        self._skills: dict[str, SkillProtocol[Any, Any]] = {}
 
-    def register(self, name: str, skill: Skill) -> None:
+    def register(self, name: str, skill: SkillProtocol[Any, Any]) -> None:
         self._skills[name] = skill
 
-    def get(self, name: str) -> Skill | None:
+    def get(self, name: str) -> SkillProtocol[Any, Any] | None:
         return self._skills.get(name)
+
+    async def execute(self, skill_name: str, intent: str, params: Any) -> Observation:
+        """Helper to execute a skill by name with tracing."""
+        skill = self.get(skill_name)
+        if not skill:
+            return Observation(success=False, error=f"Skill '{skill_name}' not found")
+
+        with tracer.start_as_current_span(f"skill:{skill_name}") as span:
+            span.set_attribute("intent", intent)
+            try:
+                result = await skill.execute(intent, params)
+                obs = cast(Observation, result)
+                span.set_attribute("success", obs.success)
+                return obs
+            except Exception as e:
+                span.record_exception(e)
+                return Observation(success=False, error=str(e))
 
     def list_skills(self) -> list[str]:
         return list(self._skills.keys())
+
+    async def close(self) -> None:
+        """Close all registered skills."""
+        for skill in self._skills.values():
+            if hasattr(skill, "close") and callable(skill.close):
+                await skill.close()
 
 
 class BaseConnector(Connector[Any, Observation, Any]):
@@ -59,23 +89,8 @@ class BaseConnector(Connector[Any, Observation, Any]):
             if i > 0:
                 params["_previous_observation"] = last_observation
 
-            skill = self.registry.get(skill_name)
-            if not skill:
-                return Observation(
-                    success=False, error=f"Skill '{skill_name}' not found in registry"
-                )
-
-            # Trace individual skill execution
-            with tracer.start_as_current_span(f"skill:{skill_name}") as span:
-                span.set_attribute("intent", intent)
-                span.set_attribute("step_index", i)
-
-                try:
-                    last_observation = await skill.execute(intent, params)
-                    span.set_attribute("success", last_observation.success)
-                except Exception as e:
-                    span.record_exception(e)
-                    return Observation(success=False, error=str(e))
+            # Use registry.execute for tracing and consistency
+            last_observation = await self.registry.execute(skill_name, intent, params)
 
             if not last_observation.success:
                 break

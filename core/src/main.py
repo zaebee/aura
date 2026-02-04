@@ -5,16 +5,9 @@ from typing import Any
 
 import grpc
 import grpc.aio
-import nats
 from aura_core import SkillRegistry
 from grpc_health.v1 import health_pb2, health_pb2_grpc
-from hive.aggregator import (
-    HiveAggregator,
-    InventoryItem,
-    SessionLocal,
-    engine,
-    generate_embedding,
-)
+from hive.aggregator import HiveAggregator
 from hive.connector import HiveConnector
 from hive.generator import HiveGenerator
 from hive.membrane import HiveMembrane
@@ -25,18 +18,15 @@ from hive.metabolism.logging_config import (
     configure_logging,
     get_logger,
 )
-from hive.metabolism.telemetry import init_telemetry
+from hive.proteins.monitor._internal import init_telemetry
 from hive.proto.aura.negotiation.v1 import negotiation_pb2, negotiation_pb2_grpc
 from hive.transformer import AuraTransformer
 from opentelemetry import trace
 from opentelemetry.instrumentation.grpc import GrpcInstrumentorServer
 from opentelemetry.instrumentation.langchain import LangchainInstrumentor
-from opentelemetry.instrumentation.sqlalchemy import SQLAlchemyInstrumentor
 from prometheus_client import start_http_server
-from sqlalchemy import text
 
 from config import settings
-from config.llm import get_raw_key
 
 # Configure structured logging on startup
 configure_logging(log_level=settings.server.log_level)
@@ -54,8 +44,6 @@ logger.info(
 # Instrument gRPC server for distributed tracing
 GrpcInstrumentorServer().instrument()
 
-# Instrument SQLAlchemy for database query tracing
-SQLAlchemyInstrumentor().instrument(engine=engine)
 
 # Instrument LangChain for LLM call tracing
 LangchainInstrumentor().instrument()
@@ -126,7 +114,9 @@ class NegotiationService(negotiation_pb2_grpc.NegotiationServiceServicer):
         finally:
             clear_request_context()
 
-    def Search(self, request: Any, context: Any) -> negotiation_pb2.SearchResponse:
+    async def Search(
+        self, request: Any, context: Any
+    ) -> negotiation_pb2.SearchResponse:
         """Semantic search implementation."""
         request_id = extract_request_id(context)
         if request_id:
@@ -135,57 +125,77 @@ class NegotiationService(negotiation_pb2_grpc.NegotiationServiceServicer):
         try:
             logger.info("search_started", query=request.query, limit=request.limit)
 
-            # Generate query vector
-            query_vector = generate_embedding(request.query)
-            if not query_vector:
-                logger.error("embedding_generation_failed", query=request.query)
+            # Generate query vector via Reasoning Protein
+            aggregator = getattr(self.metabolism, "aggregator", None)
+            registry = getattr(aggregator, "registry", None) if aggregator else None
+            if not registry:
+                context.set_code(grpc.StatusCode.INTERNAL)
+                context.set_details("Skill Registry not available")
+                return negotiation_pb2.SearchResponse()
+
+            reasoning = registry.get("reasoning")
+            if not reasoning:
+                context.set_code(grpc.StatusCode.INTERNAL)
+                context.set_details("Reasoning protein not available")
+                return negotiation_pb2.SearchResponse()
+
+            embed_obs = await reasoning.execute(
+                "generate_embedding", {"text": request.query}
+            )
+            if not embed_obs.success:
+                logger.error(
+                    "embedding_generation_failed",
+                    query=request.query,
+                    error=embed_obs.error,
+                )
                 context.set_code(grpc.StatusCode.INTERNAL)
                 context.set_details("Failed to generate embeddings")
                 return negotiation_pb2.SearchResponse()
 
-            # Vector search in database
-            session = SessionLocal()
-            try:
-                results = (
-                    session.query(
-                        InventoryItem,
-                        InventoryItem.embedding.cosine_distance(query_vector).label(
-                            "distance"
-                        ),
-                    )
-                    .order_by(InventoryItem.embedding.cosine_distance(query_vector))
-                    .limit(request.limit or 5)
-                    .all()
-                )
+            query_vector = embed_obs.data
 
-                response_items = []
-                for item, distance in results:
-                    similarity = 1 - distance
-
-                    if request.min_similarity and similarity < request.min_similarity:
-                        continue
-
-                    response_items.append(
-                        negotiation_pb2.SearchResultItem(
-                            item_id=item.id,
-                            name=item.name,
-                            base_price=item.base_price,
-                            similarity_score=similarity,
-                            description_snippet=str(item.meta),
-                        )
-                    )
-
-                logger.info("search_completed", result_count=len(response_items))
-                return negotiation_pb2.SearchResponse(results=response_items)
-
-            except Exception as e:
-                logger.error("db_error", error=str(e))
+            # Vector search via Storage Protein
+            storage = registry.get("storage")
+            if not storage:
                 context.set_code(grpc.StatusCode.INTERNAL)
-                context.set_details(str(e))
+                context.set_details("Storage protein not available")
                 return negotiation_pb2.SearchResponse()
 
-            finally:
-                session.close()
+            obs = await storage.execute(
+                "vector_search",
+                {
+                    "query_vector": query_vector,
+                    "limit": request.limit or 5,
+                    "min_similarity": request.min_similarity,
+                },
+            )
+
+            if not obs.success:
+                logger.error("search_failed", error=obs.error)
+                context.set_code(grpc.StatusCode.INTERNAL)
+                context.set_details(obs.error)
+                return negotiation_pb2.SearchResponse()
+
+            response_items = []
+            for item in obs.data:
+                response_items.append(
+                    negotiation_pb2.SearchResultItem(
+                        item_id=item["id"],
+                        name=item["name"],
+                        base_price=item["base_price"],
+                        similarity_score=item["similarity_score"],
+                        description_snippet=str(item["meta"]),
+                    )
+                )
+
+            logger.info("search_completed", result_count=len(response_items))
+            return negotiation_pb2.SearchResponse(results=response_items)
+
+        except Exception as e:
+            logger.error("search_error", error=str(e))
+            context.set_code(grpc.StatusCode.INTERNAL)
+            context.set_details(str(e))
+            return negotiation_pb2.SearchResponse()
         finally:
             if request_id:
                 clear_request_context()
@@ -242,21 +252,15 @@ class NegotiationService(negotiation_pb2_grpc.NegotiationServiceServicer):
 
             logger.info("check_deal_status_started", deal_id=request.deal_id)
 
-            # Check payment status
-            session = SessionLocal()
-            try:
-                response = await self.market_service.check_status(
-                    db=session, deal_id=request.deal_id
-                )
+            # Check payment status via MarketService
+            response = await self.market_service.check_status(deal_id=request.deal_id)
 
-                logger.info(
-                    "check_deal_status_completed",
-                    deal_id=request.deal_id,
-                    status=response.status,
-                )
-                return response  # type: ignore
-            finally:
-                session.close()
+            logger.info(
+                "check_deal_status_completed",
+                deal_id=request.deal_id,
+                status=response.status,
+            )
+            return response  # type: ignore
 
         except Exception as e:
             logger.error(
@@ -273,36 +277,6 @@ class NegotiationService(negotiation_pb2_grpc.NegotiationServiceServicer):
                 clear_request_context()
 
 
-def create_crypto_provider() -> Any:
-    """Create crypto payment provider if enabled.
-
-    Returns:
-        CryptoProvider instance or None if crypto disabled
-    """
-    if not settings.crypto.enabled:
-        logger.info("crypto_disabled", feature="crypto_payments")
-        return None
-
-    if settings.crypto.provider == "solana":
-        logger.info(
-            "crypto_provider_initialized",
-            provider="solana",
-            network=settings.crypto.solana_network,
-            currency=settings.crypto.currency,
-        )
-        from hive.connector.proteins.solana_provider import SolanaProvider
-
-        return SolanaProvider(
-            private_key_base58=get_raw_key(settings.crypto.solana_private_key),
-            rpc_url=str(settings.crypto.solana_rpc_url),
-            network=settings.crypto.solana_network,
-            usdc_mint=settings.crypto.solana_usdc_mint,
-        )
-    else:
-        logger.warning("unknown_crypto_provider", provider=settings.crypto.provider)
-        return None
-
-
 async def serve() -> None:
     from grpc_health.v1 import health
 
@@ -316,7 +290,6 @@ async def serve() -> None:
     health_pb2_grpc.add_HealthServicer_to_server(health_servicer, server)
 
     # 3. Register Negotiation Service with placeholder components
-    # This allows the server to start even while heavy LLM components are loading.
     negotiation_service = NegotiationService(metabolism=None, market_service=None)
     negotiation_pb2_grpc.add_NegotiationServiceServicer_to_server(
         negotiation_service, server
@@ -329,60 +302,69 @@ async def serve() -> None:
         "server_started_early",
         port=settings.server.port,
         status="INITIALIZING",
-        note="Health checks active, main logic loading...",
     )
 
-    # 5. Verify Database Connection (Shallow check for initial Serving status)
-    try:
-        # Use a new session for the health check
-        with SessionLocal() as session:
-            await asyncio.to_thread(session.execute, text("SELECT 1"))
-        health_servicer.set("", health_pb2.HealthCheckResponse.SERVING)
-        logger.info("db_verified_health_serving")
-    except Exception as e:
-        logger.error("db_verification_failed", error=str(e))
-        # Keep status as UNKNOWN/NOT_SERVING if DB is not reachable
-
-    # 6. Start Prometheus metrics server
+    # 5. Start Prometheus metrics server
     try:
         start_http_server(9091)
         logger.info("metrics_server_started", port=9091)
     except Exception as e:
         logger.error("metrics_server_failed", error=str(e))
 
-    # 7. Initialize Heavy Components (NATS, AI Models, Crypto)
-    nc = None
-    try:
-        nc = await nats.connect(settings.server.nats_url)
-        logger.info("nats_connected", url=settings.server.nats_url)
-    except Exception as e:
-        logger.warning(
-            "nats_connection_failed", url=settings.server.nats_url, error=str(e)
-        )
+    # 6. Initialize Skills (Proteins)
+    registry = SkillRegistry()
 
-    crypto_provider = create_crypto_provider()
+    from hive.proteins.crypto import CryptoSkill
+    from hive.proteins.guard import GuardSkill
+    from hive.proteins.monitor import MonitorSkill
+    from hive.proteins.pulse import PulseSkill
+    from hive.proteins.reasoning import ReasoningSkill
+    from hive.proteins.storage import StorageSkill
+
+    storage_protein = StorageSkill()
+    crypto_protein = CryptoSkill() if settings.crypto.enabled else None
+    reasoning_protein = ReasoningSkill()
+    monitor_protein = MonitorSkill()
+    pulse_protein = PulseSkill()
+    guard_protein = GuardSkill()
+
+    registry.register("storage", storage_protein)
+    if crypto_protein:
+        registry.register("crypto", crypto_protein)
+    registry.register("reasoning", reasoning_protein)
+    registry.register("monitor", monitor_protein)
+    registry.register("pulse", pulse_protein)
+    registry.register("guard", guard_protein)
+
+    # 7. Initialize and Verify Skills
+    await storage_protein.execute("init_db", {})
+    if await storage_protein.initialize():
+        health_servicer.set("", health_pb2.HealthCheckResponse.SERVING)
+        logger.info("db_verified_health_serving")
+    else:
+        logger.error("db_verification_failed")
+
+    await pulse_protein.initialize()
+    await reasoning_protein.initialize()
+    await monitor_protein.initialize()
+    await guard_protein.initialize()
+    if crypto_protein:
+        await crypto_protein.initialize()
+
+    # 8. Initialize Nucleotides
+    aggregator = HiveAggregator(registry=registry)
+    transformer = AuraTransformer(registry=registry)
+
     market_service = None
-    if crypto_provider:
-        from hive.connector.proteins.encryption import SecretEncryption
+    if crypto_protein:
         from hive.services.market import MarketService
 
-        encryption = SecretEncryption(
-            get_raw_key(settings.crypto.secret_encryption_key)
-        )
-        market_service = MarketService(crypto_provider, encryption)
+        market_service = MarketService(storage=storage_protein, crypto=crypto_protein)
         logger.info("market_service_initialized")
 
-    # Initialize Hive components (Aggregator, Transformer/LLM, etc.)
-    registry = SkillRegistry()
-    # Register local proteins as skills if they implement the protocol
-    if crypto_provider:
-        registry.register("solana_provider", crypto_provider)
-
-    aggregator = HiveAggregator()
-    transformer = AuraTransformer()  # Heavy: Loads DSPy/LLM
     connector = HiveConnector(registry=registry, market_service=market_service)
-    generator = HiveGenerator(nats_client=nc)
-    membrane = HiveMembrane()
+    generator = HiveGenerator(registry=registry)
+    membrane = HiveMembrane(registry=registry)
 
     metabolism = MetabolicLoop(
         aggregator=aggregator,
@@ -390,37 +372,28 @@ async def serve() -> None:
         connector=connector,
         generator=generator,
         membrane=membrane,
+        registry=registry,
     )
 
-    # 8. Wire fully initialized components into the NegotiationService
+    # 9. Wire fully initialized components into the NegotiationService
     negotiation_service.metabolism = metabolism
     negotiation_service.market_service = market_service
 
-    # 9. Start Heartbeat Deal (Honey Stimulus)
+    # 10. Start Heartbeat Deal (Honey Stimulus)
     async def heartbeat_deal_loop() -> None:
         """Trigger a mock successful negotiation periodically."""
-        if not settings.heartbeat.enabled:
-            logger.info("heartbeat_loop_disabled")
-            return
-
-        # Initial wait to allow system to warm up
         await asyncio.sleep(60)
         while True:
             try:
                 logger.info("triggering_heartbeat_deal")
+                obs = await storage_protein.execute("get_first_item", {})
 
-                # Fetch a valid item for the mock deal
-                def get_item() -> InventoryItem | None:
-                    with SessionLocal() as session:
-                        return session.query(InventoryItem).first()
-
-                item = await asyncio.to_thread(get_item)
-
-                if item:
-                    # Use real protobuf types for the heartbeat signal
+                if obs.success and obs.data:
+                    item = obs.data
                     mock_signal = negotiation_pb2.NegotiateRequest(
-                        item_id=item.id,
-                        bid_amount=item.base_price * settings.heartbeat.bid_multiplier,
+                        item_id=item["id"],
+                        bid_amount=item["base_price"]
+                        * settings.heartbeat.bid_multiplier,
                         currency_code="USD",
                         agent=negotiation_pb2.AgentIdentity(
                             did=settings.heartbeat.agent_did,
@@ -449,12 +422,8 @@ async def serve() -> None:
     try:
         await server.wait_for_termination()
     finally:
-        if nc:
-            await nc.close()
-            logger.info("nats_connection_closed")
-        if crypto_provider:
-            await crypto_provider.close()
-            logger.info("crypto_provider_closed")
+        await registry.close()
+        logger.info("all_skills_closed")
 
 
 if __name__ == "__main__":

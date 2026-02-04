@@ -302,6 +302,15 @@ See `docs/SECURITY.md` for comprehensive security documentation.
 - **Structured Logging**: JSON logging with request IDs
 - **Metrics**: OpenTelemetry for performance monitoring
 
+## 🩺 Trauma Log (Lessons Learned in Blood)
+
+| Name | Symptom | Cause | Solution |
+|------|---------|-------|----------|
+| **The Shadow Artery** | gRPC calls hang indefinitely in CI | Kubeconfig discovery logic blocks on missing local cluster | `export KUBECONFIG=/dev/null` |
+| **The Slash Trap** | Prometheus metrics return 404 | Pydantic HttpUrl forces trailing slashes | Use `.rstrip('/')` on base URLs |
+| **The Memory Famine** | DSPy loops crash with OOM | Reasoning requires >= 512MB RAM | Set resource limits to 1GB minimum |
+| **The Pickle Poison** | DSPy model loading fails | Pickle security restrictions in Nucleus | Use JSON-based brain artifacts |
+
 ## 🤝 Contributing
 
 1. Follow the existing code style

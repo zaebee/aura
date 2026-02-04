@@ -3,7 +3,7 @@ from .dna import (
     Connector,
     Generator,
     Membrane,
-    Skill,
+    SkillProtocol,
     Transformer,
 )
 from .manifest import (
@@ -53,7 +53,7 @@ __all__ = [
     "Connector",
     "Generator",
     "Membrane",
-    "Skill",
+    "SkillProtocol",
     # Engine (The Machinery)
     "BaseConnector",
     "SkillRegistry",

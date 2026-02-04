@@ -9,7 +9,7 @@ import unittest
 from unittest.mock import MagicMock, patch
 
 import structlog
-from telemetry import init_telemetry
+from hive.proteins.monitor._internal import init_telemetry
 
 
 class TestTelemetryInitialization(unittest.TestCase):

@@ -1,0 +1,10 @@
+name: guard
+role: SecurityCitadel
+description: >
+  Deterministic safety layer for negotiation decisions.
+  Validates LLM-generated prices against floor prices and minimum profit margins.
+  Prevents economic hallucinations and ensure corporate compliance.
+capabilities:
+  - validate_decision: Ensure an action and price meet safety guardrails.
+  - get_safe_price: Calculate a fallback price when guardrails are triggered.
+manifest_version: 1.0

@@ -10,7 +10,7 @@ For geography (folders, chambers), see hive-manifest.yaml at the repo root.
 
 from typing import Any, Protocol, TypeVar, runtime_checkable
 
-from .types import Observation, SystemVitals
+from .types import SystemVitals
 
 # TypeVars for the metabolic steps
 S_inv = TypeVar("S_inv", contravariant=True)  # Input Signal
@@ -19,6 +19,8 @@ C_inv = TypeVar("C_inv", contravariant=True)  # Input Context
 I_inv = TypeVar("I_inv", contravariant=True)  # Input Intent
 O_cov = TypeVar("O_cov", covariant=True)  # Output Observation
 E_cov = TypeVar("E_cov", covariant=True)  # Output Event
+P_inv = TypeVar("P_inv", contravariant=True)  # Input Params
+R_cov = TypeVar("R_cov", covariant=True)  # Output Result
 
 
 @runtime_checkable
@@ -38,7 +40,7 @@ class Transformer[C_inv, I_inv](Protocol):
 
 
 @runtime_checkable
-class Skill(Protocol):
+class SkillProtocol[P_inv, R_cov](Protocol):
     """Protocol for specialized Proteins used by the Connector."""
 
     def get_name(self) -> str: ...
@@ -47,7 +49,7 @@ class Skill(Protocol):
 
     async def initialize(self) -> bool: ...
 
-    async def execute(self, intent: str, params: dict[str, Any]) -> Observation: ...
+    async def execute(self, intent: str, params: P_inv) -> R_cov: ...
 
 
 @runtime_checkable

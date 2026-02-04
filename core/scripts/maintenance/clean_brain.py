@@ -12,6 +12,7 @@ def clean_markdown(text: str) -> str:
     text = re.sub(r"^\s*```(?:json)?\s*|\s*```\s*$", "", text, flags=re.IGNORECASE)
     return text.strip()
 
+
 def process_demo(demo: dict) -> dict:
     """Process a single demo: unify keys and clean markdown."""
     new_demo = {}
@@ -43,6 +44,7 @@ def process_demo(demo: dict) -> dict:
 
     return new_demo
 
+
 def clean_brain_file(filepath: str):
     """Parse, clean and unify JSON data files."""
     path = Path(filepath)
@@ -60,7 +62,9 @@ def clean_brain_file(filepath: str):
     # Case 1: DSPy compiled program (dict with 'negotiate' field)
     if isinstance(data, dict) and "negotiate" in data:
         for field in ["demos", "train", "traces"]:
-            if field in data["negotiate"] and isinstance(data["negotiate"][field], list):
+            if field in data["negotiate"] and isinstance(
+                data["negotiate"][field], list
+            ):
                 print(f"Processing {filepath} -> negotiate.{field}...")
                 data["negotiate"][field] = [
                     process_demo(entry) for entry in data["negotiate"][field]
@@ -71,9 +75,7 @@ def clean_brain_file(filepath: str):
         print(f"Processing {filepath} scenarios...")
         for scenario in data:
             if "turns" in scenario and isinstance(scenario["turns"], list):
-                scenario["turns"] = [
-                    process_demo(turn) for turn in scenario["turns"]
-                ]
+                scenario["turns"] = [process_demo(turn) for turn in scenario["turns"]]
 
     # Save cleaned data
     with open(path, "w", encoding="utf-8") as f:
@@ -81,12 +83,10 @@ def clean_brain_file(filepath: str):
 
     print(f"Successfully cleaned {filepath}")
 
+
 if __name__ == "__main__":
     # Target files
-    targets = [
-        "core/data/aura_brain.json",
-        "core/data/negotiation_training.json"
-    ]
+    targets = ["core/data/aura_brain.json", "core/data/negotiation_training.json"]
     for target in targets:
         if Path(target).exists():
             clean_brain_file(target)

@@ -1,0 +1,10 @@
+name: reasoning
+role: FrontalLobe
+description: >
+  The primary cognitive engine for negotiation.
+  Uses DSPy for self-optimizing strategic decisions and Mistral for semantic embeddings.
+  Provides structured negotiation outcomes with economic transparency (thought tags).
+capabilities:
+  - negotiate: Make an optimized decision (accept/counter/reject) based on context.
+  - generate_embedding: Convert text to vector space for semantic search.
+manifest_version: 1.0

@@ -1,4 +1,3 @@
-import asyncio
 import time
 import uuid
 from typing import Any
@@ -11,13 +10,9 @@ from aura_core import (
     Observation,
     SkillRegistry,
 )
-from sqlalchemy.exc import SQLAlchemyError
 
 from config import get_settings
-from hive.aggregator import SessionLocal
 from hive.proto.aura.negotiation.v1 import negotiation_pb2
-
-from .proteins.pricing import PriceConverter
 
 logger = structlog.get_logger(__name__)
 
@@ -37,7 +32,6 @@ class HiveConnector(BaseConnector):
         Handle legacy IntentActions that do not have steps.
         This executes the decision and produces an observation (the gRPC response).
         """
-        # Type safety is now enforced by the generic protocol and static analysis
         logger.debug("connector_act_started", action=action.action)
 
         # 1. Map IntentAction to Protobuf NegotiateResponse
@@ -61,7 +55,6 @@ class HiveConnector(BaseConnector):
             response.rejected.reason_code = "OFFER_TOO_LOW"
 
         elif action.action == "ui_required":
-            # Policy violation or complex deal requiring human intervention
             response.rejected.reason_code = "UI_REQUIRED"
 
         else:
@@ -81,33 +74,34 @@ class HiveConnector(BaseConnector):
         action: IntentAction,
         context: HiveContext,
     ) -> None:
-        """Encrypts the reservation code and creates a locked deal on Solana."""
-
-        def create_offer_sync() -> tuple[float, Any]:
-            with SessionLocal() as session:
-                item_name = context.item_data.get("name", "Aura Item")
-                converter = PriceConverter(
-                    use_fixed_rates=self.settings.crypto.use_fixed_rates
-                )
-                crypto_amount = converter.convert_usd_to_crypto(
-                    usd_amount=action.price,
-                    crypto_currency=self.settings.crypto.currency,  # type: ignore
-                )
-                return crypto_amount, self.market_service.create_offer(
-                    db=session,
-                    item_id=context.item_id,
-                    item_name=item_name,
-                    secret=response.accepted.reservation_code,
-                    price=crypto_amount,
-                    currency=self.settings.crypto.currency,
-                    buyer_did=context.offer.agent_did,
-                    ttl_seconds=self.settings.crypto.deal_ttl_seconds,
-                )
-
+        """Encrypts the reservation code and creates a locked deal via Skills/MarketService."""
         try:
-            crypto_amount, payment_instructions = await asyncio.to_thread(
-                create_offer_sync
+            item_name = context.item_data.get("name", "Aura Item")
+
+            # Use Crypto Skill for price conversion
+            obs = await self.registry.execute(
+                "crypto",
+                "convert_price",
+                {"usd_amount": action.price, "currency": self.settings.crypto.currency},
             )
+
+            if not obs.success:
+                raise ValueError(f"Price conversion failed: {obs.error}")
+
+            crypto_amount = obs.data
+
+            # MarketService still orchestrates complex multi-protein operations
+            # but it is passed to the connector.
+            payment_instructions = await self.market_service.create_offer(
+                item_id=context.item_id,
+                item_name=item_name,
+                secret=response.accepted.reservation_code,
+                price=crypto_amount,
+                currency=self.settings.crypto.currency,
+                buyer_did=context.offer.agent_did,
+                ttl_seconds=self.settings.crypto.deal_ttl_seconds,
+            )
+
             response.accepted.ClearField("reservation_code")
             response.accepted.crypto_payment.CopyFrom(payment_instructions)
 
@@ -118,5 +112,5 @@ class HiveConnector(BaseConnector):
                 currency=self.settings.crypto.currency,
             )
 
-        except (ValueError, SQLAlchemyError) as e:
+        except Exception as e:
             logger.error("crypto_lock_failed", error=str(e), exc_info=True)

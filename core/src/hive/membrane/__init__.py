@@ -1,64 +1,19 @@
 from typing import Any
 
 import structlog
-from aura_core import FailureIntent, HiveContext, IntentAction, Membrane
+from aura_core import FailureIntent, HiveContext, IntentAction, Membrane, SkillRegistry
 
-from config import get_settings, settings
+from config import get_settings
 
 logger = structlog.get_logger(__name__)
 
-DEFAULT_MIN_MARGIN = 0.1
-
-
-class SafetyViolation(Exception):
-    """Raised when a negotiation decision violates safety guardrails."""
-
-    pass
-
-
-class OutputGuard:
-    """
-    Deterministic safety layer for Aura Core.
-    Protects against economic hallucinations and floor price breaches.
-    """
-
-    def validate_decision(self, decision: dict, context: dict) -> bool:
-        action = decision.get("action")
-        offered_price = decision.get("price", 0.0)
-        floor_price = context.get("floor_price", 0.0)
-        internal_cost = context.get("internal_cost", 0.0)
-
-        if offered_price > 0:
-            margin = (offered_price - internal_cost) / offered_price
-            if margin < settings.safety.min_profit_margin:
-                logger.warning(
-                    "safety_margin_violation",
-                    offered_price=offered_price,
-                    internal_cost=internal_cost,
-                    margin=margin,
-                    min_margin=settings.safety.min_profit_margin,
-                )
-                raise SafetyViolation("Minimum profit margin violation")
-        elif action in ["accept", "counter"]:
-            logger.warning("invalid_offered_price", price=offered_price)
-            raise SafetyViolation("Invalid offered price")
-
-        if action in ["accept", "counter"] and offered_price < floor_price:
-            logger.warning(
-                "safety_floor_violation",
-                action=action,
-                offered_price=offered_price,
-                floor_price=floor_price,
-            )
-            raise SafetyViolation("Floor price violation")
-        return True
-
 
 class HiveMembrane(Membrane[Any, IntentAction, HiveContext]):
-    """The Immune System: Deterministic Guardrails for Inbound/Outbound signals."""
+    """The Immune System: Deterministic Guardrails using Guard Protein."""
 
-    def __init__(self) -> None:
+    def __init__(self, registry: SkillRegistry | None = None) -> None:
         self.settings = get_settings()
+        self.registry = registry
 
     async def inspect_inbound(self, signal: Any) -> Any:
         if hasattr(signal, "bid_amount") and signal.bid_amount <= 0:
@@ -96,35 +51,67 @@ class HiveMembrane(Membrane[Any, IntentAction, HiveContext]):
         self, decision: IntentAction, context: HiveContext
     ) -> IntentAction:
         floor_price = context.item_data.get("floor_price", 0.0)
+
+        # 1. Handle explicit failures
         if isinstance(decision, FailureIntent) or decision.action == "error":
+            safe_price = floor_price * 1.05
+            if self.registry:
+                obs_safe = await self.registry.execute(
+                    "guard",
+                    "get_safe_price",
+                    {
+                        "context": {"floor_price": floor_price},
+                        "reason": "FAILURE_RECOVERY",
+                    },
+                )
+                if obs_safe.success:
+                    safe_price = obs_safe.data["safe_price"]
+
             return self._override_with_safe_offer(
-                decision, floor_price * 1.05, "FAILURE_RECOVERY"
+                decision, safe_price, "FAILURE_RECOVERY"
             )
 
+        # 2. DLP Check
         if "floor_price" in decision.message.lower():
             decision.message = "I cannot disclose internal pricing details."
             decision.thought += " [MEMBRANE: DLP block]"
 
         if decision.action not in ["accept", "counter"]:
             return decision
-        if decision.price < floor_price:
-            return self._override_with_safe_offer(
-                decision, floor_price * 1.05, "FLOOR_PRICE_VIOLATION"
-            )
 
-        min_margin = getattr(self.settings.logic, "min_margin", DEFAULT_MIN_MARGIN)
-        required_min_price = floor_price / (1 - min_margin)
-        if decision.price < required_min_price:
-            return self._override_with_safe_offer(
-                decision, required_min_price, "MIN_MARGIN_VIOLATION"
-            )
+        # 3. Call Guard Protein for validation
+        if not self.registry:
+            return decision
+
+        internal_cost = context.item_data.get("meta", {}).get(
+            "internal_cost", floor_price
+        )
+        guard_context = {"floor_price": floor_price, "internal_cost": internal_cost}
+
+        obs = await self.registry.execute(
+            "guard",
+            "validate_decision",
+            {
+                "decision": {"action": decision.action, "price": decision.price},
+                "context": guard_context,
+            },
+        )
+
+        if not obs.success:
+            # Determine reason for logging/override using structured error code
+            reason = obs.data.get("error_code", "SAFETY_VIOLATION")
+
+            # Use safe price provided by the Guard Protein
+            safe_price = obs.data.get("safe_price", floor_price * 1.05)
+            return self._override_with_safe_offer(decision, safe_price, reason)
+
         return decision
 
     def _override_with_safe_offer(
         self, original: IntentAction, safe_price: float, reason: str
     ) -> IntentAction:
         rounded_price = round(safe_price, 2)
-        new_thought = f"Membrane Override: {reason}. LLM suggested {original.action} at {original.price}."
+        new_thought = f"Membrane Override: {reason}. LLM suggested {original.action} at {getattr(original, 'price', 0.0)}."
         if original.thought:
             new_thought = f"{original.thought} | {new_thought}"
 
@@ -135,7 +122,7 @@ class HiveMembrane(Membrane[Any, IntentAction, HiveContext]):
             thought=new_thought,
             metadata={
                 "original_decision": original.action,
-                "original_price": original.price,
+                "original_price": getattr(original, "price", 0.0),
                 "override_reason": reason,
             },
         )

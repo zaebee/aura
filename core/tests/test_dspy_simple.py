@@ -6,9 +6,11 @@ Simple test for DSPy integration - tests basic functionality.
 import sys
 
 import structlog
-from src.hive.transformer.llm.dspy_strategy import DSPyStrategy
-from src.hive.transformer.llm.engine import AuraNegotiator
-from src.hive.transformer.llm.signatures import Negotiate
+from src.hive.proteins.reasoning._internal import (
+    AuraNegotiator,
+    DSPyStrategy,
+    Negotiate,
+)
 
 # Configure logging
 structlog.configure(

@@ -7,7 +7,7 @@ import os
 
 import dspy
 import structlog
-from src.hive.transformer.llm.engine import AuraNegotiator
+from src.hive.proteins.reasoning._internal import AuraNegotiator
 
 # Configure logging
 structlog.configure(
