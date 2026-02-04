@@ -111,6 +111,7 @@ class BeeContext:
     hive_metrics: dict[str, Any]
     filesystem_map: list[str]
     repo_name: str
+    system_health: SystemVitals | dict[str, Any] = field(default_factory=dict)
     event_name: str = "manual"
     event_data: dict[str, Any] = field(default_factory=dict)
     metadata: dict[str, Any] = field(default_factory=dict)
@@ -149,6 +150,7 @@ class TelegramContext:
     user_id: int
     chat_id: int
     hive_context: HiveContext | None = None
+    system_health: SystemVitals | dict[str, Any] = field(default_factory=dict)
     message_text: str | None = None
     callback_data: str | None = None
     fsm_state: str | None = None
