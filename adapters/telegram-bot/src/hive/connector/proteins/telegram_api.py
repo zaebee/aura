@@ -50,18 +50,14 @@ class TelegramProtein(Skill):
 
         elif intent == "send_search_results":
             prev_obs = params.get("_previous_observation")
-            if not prev_obs or not prev_obs.success:
-                return await self.execute(
-                    "send_message",
-                    {"chat_id": chat_id, "text": "No results found. 😕"},
-                )
-
-            search_results = prev_obs.data
+            search_results = prev_obs.data if prev_obs and prev_obs.success else None
             if not search_results:
-                return await self.execute(
+                obs = await self.execute(
                     "send_message",
                     {"chat_id": chat_id, "text": "No results found. 😕"},
                 )
+                obs.event_type = "search_failed"
+                return obs
 
             keyboard = []
             for item in search_results:
@@ -101,6 +97,12 @@ class TelegramProtein(Skill):
                 )
 
             core_response = prev_obs.data
+            if not core_response:
+                return await self.execute(
+                    "send_message",
+                    {"chat_id": chat_id, "text": "Received an empty response from Core."},
+                )
+
             if "error" in core_response:
                 return await self.execute(
                     "send_message",

@@ -34,7 +34,8 @@ class HiveConnector(BaseConnector):
         self, action: IntentAction, context: HiveContext
     ) -> Observation:
         """
-        Execute the decision and produce an observation (the gRPC response).
+        Handle legacy IntentActions that do not have steps.
+        This executes the decision and produces an observation (the gRPC response).
         """
         # Type safety is now enforced by the generic protocol and static analysis
         logger.debug("connector_act_started", action=action.action)
