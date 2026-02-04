@@ -35,7 +35,9 @@ def load_training_data() -> list[dict]:
 
     if not data_path.exists():
         # Fallback to relative path if not run from root
-        data_path = Path(__file__).parent.parent.parent / "data" / "negotiation_training.json"
+        data_path = (
+            Path(__file__).parent.parent.parent / "data" / "negotiation_training.json"
+        )
 
     if not data_path.exists():
         raise FileNotFoundError(f"Training data not found at {data_path}")

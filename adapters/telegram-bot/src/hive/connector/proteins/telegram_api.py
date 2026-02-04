@@ -95,14 +95,18 @@ class TelegramProtein(Skill):
                     prev_obs.error if prev_obs else "Negotiation failed (no response)"
                 )
                 return await self.execute(
-                    "send_message", {"chat_id": chat_id, "text": f"❌ Error: {error_msg}"}
+                    "send_message",
+                    {"chat_id": chat_id, "text": f"❌ Error: {error_msg}"},
                 )
 
             core_response = prev_obs.data
             if not core_response:
                 return await self.execute(
                     "send_message",
-                    {"chat_id": chat_id, "text": "Received an empty response from Core."},
+                    {
+                        "chat_id": chat_id,
+                        "text": "Received an empty response from Core.",
+                    },
                 )
 
             if "error" in core_response:
@@ -160,7 +164,10 @@ class TelegramProtein(Skill):
             if "rejected" in core_response:
                 return await self.execute(
                     "send_message",
-                    {"chat_id": chat_id, "text": "❌ Offer rejected. Try a higher bid."},
+                    {
+                        "chat_id": chat_id,
+                        "text": "❌ Offer rejected. Try a higher bid.",
+                    },
                 )
 
             return await self.execute(
