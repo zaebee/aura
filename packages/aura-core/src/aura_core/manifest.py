@@ -5,11 +5,20 @@ Provides backward-compatible access to MACRO_ATCG_FOLDERS, ALLOWED_ROOT_FILES,
 and ALLOWED_CHAMBERS from the language-agnostic YAML file.
 """
 
+import logging
 from functools import lru_cache
 from pathlib import Path
 from typing import Any
 
 import yaml
+
+logger = logging.getLogger(__name__)
+
+_DEFAULT_MANIFEST: dict[str, Any] = {
+    "macro_atcg_folders": [],
+    "allowed_root_files": [],
+    "allowed_chambers": {},
+}
 
 
 def find_hive_root() -> Path:
@@ -32,15 +41,32 @@ def _load_manifest() -> dict[str, Any]:
     manifest_path = root / "hive-manifest.yaml"
 
     if not manifest_path.exists():
-        # Return defaults if manifest doesn't exist
-        return {
-            "macro_atcg_folders": [],
-            "allowed_root_files": [],
-            "allowed_chambers": {},
-        }
+        logger.warning("hive-manifest.yaml not found at %s, using defaults", root)
+        return _DEFAULT_MANIFEST
 
-    with open(manifest_path) as f:
-        return yaml.safe_load(f)
+    try:
+        with open(manifest_path) as f:
+            data = yaml.safe_load(f)
+            if data is None:
+                logger.warning(
+                    "hive-manifest.yaml at %s is empty or invalid, using defaults",
+                    manifest_path,
+                )
+                return _DEFAULT_MANIFEST
+            if not isinstance(data, dict):
+                logger.warning(
+                    "hive-manifest.yaml at %s has invalid format, using defaults",
+                    manifest_path,
+                )
+                return _DEFAULT_MANIFEST
+            return data
+    except yaml.YAMLError as e:
+        logger.warning(
+            "Failed to parse hive-manifest.yaml at %s: %s, using defaults",
+            manifest_path,
+            e,
+        )
+        return _DEFAULT_MANIFEST
 
 
 def get_macro_atcg_folders() -> list[str]:

@@ -51,7 +51,7 @@ allowed_chambers:
   core/src/hive/membrane: HiveMembrane
   core/src/hive/aggregator: SensoryNexus
   core/src/hive/generator: NeuralPulse
-  core/src/hive/metabolism: SacredCodex
+  core/src/hive/metabolism: MetabolicEngine
   deploy: HiveArmor
   proto: SacredScrolls
   docs: ChroniclersArchive

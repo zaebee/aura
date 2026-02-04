@@ -28,10 +28,21 @@ message Context {
   map<string, string> metadata = 5;
 }
 
+// ActionType - Enumeration of possible intent actions
+enum ActionType {
+  ACTION_TYPE_UNSPECIFIED = 0;
+  ACTION_TYPE_ACCEPT = 1;
+  ACTION_TYPE_COUNTER = 2;
+  ACTION_TYPE_REJECT = 3;
+  ACTION_TYPE_AUDIT = 4;
+  ACTION_TYPE_UI_REQUIRED = 5;
+  ACTION_TYPE_ERROR = 6;
+}
+
 // Intent - Decision made by the Transformer
 message Intent {
   string intent_id = 1;
-  string action = 2;  // e.g., "accept", "counter", "reject", "audit"
+  ActionType action = 2;
   google.protobuf.Struct params = 3;
   string reasoning = 4;
   repeated IntentStep steps = 5;
@@ -62,9 +73,17 @@ message Event {
   google.protobuf.Timestamp timestamp = 3;
 }
 
+// VitalsStatus - Enumeration of system health states
+enum VitalsStatus {
+  VITALS_STATUS_UNSPECIFIED = 0;
+  VITALS_STATUS_OK = 1;
+  VITALS_STATUS_DEGRADED = 2;
+  VITALS_STATUS_ERROR = 3;
+}
+
 // SystemVitals - Health metrics for proprioception
 message SystemVitals {
-  string status = 1;  // "ok" | "degraded" | "error"
+  VitalsStatus status = 1;
   double cpu_usage_percent = 2;
   double memory_usage_mb = 3;
   google.protobuf.Timestamp timestamp = 4;
