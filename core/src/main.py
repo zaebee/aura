@@ -393,6 +393,10 @@ async def serve() -> None:
     # 9. Start Heartbeat Deal (Honey Stimulus)
     async def heartbeat_deal_loop() -> None:
         """Trigger a mock successful negotiation periodically."""
+        if not settings.heartbeat.enabled:
+            logger.info("heartbeat_loop_disabled")
+            return
+
         # Initial wait to allow system to warm up
         await asyncio.sleep(60)
         while True:
@@ -415,7 +419,7 @@ async def serve() -> None:
                         ),
                         request_id=f"heartbeat-{uuid.uuid4()}",
                     )
-                    await metabolism.execute(mock_signal)
+                    await metabolism.execute(mock_signal, is_heartbeat=True)
                     logger.info("heartbeat_deal_successful")
                 else:
                     logger.warning("heartbeat_deal_failed_no_items")

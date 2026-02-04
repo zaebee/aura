@@ -16,7 +16,7 @@ from aura_core import (
 )
 from opentelemetry import trace
 
-from .metrics import negotiation_accepted_total, negotiation_total
+from .metrics import heartbeat_total, negotiation_accepted_total, negotiation_total
 
 logger = structlog.get_logger(__name__)
 tracer = trace.get_tracer(__name__)
@@ -45,9 +45,16 @@ class MetabolicLoop(
         Execute one full metabolic cycle.
         """
         negotiation_total.labels(service="core").inc()
+        is_heartbeat = kwargs.get("is_heartbeat", False)
+        if is_heartbeat:
+            heartbeat_total.labels(service="core").inc()
+
         logger.info("metabolism_cycle_started")
 
         observation = await super().execute(signal, **kwargs)
+
+        if is_heartbeat:
+            observation.metadata["is_heartbeat"] = True
 
         if observation.success and observation.event_type == "negotiation_accept":
             negotiation_accepted_total.labels(service="core").inc()

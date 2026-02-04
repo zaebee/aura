@@ -21,3 +21,9 @@ negotiation_accepted_total = _get_counter(
     "Total number of negotiations successfully accepted",
     ["service"],
 )
+
+heartbeat_total = _get_counter(
+    "heartbeat_total",
+    "Total number of heartbeat stimulus deals executed",
+    ["service"],
+)
