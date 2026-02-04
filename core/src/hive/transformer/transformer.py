@@ -109,7 +109,8 @@ class AuraTransformer(Transformer[HiveContext, IntentAction]):
             return strategy.evaluate(
                 context.item_data,
                 context.offer.bid_amount,
-                context.offer.reputation
+                context.offer.reputation,
+                context.request_id
             )
 
         try:

@@ -34,19 +34,30 @@ class GuardSkill(SkillProtocol[dict[str, Any], Observation]):
                 self.guard.validate_decision(decision, context)
                 return Observation(success=True)
             except SafetyViolation as e:
-                # Return safe price info along with error
                 error_msg = str(e)
-                safe_price = self._calculate_safe_price(params.get("context", {}), error_msg)
+                error_code = "SAFETY_VIOLATION"
+                if "margin" in error_msg.lower():
+                    error_code = "MIN_MARGIN_VIOLATION"
+                elif "floor" in error_msg.lower():
+                    error_code = "FLOOR_PRICE_VIOLATION"
+                elif "price" in error_msg.lower():
+                    error_code = "INVALID_PRICE"
+
+                safe_price = self._calculate_safe_price(params.get("context", {}), error_code)
                 return Observation(
                     success=False,
                     error=error_msg,
-                    data={"safe_price": safe_price}
+                    data={
+                        "error_code": error_code,
+                        "safe_price": safe_price
+                    }
                 )
             except Exception as e:
                 return Observation(success=False, error=f"Validation error: {e}")
 
         elif intent == "get_safe_price":
-            safe_price = self._calculate_safe_price(params.get("context", {}), params.get("reason", ""))
+            reason = params.get("reason", "")
+            safe_price = self._calculate_safe_price(params.get("context", {}), reason)
             return Observation(success=True, data={"safe_price": safe_price})
 
         elif intent == "sanitize_input":

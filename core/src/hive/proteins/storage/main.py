@@ -34,6 +34,7 @@ class StorageSkill(SkillProtocol[dict[str, Any], Observation]):
             "get_deal_by_id",
             "update_deal_status",
             "vector_search",
+            "list_items_semantic_search",
             "init_db",
             "upsert_item",
             "get_first_item"

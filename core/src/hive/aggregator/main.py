@@ -2,6 +2,7 @@ import asyncio
 from pathlib import Path
 from typing import Any
 
+import httpx
 import structlog
 from aura_core import (
     Aggregator,
@@ -50,8 +51,11 @@ class HiveAggregator(Aggregator[Any, HiveContext]):
             if obs.success:
                 return SystemVitals(**obs.data)
             return SystemVitals(status="unstable", timestamp="", error=obs.error)
+        except (httpx.TimeoutException, httpx.ConnectError) as http_err:
+            logger.warning("aggregator_vitals_http_error", error=str(http_err))
+            return SystemVitals(status="unstable", timestamp="", error=str(http_err))
         except Exception as e:
-            logger.error("aggregator_vitals_error", error=str(e))
+            logger.error("aggregator_vitals_unexpected_error", error=str(e))
             return SystemVitals(status="error", timestamp="", error=str(e))
 
     async def get_system_metrics(self) -> dict[str, Any]:

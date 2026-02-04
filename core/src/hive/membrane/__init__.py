@@ -93,12 +93,8 @@ class HiveMembrane(Membrane[Any, IntentAction, HiveContext]):
         })
 
         if not obs.success:
-            # Determine reason for logging/override
-            reason = "SAFETY_VIOLATION"
-            if "margin" in obs.error.lower():
-                reason = "MIN_MARGIN_VIOLATION"
-            elif "floor" in obs.error.lower():
-                reason = "FLOOR_PRICE_VIOLATION"
+            # Determine reason for logging/override using structured error code
+            reason = obs.data.get("error_code", "SAFETY_VIOLATION")
 
             # Use safe price provided by the Guard Protein
             safe_price = obs.data.get("safe_price", floor_price * 1.05)
@@ -110,7 +106,7 @@ class HiveMembrane(Membrane[Any, IntentAction, HiveContext]):
         self, original: IntentAction, safe_price: float, reason: str
     ) -> IntentAction:
         rounded_price = round(safe_price, 2)
-        new_thought = f"Membrane Override: {reason}. LLM suggested {original.action} at {original.price}."
+        new_thought = f"Membrane Override: {reason}. LLM suggested {original.action} at {getattr(original, 'price', 0.0)}."
         if original.thought:
             new_thought = f"{original.thought} | {new_thought}"
 
