@@ -91,18 +91,14 @@ redis:
 
 # Frontnend Configuration
 frontend:
-  livenessProbe:
+  probe: &frontendProbe
     path: /
     initialDelaySeconds: 5
     periodSeconds: 10
     timeoutSeconds: 2
     failureThreshold: 3
-  readinessProbe:
-    path: /
-    initialDelaySeconds: 5
-    periodSeconds: 10
-    timeoutSeconds: 2
-    failureThreshold: 3
+  livenessProbe: *frontendProbe
+  readinessProbe: *frontendProbe
   image:
     repository: ghcr.io/zaebee/aura-frontend
     tag: latest
