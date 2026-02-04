@@ -4,14 +4,14 @@ from typing import Any
 import grpc
 import structlog
 from aura.negotiation.v1 import negotiation_pb2, negotiation_pb2_grpc
-from aura_core import Observation, Skill
+from aura_core import Observation, SkillProtocol
 from google.protobuf.json_format import MessageToDict
 from interfaces import NegotiationProvider, NegotiationResult, SearchResult
 
 logger = structlog.get_logger()
 
 
-class GRPCNegotiationClient(NegotiationProvider, Skill):
+class GRPCNegotiationClient(NegotiationProvider, SkillProtocol[dict[str, Any], Observation]):
     def __init__(self, grpc_url: str, timeout: float = 30.0) -> None:
         self.channel = grpc.aio.insecure_channel(grpc_url)
         self.stub = negotiation_pb2_grpc.NegotiationServiceStub(self.channel)

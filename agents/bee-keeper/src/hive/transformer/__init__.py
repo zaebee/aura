@@ -187,7 +187,7 @@ class BeeTransformer(Transformer[BeeContext, AuditObservation]):
                         for n in ["aggregator", "transformer", "connector", "generator"]
                     )
                     if is_atcg_file and "src/hive" in current_file:
-                        # Ensure it implements the generic protocol (e.g., Aggregator[...) or Skill
+                        # Ensure it implements the generic protocol (e.g., Aggregator[...) or SkillProtocol
                         has_protocol = any(
                             p in added_code
                             for p in [
@@ -195,12 +195,12 @@ class BeeTransformer(Transformer[BeeContext, AuditObservation]):
                                 "Transformer[",
                                 "Connector[",
                                 "Generator[",
-                                "Skill",
+                                "SkillProtocol",
                             ]
                         )
                         if not has_protocol:
                             heresies.append(
-                                f"Protocol Heresy: Class `{added_code}` in `{current_file}` does not implement a Generic ATCG Protocol or Skill. Architecture purity is compromised."
+                                f"Protocol Heresy: Class `{added_code}` in `{current_file}` does not implement a Generic ATCG Protocol or SkillProtocol. Architecture purity is compromised."
                             )
 
         return heresies

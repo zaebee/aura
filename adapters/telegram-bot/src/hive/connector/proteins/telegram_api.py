@@ -3,12 +3,12 @@ from typing import Any
 import structlog
 from aiogram import Bot
 from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup
-from aura_core import Observation, Skill
+from aura_core import Observation, SkillProtocol
 
 logger = structlog.get_logger(__name__)
 
 
-class TelegramProtein(Skill):
+class TelegramProtein(SkillProtocol[dict[str, Any], Observation]):
     """Protein for Telegram API interactions."""
 
     def __init__(self, bot: Bot):
