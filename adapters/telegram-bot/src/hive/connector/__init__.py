@@ -1,4 +1,6 @@
-
+"""Telegram Connector Module.
+Implements the Connector component for Telegram Metabolism.
+"""
 
 import structlog
 from aura_core import (
