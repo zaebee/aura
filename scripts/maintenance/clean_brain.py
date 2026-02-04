@@ -3,6 +3,7 @@ import json
 import re
 from pathlib import Path
 
+
 def clean_markdown(text: str) -> str:
     """Remove Markdown code blocks from string."""
     if not isinstance(text, str):
@@ -49,7 +50,7 @@ def clean_brain_file(filepath: str):
         print(f"Error: File {filepath} not found.")
         return
 
-    with open(path, "r", encoding="utf-8") as f:
+    with open(path, encoding="utf-8") as f:
         try:
             data = json.load(f)
         except json.JSONDecodeError as e:
