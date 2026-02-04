@@ -1,7 +1,7 @@
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
-from aura_core import HiveContext, IntentAction, NegotiationOffer
+from aura_core import HiveContext, IntentAction, NegotiationOffer, SystemVitals
 from hive.aggregator import HiveAggregator
 from hive.membrane import HiveMembrane
 
@@ -19,8 +19,10 @@ async def test_aggregator_perceive(mocker):
     aggregator = HiveAggregator()
     mocker.patch.object(
         aggregator,
-        "get_system_metrics",
-        side_effect=AsyncMock(return_value={"status": "ok", "cpu_usage_percent": 10.0}),
+        "get_vitals",
+        side_effect=AsyncMock(
+            return_value=SystemVitals(status="ok", cpu_usage_percent=10.0)
+        ),
     )
     signal = MagicMock()
     signal.item_id = "item1"
@@ -29,9 +31,13 @@ async def test_aggregator_perceive(mocker):
     signal.agent.reputation_score = 0.9
 
     context = await aggregator.perceive(signal)
+    # Manually inject vitals for direct perceive test, mirroring MetabolicLoop behavior
+    vitals = await aggregator.get_vitals()
+    context.system_health = vitals
+
     assert context.item_id == "item1"
     assert context.offer.bid_amount == 100.0
-    assert context.system_health["cpu_usage_percent"] == 10.0
+    assert context.system_health.cpu_usage_percent == 10.0
     assert context.item_data["floor_price"] == 100.0
 
 

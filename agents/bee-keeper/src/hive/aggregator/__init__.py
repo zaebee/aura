@@ -5,16 +5,25 @@ from typing import Any
 
 import httpx
 import litellm
+from datetime import UTC, datetime
+
 import structlog
 
 from config import KeeperSettings
-from aura_core import Aggregator, BeeContext, find_hive_root
+from aura_core import Aggregator, BeeContext, find_hive_root, SystemVitals
 
 logger = structlog.get_logger(__name__)
 
 
 class BeeAggregator(Aggregator[Any, BeeContext]):
     """A - Aggregator: Gathers signals from Git, Prometheus, and Filesystem."""
+
+    async def get_vitals(self) -> SystemVitals:
+        """Proprioception for the BeeKeeper."""
+        return SystemVitals(
+            status="ok",
+            timestamp=datetime.now(UTC).isoformat(),
+        )
 
     def __init__(self, settings: KeeperSettings) -> None:
         self.settings = settings

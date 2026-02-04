@@ -5,7 +5,13 @@ from typing import Any, Protocol
 
 import dspy
 import structlog
-from aura_core import FailureIntent, HiveContext, IntentAction, Transformer
+from aura_core import (
+    FailureIntent,
+    HiveContext,
+    IntentAction,
+    SystemVitals,
+    Transformer,
+)
 
 from config import get_settings
 from hive.aggregator import InventoryItem, SessionLocal
@@ -147,7 +153,11 @@ class AuraTransformer(Transformer[HiveContext, IntentAction]):
 
     def _build_economic_context(self, context: HiveContext) -> dict:
         """Construct pure economic context without infrastructure leakage."""
-        cpu_load = context.system_health.get("cpu_usage_percent", 0.0)
+        if isinstance(context.system_health, SystemVitals):
+            cpu_load = context.system_health.cpu_usage_percent
+        else:
+            cpu_load = context.system_health.get("cpu_usage_percent", 0.0)
+
         constraints = []
         if cpu_load > 80.0:
             constraints.append("SYSTEM_LOAD_HIGH: Be extremely concise.")
@@ -175,7 +185,10 @@ class AuraTransformer(Transformer[HiveContext, IntentAction]):
                 context.request_id,
             )
 
-        cpu_load = context.system_health.get("cpu_usage_percent", 0.0)
+        if isinstance(context.system_health, SystemVitals):
+            cpu_load = context.system_health.cpu_usage_percent
+        else:
+            cpu_load = context.system_health.get("cpu_usage_percent", 0.0)
 
         # Self-reflective tuning: adjust model and temperature based on system health
         model = self.settings.llm.model

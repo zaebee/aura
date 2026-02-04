@@ -1,8 +1,15 @@
+from datetime import UTC, datetime
 from typing import Any
 
 import structlog
 from aiogram.types import CallbackQuery, Message
-from aura_core import Aggregator, HiveContext, NegotiationOffer, TelegramContext
+from aura_core import (
+    Aggregator,
+    HiveContext,
+    NegotiationOffer,
+    SystemVitals,
+    TelegramContext,
+)
 from opentelemetry import trace
 
 logger = structlog.get_logger(__name__)
@@ -11,6 +18,14 @@ tracer = trace.get_tracer(__name__)
 
 class TelegramAggregator(Aggregator[Any, TelegramContext]):
     """A - Aggregator: Extracts Telegram signals into context."""
+
+    async def get_vitals(self) -> SystemVitals:
+        """Proprioception for the Telegram Bot."""
+        # Simple status for now, could be expanded to check Bot API connectivity
+        return SystemVitals(
+            status="ok",
+            timestamp=datetime.now(UTC).isoformat(),
+        )
 
     async def perceive(
         self, signal: Any, **kwargs: Any
@@ -44,6 +59,7 @@ class TelegramAggregator(Aggregator[Any, TelegramContext]):
             hive_context = HiveContext(
                 item_id=item_id,
                 offer=NegotiationOffer(bid_amount=bid_amount),
+                # system_health will be automatically injected by MetabolicLoop
                 metadata={"history": history},
             )
 

@@ -2,12 +2,26 @@ import time
 from dataclasses import dataclass, field
 from typing import Any, Protocol, TypedDict, runtime_checkable
 
+from pydantic import BaseModel
+
 
 @runtime_checkable
 class Signal(Protocol):
     """Protocol for inbound signals."""
 
     pass
+
+
+class SystemVitals(BaseModel):
+    """Standardized system health metrics."""
+
+    status: str
+    cpu_usage_percent: float = 0.0
+    memory_usage_mb: float = 0.0
+    timestamp: str = ""
+    cached: bool = False
+    warnings: list[str] = []
+    error: str | None = None
 
 
 @dataclass
@@ -26,7 +40,7 @@ class HiveContext:
     item_id: str
     offer: NegotiationOffer
     item_data: dict[str, Any] = field(default_factory=dict)
-    system_health: dict[str, Any] = field(default_factory=dict)
+    system_health: SystemVitals | dict[str, Any] = field(default_factory=dict)
     request_id: str = ""
     metadata: dict[str, Any] = field(default_factory=dict)
 
