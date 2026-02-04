@@ -1,17 +1,24 @@
 from .dna import (
-    ALLOWED_CHAMBERS,
-    ALLOWED_ROOT_FILES,
-    MACRO_ATCG_FOLDERS,
     Aggregator,
-    BaseConnector,
     Connector,
     Generator,
     Membrane,
-    MetabolicLoop,
     Skill,
-    SkillRegistry,
     Transformer,
+)
+from .manifest import (
+    ALLOWED_CHAMBERS,
+    ALLOWED_ROOT_FILES,
+    MACRO_ATCG_FOLDERS,
     find_hive_root,
+    get_allowed_chambers,
+    get_allowed_root_files,
+    get_macro_atcg_folders,
+)
+from .metabolism import (
+    BaseConnector,
+    MetabolicLoop,
+    SkillRegistry,
 )
 from .types import (
     AuditObservation,
@@ -32,19 +39,22 @@ from .types import (
 )
 
 __all__ = [
-    # Constants & Helpers
+    # Manifest (Geography)
     "find_hive_root",
     "MACRO_ATCG_FOLDERS",
     "ALLOWED_ROOT_FILES",
     "ALLOWED_CHAMBERS",
-    # Protocols
+    "get_macro_atcg_folders",
+    "get_allowed_root_files",
+    "get_allowed_chambers",
+    # Protocols (The Law)
     "Aggregator",
     "Transformer",
     "Connector",
     "Generator",
     "Membrane",
     "Skill",
-    # Logic
+    # Engine (The Machinery)
     "BaseConnector",
     "SkillRegistry",
     "MetabolicLoop",
