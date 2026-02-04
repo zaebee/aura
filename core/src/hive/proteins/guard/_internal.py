@@ -4,9 +4,12 @@ from config import settings
 
 logger = logging.getLogger(__name__)
 
+
 class SafetyViolation(Exception):
     """Raised when a negotiation decision violates safety guardrails."""
+
     pass
+
 
 class OutputGuard:
     """
@@ -36,7 +39,7 @@ class OutputGuard:
                     "action": action,
                     "offered_price": offered_price,
                     "floor_price": floor_price,
-                }
+                },
             )
             raise SafetyViolation("Floor price violation")
 
@@ -50,7 +53,7 @@ class OutputGuard:
                     "internal_cost": internal_cost,
                     "margin": margin,
                     "min_margin": settings.safety.min_profit_margin,
-                }
+                },
             )
             raise SafetyViolation("Minimum profit margin violation")
 

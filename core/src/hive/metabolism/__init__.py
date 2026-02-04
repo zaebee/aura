@@ -25,7 +25,7 @@ class MetabolicLoop(
     BaseMetabolicLoop[Any, HiveContext, IntentAction, Observation, Any]
 ):
     """
-    Orchestrates the ATCG flow with core-specific telemetry via Telemetry Protein.
+    Orchestrates the ATCG flow with core-specific monitoring via Monitor Protein.
     """
 
     def __init__(
@@ -45,10 +45,11 @@ class MetabolicLoop(
         Execute one full metabolic cycle.
         """
         if self.registry:
-            await self.registry.execute("telemetry", "increment_counter", {
-                "name": "negotiation_total",
-                "labels": {"service": "core"}
-            })
+            await self.registry.execute(
+                "monitor",
+                "increment_counter",
+                {"name": "negotiation_total", "labels": {"service": "core"}},
+            )
 
         logger.info("metabolism_cycle_started")
 
@@ -56,10 +57,14 @@ class MetabolicLoop(
 
         if observation.success and observation.event_type == "negotiation_accept":
             if self.registry:
-                await self.registry.execute("telemetry", "increment_counter", {
-                    "name": "negotiation_accepted_total",
-                    "labels": {"service": "core"}
-                })
+                await self.registry.execute(
+                    "monitor",
+                    "increment_counter",
+                    {
+                        "name": "negotiation_accepted_total",
+                        "labels": {"service": "core"},
+                    },
+                )
 
         logger.info(
             "metabolism_cycle_completed",

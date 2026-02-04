@@ -43,10 +43,9 @@ class HiveGenerator(Generator[Observation, Event]):
             )
 
             # Emit via Pulse Protein
-            await self.registry.execute("pulse", "emit_event", {
-                "topic": topic,
-                "payload": payload
-            })
+            await self.registry.execute(
+                "pulse", "emit_event", {"topic": topic, "payload": payload}
+            )
 
         # 2. System Heartbeat
         heartbeat_topic = "aura.hive.heartbeat"

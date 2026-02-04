@@ -1,0 +1,11 @@
+name: monitor
+role: SensoryOrgan
+description: >
+  Standardized proprioception for the Hive.
+  Fetches metrics from Prometheus and initializes OpenTelemetry tracing.
+  Tracks economic counters like negotiation successes and heartbeats.
+capabilities:
+  - fetch_metrics: Retrieve system CPU, memory, and status vitals.
+  - health_check: Verify the protein's own operational state.
+  - increment_counter: Record event occurrences in Prometheus.
+manifest_version: 1.0

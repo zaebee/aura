@@ -1,5 +1,5 @@
 import pytest
-from src.hive.proteins.guard._output_guard import OutputGuard, SafetyViolation
+from src.hive.proteins.guard._internal import OutputGuard, SafetyViolation
 
 
 def test_margin_violation():

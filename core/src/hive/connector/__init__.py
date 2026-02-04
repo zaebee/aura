@@ -79,10 +79,11 @@ class HiveConnector(BaseConnector):
             item_name = context.item_data.get("name", "Aura Item")
 
             # Use Crypto Skill for price conversion
-            obs = await self.registry.execute("crypto", "convert_price", {
-                "usd_amount": action.price,
-                "currency": self.settings.crypto.currency
-            })
+            obs = await self.registry.execute(
+                "crypto",
+                "convert_price",
+                {"usd_amount": action.price, "currency": self.settings.crypto.currency},
+            )
 
             if not obs.success:
                 raise ValueError(f"Price conversion failed: {obs.error}")

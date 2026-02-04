@@ -11,7 +11,9 @@ from interfaces import NegotiationProvider, NegotiationResult, SearchResult
 logger = structlog.get_logger()
 
 
-class GRPCNegotiationClient(NegotiationProvider, SkillProtocol[dict[str, Any], Observation]):
+class GRPCNegotiationClient(
+    NegotiationProvider, SkillProtocol[dict[str, Any], Observation]
+):
     def __init__(self, grpc_url: str, timeout: float = 30.0) -> None:
         self.channel = grpc.aio.insecure_channel(grpc_url)
         self.stub = negotiation_pb2_grpc.NegotiationServiceStub(self.channel)

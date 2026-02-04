@@ -5,15 +5,18 @@ from aura_core import Observation, SkillProtocol
 
 from config import settings
 
-from ._output_guard import OutputGuard, SafetyViolation
+from ._internal import OutputGuard, SafetyViolation
+from .schema import SafePriceParams, ValidationParams
 
 logger = logging.getLogger(__name__)
 
 DEFAULT_MIN_MARGIN = 0.1
 
+
 class GuardSkill(SkillProtocol[dict[str, Any], Observation]):
     """
     Guard Protein: Handles safety validation and safe price calculation.
+    Standardized following the Crystalline Protein Standard.
     """
 
     def __init__(self) -> None:
@@ -23,59 +26,46 @@ class GuardSkill(SkillProtocol[dict[str, Any], Observation]):
         return "guard"
 
     def get_capabilities(self) -> list[str]:
-        return ["validate_decision", "get_safe_price", "sanitize_input"]
+        return ["validate_decision", "get_safe_price"]
 
     async def initialize(self) -> bool:
         return True
 
     async def execute(self, intent: str, params: dict[str, Any]) -> Observation:
-        if intent in ["validate_decision", "validate_margin", "validate_floor"]:
-            try:
-                decision = params.get("decision", {})
-                context = params.get("context", {})
-                self.guard.validate_decision(decision, context)
+        try:
+            if intent in ["validate_decision", "validate_margin", "validate_floor"]:
+                p = ValidationParams(**params)
+                self.guard.validate_decision(p.decision, p.context)
                 return Observation(success=True)
-            except SafetyViolation as e:
-                error_msg = str(e)
-                error_code = "SAFETY_VIOLATION"
-                if "margin" in error_msg.lower():
-                    error_code = "MIN_MARGIN_VIOLATION"
-                elif "floor" in error_msg.lower():
-                    error_code = "FLOOR_PRICE_VIOLATION"
-                elif "price" in error_msg.lower():
-                    error_code = "INVALID_PRICE"
 
-                safe_price = self._calculate_safe_price(params.get("context", {}), error_code)
-                return Observation(
-                    success=False,
-                    error=error_msg,
-                    data={
-                        "error_code": error_code,
-                        "safe_price": safe_price
-                    }
-                )
-            except Exception as e:
-                return Observation(success=False, error=f"Validation error: {e}")
+            elif intent == "get_safe_price":
+                p_safe = SafePriceParams(**params)
+                price = self._calculate_safe_price(p_safe.context, p_safe.reason)
+                return Observation(success=True, data={"safe_price": price})
 
-        elif intent == "get_safe_price":
-            reason = params.get("reason", "")
-            safe_price = self._calculate_safe_price(params.get("context", {}), reason)
-            return Observation(success=True, data={"safe_price": safe_price})
+            return Observation(success=False, error=f"Unknown intent: {intent}")
+        except SafetyViolation as e:
+            err_msg = str(e)
+            code = "SAFETY_VIOLATION"
+            if "margin" in err_msg.lower():
+                code = "MIN_MARGIN_VIOLATION"
+            elif "floor" in err_msg.lower():
+                code = "FLOOR_PRICE_VIOLATION"
 
-        elif intent == "sanitize_input":
-             return Observation(success=True, data=params.get("text", ""))
-
-        return Observation(success=False, error=f"Unknown intent: {intent}")
+            safe_p = self._calculate_safe_price(params.get("context", {}), code)
+            return Observation(
+                success=False,
+                error=err_msg,
+                data={"error_code": code, "safe_price": safe_p},
+            )
+        except Exception as e:
+            return Observation(success=False, error=str(e))
 
     def _calculate_safe_price(self, context: dict, reason: str) -> float:
-        floor_price = context.get("floor_price", 0.0)
-
+        floor = float(context.get("floor_price", 0.0))
         if "margin" in reason.lower():
-            min_margin = getattr(settings.logic, "min_margin", DEFAULT_MIN_MARGIN)
-            # Ensure we don't divide by zero
-            if min_margin >= 1.0:
-                min_margin = DEFAULT_MIN_MARGIN
-            return round(floor_price / (1 - min_margin), 2)
-
-        # Default fallback: floor + 5%
-        return round(floor_price * 1.05, 2)
+            min_m = float(getattr(settings.logic, "min_margin", DEFAULT_MIN_MARGIN))
+            if min_m >= 1.0:
+                min_m = DEFAULT_MIN_MARGIN
+            return float(round(floor / (1 - min_m), 2))
+        return float(round(floor * 1.05, 2))

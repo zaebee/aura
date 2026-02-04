@@ -1,0 +1,62 @@
+import logging
+from typing import Any
+
+from aura_core import Observation, SkillProtocol
+
+from config import get_settings
+
+from ._internal import (
+    MetricsCache,
+    fetch_vitals,
+    negotiation_accepted_total,
+    negotiation_total,
+)
+from .schema import MetricIncrementParams
+
+logger = logging.getLogger(__name__)
+
+
+class MonitorSkill(SkillProtocol[dict[str, Any], Observation]):
+    """
+    Monitor Protein: Handles system metrics and health checks.
+    Standardized following the Crystalline Protein Standard.
+    """
+
+    def __init__(self) -> None:
+        self.settings = get_settings()
+        self._metrics_cache = MetricsCache(ttl_seconds=30)
+
+    def get_name(self) -> str:
+        return "monitor"
+
+    def get_capabilities(self) -> list[str]:
+        return ["fetch_metrics", "health_check", "increment_counter"]
+
+    async def initialize(self) -> bool:
+        return True
+
+    async def execute(self, intent: str, params: dict[str, Any]) -> Observation:
+        try:
+            if intent in ["fetch_metrics", "get_vitals"]:
+                vitals = await fetch_vitals(self._metrics_cache, self.settings)
+                return Observation(success=True, data=vitals.model_dump())
+
+            elif intent == "health_check":
+                return Observation(success=True, data={"status": "healthy"})
+
+            elif intent == "increment_counter":
+                p = MetricIncrementParams(**params)
+                if p.name == "negotiation_total":
+                    negotiation_total.labels(**p.labels).inc()
+                elif p.name == "negotiation_accepted_total":
+                    negotiation_accepted_total.labels(**p.labels).inc()
+                else:
+                    return Observation(
+                        success=False, error=f"Unknown counter: {p.name}"
+                    )
+                return Observation(success=True)
+
+            return Observation(success=False, error=f"Unknown intent: {intent}")
+        except Exception as e:
+            logger.error(f"Monitor skill error: {e}")
+            return Observation(success=False, error=str(e))

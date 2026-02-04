@@ -11,17 +11,30 @@ from sqlalchemy import (
     Float,
     LargeBinary,
     String,
+    create_engine,
 )
 from sqlalchemy.dialects.postgresql import JSONB, UUID
-from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
+from sqlalchemy.orm import (
+    DeclarativeBase,
+    Mapped,
+    mapped_column,
+    sessionmaker,
+)
 
 from config import get_settings
 
 settings = get_settings()
 
+# 1. Implementation Details: SQLAlchemy Setup
+engine = create_engine(str(settings.database.url))
+SessionLocal = sessionmaker(bind=engine)
+
+
 class Base(DeclarativeBase):
     pass
 
+
+# 2. Implementation Details: Database Models
 class InventoryItem(Base):
     __tablename__ = "inventory_items"
 
