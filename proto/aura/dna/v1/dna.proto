@@ -1,0 +1,74 @@
+// DNA Protocol Buffers - Universal Language for the Hive
+// 
+// These definitions can be generated for TS/Go/Rust/Python.
+// They represent the fundamental data structures of the ATCG metabolic loop.
+
+syntax = "proto3";
+
+package aura.dna.v1;
+
+import "google/protobuf/struct.proto";
+import "google/protobuf/timestamp.proto";
+
+// Signal - Inbound stimulus to the Hive
+message Signal {
+  string signal_id = 1;
+  string signal_type = 2;  // e.g., "negotiation", "audit", "telegram"
+  google.protobuf.Struct payload = 3;
+  google.protobuf.Timestamp timestamp = 4;
+  map<string, string> metadata = 5;
+}
+
+// Context - Enriched understanding after Aggregator processing
+message Context {
+  string context_id = 1;
+  string context_type = 2;  // e.g., "hive", "bee", "telegram"
+  google.protobuf.Struct data = 3;
+  SystemVitals system_health = 4;
+  map<string, string> metadata = 5;
+}
+
+// Intent - Decision made by the Transformer
+message Intent {
+  string intent_id = 1;
+  string action = 2;  // e.g., "accept", "counter", "reject", "audit"
+  google.protobuf.Struct params = 3;
+  string reasoning = 4;
+  repeated IntentStep steps = 5;
+  map<string, string> metadata = 6;
+}
+
+// IntentStep - A single step in a multi-step Intent
+message IntentStep {
+  string skill = 1;
+  string intent = 2;
+  google.protobuf.Struct params = 3;
+}
+
+// Observation - Result of Connector execution
+message Observation {
+  bool success = 1;
+  google.protobuf.Struct data = 2;
+  optional int64 message_id = 3;
+  optional string error = 4;
+  string event_type = 5;
+  map<string, string> metadata = 6;
+}
+
+// Event - Emitted to the Hive's bloodstream (NATS)
+message Event {
+  string topic = 1;
+  google.protobuf.Struct payload = 2;
+  google.protobuf.Timestamp timestamp = 3;
+}
+
+// SystemVitals - Health metrics for proprioception
+message SystemVitals {
+  string status = 1;  // "ok" | "degraded" | "error"
+  double cpu_usage_percent = 2;
+  double memory_usage_mb = 3;
+  google.protobuf.Timestamp timestamp = 4;
+  bool cached = 5;
+  repeated string warnings = 6;
+  optional string error = 7;
+}
