@@ -120,6 +120,10 @@ token_usage: 0
 event: manual
 -->
 ## 🧬 Active Mutations
+- [/] **Task 56: DNA Crystallization** (Assignee: bee.Ona)
+- [ ] **Task 57: Aggregator Decoupling** (Assignee: bee.Jules) - *Priority: HIGH*
+- [ ] **Task 58: Brain Decontamination** (Assignee: bee.Jules) - *Status: CRITICAL*
+- [ ] Implement `arch_brain.json` before 1M token limit.
 - [ ] **Operation Genesis (Tasks 26, 37, 29)** 
   - *Assignee:* bee.Ona + bee.Jules
   - *Status:* 🚀 EXECUTING (High Priority)
