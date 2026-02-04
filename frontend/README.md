@@ -1,36 +1,63 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Aura Frontend
 
-## Getting Started
+A lightning-fast, tiny containerized React application built with Vite and TypeScript, following the ATCG-M architectural pattern.
 
-First, run the development server:
+## 🚀 Overview
+
+The Aura Frontend serves as the user interface for the Aura Agent system. It has been migrated from Next.js to a pure client-side Vite + React setup to achieve minimal image size (<25MB) and maximum performance.
+
+## 🧬 ATCG-M Architecture
+
+This project follows the Hive's internal structure:
+
+- **Aggregator (`src/hive/aggregator/`)**: Logic for fetching Hive State and Search results.
+- **Transformer (`src/hive/transformer/`)**: The JIT (Just-In-Time) UI engine that transforms backend requests into dynamic React components.
+- **Connector (`src/hive/connector/`)**: API calling logic and Agent Wallet management.
+- **Membrane (`src/hive/membrane/`)**: Input validation and schema checking.
+
+## 🛠️ Development
+
+### Prerequisites
+
+- [Bun](https://bun.sh/) (preferred) or Node.js 20+
+
+### Setup
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+cd frontend
+bun install
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+### Run Development Server
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+```bash
+bun run dev
+```
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+### Build for Production
 
-## Learn More
+```bash
+bun run build
+```
 
-To learn more about Next.js, take a look at the following resources:
+### Linting
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+```bash
+bun run lint
+```
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+### Protocol Synchronization
 
-## Deploy on Vercel
+To regenerate TypeScript stubs from Protobuf definitions:
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+```bash
+bun run gen:proto
+```
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+## 🐳 Docker
+
+The project uses a multi-stage Docker build:
+1. **Builder**: Uses `oven/bun:alpine` to build static assets.
+2. **Runner**: Uses `nginx:alpine` to serve the `dist/` folder.
+
+Final image size is optimized to be under 25MB.

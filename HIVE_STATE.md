@@ -130,6 +130,27 @@ token_usage: 0
 event: manual
 -->
 ## 🧬 Active Mutations`
+- [/] **Task 56: DNA Crystallization** (Assignee: bee.Ona)
+- [ ] **Task 58: Brain Decontamination** (Assignee: bee.Jules) - *Status: CRITICAL*
+- [ ] Implement `arch_brain.json` before 1M token limit.
+- [ ] **Operation Genesis (Tasks 26, 37, 29)** 
+  - *Assignee:* bee.Ona + bee.Jules
+  - *Status:* 🚀 EXECUTING (High Priority)
+  - *Goal:* Total synchronization of DNA across all Hive Cells.
+- [x] **Task 45: Healing the Visual Layer** (Assignee: bee.Claude)
+  - *Goal:* Eradicate Semantic Blights. Implement Fractal Maps.
+  - *Status:* ✍️ SCRIBING (Remediation started).
+- [ ] **Operation Genesis (Final Step):** 🌪️ CONFLICT RESOLUTION.
+  - *Status:* 🔴 BLOCKED by Merge Conflicts.
+  - *Action:* Jules is performing manual DNA re-anchoring.
+  - *Warning:* CI/CD is temporarily broken until paths are aligned.
+
+## 🧱 Architectural Debt
+- [x] Establish Visual Reasoning Layer (PR #69 - Commit 6557b4e).
+- [ ] Finalize total structural fractalization (Waiting for Jules).
+- [ ] Implement NATS Bloodstream Visualization (Backlog).
+- [ ] Move `aura_brain.json` to a persistent /data/ volume (Planned).
+>>>>>>> main
 - [/] Task 24: bee.Chronicler Initialization - Status: AWAKENING`
 - [ ] Task 35: Root Sanctification (Macro-ATCG) - Assigned to bee.Jules`
 
