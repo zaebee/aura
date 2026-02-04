@@ -27,9 +27,7 @@ class TelegramAggregator(Aggregator[Any, TelegramContext]):
             timestamp=datetime.now(UTC).isoformat(),
         )
 
-    async def perceive(
-        self, signal: Any, **kwargs: Any
-    ) -> TelegramContext:
+    async def perceive(self, signal: Any, **kwargs: Any) -> TelegramContext:
         state_data = kwargs.get("state_data", {})
         with tracer.start_as_current_span("aggregator_perceive") as span:
             user_id = 0

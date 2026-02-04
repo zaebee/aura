@@ -54,5 +54,7 @@ async def test_process_bid_accepted(message, mock_metabolism):
 
     await process_bid(message, state, mock_metabolism)
 
-    mock_metabolism.execute.assert_called_with(message, state_data={"item_id": "hotel_1"})
+    mock_metabolism.execute.assert_called_with(
+        message, state_data={"item_id": "hotel_1"}
+    )
     state.clear.assert_called()

@@ -11,6 +11,7 @@ def _get_counter(name: str, documentation: str, labelnames: list[str]) -> Counte
         return cast(Counter, REGISTRY._names_to_collectors[name])
     return Counter(name, documentation, labelnames)
 
+
 negotiation_total = _get_counter(
     "negotiation_total", "Total number of negotiations initiated", ["service"]
 )

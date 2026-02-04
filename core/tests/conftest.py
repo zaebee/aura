@@ -11,7 +11,6 @@ os.environ.setdefault(
 os.environ.setdefault("AURA_LLM__API_KEY", "test-api-key")
 
 
-
 class MockInventoryItem:
     """Mock inventory item for testing without database dependency."""
 

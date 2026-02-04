@@ -22,7 +22,9 @@ logger = structlog.get_logger(__name__)
 tracer = trace.get_tracer(__name__)
 
 
-class MetabolicLoop(BaseMetabolicLoop[Any, HiveContext, IntentAction, Observation, Any]):
+class MetabolicLoop(
+    BaseMetabolicLoop[Any, HiveContext, IntentAction, Observation, Any]
+):
     """
     Orchestrates the ATCG flow with core-specific telemetry:
     Signal -> Membrane(In) -> Aggregator -> Transformer -> Membrane(Out) -> Connector -> Generator
