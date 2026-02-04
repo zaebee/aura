@@ -6,7 +6,7 @@ from aiogram.types import (
     CallbackQuery,
     Message,
 )
-from hive.metabolism import TelegramMetabolism
+from aura_core import MetabolicLoop
 
 router = Router()
 
@@ -26,14 +26,10 @@ async def cmd_start(message: Message) -> None:
 
 @router.message(Command("search"))
 async def cmd_search(
-    message: Message, command: CommandObject, metabolism: TelegramMetabolism
+    message: Message, command: CommandObject, metabolism: MetabolicLoop
 ) -> None:
-    if not command.args:
-        await message.answer("Usage: /search <query>")
-        return
-
     # Execute full ATCG search loop
-    await metabolism.execute_search(command.args, message)
+    await metabolism.execute(message)
 
 
 @router.callback_query(F.data.startswith("select:"))
@@ -52,12 +48,12 @@ async def process_select_hotel(callback: CallbackQuery, state: FSMContext) -> No
 
 @router.message(NegotiationStates.WaitingForBid, F.text.regexp(r"^\d+(\.\d+)?$"))
 async def process_bid(
-    message: Message, state: FSMContext, metabolism: TelegramMetabolism
+    message: Message, state: FSMContext, metabolism: MetabolicLoop
 ) -> None:
     data = await state.get_data()
 
     # Execute full ATCG negotiation loop
-    observation = await metabolism.execute_negotiation(message, data)
+    observation = await metabolism.execute(message, state_data=data)
 
     if not observation.success:
         await message.answer(f"Sorry, something went wrong: {observation.error}")

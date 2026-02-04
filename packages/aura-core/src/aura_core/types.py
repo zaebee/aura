@@ -39,6 +39,7 @@ class IntentAction:
     price: float
     message: str
     thought: str = ""
+    steps: list[dict[str, Any]] = field(default_factory=list)
     metadata: dict[str, Any] = field(default_factory=dict)
 
 

@@ -1,94 +1,93 @@
 from typing import Any
 
 import structlog
-from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup
-from aura_core import TelegramContext, Transformer, UIAction
+from aura_core import IntentAction, TelegramContext, Transformer
 from opentelemetry import trace
 
 logger = structlog.get_logger(__name__)
 tracer = trace.get_tracer(__name__)
 
 
-class TelegramTransformer(Transformer[TelegramContext, UIAction]):
-    """T - Transformer: Decides on UI actions."""
+class TelegramTransformer(Transformer[TelegramContext, IntentAction]):
+    """T - Transformer: Decides on multi-step IntentActions."""
 
     async def think(
         self,
         context: TelegramContext,
         **kwargs: Any,
-    ) -> UIAction:
-        core_response = kwargs.get("core_response")
-        search_results = kwargs.get("search_results")
+    ) -> IntentAction:
         with tracer.start_as_current_span("transformer_think") as span:
-            # Handle Search results
-            if search_results is not None:
-                span.set_attribute("action", "search_results")
-                if not search_results:
-                    return UIAction(text="No results found or core unreachable. 😕")
-
-                keyboard = []
-                for item in search_results:
-                    item_id = item.get("item_id", item.get("itemId"))
-                    name = item.get("name", "Unknown")
-                    base_price = item.get("base_price", item.get("basePrice", 0))
-
-                    keyboard.append(
-                        [
-                            InlineKeyboardButton(
-                                text=f"{name} (${base_price})",
-                                callback_data=f"select:{item_id}",
-                            )
-                        ]
+            # 1. Check for Search command
+            if context.message_text and context.message_text.startswith("/search"):
+                query = context.message_text.replace("/search", "").strip()
+                if not query:
+                    return IntentAction(
+                        action="error",
+                        price=0.0,
+                        message="Please provide a search query.",
+                        steps=[
+                            {
+                                "skill": "messenger",
+                                "intent": "send_message",
+                                "params": {"text": "Usage: /search <query>"},
+                            }
+                        ],
                     )
 
-                markup = InlineKeyboardMarkup(inline_keyboard=keyboard)
-                return UIAction(
-                    text="Choose a hotel to negotiate:", reply_markup=markup
+                span.set_attribute("action", "search")
+                return IntentAction(
+                    action="search",
+                    price=0.0,
+                    message=f"Searching for {query}",
+                    steps=[
+                        {
+                            "skill": "core_link",
+                            "intent": "search",
+                            "params": {"query": query},
+                        },
+                        {
+                            "skill": "messenger",
+                            "intent": "send_search_results",
+                            "params": {},
+                        },
+                    ],
                 )
 
-            # Handle Negotiation flow
-            if core_response is None:
-                span.set_attribute("action", "thinking")
-                return UIAction(text="⏳ Aura is thinking...", show_thinking=True)
-
-            span.set_attribute("core_response_present", True)
-
-            if "error" in core_response:
-                return UIAction(text=f"❌ Error: {core_response['error']}")
-
-            if "accepted" in core_response and core_response["accepted"] is not None:
-                acc = core_response["accepted"]
-                final_price = acc.get("finalPrice", acc.get("final_price"))
-                code = acc.get("reservationCode", acc.get("reservation_code"))
-
-                keyboard = [
-                    [
-                        InlineKeyboardButton(
-                            text="Pay Now (Stub)", callback_data="pay_stub"
-                        )
-                    ]
-                ]
-                markup = InlineKeyboardMarkup(inline_keyboard=keyboard)
-
-                return UIAction(
-                    text=f"✅ **Deal!**\nFinal Price: ${final_price}\nCode: `{code}`",
-                    reply_markup=markup,
+            # 2. Check for Bid (Negotiation)
+            if context.hive_context and context.hive_context.offer.bid_amount > 0:
+                item_id = context.hive_context.item_id
+                bid = context.hive_context.offer.bid_amount
+                span.set_attribute("action", "negotiate")
+                return IntentAction(
+                    action="negotiate",
+                    price=bid,
+                    message=f"Negotiating for {item_id} at ${bid}",
+                    steps=[
+                        {
+                            "skill": "core_link",
+                            "intent": "negotiate",
+                            "params": {"item_id": item_id, "bid_amount": bid},
+                        },
+                        {
+                            "skill": "messenger",
+                            "intent": "send_negotiation_results",
+                            "params": {},
+                        },
+                    ],
                 )
 
-            if "countered" in core_response and core_response["countered"] is not None:
-                cnt = core_response["countered"]
-                proposed_price = cnt.get("proposedPrice", cnt.get("proposed_price"))
-                msg = cnt.get("humanMessage", cnt.get("human_message", ""))
-
-                return UIAction(
-                    text=f"⚠️ **Offer: ${proposed_price}**\n{msg}\n\n"
-                    "You can enter a new bid or say /search to restart."
-                )
-
-            if "ui_required" in core_response:
-                return UIAction(text="👮 Human check needed. Please wait for an agent.")
-
-            if "rejected" in core_response:
-                return UIAction(text="❌ Offer rejected. Try a higher bid.")
-
-            return UIAction(text="Received an unknown response from Aura Core.")
+            # Default: Show help or unknown
+            return IntentAction(
+                action="help",
+                price=0.0,
+                message="Show help",
+                steps=[
+                    {
+                        "skill": "messenger",
+                        "intent": "send_message",
+                        "params": {
+                            "text": "Welcome! Try /search <destination> or enter a bid to start negotiating."
+                        },
+                    }
+                ],
+            )

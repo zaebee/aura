@@ -5,12 +5,12 @@ import nats
 import structlog
 from aiogram import Bot, Dispatcher
 from bot import router
+from aura_core import MetabolicLoop, SkillRegistry
 from hive.aggregator import TelegramAggregator
 from hive.connector import TelegramConnector
 from hive.connector.proteins.aura_client import GRPCNegotiationClient
 from hive.connector.proteins.telegram_api import TelegramProtein
 from hive.generator import TelegramGenerator
-from hive.metabolism import TelegramMetabolism
 from hive.transformer import TelegramTransformer
 from opentelemetry import trace
 from opentelemetry.exporter.otlp.proto.grpc.trace_exporter import OTLPSpanExporter
@@ -73,12 +73,17 @@ async def main() -> None:
         settings.core_url, timeout=settings.negotiation_timeout
     )
 
+    # Initialize Skill Registry
+    registry = SkillRegistry()
+    registry.register("messenger", telegram_protein)
+    registry.register("core_link", aura_protein)
+
     # Initialize Hive components
     aggregator = TelegramAggregator()
     transformer = TelegramTransformer()
-    connector = TelegramConnector(telegram_protein, aura_protein)
+    connector = TelegramConnector(registry)
     generator = TelegramGenerator(nats_client=nc)
-    metabolism = TelegramMetabolism(aggregator, transformer, connector, generator)
+    metabolism = MetabolicLoop(aggregator, transformer, connector, generator)
 
     # Initialize Dispatcher
     dp = Dispatcher()

@@ -3,11 +3,13 @@ from .dna import (
     ALLOWED_ROOT_FILES,
     MACRO_ATCG_FOLDERS,
     Aggregator,
+    BaseConnector,
     Connector,
     Generator,
     Membrane,
     MetabolicLoop,
     Skill,
+    SkillRegistry,
     Transformer,
     find_hive_root,
 )
@@ -42,6 +44,8 @@ __all__ = [
     "Membrane",
     "Skill",
     # Logic
+    "BaseConnector",
+    "SkillRegistry",
     "MetabolicLoop",
     # Types
     "Signal",

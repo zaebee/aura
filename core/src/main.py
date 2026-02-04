@@ -7,6 +7,7 @@ import grpc
 import grpc.aio
 import nats
 from grpc_health.v1 import health_pb2, health_pb2_grpc
+from aura_core import SkillRegistry
 from hive.aggregator import (
     HiveAggregator,
     InventoryItem,
@@ -373,9 +374,14 @@ async def serve() -> None:
         logger.info("market_service_initialized")
 
     # Initialize Hive components (Aggregator, Transformer/LLM, etc.)
+    registry = SkillRegistry()
+    # Register local proteins as skills if they implement the protocol
+    if crypto_provider:
+        registry.register("solana_provider", crypto_provider)
+
     aggregator = HiveAggregator()
     transformer = AuraTransformer()  # Heavy: Loads DSPy/LLM
-    connector = HiveConnector(market_service=market_service)
+    connector = HiveConnector(registry=registry, market_service=market_service)
     generator = HiveGenerator(nats_client=nc)
     membrane = HiveMembrane()
 

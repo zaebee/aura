@@ -26,7 +26,7 @@ async def test_cmd_search_results(message, mock_metabolism):
 
     await cmd_search(message, command, mock_metabolism)
 
-    mock_metabolism.execute_search.assert_called_with("Paris", message)
+    mock_metabolism.execute.assert_called_with(message)
 
 
 @pytest.mark.asyncio
@@ -48,11 +48,11 @@ async def test_process_bid_accepted(message, mock_metabolism):
     state.get_data.return_value = {"item_id": "hotel_1"}
     message.text = "90"
 
-    mock_metabolism.execute_negotiation.return_value = Observation(
+    mock_metabolism.execute.return_value = Observation(
         success=True, event_type="deal_accepted"
     )
 
     await process_bid(message, state, mock_metabolism)
 
-    mock_metabolism.execute_negotiation.assert_called()
+    mock_metabolism.execute.assert_called_with(message, state_data={"item_id": "hotel_1"})
     state.clear.assert_called()
