@@ -54,6 +54,9 @@ class MetabolicLoop(
 
         observation = await super().execute(signal, **kwargs)
 
+        if is_heartbeat:
+            observation.metadata["is_heartbeat"] = True
+
         if observation.success and observation.event_type == "negotiation_accept":
             if self.registry:
                 await self.registry.execute("telemetry", "increment_counter", {
