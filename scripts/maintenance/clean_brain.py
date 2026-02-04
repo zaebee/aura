@@ -7,10 +7,8 @@ def clean_markdown(text: str) -> str:
     """Remove Markdown code blocks from string."""
     if not isinstance(text, str):
         return text
-    # Remove ```json and ``` markers
-    text = re.sub(r"^```json\s*", "", text, flags=re.IGNORECASE)
-    text = re.sub(r"^```\s*", "", text)
-    text = re.sub(r"\s*```$", "", text)
+    # Remove ```json and ``` markers with a single robust regex
+    text = re.sub(r"^\s*```(?:json)?\s*|\s*```\s*$", "", text, flags=re.IGNORECASE)
     return text.strip()
 
 def process_demo(demo: dict) -> dict:
@@ -24,6 +22,13 @@ def process_demo(demo: dict) -> dict:
             target_key = "thought"
         elif k in ["response", "ideal_response", "action"]:
             target_key = "action"
+
+        # Check for key collisions to avoid silent data loss
+        if target_key in new_demo:
+            raise ValueError(
+                f"Data collision: demo already has '{target_key}' key. "
+                f"Original keys: {list(demo.keys())}"
+            )
 
         # If action is a dict, convert to JSON string before cleaning
         if target_key == "action" and isinstance(v, dict):
@@ -56,20 +61,18 @@ def clean_brain_file(filepath: str):
         for field in ["demos", "train", "traces"]:
             if field in data["negotiate"] and isinstance(data["negotiate"][field], list):
                 print(f"Processing {filepath} -> negotiate.{field}...")
-                cleaned_list = []
-                for entry in data["negotiate"][field]:
-                    cleaned_list.append(process_demo(entry))
-                data["negotiate"][field] = cleaned_list
+                data["negotiate"][field] = [
+                    process_demo(entry) for entry in data["negotiate"][field]
+                ]
 
     # Case 2: Training data (list of scenarios with 'turns')
     elif isinstance(data, list):
         print(f"Processing {filepath} scenarios...")
         for scenario in data:
             if "turns" in scenario and isinstance(scenario["turns"], list):
-                cleaned_turns = []
-                for turn in scenario["turns"]:
-                    cleaned_turns.append(process_demo(turn))
-                scenario["turns"] = cleaned_turns
+                scenario["turns"] = [
+                    process_demo(turn) for turn in scenario["turns"]
+                ]
 
     # Save cleaned data
     with open(path, "w", encoding="utf-8") as f:
