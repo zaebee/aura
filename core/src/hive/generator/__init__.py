@@ -1,5 +1,4 @@
 import time
-from typing import Any
 
 import structlog
 from aura_core import Event, Generator, Observation, SkillRegistry

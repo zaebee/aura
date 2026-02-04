@@ -1,7 +1,8 @@
 import asyncio
+
 from hive.aggregator import generate_embedding
-from hive.proteins.storage import StorageProtein
 from hive.metabolism.logging_config import configure_logging, get_logger
+from hive.proteins.storage import StorageProtein
 
 # Configure structured logging on startup
 configure_logging()

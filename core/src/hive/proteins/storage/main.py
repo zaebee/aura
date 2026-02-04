@@ -8,7 +8,8 @@ from sqlalchemy import create_engine, text
 from sqlalchemy.orm import sessionmaker
 
 from config import get_settings
-from .models import Base, InventoryItem, LockedDeal, DealStatus
+
+from .models import Base, DealStatus, InventoryItem, LockedDeal
 
 logger = logging.getLogger(__name__)
 

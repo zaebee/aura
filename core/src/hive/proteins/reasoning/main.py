@@ -4,10 +4,11 @@ from typing import Any
 
 import dspy
 from aura_core import Observation, SkillProtocol
+
 from config import get_settings
 
-from ._engine import AuraNegotiator
 from ._embeddings import generate_embedding as _generate_embedding
+from ._engine import AuraNegotiator
 
 logger = logging.getLogger(__name__)
 

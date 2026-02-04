@@ -10,6 +10,7 @@ from datetime import UTC, datetime, timedelta
 from typing import Any
 
 from aura_core import SkillProtocol
+
 from hive.proto.aura.negotiation.v1 import negotiation_pb2
 
 logger = logging.getLogger(__name__)

@@ -13,6 +13,7 @@ import structlog
 
 from config import get_settings
 from hive.proto.aura.negotiation.v1 import negotiation_pb2
+
 from ._engine import AuraNegotiator
 
 logger = structlog.get_logger(__name__)

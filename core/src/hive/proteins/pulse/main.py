@@ -6,6 +6,7 @@ from typing import Any
 import nats
 import nats.errors
 from aura_core import Observation, SkillProtocol
+
 from config import get_settings
 
 logger = logging.getLogger(__name__)

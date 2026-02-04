@@ -45,7 +45,7 @@ allowed_chambers:
   core/scripts: WorkerDirectives
   api-gateway: HiveGate
   core/src/config: SacredCodex
-  core/src/hive/services: LegacyChamber
+  core/src/hive/services: WorkerDirectives
   core/src/hive/transformer: ReasoningNucleus
   core/src/hive/connector/proteins: SecurityCitadel
   core/src/hive/membrane: HiveMembrane
@@ -56,7 +56,16 @@ allowed_chambers:
   proto: SacredScrolls
   docs: ChroniclersArchive
   agents: WorkerCells
+  agents/bee-keeper: KeeperCell
   agents/bee-keeper/src/hive/: KeeperNucleus
+  core/src/hive/aggregator/db.py: AuthorizedEnzyme
+  core/src/hive/aggregator/embeddings.py: AuthorizedEnzyme
+  core/src/hive/aggregator/main.py: AuthorizedEnzyme
+  core/src/hive/aggregator/vitals.py: AuthorizedEnzyme
+  core/src/hive/transformer/__init__.py: AuthorizedEnzyme
+  core/src/hive/connector/__init__.py: AuthorizedEnzyme
+  core/src/hive/generator/__init__.py: AuthorizedEnzyme
+  core/src/hive/services/market.py: AuthorizedEnzyme
   adapters: HiveExtensions
   frontend: HiveWindow
   tools: ToolShed

@@ -302,12 +302,12 @@ async def serve() -> None:
     # 6. Initialize Skills (Proteins)
     registry = SkillRegistry()
 
-    from hive.proteins.storage import StorageSkill
     from hive.proteins.crypto import CryptoSkill
-    from hive.proteins.reasoning import ReasoningSkill
-    from hive.proteins.telemetry import TelemetrySkill
-    from hive.proteins.pulse import PulseSkill
     from hive.proteins.guard import GuardSkill
+    from hive.proteins.pulse import PulseSkill
+    from hive.proteins.reasoning import ReasoningSkill
+    from hive.proteins.storage import StorageSkill
+    from hive.proteins.telemetry import TelemetrySkill
 
     storage_protein = StorageSkill()
     crypto_protein = CryptoSkill() if settings.crypto.enabled else None
@@ -387,7 +387,7 @@ async def serve() -> None:
                         ),
                         request_id=f"heartbeat-{uuid.uuid4()}",
                     )
-                    await metabolism.execute(mock_signal)
+                    await metabolism.execute(mock_signal, is_heartbeat=True)
                     logger.info("heartbeat_deal_successful")
                 else:
                     logger.warning("heartbeat_deal_failed_no_items")

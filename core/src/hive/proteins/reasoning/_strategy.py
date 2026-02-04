@@ -14,6 +14,7 @@ from pydantic import BaseModel, Field
 
 from hive.metabolism.logging_config import bind_request_id
 from hive.proto.aura.negotiation.v1 import negotiation_pb2
+
 from ._engine import LLMEngine
 
 logger = structlog.get_logger(__name__)

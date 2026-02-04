@@ -9,8 +9,8 @@ from aura_core import (
     IntentAction,
     Membrane,
     Observation,
-    Transformer,
     SkillRegistry,
+    Transformer,
 )
 from aura_core import (
     MetabolicLoop as BaseMetabolicLoop,

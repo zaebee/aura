@@ -1,5 +1,5 @@
 import logging
-from typing import Any
+
 from config import settings
 
 logger = logging.getLogger(__name__)
