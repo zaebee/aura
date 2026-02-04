@@ -2,10 +2,11 @@ import logging
 from typing import Any
 
 from aura_core import Observation, SkillProtocol
+
 from config import get_settings
 
-from ._vitals import MetricsCache, fetch_vitals
 from ._metrics import negotiation_accepted_total, negotiation_total
+from ._vitals import MetricsCache, fetch_vitals
 
 logger = logging.getLogger(__name__)
 

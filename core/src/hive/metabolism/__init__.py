@@ -9,8 +9,8 @@ from aura_core import (
     IntentAction,
     Membrane,
     Observation,
-    Transformer,
     SkillRegistry,
+    Transformer,
 )
 from aura_core import (
     MetabolicLoop as BaseMetabolicLoop,
@@ -53,9 +53,6 @@ class MetabolicLoop(
         logger.info("metabolism_cycle_started")
 
         observation = await super().execute(signal, **kwargs)
-
-        if is_heartbeat:
-            observation.metadata["is_heartbeat"] = True
 
         if observation.success and observation.event_type == "negotiation_accept":
             if self.registry:

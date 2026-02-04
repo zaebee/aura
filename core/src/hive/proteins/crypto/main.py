@@ -2,12 +2,13 @@ import logging
 from typing import Any
 
 from aura_core import Observation, SkillProtocol
+
 from config import get_settings
 from config.llm import get_raw_key
 
-from ._solana import CryptoProtein
 from ._encryption import SecretEncryption
 from ._pricing import PriceConverter
+from ._solana import CryptoProtein
 
 logger = logging.getLogger(__name__)
 

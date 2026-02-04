@@ -302,12 +302,12 @@ async def serve() -> None:
     # 6. Initialize Skills (Proteins)
     registry = SkillRegistry()
 
-    from hive.proteins.storage import StorageSkill
     from hive.proteins.crypto import CryptoSkill
-    from hive.proteins.reasoning import ReasoningSkill
-    from hive.proteins.telemetry import TelemetrySkill
-    from hive.proteins.pulse import PulseSkill
     from hive.proteins.guard import GuardSkill
+    from hive.proteins.pulse import PulseSkill
+    from hive.proteins.reasoning import ReasoningSkill
+    from hive.proteins.storage import StorageSkill
+    from hive.proteins.telemetry import TelemetrySkill
 
     storage_protein = StorageSkill()
     crypto_protein = CryptoSkill() if settings.crypto.enabled else None

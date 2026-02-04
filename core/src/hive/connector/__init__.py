@@ -1,4 +1,3 @@
-import asyncio
 import time
 import uuid
 from typing import Any
@@ -11,6 +10,7 @@ from aura_core import (
     Observation,
     SkillRegistry,
 )
+
 from config import get_settings
 from hive.proto.aura.negotiation.v1 import negotiation_pb2
 

@@ -3,11 +3,13 @@ from datetime import UTC, datetime
 from typing import Any
 
 from aura_core import Observation, SkillProtocol
-from sqlalchemy import create_engine, select
+from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
 from config import get_settings
-from .models import Base, InventoryItem, LockedDeal, DealStatus
+
+from .models import Base, DealStatus, InventoryItem, LockedDeal
+
 
 class StorageProtein(SkillProtocol[dict[str, Any], Observation]):
     """

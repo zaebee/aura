@@ -10,7 +10,7 @@ For geography (folders, chambers), see hive-manifest.yaml at the repo root.
 
 from typing import Any, Protocol, TypeVar, runtime_checkable
 
-from .types import Observation, SystemVitals
+from .types import SystemVitals
 
 # TypeVars for the metabolic steps
 S_inv = TypeVar("S_inv", contravariant=True)  # Input Signal

@@ -261,7 +261,8 @@ class CryptoProtein(SkillProtocol[dict[str, Any], Observation]):
             sender_addr = ""
             max_decrease = 0
             for idx, key_info in enumerate(account_keys):
-                if idx == our_idx: continue
+                if idx == our_idx:
+                    continue
                 balance_change = pre_balances[idx] - post_balances[idx]
                 if balance_change > max_decrease:
                     max_decrease = balance_change

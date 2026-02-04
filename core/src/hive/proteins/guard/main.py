@@ -2,7 +2,9 @@ import logging
 from typing import Any
 
 from aura_core import Observation, SkillProtocol
+
 from config import settings
+
 from ._output_guard import OutputGuard, SafetyViolation
 
 logger = logging.getLogger(__name__)
