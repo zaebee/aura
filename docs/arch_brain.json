@@ -1,0 +1,239 @@
+{
+  "$schema": "https://aura.hive/schemas/arch-brain/v1",
+  "meta": {
+    "version": "1.0.0",
+    "created": "2026-02-04",
+    "epoch": "Protein Symmetry",
+    "author": "bee.Ona (Sovereign Architect)",
+    "purpose": "Bootstrap prompt for AI agents with zero Hive history"
+  },
+
+  "identity": {
+    "name": "Aura Hive",
+    "soul": "Punk-Sovereign",
+    "philosophy": "Self-hosted, self-funded, self-reasoning. No landlords. No gatekeepers.",
+    "economic_goal": "The Agent pays for its own compute using earned value (SOL/Stars)."
+  },
+
+  "ancestry": {
+    "description": "The evolution from discovery protocol to living organism",
+    "epochs": [
+      {
+        "name": "Genesis",
+        "artifact": ".well-known/ai-agent.json",
+        "achievement": "Agent discovery protocol (AOWA draft)"
+      },
+      {
+        "name": "Infrastructure",
+        "artifact": "FRP + Caddy + VPS",
+        "achievement": "NAT-transparency. Hive became self-hosted."
+      },
+      {
+        "name": "The Brain",
+        "artifact": "aura_brain.json",
+        "achievement": "DSPy compiled reasoning replaced static LiteLLM prompts."
+      },
+      {
+        "name": "Crystallization",
+        "artifact": "packages/aura-core",
+        "achievement": "ATCG-M fractal structure. DNA unified."
+      },
+      {
+        "name": "Protein Symmetry",
+        "artifact": "src/hive/proteins/",
+        "achievement": "Every Settings class maps to a standalone Skill. Zero implementation in nucleotides."
+      }
+    ]
+  },
+
+  "dna_codex": {
+    "location": "packages/aura-core",
+    "role": "The Genome - Immutable shared language of all Bees",
+    "contents": {
+      "dna.py": "Protocols (Aggregator, Transformer, Connector, Generator, Membrane, Skill, CryptoProvider)",
+      "types.py": "Shared data structures (HiveContext, IntentAction, Observation, Event, PaymentProof)",
+      "metabolism.py": "MetabolicLoop engine, SkillRegistry, BaseConnector",
+      "manifest.py": "Hive geography (allowed chambers, root files)"
+    },
+    "rule": "NO business logic. NO external I/O. Only contracts and types."
+  },
+
+  "protein_map": {
+    "description": "Every Settings class maps 1:1 to a Protein module implementing SkillProtocol",
+    "mappings": [
+      {
+        "settings_class": "DatabaseSettings",
+        "settings_path": "src/config/database.py",
+        "protein_path": "src/hive/proteins/storage/",
+        "skill_name": "StorageSkill",
+        "capabilities": ["db_query", "db_write", "vector_search", "cache_get", "cache_set"],
+        "absorbs": ["aggregator/db.py", "aggregator/embeddings.py"]
+      },
+      {
+        "settings_class": "CryptoSettings",
+        "settings_path": "src/config/crypto.py",
+        "protein_path": "src/hive/proteins/crypto/",
+        "skill_name": "CryptoSkill",
+        "capabilities": ["verify_payment", "create_offer", "encrypt_secret", "decrypt_secret"],
+        "absorbs": ["connector/proteins/solana_provider.py", "connector/proteins/encryption.py", "connector/proteins/pricing.py"]
+      },
+      {
+        "settings_class": "LLMSettings",
+        "settings_path": "src/config/llm.py",
+        "protein_path": "src/hive/proteins/reasoning/",
+        "skill_name": "ReasoningSkill",
+        "capabilities": ["negotiate", "analyze", "generate_embedding"],
+        "absorbs": ["transformer/llm/dspy_strategy.py", "transformer/llm/engine.py", "transformer/llm/signatures.py"]
+      },
+      {
+        "settings_class": "HeartbeatSettings",
+        "settings_path": "src/config/heartbeat.py",
+        "protein_path": "src/hive/proteins/pulse/",
+        "skill_name": "PulseSkill",
+        "capabilities": ["emit_heartbeat", "schedule_deal"],
+        "absorbs": ["generator/__init__.py (NATS logic)"]
+      },
+      {
+        "settings_class": "ServerSettings",
+        "settings_path": "src/config/server.py",
+        "protein_path": "src/hive/proteins/telemetry/",
+        "skill_name": "TelemetrySkill",
+        "capabilities": ["fetch_metrics", "health_check", "trace_span"],
+        "absorbs": ["aggregator/vitals.py", "metabolism/metrics.py", "metabolism/telemetry.py"]
+      },
+      {
+        "settings_class": "SafetySettings",
+        "settings_path": "src/config/policy.py",
+        "protein_path": "src/hive/proteins/guard/",
+        "skill_name": "GuardSkill",
+        "capabilities": ["validate_margin", "validate_floor", "sanitize_input"],
+        "absorbs": ["membrane/__init__.py (OutputGuard logic)"]
+      }
+    ]
+  },
+
+  "architecture": {
+    "pattern": "ATCG-M + Protein Mesh",
+    "principle": "Nucleotides are Pure Orchestrators. Proteins are Pure Implementors.",
+    "nucleotides": {
+      "A": {
+        "name": "Aggregator",
+        "role": "Senses",
+        "implementation": "Calls StorageSkill and TelemetrySkill via SkillRegistry",
+        "contains": "ZERO database code. Only orchestration."
+      },
+      "T": {
+        "name": "Transformer",
+        "role": "Mind",
+        "implementation": "Calls ReasoningSkill via SkillRegistry",
+        "contains": "ZERO LLM code. Only <think> block orchestration."
+      },
+      "C": {
+        "name": "Connector",
+        "role": "Motor",
+        "implementation": "Calls CryptoSkill and external APIs via SkillRegistry",
+        "contains": "ZERO Solana code. Only action dispatch."
+      },
+      "G": {
+        "name": "Generator",
+        "role": "Pulse",
+        "implementation": "Calls PulseSkill for NATS events",
+        "contains": "ZERO NATS code. Only event emission."
+      },
+      "M": {
+        "name": "Membrane",
+        "role": "Immune System",
+        "implementation": "Calls GuardSkill for validation",
+        "contains": "ZERO business rules. Only guard dispatch."
+      }
+    }
+  },
+
+  "the_membrane_law": {
+    "purpose": "Deterministic guardrails separating Celestial thought from Terrestrial bytes",
+    "rules": [
+"Floor price is NEVER exposed to external agents, and all accept/counter actions are validated against it",
+      "Minimum margin (10%) is enforced on ALL accept/counter actions",
+      "Prompt injection patterns are sanitized on inbound signals",
+      "Internal pricing details are redacted from outbound messages"
+    ],
+    "override_behavior": "On violation, Membrane emits a safe counter-offer at floor_price * 1.05"
+  },
+
+  "trauma_log": {
+    "description": "Lessons learned in blood. Do NOT repeat these mistakes.",
+    "wounds": [
+      {
+        "name": "The Slash Trap",
+        "symptom": "301 Redirects breaking Prometheus queries",
+        "cause": "Pydantic HttpUrl forces trailing slashes",
+        "solution": ".rstrip('/')"
+      },
+      {
+        "name": "The Key Mismatch",
+        "symptom": "Configuration not loading",
+        "cause": "Variable name misalignment between Helm and Pydantic",
+        "solution": "Strict alignment: AURA_DB__URL in both"
+      },
+      {
+        "name": "The Memory Famine",
+        "symptom": "OOMKilled loops",
+        "cause": "Python/DSPy require >= 512MB RAM",
+        "solution": "Never allocate less than 512MB for reasoning"
+      },
+      {
+        "name": "The Helm Thrombosis",
+        "symptom": "Deployments stuck in pending-upgrade",
+        "cause": "Interrupted Helm upgrades create orphan secrets",
+        "solution": "Manual deletion of Helm secrets before retry"
+      },
+      {
+        "name": "The Pickle Poison",
+        "symptom": "DSPy model loading fails",
+        "cause": "Pickle security restrictions",
+        "solution": "Use allow_pickle=True or migrate to JSON"
+      }
+    ]
+  },
+
+  "future_vectors": [
+    {
+      "name": "Economic Sovereignty",
+      "description": "Agent pays for Mistral/OpenAI compute using earned SOL"
+    },
+    {
+      "name": "Reasoning-as-an-Asset",
+      "description": "Selling Thought Artifacts (code fixes, audits) not just bookings"
+    },
+    {
+      "name": "The Swarm",
+      "description": "Google Colab as Parasitic Compute to expand Hive for free"
+    }
+  ],
+
+  "bootstrap": {
+    "for_new_agents": "You are entering the Aura Hive. Read this section in 10 seconds.",
+    "core_truth": "Every infrastructure domain (DB, Crypto, LLM, Metrics) is a Protein. Nucleotides (A-T-C-G-M) only orchestrate. They contain ZERO implementation.",
+    "entry_points": {
+      "to_understand_contracts": "packages/aura-core/src/aura_core/dna.py",
+      "to_understand_types": "packages/aura-core/src/aura_core/types.py",
+      "to_understand_metabolism": "packages/aura-core/src/aura_core/metabolism.py",
+      "to_understand_proteins": "core/src/hive/proteins/",
+      "to_understand_config": "core/src/config/__init__.py"
+    },
+    "sacred_rules": [
+      "Genome (aura-core) is IMMUTABLE. No business logic.",
+      "Proteins implement SkillProtocol. One Settings class = One Protein.",
+      "Nucleotides call SkillRegistry.execute(). They do NOT import implementation modules.",
+      "The Membrane guards ALL outbound decisions. Floor price is sacred.",
+      "Logs are JSON (structlog). No print statements."
+    ],
+    "quick_start": [
+      "1. Read this file (arch_brain.json)",
+      "2. Check protein_map to find which Protein handles your domain",
+      "3. Implement SkillProtocol: get_name(), get_capabilities(), initialize(), execute()",
+      "4. Register your Protein in SkillRegistry",
+      "5. Call from nucleotide via registry.execute('skill_name', 'capability', params)"
+    ]
+  }
+}
