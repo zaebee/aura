@@ -88,13 +88,13 @@ services:
 
   frontend:
     build:
-      context: ./frontend
-      dockerfile: Dockerfile
+      context: .
+      dockerfile: frontend/Dockerfile
     restart: on-failure
     environment:
       NEXT_PUBLIC_API_GATEWAY_URL: http://api-gateway:8000/v1
     ports:
-      - "3000:3000"
+      - "3000:80"
     depends_on:
       - api-gateway
     healthcheck:
