@@ -98,6 +98,12 @@ class NegotiationService(negotiation_pb2_grpc.NegotiationServiceServicer):
             context.set_code(grpc.StatusCode.UNAVAILABLE)
             return negotiation_pb2.SearchResponse()
 
+        request_id = str(
+            extract_request_id(context)
+            or getattr(request, "request_id", str(uuid.uuid4()))
+        )
+        bind_request_id(request_id)
+
         try:
             reasoning = self.registry.get("reasoning")
             emb_obs = await reasoning.execute("generate_embedding", {"text": request.query})
@@ -129,6 +135,8 @@ class NegotiationService(negotiation_pb2_grpc.NegotiationServiceServicer):
             logger.error("search_error", error=str(e))
             context.set_code(grpc.StatusCode.INTERNAL)
             return negotiation_pb2.SearchResponse()
+        finally:
+            clear_request_context()
 
     async def GetSystemStatus(
         self, request: negotiation_pb2.GetSystemStatusRequest, context: Any
@@ -183,6 +191,13 @@ async def serve() -> None:
         start_http_server(9091)
     except Exception:
         pass
+
+    # NATS
+    nc = None
+    try:
+        nc = await nats.connect(settings.server.nats_url)
+    except Exception:
+        logger.warning("nats_failed")
 
     # Proteins
     registry = SkillRegistry()
@@ -262,8 +277,8 @@ async def serve() -> None:
                         request_id=f"heartbeat-{uuid.uuid4()}",
                     )
                     await metabolism.execute(mock_signal)
-            except Exception:
-                pass
+            except Exception as e:
+                logger.error("heartbeat_loop_failed", error=str(e))
             await asyncio.sleep(settings.heartbeat.interval_seconds)
 
     asyncio.create_task(heartbeat_loop())

@@ -52,8 +52,6 @@ class AuraTransformer(Transformer[HiveContext, IntentAction]):
 
         reasoning = self.registry.get("reasoning")
         if not reasoning:
-            # For tests, if reasoning skill missing but dspy imported...
-            # Actually, better to just return failure or use a rule fallback if allowed
             return self._rule_fallback(context)
 
         cpu_load = self._get_cpu_load(context.system_health)
@@ -97,19 +95,11 @@ class AuraTransformer(Transformer[HiveContext, IntentAction]):
             return FailureIntent(error=str(e))
 
     def _rule_fallback(self, context: HiveContext) -> IntentAction:
-        bid = context.offer.bid_amount
-        floor_price = context.item_data.get("floor_price", 0.0)
-
-        if bid < floor_price:
-            return IntentAction(
-                action="counter",
-                price=floor_price,
-                message=f"Our minimum is ${floor_price}.",
-                thought="<think>Bid below floor. Countering with floor.</think>"
-            )
-        return IntentAction(
-            action="accept",
-            price=bid,
-            message="Accepted.",
-            thought="<think>Bid above floor. Accepting.</think>"
+        from hive.transformer import RuleBasedStrategy
+        strategy = RuleBasedStrategy()
+        return strategy.evaluate(
+            context.item_data,
+            context.offer.bid_amount,
+            context.offer.reputation,
+            context.request_id,
         )

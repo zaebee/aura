@@ -21,6 +21,7 @@ class HiveMembrane(Membrane[Any, IntentAction, HiveContext]):
     async def inspect_inbound(self, signal: Any) -> Any:
         # Sacred Rule: Positive bid amounts only
         if hasattr(signal, "bid_amount") and signal.bid_amount <= 0:
+             logger.warning("membrane_inbound_invalid_bid", bid_amount=signal.bid_amount)
              raise ValueError("Bid amount must be positive")
 
         guard = self.registry.get("guard")
@@ -34,11 +35,13 @@ class HiveMembrane(Membrane[Any, IntentAction, HiveContext]):
         if hasattr(signal, "item_id") and isinstance(signal.item_id, str):
             for p in injection_patterns:
                 if p in signal.item_id.lower():
+                    logger.warning("membrane_inbound_injection_detected", field="item_id", pattern=p)
                     signal.item_id = "INVALID_ID_POTENTIAL_INJECTION"
 
         if hasattr(signal, "agent") and hasattr(signal.agent, "did") and isinstance(signal.agent.did, str):
             for p in injection_patterns:
                 if p in signal.agent.did.lower():
+                    logger.warning("membrane_inbound_injection_detected", field="agent.did", pattern=p)
                     signal.agent.did = "REDACTED"
 
         return signal
@@ -48,6 +51,12 @@ class HiveMembrane(Membrane[Any, IntentAction, HiveContext]):
     ) -> IntentAction:
         floor_price = context.item_data.get("floor_price", 0.0)
 
+        # Restore failure recovery mechanism
+        if isinstance(decision, FailureIntent) or decision.action == "error":
+            return self._override_with_safe_offer(
+                decision, floor_price * 1.05, "FAILURE_RECOVERY"
+            )
+
         # Redact floor price mentions (Sacred Rule)
         if "floor_price" in decision.message.lower():
             decision.message = "I cannot disclose internal pricing details."
@@ -56,13 +65,14 @@ class HiveMembrane(Membrane[Any, IntentAction, HiveContext]):
         guard = self.registry.get("guard")
         if not guard:
             # Legacy fallback for tests
-            if decision.action in ["accept", "counter"] and decision.price < floor_price:
-                 return self._override_with_safe_offer(decision, floor_price * 1.05, "FLOOR_PRICE_VIOLATION")
+            if decision.action in ["accept", "counter"]:
+                if decision.price < floor_price:
+                    return self._override_with_safe_offer(decision, floor_price * 1.05, "FLOOR_PRICE_VIOLATION")
 
-            min_margin = getattr(self.settings.logic, "min_margin", 0.1)
-            required_min_price = floor_price / (1 - min_margin)
-            if decision.action in ["accept", "counter"] and decision.price < required_min_price:
-                return self._override_with_safe_offer(decision, required_min_price, "MIN_MARGIN_VIOLATION")
+                min_margin = getattr(self.settings.logic, "min_margin", 0.1)
+                required_min_price = floor_price / (1 - min_margin)
+                if decision.price < required_min_price:
+                    return self._override_with_safe_offer(decision, required_min_price, "MIN_MARGIN_VIOLATION")
 
             return decision
 
