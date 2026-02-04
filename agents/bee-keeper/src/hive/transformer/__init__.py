@@ -167,7 +167,7 @@ class BeeTransformer(Transformer[BeeContext, AuditObservation]):
                     continue
 
                 # Skip pattern check for the transformer itself to avoid false positives on rule definitions
-                if "transformer.py" in current_file:
+                if "/transformer/" in current_file:
                     continue
 
                 if "print(" in added_code and "logger" not in added_code:
