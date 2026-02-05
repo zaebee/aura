@@ -90,6 +90,10 @@ jobs:
             - name: Run Linters
               run: make lint
             - name: Run Tests
+              env:
+                  AURA_DATABASE__URL: postgresql://test:test@localhost:5432/test_db
+                  AURA_DATABASE__REDIS_URL: redis://localhost:6379/0
+                  AURA_LLM__API_KEY: test-key-for-ci
               run: make test
 
     # === STAGE 2: THE FAN-OUT (PARALLEL BUILD) ===
@@ -173,6 +177,7 @@ jobs:
                   SOL_KEY: ${{ secrets.SOLANA_PRIVATE_KEY }}
                   FRP_TOKEN: ${{ secrets.FRP_CLIENT_TOKEN }}
                   ENC_KEY: ${{ secrets.AURA_SECRET_ENCRYPTION_KEY }}
+                  STCP_KEY: ${{ secrets.AURA_INFRA_STCP_KEY }}
               run: |
                   SHORT_SHA=$(git rev-parse --short HEAD)
                   CHART_VERSION="0.1.${{ github.run_number }}"
@@ -186,10 +191,12 @@ jobs:
                   kubectl create secret generic aura-secrets \
                     --from-literal=telegram-token="$TG_TOKEN" \
                     --from-literal=api-key="$API_KEY" \
-                    --from-literal=openai-key="$API_KEY" \
+                    --from-literal=openai-key="$OPENAI_KEY" \
                     --from-literal=secret-encryption-key="$ENC_KEY" \
                     --from-literal=frp-client-token="$FRP_TOKEN" \
-                    --from-literal=solana-private-key="$SOL_KEY"
+                    --from-literal=solana-private-key="$SOL_KEY" \
+                    --from-literal=stcp-key="$STCP_KEY" \
+                    --dry-run=client -o yaml | kubectl apply -f -
 
                   echo "🚀 Deploying to Cluster..."
                   helm dependency update ./deploy/aura

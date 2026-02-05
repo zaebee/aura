@@ -1,4 +1,4 @@
-from pydantic import AliasChoices, Field, SecretStr, field_validator
+from pydantic import AliasChoices, Field, SecretStr, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -25,3 +25,20 @@ class LLMSettings(BaseSettings):
         if isinstance(v, str) and "/" not in v:
             return f"mistral/{v}"
         return v
+
+    @model_validator(mode="after")
+    def validate_api_keys(self) -> "LLMSettings":
+        """Validate API keys are present for non-rule-based models."""
+        if self.model.startswith("mistral/"):
+            if not self.api_key or not self.api_key.get_secret_value():
+                raise ValueError(
+                    "AURA_LLM__API_KEY is required for Mistral models. "
+                    "Set AURA_LLM__API_KEY environment variable."
+                )
+        elif self.model.startswith("openai/"):
+            if not self.openai_api_key or not self.openai_api_key.get_secret_value():
+                raise ValueError(
+                    "AURA_LLM__OPENAI_API_KEY is required for OpenAI models. "
+                    "Set AURA_LLM__OPENAI_API_KEY environment variable."
+                )
+        return self

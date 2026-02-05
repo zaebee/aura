@@ -64,7 +64,9 @@ class MarketService:
         expires_at = now + timedelta(seconds=ttl_seconds)
 
         # Encrypt secret via Transaction Protein
-        encrypt_obs = await self.transaction.execute("encrypt_secret", {"secret": secret})
+        encrypt_obs = await self.transaction.execute(
+            "encrypt_secret", {"secret": secret}
+        )
         if not encrypt_obs.success:
             raise ValueError(f"Encryption failed: {encrypt_obs.error}")
         encrypted_secret = encrypt_obs.data

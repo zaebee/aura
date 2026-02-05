@@ -16,3 +16,6 @@ wheels/
 
 # Environment variables (secrets)
 .env
+
+# FRP client configuration (contains secrets)
+ona-dance.toml
