@@ -181,19 +181,24 @@ jobs:
                   sed -i "s/^version: .*/version: $CHART_VERSION/" deploy/aura/Chart.yaml
                   sed -i "s/^appVersion: .*/appVersion: \"$SHORT_SHA\"/" deploy/aura/Chart.yaml
 
+                  echo "🚀 Updating Secrets..."
+                  kubectl delete secret aura-secrets --ignore-not-found
+                  kubectl create secret generic aura-secrets \
+                    --from-literal=telegram-token="$TG_TOKEN" \
+                    --from-literal=mistral-key="$API_KEY" \
+                    --from-literal=llm-api-key="$API_KEY" \
+                    --from-literal=openai-key="$API_KEY" \
+                    --from-literal=secret-encryption-key="$ENC_KEY" \
+                    --from-literal=frp-client-token="$FRP_TOKEN" \
+                    --from-literal=solana-private-key="$SOL_KEY"
+
                   echo "🚀 Deploying to Cluster..."
                   helm dependency update ./deploy/aura
                   helm upgrade aura ./deploy/aura --install --atomic --wait --timeout 10m \
                     --set core.image.tag=sha-$SHORT_SHA \
                     --set gateway.image.tag=sha-$SHORT_SHA \
                     --set frontend.image.tag=sha-$SHORT_SHA \
-                    --set telegram.image.tag=sha-$SHORT_SHA \
-                    --set secrets.llmApiKey="$API_KEY" \
-                    --set secrets.openaiApiKey="$OPENAI_KEY" \
-                    --set secrets.telegramToken="$TG_TOKEN" \
-                    --set secrets.secretEncryptionKey="$ENC_KEY" \
-                    --set secrets.solanaPrivateKey="$SOL_KEY" \
-                    --set secrets.frpClientToken.value="$FRP_TOKEN"
+                    --set telegram.image.tag=sha-$SHORT_SHA
 
             - name: Verify Rollout
               run: |

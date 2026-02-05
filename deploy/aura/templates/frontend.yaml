@@ -21,7 +21,24 @@ spec:
           image: "{{ .Values.frontend.image.repository }}:{{ .Values.frontend.image.tag }}"
           imagePullPolicy: {{ .Values.frontend.image.pullPolicy }}
           ports:
-            - containerPort: 3000
+            - name: http
+              containerPort: {{ .Values.frontend.service.targetPort }}
+          livenessProbe:
+            httpGet:
+              path: {{ .Values.frontend.livenessProbe.path }}
+              port: http
+            initialDelaySeconds: {{ .Values.frontend.livenessProbe.initialDelaySeconds }}
+            periodSeconds: {{ .Values.frontend.livenessProbe.periodSeconds }}
+            timeoutSeconds: {{ .Values.frontend.livenessProbe.timeoutSeconds }}
+            failureThreshold: {{ .Values.frontend.livenessProbe.failureThreshold }}
+          readinessProbe:
+            httpGet:
+              path: {{ .Values.frontend.readinessProbe.path }}
+              port: http
+            initialDelaySeconds: {{ .Values.frontend.readinessProbe.initialDelaySeconds }}
+            periodSeconds: {{ .Values.frontend.readinessProbe.periodSeconds }}
+            timeoutSeconds: {{ .Values.frontend.readinessProbe.timeoutSeconds }}
+            failureThreshold: {{ .Values.frontend.readinessProbe.failureThreshold }}
           env:
             - name: NEXT_PUBLIC_API_GATEWAY_URL
               value: "{{ .Values.frontend.apiGatewayUrl }}"
@@ -33,7 +50,7 @@ metadata:
 spec:
   type: {{ .Values.frontend.service.type }}
   ports:
-    - port: 3000
-      targetPort: 3000
+    - port: {{ .Values.frontend.service.port }}
+      targetPort: {{ .Values.frontend.service.targetPort }}
   selector:
     app: frontend
