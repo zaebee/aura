@@ -3,6 +3,13 @@ kind: ConfigMap
 metadata:
   name: "{{ .Release.Name }}-frpc-config"
 data:
+  entrypoint.sh: |
+    #!/bin/sh
+    # Append the secretKey to the frpc.toml file
+    echo "secretKey = \"$FRP_STCP_SECRET_KEY\"" >> /etc/frp/frpc.toml
+    # Execute the original frpc command
+    exec frpc -c /etc/frp/frpc.toml
+
   frpc.toml: |
     serverAddr = "aura.zae.life"
     serverPort = 7000
@@ -69,6 +76,7 @@ spec:
             secretKeyRef:
               name: "{{ .Release.Name }}-secrets"
               key: "stcp-key"
+        command: ["/usr/local/bin/entrypoint.sh"]
         volumeMounts:
         - name: config-volume
           mountPath: /etc/frp/frpc.toml
@@ -76,6 +84,10 @@ spec:
         - name: token-volume
           mountPath: /etc/frp/token
           subPath: frp-token
+        - name: entrypoint-script-volume
+          mountPath: /usr/local/bin/entrypoint.sh
+          subPath: entrypoint.sh
+          readOnly: true
       volumes:
       - name: config-volume
         configMap:
@@ -86,3 +98,7 @@ spec:
           items:
           - key: frp-client-token
             path: frp-token
+      - name: entrypoint-script-volume
+        configMap:
+          name: frpc-entrypoint-configmap
+          defaultMode: 0755
