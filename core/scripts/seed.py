@@ -6,6 +6,7 @@ from hive.proteins.reasoning.enzymes.reasoning_engine import (
     generate_embedding,
     get_embedding_model,
 )
+from langchain_mistralai import MistralAIEmbeddings
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
@@ -16,21 +17,33 @@ configure_logging()
 logger = get_logger("seed")
 
 
-async def seed() -> None:
-    # Initialize database persistence
+async def setup_database() -> PersistenceSkill:
+    """Initialize database persistence and create tables."""
     engine = create_engine(str(settings.database.url), hide_parameters=True)
     SessionLocal = sessionmaker(bind=engine)
     persistence = PersistenceSkill()
     persistence.bind(settings.database, (SessionLocal, engine))
 
-    # Initialize database tables
     await persistence.execute("init_db", {})
     logger.info("database_initialized")
 
-    # Initialize embedding model
+    return persistence
+
+
+def setup_embedding_model() -> MistralAIEmbeddings:
+    """Initialize and configure the embedding model."""
     api_key = settings.llm.api_key.get_secret_value()
     embedding_model = get_embedding_model(api_key)
     logger.info("embedding_model_initialized", model=embedding_model.model)
+
+    return embedding_model
+
+
+async def seed() -> None:
+    """Seed the database with initial inventory items."""
+    # Setup infrastructure
+    persistence = await setup_database()
+    embedding_model = setup_embedding_model()
 
     # List of hotels to add
     raw_items = [
