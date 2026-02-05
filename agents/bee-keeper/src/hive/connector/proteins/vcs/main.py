@@ -4,6 +4,7 @@ from aura_core import Observation, SkillProtocol
 from ._internal import GitHubProvider
 from .schema import CommentParams
 
+
 class VCS_Skill(SkillProtocol[Any, httpx.AsyncClient, dict[str, Any], Observation]):
     """
     VCS Protein: Handles interactions with GitHub.
@@ -42,7 +43,7 @@ class VCS_Skill(SkillProtocol[Any, httpx.AsyncClient, dict[str, Any], Observatio
                 repo=p.repo,
                 issue_number=p.issue_number,
                 commit_sha=p.commit_sha,
-                body=p.body
+                body=p.body,
             )
             return Observation(success=bool(url), data={"url": url})
 

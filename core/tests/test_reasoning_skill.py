@@ -13,6 +13,7 @@ async def test_reasoning_skill_initialize_rule_mode(mocker):
     success = await skill.initialize()
     assert success is True
 
+
 @pytest.mark.asyncio
 async def test_reasoning_skill_execute_no_negotiator():
     skill = ReasoningSkill()

@@ -21,7 +21,9 @@ logger = logging.getLogger(__name__)
 
 
 class PersistenceSkill(
-    SkillProtocol[DatabaseSettings, tuple[sessionmaker, Engine], dict[str, Any], Observation]
+    SkillProtocol[
+        DatabaseSettings, tuple[sessionmaker, Engine], dict[str, Any], Observation
+    ]
 ):
     """
     Persistence Protein: Handles all database operations.
@@ -66,6 +68,7 @@ class PersistenceSkill(
             return False
 
         from pgvector.sqlalchemy import Vector
+
         # DNA Rule: Dynamic configuration of vector dimension
         InventoryItem.__table__.c.embedding.type = Vector(
             self.settings.vector_dimension

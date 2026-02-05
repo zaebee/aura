@@ -1,0 +1,18 @@
+serverAddr = "aura.zae.life"
+serverPort = 7000
+auth.token = "Fd7AGG2zSszYlM10drrroCGXqbichN7M"
+
+[[proxies]]
+name = "ona-brain-rpc"
+type = "tcp"
+localIP = "127.0.0.1"
+localPort = 50051
+remotePort = 9001
+
+[[visitors]]
+name = "nats-visitor"
+type = "stcp"
+serverName = "nats-hidden"
+secretKey = "ona-cloud-brain-rpc"
+bindAddr = "127.0.0.1"
+bindPort = 4222

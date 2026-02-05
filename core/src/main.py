@@ -427,7 +427,9 @@ async def serve() -> None:
         )
         logger.info("market_service_initialized")
 
-    connector = HiveConnector(registry=registry, market_service=market_service, settings=settings)
+    connector = HiveConnector(
+        registry=registry, market_service=market_service, settings=settings
+    )
     generator = HiveGenerator(registry=registry, settings=settings)
     membrane = HiveMembrane(registry=registry)
 

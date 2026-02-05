@@ -9,7 +9,9 @@ from .enzymes.pulse_broker import NatsProvider
 from .schema import EventParams
 
 
-class PulseSkill(SkillProtocol[ServerSettings, NatsProvider, dict[str, Any], Observation]):
+class PulseSkill(
+    SkillProtocol[ServerSettings, NatsProvider, dict[str, Any], Observation]
+):
     """
     Pulse Protein: Handles NATS event emission and heartbeats.
     Standardized following the Crystalline Protein Standard and Enzyme pattern.

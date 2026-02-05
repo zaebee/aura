@@ -9,15 +9,18 @@ def mock_dspy_lm(monkeypatch):
     """Bypass live API calls if MISTRAL_API_KEY is missing."""
     if not os.getenv("MISTRAL_API_KEY"):
         import dspy
+
         lm = dspy.LM("mistral/mistral-large-latest", api_key="mock")
         monkeypatch.setattr("dspy.settings.lm", lm)
         return lm
     return None
 
+
 def test_aura_negotiator_init():
     negotiator = AuraNegotiator()
     assert hasattr(negotiator, "negotiate")
     assert negotiator.negotiate.signature.instructions is not None
+
 
 @pytest.mark.asyncio
 async def test_aura_negotiator_mock_call(mocker, mock_dspy_lm):

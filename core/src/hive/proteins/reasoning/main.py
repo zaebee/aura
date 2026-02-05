@@ -13,7 +13,9 @@ from .schema import EmbeddingParams, NegotiationParams, NegotiationResult
 logger = logging.getLogger(__name__)
 
 
-class ReasoningSkill(SkillProtocol[LLMSettings, dict[str, Any], dict[str, Any], Observation]):
+class ReasoningSkill(
+    SkillProtocol[LLMSettings, dict[str, Any], dict[str, Any], Observation]
+):
     """
     Reasoning Protein: Handles LLM logic, DSPy negotiation, and embeddings.
     Standardized following the Crystalline Protein Standard and Enzyme pattern.

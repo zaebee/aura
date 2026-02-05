@@ -16,6 +16,7 @@ async def test_pulse_skill_initialize(mocker):
     success = await skill.initialize()
     assert success is True
 
+
 @pytest.mark.asyncio
 async def test_pulse_skill_execute_not_initialized():
     skill = PulseSkill()

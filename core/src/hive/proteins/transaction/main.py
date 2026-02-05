@@ -11,7 +11,9 @@ from .schema import PaymentProof, PaymentVerificationParams
 logger = logging.getLogger(__name__)
 
 
-class TransactionSkill(SkillProtocol[CryptoSettings, dict[str, Any], dict[str, Any], Observation]):
+class TransactionSkill(
+    SkillProtocol[CryptoSettings, dict[str, Any], dict[str, Any], Observation]
+):
     """
     Transaction Protein: Handles payments and encryption.
     Standardized following the Crystalline Protein Standard and Enzyme pattern.
@@ -46,7 +48,12 @@ class TransactionSkill(SkillProtocol[CryptoSettings, dict[str, Any], dict[str, A
         return True
 
     async def execute(self, intent: str, params: dict[str, Any]) -> Observation:
-        if not self.provider or not self.encryption or not self.converter or not self.settings:
+        if (
+            not self.provider
+            or not self.encryption
+            or not self.converter
+            or not self.settings
+        ):
             return Observation(success=False, error="transaction_not_initialized")
         try:
             if intent == "verify_payment":
@@ -74,11 +81,15 @@ class TransactionSkill(SkillProtocol[CryptoSettings, dict[str, Any], dict[str, A
                 return Observation(success=True, data=amount)
 
             elif intent == "get_address":
-                return Observation(success=True, data=str(self.provider.keypair.pubkey()))
+                return Observation(
+                    success=True, data=str(self.provider.keypair.pubkey())
+                )
 
             elif intent == "get_network_name":
                 # Return network name from settings (e.g., "solana-mainnet")
-                return Observation(success=True, data=self.settings.solana_network or "solana")
+                return Observation(
+                    success=True, data=self.settings.solana_network or "solana"
+                )
 
             return Observation(success=False, error=f"Unknown intent: {intent}")
         except Exception as e:

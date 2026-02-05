@@ -12,7 +12,8 @@ logger = structlog.get_logger()
 
 
 class GRPCNegotiationClient(
-    NegotiationProvider, SkillProtocol[dict[str, Any], grpc.aio.Channel, dict[str, Any], Observation]
+    NegotiationProvider,
+    SkillProtocol[dict[str, Any], grpc.aio.Channel, dict[str, Any], Observation],
 ):
     def __init__(self) -> None:
         self.channel: grpc.aio.Channel | None = None

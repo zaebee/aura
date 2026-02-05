@@ -6,6 +6,7 @@ import structlog
 
 logger = structlog.get_logger(__name__)
 
+
 class GitHubProvider:
     def __init__(self, token: str, client: httpx.AsyncClient) -> None:
         self.token = token
@@ -25,14 +26,22 @@ class GitHubProvider:
             response = await self.client.request(method, url, **kwargs)
             remaining = response.headers.get("X-RateLimit-Remaining")
             if response.status_code == 403 and remaining == "0":
-                reset_time = int(response.headers.get("X-RateLimit-Reset", time.time() + 60))
+                reset_time = int(
+                    response.headers.get("X-RateLimit-Reset", time.time() + 60)
+                )
                 wait_time = max(reset_time - int(time.time()), 1)
                 logger.warning("github_rate_limit_hit", wait_time=wait_time, path=path)
                 await asyncio.sleep(wait_time)
                 continue
             return response
 
-    async def post_comment(self, repo: str, issue_number: Optional[int] = None, commit_sha: Optional[str] = None, body: str = "") -> str:
+    async def post_comment(
+        self,
+        repo: str,
+        issue_number: Optional[int] = None,
+        commit_sha: Optional[str] = None,
+        body: str = "",
+    ) -> str:
         if issue_number:
             path = f"repos/{repo}/issues/{issue_number}/comments"
         elif commit_sha:
@@ -45,7 +54,11 @@ class GitHubProvider:
             if response.status_code == 201:
                 return str(response.json().get("html_url", ""))
 
-            logger.warning("github_post_comment_failed", status_code=response.status_code, body=response.text)
+            logger.warning(
+                "github_post_comment_failed",
+                status_code=response.status_code,
+                body=response.text,
+            )
             return ""
         except Exception as e:
             logger.error("github_post_comment_exception", error=str(e))

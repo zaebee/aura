@@ -78,7 +78,9 @@ async def fetch_vitals(metrics_cache: MetricsCache, settings: Any) -> SystemVita
     if cached:
         return SystemVitals(**{**cached, "cached": True})
 
-    cpu_q = 'avg(rate(container_cpu_usage_seconds_total{namespace="default"}[5m])) * 100'
+    cpu_q = (
+        'avg(rate(container_cpu_usage_seconds_total{namespace="default"}[5m])) * 100'
+    )
     mem_q = 'avg(container_memory_working_set_bytes{namespace="default"}) / 1024 / 1024'
 
     # DNA Rule: Proteins must not import global settings.
