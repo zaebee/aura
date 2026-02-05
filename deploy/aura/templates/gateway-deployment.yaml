@@ -59,3 +59,5 @@ spec:
               value: {{ .Values.monitoring.jaeger.collectorUrl | default (include "aura.jaeger.collectorUrl" .) | quote }}
             - name: CORS_ORIGINS
               value: "{{ .Values.gateway.corsOrigins }}"
+            - name: LOG_LEVEL
+              value: {{ .Values.gateway.env.LOG_LEVEL | default "info" | quote }}
