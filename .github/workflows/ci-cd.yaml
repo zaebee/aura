@@ -219,7 +219,7 @@ jobs:
 
                   echo "🚀 Deploying to Cluster..."
                   helm dependency update ./deploy/aura
-                  helm upgrade aura ./deploy/aura --install --atomic --wait --timeout 10m \
+                  helm upgrade aura ./deploy/aura --install --atomic --wait --timeout 20m \
                     --set core.image.tag=sha-$SHORT_SHA \
                     --set gateway.image.tag=sha-$SHORT_SHA \
                     --set frontend.image.tag=sha-$SHORT_SHA \
