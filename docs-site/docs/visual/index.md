@@ -136,15 +136,15 @@ Visual diagrams are aligned with the canonical architecture defined in:
 ## Navigation
 
 ### 🧬 Hive-Level Maps (`visual/hive/`)
-- **[ATCG-M Fractal Pattern](hive/atcg-fractal.md)** — How EVERY Bee follows the same 5-nucleotide structure
-- **[Four Ontological Levels](hive/four-levels.md)** — Genome, Nucleus, Organs, Citizens hierarchy
-- **[Sacred Chambers Map](hive/chambers-map.md)** — Poetic directory roles with bio-organic names
+- **[ATCG-M Fractal Pattern](/docs/visual/hive/atcg-fractal)** — How EVERY Bee follows the same 5-nucleotide structure
+- **[Four Ontological Levels](/docs/visual/hive/four-levels)** — Genome, Nucleus, Organs, Citizens hierarchy
+- **[Sacred Chambers Map](/docs/visual/hive/chambers-map)** — Poetic directory roles with bio-organic names
 
 ### 🔬 Component-Level Views (`visual/components/`)
-- **[Membrane Guard Patterns](components/membrane-guards.md)** — Security architecture: inbound/outbound validation
+- **[Membrane Guard Patterns](/docs/visual/components/membrane-guards)** — Security architecture: inbound/outbound validation
 
 ### 🩸 Pipeline & Event Flows (`visual/pipelines/`)
-- **[NATS Bloodstream Events](pipelines/nats-events.md)** — Inter-bee choreography via pub/sub events
+- **[NATS Bloodstream Events](/docs/visual/pipelines/nats-events)** — Inter-bee choreography via pub/sub events
 
 ---
 
