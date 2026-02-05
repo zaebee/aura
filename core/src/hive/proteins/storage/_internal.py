@@ -18,18 +18,12 @@ from sqlalchemy.orm import (
     DeclarativeBase,
     Mapped,
     mapped_column,
-    sessionmaker,
 )
 
 # DNA Rule: Proteins must not import global settings.
 # Models will be initialized during Skill.initialize()
 
 # 1. Implementation Details: SQLAlchemy Setup
-# These will be initialized properly during Skill.initialize()
-engine: Engine | None = None
-SessionLocal = sessionmaker()
-
-
 class Base(DeclarativeBase):
     pass
 

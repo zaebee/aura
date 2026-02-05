@@ -314,20 +314,83 @@ async def serve() -> None:
     # 6. Initialize Skills (Proteins)
     registry = SkillRegistry()
 
+    import dspy
+    from aura_core import get_raw_key
     from hive.proteins.crypto import CryptoSkill
+    from hive.proteins.crypto._internal import (
+        PriceConverter,
+        SecretEncryption,
+        SolanaProvider,
+    )
     from hive.proteins.guard import GuardSkill
+    from hive.proteins.guard._internal import OutputGuard
     from hive.proteins.monitor import MonitorSkill
     from hive.proteins.pulse import PulseSkill
+    from hive.proteins.pulse._internal import NatsProvider
     from hive.proteins.reasoning import ReasoningSkill
+    from hive.proteins.reasoning._internal import get_embedding_model
     from hive.proteins.storage import StorageSkill
+    from sqlalchemy import create_engine
+    from sqlalchemy.orm import sessionmaker
+
+    # --- Provider Factories (Trinity Pattern) ---
+
+    # Storage Provider
+    engine = create_engine(str(settings.database.url))
+    SessionLocal = sessionmaker(bind=engine)
+
+    # Pulse Provider
+    nats_provider = NatsProvider(settings.server.nats_url)
+
+    # Crypto Provider (if enabled)
+    crypto_bundle = {}
+    if settings.crypto.enabled:
+        crypto_bundle = {
+            "provider": SolanaProvider(
+                private_key_base58=get_raw_key(settings.crypto.solana_private_key),
+                rpc_url=str(settings.crypto.solana_rpc_url),
+                usdc_mint=settings.crypto.solana_usdc_mint,
+            ),
+            "encryption": SecretEncryption(
+                get_raw_key(settings.crypto.secret_encryption_key)
+            ),
+            "converter": PriceConverter(),
+        }
+
+    # Reasoning Provider
+    lm = None
+    embedder = None
+    if settings.llm.model != "rule":
+        lm = dspy.LM(settings.llm.model)
+        embedder = get_embedding_model(get_raw_key(settings.llm.api_key))
+    reasoning_provider = {"lm": lm, "embedder": embedder}
+
+    # Guard Provider
+    guard_provider = OutputGuard(safety_settings=settings.safety)
+
+    # --- Skill Instantiation & Binding ---
 
     storage_protein = StorageSkill()
-    crypto_protein = CryptoSkill() if settings.crypto.enabled else None
-    reasoning_protein = ReasoningSkill()
-    monitor_protein = MonitorSkill()
-    pulse_protein = PulseSkill()
-    guard_protein = GuardSkill()
+    storage_protein.bind(settings.database, (SessionLocal, engine))
 
+    pulse_protein = PulseSkill()
+    pulse_protein.bind(settings.server, nats_provider)
+
+    reasoning_protein = ReasoningSkill()
+    reasoning_protein.bind(settings.llm, reasoning_provider)
+
+    monitor_protein = MonitorSkill()
+    monitor_protein.bind(settings.server, None)
+
+    guard_protein = GuardSkill()
+    guard_protein.bind(settings.safety, guard_provider)
+
+    crypto_protein = None
+    if settings.crypto.enabled:
+        crypto_protein = CryptoSkill()
+        crypto_protein.bind(settings.crypto, crypto_bundle)
+
+    # Register in registry
     registry.register("storage", storage_protein)
     if crypto_protein:
         registry.register("crypto", crypto_protein)
@@ -337,19 +400,19 @@ async def serve() -> None:
     registry.register("guard", guard_protein)
 
     # 7. Initialize and Verify Skills
-    if await storage_protein.initialize(settings.database):
-        await storage_protein.execute("init_db", {})
+    await storage_protein.execute("init_db", {})
+    if await storage_protein.initialize():
         health_servicer.set("", health_pb2.HealthCheckResponse.SERVING)
         logger.info("db_verified_health_serving")
     else:
         logger.error("db_verification_failed")
 
-    await pulse_protein.initialize(settings.server)
-    await reasoning_protein.initialize(settings.llm)
-    await monitor_protein.initialize(settings.server)
-    await guard_protein.initialize(settings.safety)
+    await pulse_protein.initialize()
+    await reasoning_protein.initialize()
+    await monitor_protein.initialize()
+    await guard_protein.initialize()
     if crypto_protein:
-        await crypto_protein.initialize(settings.crypto)
+        await crypto_protein.initialize()
 
     # 8. Initialize Nucleotides
     aggregator = HiveAggregator(registry=registry)

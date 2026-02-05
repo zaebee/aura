@@ -1,4 +1,5 @@
 import pytest
+from hive.proteins.guard._internal import OutputGuard
 from hive.proteins.guard.main import GuardSkill
 
 from config.policy import SafetySettings
@@ -8,7 +9,8 @@ from config.policy import SafetySettings
 async def test_guard_skill_initialize():
     skill = GuardSkill()
     settings = SafetySettings()
-    success = await skill.initialize(settings)
+    skill.bind(settings, OutputGuard(safety_settings=settings))
+    success = await skill.initialize()
     assert success is True
     assert skill.settings == settings
 
@@ -16,7 +18,9 @@ async def test_guard_skill_initialize():
 @pytest.mark.asyncio
 async def test_guard_skill_validate_decision():
     skill = GuardSkill()
-    await skill.initialize(SafetySettings(min_profit_margin=0.1))
+    settings = SafetySettings(min_profit_margin=0.1)
+    skill.bind(settings, OutputGuard(safety_settings=settings))
+    await skill.initialize()
 
     # Valid decision
     obs = await skill.execute(

@@ -26,7 +26,7 @@ class AuraTransformer(Transformer[HiveContext, IntentAction]):
 
     def _get_cpu_load(self, system_health: SystemVitals | dict[str, Any]) -> float:
         if isinstance(system_health, SystemVitals):
-            return system_health.cpu_usage_percent
+            return float(system_health.cpu_usage_percent)
         return float(system_health.get("cpu_usage_percent", 0.0))
 
     def _build_economic_context(self, context: HiveContext) -> dict:
