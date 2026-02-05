@@ -316,8 +316,8 @@ async def serve() -> None:
 
     import dspy
     from aura_core import get_raw_key
+    from guard.membrane import OutputGuard
     from hive.proteins.guard import GuardSkill
-    from hive.proteins.guard.enzymes.guard_logic import OutputGuard
     from hive.proteins.persistence import PersistenceSkill
     from hive.proteins.pulse import PulseSkill
     from hive.proteins.pulse.enzymes.pulse_broker import NatsProvider
@@ -416,7 +416,9 @@ async def serve() -> None:
 
     # 8. Initialize Nucleotides
     aggregator = HiveAggregator(registry=registry, settings=settings)
-    transformer = AuraTransformer(registry=registry, settings=settings)
+    transformer = AuraTransformer(
+        registry=registry, settings=settings, guard=guard_provider
+    )
 
     market_service = None
     if transaction_protein:

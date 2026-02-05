@@ -10,6 +10,7 @@ from aura_core import (
     SystemVitals,
     Transformer,
 )
+from guard.membrane import OutputGuard, SafetyViolation
 
 logger = structlog.get_logger(__name__)
 
@@ -76,9 +77,15 @@ class RuleBasedStrategy:
 class AuraTransformer(Transformer[HiveContext, IntentAction]):
     """T - Transformer: Pure reasoning engine calling Reasoning Protein."""
 
-    def __init__(self, registry: SkillRegistry, settings: Any = None):
+    def __init__(
+        self,
+        registry: SkillRegistry,
+        settings: Any = None,
+        guard: OutputGuard | None = None,
+    ):
         self.settings = settings
         self.registry = registry
+        self.guard = guard
 
     def _get_cpu_load(self, system_health: SystemVitals | dict[str, Any]) -> float:
         if isinstance(system_health, SystemVitals):
@@ -136,14 +143,51 @@ class AuraTransformer(Transformer[HiveContext, IntentAction]):
             raw_thought = result.get("thought", "")
             wrapped_thought = f"<think>\n{raw_thought}\n</think>" if raw_thought else ""
 
+            decision = {
+                "action": result["action"],
+                "price": result["price"],
+                "message": result["message"],
+                "thought": wrapped_thought,
+                "metadata": result.get("metadata", {}),
+            }
+
+            # Deterministic safety layer after the LLM but before the API response
+            if self.guard:
+                try:
+                    floor_price = context.item_data.get("floor_price", 0.0)
+                    internal_cost = context.item_data.get("meta", {}).get(
+                        "internal_cost", floor_price
+                    )
+                    guard_context = {
+                        "floor_price": floor_price,
+                        "internal_cost": internal_cost,
+                    }
+                    self.guard.validate_decision(decision, guard_context)
+                except SafetyViolation as e:
+                    logger.warning("transformer_safety_violation_override", error=str(e))
+                    # Fallback strategy: Force a counter-offer at floor price
+                    return self._create_safe_counter_offer(
+                        context.item_data.get("floor_price", 0.0), str(e)
+                    )
+
             return IntentAction(
-                action=result["action"],
-                price=result["price"],
-                message=result["message"],
-                thought=wrapped_thought,
-                metadata=result.get("metadata", {}),
+                action=decision["action"],
+                price=decision["price"],
+                message=decision["message"],
+                thought=decision["thought"],
+                metadata=decision["metadata"],
             )
 
         except Exception as e:
             logger.error("transformer_error", error=str(e), exc_info=True)
             return FailureIntent(error=str(e))
+
+    def _create_safe_counter_offer(self, floor_price: float, reason: str) -> IntentAction:
+        """Fallback strategy: Force a counter-offer at floor price."""
+        return IntentAction(
+            action="counter",
+            price=floor_price,
+            message=f"I've reached my final limit for this item. My best offer is ${floor_price:.2f}.",
+            thought=f"<think>Safety violation: {reason}. Overriding with floor price.</think>",
+            metadata={"override_reason": reason, "original_action": "safety_fallback"},
+        )

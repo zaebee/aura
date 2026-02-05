@@ -56,10 +56,14 @@ class GuardSkill(
         except SafetyViolation as e:
             err_msg = str(e)
             code = "SAFETY_VIOLATION"
-            if "margin" in err_msg.lower():
+            if "margin" in err_msg.lower() or "suicide" in err_msg.lower():
                 code = "MIN_MARGIN_VIOLATION"
-            elif "floor" in err_msg.lower():
+            elif "floor" in err_msg.lower() or "breach" in err_msg.lower():
                 code = "FLOOR_PRICE_VIOLATION"
+            elif "discount" in err_msg.lower():
+                code = "MAX_DISCOUNT_VIOLATION"
+            elif "addon" in err_msg.lower():
+                code = "UNSANCTIONED_ADDON_VIOLATION"
 
             safe_p = self._calculate_safe_price(params.get("context", {}), code)
             return Observation(
@@ -72,12 +76,12 @@ class GuardSkill(
 
     def _calculate_safe_price(self, context: dict, reason: str) -> float:
         floor = float(context.get("floor_price", 0.0))
-        if "margin" in reason.lower():
+        internal_cost = float(context.get("internal_cost", floor))
+        if "margin" in reason.lower() or "suicide" in reason.lower():
             min_m = DEFAULT_MIN_MARGIN
             if self.settings:
                 min_m = float(self.settings.min_profit_margin)
 
-            if min_m >= 1.0:
-                min_m = DEFAULT_MIN_MARGIN
-            return float(round(floor / (1 - min_m), 2))
+            # Using the new formula requested by the user: P = C * (1 + margin)
+            return float(round(internal_cost * (1 + min_m), 2))
         return float(round(floor * 1.05, 2))

@@ -90,8 +90,8 @@ async def test_membrane_outbound_override(mocker):
     decision2 = IntentAction(action="accept", price=105.0, message="OK")
     safe_decision2 = await membrane.inspect_outbound(decision2, context)
     assert safe_decision2.action == "counter"
-    # min_price = 100 / (1 - 0.1) = 111.111... -> 111.11
-    assert safe_decision2.price == 111.11
+    # min_price = 100 * (1 + 0.1) = 110.0 (New Markup-based formula)
+    assert safe_decision2.price == 110.0
     assert safe_decision2.metadata["override_reason"] == "MIN_MARGIN_VIOLATION"
     assert "Membrane Override" in safe_decision2.thought
 
