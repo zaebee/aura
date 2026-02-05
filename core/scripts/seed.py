@@ -1,8 +1,15 @@
 import asyncio
 
-from hive.aggregator import generate_embedding
 from hive.metabolism.logging_config import configure_logging, get_logger
-from hive.proteins.storage import StorageProtein
+from hive.proteins.persistence import PersistenceSkill
+from hive.proteins.reasoning.enzymes.reasoning_engine import (
+    generate_embedding,
+    get_embedding_model,
+)
+from sqlalchemy import create_engine
+from sqlalchemy.orm import sessionmaker
+
+from config import settings
 
 # Configure structured logging on startup
 configure_logging()
@@ -10,8 +17,20 @@ logger = get_logger("seed")
 
 
 async def seed() -> None:
-    storage = StorageProtein()
-    await storage.execute("init_db", {})
+    # Initialize database persistence
+    engine = create_engine(str(settings.database.url))
+    SessionLocal = sessionmaker(bind=engine)
+    persistence = PersistenceSkill()
+    persistence.bind(settings.database, (SessionLocal, engine))
+
+    # Initialize database tables
+    await persistence.execute("init_db", {})
+    logger.info("database_initialized")
+
+    # Initialize embedding model
+    api_key = settings.llm.api_key.get_secret_value()
+    embedding_model = get_embedding_model(api_key)
+    logger.info("embedding_model_initialized", model="mistral-embed")
 
     # List of hotels to add
     raw_items = [
@@ -38,10 +57,10 @@ async def seed() -> None:
     for raw in raw_items:
         # Generate vector embedding
         logger.info("embedding_generation_started", item_id=raw["id"])
-        vector = generate_embedding(str(raw["desc"]))
+        vector = generate_embedding(str(raw["desc"]), embedding_model)
 
-        # Upsert via Storage Protein
-        obs = await storage.execute(
+        # Upsert via Persistence Skill
+        obs = await persistence.execute(
             "upsert_item",
             {
                 "id": raw["id"],

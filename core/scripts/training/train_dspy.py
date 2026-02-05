@@ -9,12 +9,15 @@ and saves the compiled program for production use.
 import json
 import sys
 from pathlib import Path
+from typing import Any
 
 import dspy
 import structlog
 from dspy.teleprompt import BootstrapFewShot
-from hive.transformer.llm.engine import AuraNegotiator
-from hive.transformer.llm.prepare.clean import clean_and_parse_json
+from hive.proteins.reasoning.enzymes.reasoning_engine import (
+    AuraNegotiator,
+    clean_and_parse_json,
+)
 
 # Configure logging
 structlog.configure(
@@ -62,7 +65,7 @@ def load_training_data() -> list[dict]:
     return examples
 
 
-def economic_metric(gold, pred, trace=None):
+def economic_metric(gold: Any, pred: Any, trace: Any = None) -> float:
     """Economic metric for negotiation quality.
 
     Evaluates decisions based on:
@@ -106,7 +109,7 @@ def economic_metric(gold, pred, trace=None):
         except (ValueError, json.JSONDecodeError):
             return 0
 
-    score = 0
+    score = 0.0
 
     # A. Structure valid (passed parsing)
     score += 0.2
@@ -134,7 +137,7 @@ def economic_metric(gold, pred, trace=None):
     return min(score, 1.0)  # Normalize to 1.0
 
 
-def train_negotiator():
+def train_negotiator() -> Any:
     """Train and save the DSPy negotiator."""
     logger.info("starting_dspy_training")
 
