@@ -1,5 +1,5 @@
 import time
-from typing import Any
+from typing import Any, cast
 
 import structlog
 from aura_core import (
@@ -9,7 +9,10 @@ from aura_core import (
     SkillRegistry,
     SystemVitals,
     Transformer,
+    map_action,
+    resolve_brain_path,
 )
+from aura_core.gen.aura.dna.v1 import ActionType
 
 logger = structlog.get_logger(__name__)
 
@@ -35,7 +38,7 @@ class RuleBasedStrategy:
     ) -> IntentAction:
         if not item_data:
             return IntentAction(
-                action="reject",
+                action=cast(ActionType, ActionType.ACTION_TYPE_REJECT),
                 price=0.0,
                 message="Item not found",
                 metadata={"reason_code": "ITEM_NOT_FOUND"},
@@ -45,7 +48,7 @@ class RuleBasedStrategy:
         # Rule: High-value bids require UI confirmation
         if bid > self.trigger_price:
             return IntentAction(
-                action="ui_required",
+                action=cast(ActionType, ActionType.ACTION_TYPE_UI_REQUIRED),
                 price=bid,
                 message=f"Bid of ${bid} exceeds security threshold",
                 metadata={"template_id": "high_value_confirm"},
@@ -56,7 +59,7 @@ class RuleBasedStrategy:
         # Rule: Bid below floor price - counter with floor price
         if bid < floor_price:
             return IntentAction(
-                action="counter",
+                action=cast(ActionType, ActionType.ACTION_TYPE_COUNTER),
                 price=floor_price,
                 message=f"We cannot accept less than ${floor_price}.",
                 metadata={"reason_code": "BELOW_FLOOR"},
@@ -65,7 +68,7 @@ class RuleBasedStrategy:
 
         # Rule: Bid at or above floor price - accept
         return IntentAction(
-            action="accept",
+            action=cast(ActionType, ActionType.ACTION_TYPE_ACCEPT),
             price=bid,
             message="Offer accepted.",
             metadata={"reservation_code": f"RULE-{int(time.time())}"},
@@ -79,6 +82,10 @@ class AuraTransformer(Transformer[HiveContext, IntentAction]):
     def __init__(self, registry: SkillRegistry, settings: Any = None):
         self.settings = settings
         self.registry = registry
+        compiled_path = None
+        if settings and hasattr(settings, "llm") and hasattr(settings.llm, "compiled_program_path"):
+            compiled_path = settings.llm.compiled_program_path
+        self.brain_path = resolve_brain_path(compiled_path)
 
     def _get_cpu_load(self, system_health: SystemVitals | dict[str, Any]) -> float:
         if isinstance(system_health, SystemVitals):
@@ -137,11 +144,14 @@ class AuraTransformer(Transformer[HiveContext, IntentAction]):
             wrapped_thought = f"<think>\n{raw_thought}\n</think>" if raw_thought else ""
 
             return IntentAction(
-                action=result["action"],
+                action=cast(ActionType, map_action(result["action"])),
                 price=result["price"],
                 message=result["message"],
                 thought=wrapped_thought,
-                metadata=result.get("metadata", {}),
+                metadata={
+                    **result.get("metadata", {}),
+                    "brain_path": self.brain_path,
+                },
             )
 
         except Exception as e:
