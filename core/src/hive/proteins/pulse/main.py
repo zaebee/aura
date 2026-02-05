@@ -9,7 +9,7 @@ from ._internal import NatsProvider
 from .schema import EventParams
 
 
-class PulseSkill(SkillProtocol[dict[str, Any], Observation]):
+class PulseSkill(SkillProtocol[ServerSettings, NatsProvider, dict[str, Any], Observation]):
     """
     Pulse Protein: Handles NATS event emission and heartbeats.
     Standardized following the Crystalline Protein Standard.
@@ -25,11 +25,13 @@ class PulseSkill(SkillProtocol[dict[str, Any], Observation]):
     def get_capabilities(self) -> list[str]:
         return ["emit_event", "emit_heartbeat"]
 
-    async def initialize(self, settings: ServerSettings | None = None) -> bool:
+    def bind(self, settings: ServerSettings, provider: NatsProvider) -> None:
         self.settings = settings
-        if not self.settings:
+        self.provider = provider
+
+    async def initialize(self) -> bool:
+        if not self.provider:
             return False
-        self.provider = NatsProvider(self.settings.nats_url)
         return await self.provider.connect()
 
     async def execute(self, intent: str, params: dict[str, Any]) -> Observation:

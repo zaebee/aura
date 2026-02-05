@@ -1,4 +1,4 @@
-from unittest.mock import patch
+from unittest.mock import MagicMock
 
 import pytest
 from hive.proteins.storage.main import StorageSkill
@@ -13,17 +13,23 @@ async def test_storage_skill_initialize():
         url="postgresql://user:password@localhost:5432/aura_db",
         redis_url="redis://localhost:6379/0",
     )
+    mock_sessionmaker = MagicMock()
+    mock_engine = MagicMock()
 
-    with patch("sqlalchemy.create_engine") as mock_create:
-        success = await skill.initialize(settings)
-        assert success is True
-        assert skill.settings == settings
-        mock_create.assert_called_once()
+    skill.bind(settings, (mock_sessionmaker, mock_engine))
+    success = await skill.initialize()
+    assert success is True
+    assert skill.settings == settings
 
 
 @pytest.mark.asyncio
 async def test_storage_skill_execute_unknown_intent():
     skill = StorageSkill()
+    settings = DatabaseSettings(
+        url="postgresql://user:password@localhost:5432/aura_db",
+        redis_url="redis://localhost:6379/0",
+    )
+    skill.bind(settings, (MagicMock(), MagicMock()))
     obs = await skill.execute("unknown", {})
     assert obs.success is False
     assert "Unknown intent" in obs.error

@@ -13,12 +13,35 @@ logger = get_logger("seed")
 
 async def seed() -> None:
     # Initialize Skills
+    import dspy
+    from aura_core import get_raw_key
+    from hive.proteins.reasoning._internal import get_embedding_model
+    from sqlalchemy import create_engine
+    from sqlalchemy.orm import sessionmaker
+
+    # Storage Provider
+    engine = create_engine(str(settings.database.url))
+    SessionLocal = sessionmaker(bind=engine)
+
     storage = StorageSkill()
-    await storage.initialize(settings.database)
+    storage.bind(settings.database, (SessionLocal, engine))
+    await storage.initialize()
     await storage.execute("init_db", {})
 
+    # Reasoning Provider
+    lm = None
+    embedder = None
+    if settings.llm.model != "rule":
+        try:
+            lm = dspy.LM(settings.llm.model)
+            embedder = get_embedding_model(get_raw_key(settings.llm.api_key))
+        except Exception as e:
+            logger.warning("reasoning_provider_init_failed", error=str(e))
+    reasoning_provider = {"lm": lm, "embedder": embedder}
+
     reasoning = ReasoningSkill()
-    await reasoning.initialize(settings.llm)
+    reasoning.bind(settings.llm, reasoning_provider)
+    await reasoning.initialize()
 
     # List of hotels to add
     raw_items = [

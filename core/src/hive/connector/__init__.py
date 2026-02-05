@@ -112,5 +112,5 @@ class HiveConnector(BaseConnector):
                 currency=self.settings.crypto.currency,
             )
 
-        except Exception as e:
-            logger.error("crypto_lock_failed", error=str(e), exc_info=True)
+        except ValueError as e:
+            logger.warning("crypto_lock_failed", error=str(e), exc_info=True)
