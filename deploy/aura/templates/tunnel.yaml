@@ -87,7 +87,7 @@ spec:
         - name: token-volume
           mountPath: /etc/frp/token
           subPath: frp-token
-        - name: entrypoint-script-volume
+        - name: entrypoint-volume
           mountPath: /usr/local/bin/entrypoint.sh
           subPath: entrypoint.sh
           readOnly: true
@@ -95,13 +95,13 @@ spec:
       - name: config-volume
         configMap:
           name: "{{ .Release.Name }}-frpc-config"
+      - name: entrypoint-volume
+        configMap:
+          name: {{ .Release.Name }}-frpc-entrypoint-config
+          defaultMode: 0755
       - name: token-volume
         secret:
           secretName: "{{ .Release.Name }}-secrets"
           items:
           - key: frp-client-token
             path: frp-token
-      - name: entrypoint-script-volume
-        configMap:
-          name: {{ .Release.Name }}-frpc-entrypoint-config
-          defaultMode: 0755
