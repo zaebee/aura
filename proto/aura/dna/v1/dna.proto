@@ -1,8 +1,8 @@
 // DNA Protocol Buffers - Universal Language for the Hive
-// 
+//
 // Binary Bloodstream: Strictly typed messages for NATS JetStream.
 // NO google.protobuf.Struct - all payloads are explicit.
-// 
+//
 // These definitions can be generated for TS/Go/Rust/Python.
 
 syntax = "proto3";
@@ -33,7 +33,7 @@ message Signal {
   google.protobuf.Timestamp timestamp = 3;
   map<string, string> metadata = 4;
   TraceContext trace = 5;
-  
+
   // Strictly typed payload - no Struct
   oneof payload {
     NegotiationSignal negotiation = 10;
@@ -92,7 +92,7 @@ message Context {
   SystemVitals system_health = 3;
   map<string, string> metadata = 4;
   TraceContext trace = 5;
-  
+
   // Strictly typed context data
   oneof data {
     HiveContextData hive = 10;
@@ -154,7 +154,7 @@ message Intent {
   repeated IntentStep steps = 4;
   map<string, string> metadata = 5;
   TraceContext trace = 6;
-  
+
   // Strictly typed action params
   oneof params {
     NegotiationIntent negotiation = 10;
@@ -204,12 +204,12 @@ message IntentStep {
 
 message Observation {
   bool success = 1;
-  optional int64 message_id = 2;
-  optional string error = 3;
+  int64 message_id = 2;
+  string error = 3;
   string event_type = 4;
   map<string, string> metadata = 5;
   TraceContext trace = 6;
-  
+
   // Strictly typed observation data
   oneof data {
     NegotiationObservation negotiation = 10;
@@ -221,7 +221,7 @@ message Observation {
 message NegotiationObservation {
   string session_token = 1;
   int64 valid_until_timestamp = 2;
-  
+
   oneof result {
     OfferAccepted accepted = 3;
     OfferCountered countered = 4;
@@ -279,7 +279,7 @@ message Event {
   google.protobuf.Timestamp timestamp = 3;
   map<string, string> metadata = 4;
   TraceContext trace = 5;
-  
+
   // Strictly typed event payload
   oneof payload {
     NegotiationEvent negotiation = 10;
@@ -350,5 +350,5 @@ message SystemVitals {
   google.protobuf.Timestamp timestamp = 4;
   bool cached = 5;
   repeated string warnings = 6;
-  optional string error = 7;
+  string error = 7;
 }
