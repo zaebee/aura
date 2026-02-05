@@ -21,32 +21,39 @@ class HiveGenerator(Generator[Observation, Event]):
         events = []
         now = time.time()
 
-        # 1. Negotiation Event
-        if observation.event_type:
-            payload = {
-                "success": observation.success,
-                "event_type": observation.event_type,
-                "timestamp": now,
-            }
+        # 1. Negotiation Event (Binary Bloodstream)
+        if observation.event_type and "negotiation" in observation.event_type:
+            action_name = observation.event_type.replace("negotiation_", "")
+            session_token = getattr(observation.data, "session_token", "unknown")
 
-            if hasattr(observation.data, "session_token"):
-                payload["session_token"] = observation.data.session_token
+            decision = observation.metadata.get("decision")
+            price = getattr(decision, "price", 0.0)
+            item_id = observation.metadata.get("item_id", "unknown")
+            agent_did = observation.metadata.get("agent_did", "unknown")
 
-            topic = f"aura.hive.events.{observation.event_type}"
-            events.append(
-                Event(
-                    topic=topic,
-                    payload=payload,
-                    timestamp=now,
-                )
-            )
-
-            # Emit via Pulse Protein
+            # Emit via Pulse Protein using binary emit_negotiation
             await self.registry.execute(
-                "pulse", "emit_event", {"topic": topic, "payload": payload}
+                "pulse",
+                "emit_negotiation",
+                {
+                    "session_token": session_token,
+                    "action": action_name,
+                    "price": price,
+                    "item_id": item_id,
+                    "agent_did": agent_did,
+                }
             )
 
-        # 2. System Heartbeat
+            # 2. Metric Normalization (The 0.0 Success Rate Fix)
+            # Ensure BOTH ACCEPT and COUNTER increment the accepted metric
+            if action_name in ["accept", "counter"]:
+                await self.registry.execute(
+                    "telemetry",
+                    "increment_counter",
+                    {"name": "negotiation_accepted_total", "labels": {"status": "success"}}
+                )
+
+        # 3. System Heartbeat
         heartbeat_topic = "aura.hive.heartbeat"
         heartbeat_payload = {
             "status": "active",

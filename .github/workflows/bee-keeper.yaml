@@ -36,10 +36,18 @@ jobs:
         with:
           enable-cache: true
 
+      - name: Install Buf
+        uses: bufbuild/buf-setup-action@v1
+        with:
+          github_token: ${{ github.token }}
+
       - name: Install Dependencies
         run: |
           uv python install 3.12
           uv sync
+
+      - name: Generate Protos
+        run: make generate
 
       - name: Open Hive Umbilical (Port-Forward)
         run: |

@@ -7,6 +7,7 @@ from typing import Any, cast
 import dspy
 import litellm
 import structlog
+from aura_core import resolve_brain_path
 from jinja2 import Template
 from langchain_mistralai import MistralAIEmbeddings
 from pydantic import BaseModel
@@ -96,19 +97,14 @@ def generate_embedding(text: str, model: MistralAIEmbeddings) -> list[float]:
 
 
 def load_brain(compiled_path: str | None = None) -> Any:
-    search_paths = [
-        Path("/app/core/data/aura_brain.json"),
-        Path("./data/aura_brain.json"),
-        Path(__file__).parent.parent.parent.parent / "data" / "aura_brain.json",
-    ]
-    if compiled_path:
-        search_paths.insert(0, Path(compiled_path))
-    for p in search_paths:
-        if p.exists() and p.is_file():
-            try:
-                return dspy.load(str(p))
-            except Exception:  # nosec B112
-                continue
+    """Load the DSPy brain using the standardized absolute discovery logic."""
+    path = resolve_brain_path(compiled_path)
+    if path != "UNKNOWN":
+        try:
+            return dspy.load(path)
+        except Exception:  # nosec B112
+            logger.warning("failed_to_load_brain", path=path)
+
     return AuraNegotiator()
 
 
