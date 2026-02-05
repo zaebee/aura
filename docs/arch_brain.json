@@ -42,6 +42,11 @@
         "name": "Protein Symmetry",
         "artifact": "src/hive/proteins/",
         "achievement": "Every Settings class maps to a standalone Skill. Zero implementation in nucleotides."
+      },
+      {
+        "name": "Binary Bloodstream",
+        "artifact": "proto/aura/dna/v1/dna.proto",
+        "achievement": "Proto-as-Source-of-Truth. All domain schemas generated from Protobuf. Manual schema.py files incinerated."
       }
     ]
   },
@@ -53,9 +58,11 @@
       "dna.py": "Protocols (Aggregator, Transformer, Connector, Generator, Membrane, Skill, CryptoProvider)",
       "types.py": "Shared data structures (HiveContext, IntentAction, Observation, Event, PaymentProof)",
       "metabolism.py": "MetabolicLoop engine, SkillRegistry, BaseConnector",
-      "manifest.py": "Hive geography (allowed chambers, root files)"
+      "manifest.py": "Hive geography (allowed chambers, root files)",
+      "gen/": "AUTO-GENERATED Pydantic models from Proto. DO NOT EDIT."
     },
-    "rule": "NO business logic. NO external I/O. Only contracts and types."
+    "rule": "NO business logic. NO external I/O. Only contracts and types.",
+    "proto_law": "Binary Proto is the ONLY source of truth. Manual schema.py files are heretical."
   },
 
   "protein_map": {
@@ -226,7 +233,9 @@
       "Proteins implement SkillProtocol. One Settings class = One Protein.",
       "Nucleotides call SkillRegistry.execute(). They do NOT import implementation modules.",
       "The Membrane guards ALL outbound decisions. Floor price is sacred.",
-      "Logs are JSON (structlog). No print statements."
+      "Logs are JSON (structlog). No print statements.",
+      "Manual schema.py files are HERETICAL. Binary Proto (dna.proto) is the ONLY source of truth.",
+      "Use MessageToDict() ONLY at Transformer (T) entrance. All other pathways use binary proto."
     ],
     "quick_start": [
       "1. Read this file (arch_brain.json)",

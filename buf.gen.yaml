@@ -1,5 +1,12 @@
 version: v2
 plugins:
+  # Pydantic models from Proto (Source of Truth)
+  - remote: buf.build/community/neofelis-pydantic
+    out: packages/aura-core/src/aura_core/gen
+    opt:
+      - pydantic_version=2
+
+  # Core service proto
   - remote: buf.build/protocolbuffers/pyi
     out: core/src/hive/proto
   - remote: buf.build/grpc/python:v1.76.0
