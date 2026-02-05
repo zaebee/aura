@@ -49,8 +49,6 @@ data:
     type = "stcp"
     localIP = "aura-nats"
     localPort = 4222
-    secretKey = "{{ .Envs.FRP_STCP_SECRET_KEY }}"
-
 ---
 apiVersion: apps/v1
 kind: Deployment
