@@ -1,11 +1,11 @@
 import asyncio
 import logging
 from datetime import UTC, datetime
-from typing import Any
+from typing import Any, cast
 
 from aura_core import Observation, SkillProtocol
-from sqlalchemy import text
-from sqlalchemy.orm import sessionmaker
+from sqlalchemy import Engine, text
+from sqlalchemy.orm import Session, sessionmaker
 
 from config.database import DatabaseSettings
 
@@ -20,7 +20,9 @@ from .schema import DealSchema, ItemSchema
 logger = logging.getLogger(__name__)
 
 
-class StorageSkill(SkillProtocol[DatabaseSettings, sessionmaker, dict[str, Any], Observation]):
+class StorageSkill(
+    SkillProtocol[DatabaseSettings, tuple[sessionmaker, Engine], dict[str, Any], Observation]
+):
     """
     Storage Protein: Handles all database operations.
     Standardized following the Crystalline Protein Standard.
@@ -29,6 +31,7 @@ class StorageSkill(SkillProtocol[DatabaseSettings, sessionmaker, dict[str, Any],
     def __init__(self) -> None:
         self.settings: DatabaseSettings | None = None
         self.provider: sessionmaker | None = None
+        self.engine: Engine | None = None
 
     def get_name(self) -> str:
         return "storage"
@@ -47,9 +50,16 @@ class StorageSkill(SkillProtocol[DatabaseSettings, sessionmaker, dict[str, Any],
             "get_first_item",
         ]
 
-    def bind(self, settings: DatabaseSettings, provider: sessionmaker) -> None:
+    def bind(
+        self, settings: DatabaseSettings, provider: tuple[sessionmaker, Engine]
+    ) -> None:
         self.settings = settings
-        self.provider = provider
+        self.provider, self.engine = provider
+
+    def _get_session(self) -> Session:
+        if not self.provider:
+            raise RuntimeError("provider_not_initialized")
+        return cast(Session, self.provider())
 
     async def initialize(self) -> bool:
         if not self.settings or not self.provider:
@@ -64,10 +74,7 @@ class StorageSkill(SkillProtocol[DatabaseSettings, sessionmaker, dict[str, Any],
         try:
 
             def check() -> bool:
-                from typing import cast
-
-                p = cast(sessionmaker, self.provider)
-                with p() as session:
+                with self._get_session() as session:
                     session.execute(text("SELECT 1"))
                 return True
 
@@ -102,18 +109,12 @@ class StorageSkill(SkillProtocol[DatabaseSettings, sessionmaker, dict[str, Any],
         return Observation(success=False, error=f"Unknown intent: {intent}")
 
     async def _init_db(self) -> Observation:
-        if not self.provider:
-            return Observation(success=False, error="provider_not_initialized")
+        if not self.engine:
+            return Observation(success=False, error="engine_not_initialized")
         try:
 
             def create() -> None:
-                from typing import cast
-
-                from sqlalchemy import Engine
-
-                p = cast(sessionmaker, self.provider)
-                engine = cast(Engine, p.kw.get("bind"))
-                Base.metadata.create_all(bind=engine)
+                Base.metadata.create_all(bind=cast(Engine, self.engine))
 
             await asyncio.to_thread(create)
             return Observation(success=True)
@@ -121,16 +122,11 @@ class StorageSkill(SkillProtocol[DatabaseSettings, sessionmaker, dict[str, Any],
             return Observation(success=False, error=str(e))
 
     async def _read_item(self, item_id: str | None) -> Observation:
-        if not self.provider or not item_id:
-            return Observation(
-                success=False, error="item_id_required" if not item_id else "no_provider"
-            )
+        if not item_id:
+            return Observation(success=False, error="item_id_required")
 
         def fetch() -> dict[str, Any] | None:
-            from typing import cast
-
-            p = cast(sessionmaker, self.provider)
-            with p() as session:
+            with self._get_session() as session:
                 item = session.query(InventoryItem).filter_by(id=item_id).first()
                 if item:
                     return ItemSchema.model_validate(item).model_dump()
@@ -142,14 +138,8 @@ class StorageSkill(SkillProtocol[DatabaseSettings, sessionmaker, dict[str, Any],
         return Observation(success=False, error="item_not_found")
 
     async def _get_first_item(self) -> Observation:
-        if not self.provider:
-            return Observation(success=False, error="no_provider")
-
         def fetch() -> dict[str, Any] | None:
-            from typing import cast
-
-            p = cast(sessionmaker, self.provider)
-            with p() as session:
+            with self._get_session() as session:
                 item = session.query(InventoryItem).first()
                 if item:
                     return ItemSchema.model_validate(item).model_dump()
@@ -161,15 +151,10 @@ class StorageSkill(SkillProtocol[DatabaseSettings, sessionmaker, dict[str, Any],
         return Observation(success=False, error="no_items_found")
 
     async def _create_deal(self, params: dict[str, Any]) -> Observation:
-        if not self.provider:
-            return Observation(success=False, error="no_provider")
         try:
 
             def create() -> bool:
-                from typing import cast
-
-                p = cast(sessionmaker, self.provider)
-                with p() as session:
+                with self._get_session() as session:
                     deal = LockedDeal(
                         id=params["id"],
                         item_id=params["item_id"],
@@ -192,16 +177,11 @@ class StorageSkill(SkillProtocol[DatabaseSettings, sessionmaker, dict[str, Any],
             return Observation(success=False, error=str(e))
 
     async def _get_deal_by_id(self, deal_id: Any) -> Observation:
-        if not self.provider or not deal_id:
-            return Observation(
-                success=False, error="deal_id_required" if not deal_id else "no_provider"
-            )
+        if not deal_id:
+            return Observation(success=False, error="deal_id_required")
 
         def fetch() -> dict[str, Any] | None:
-            from typing import cast
-
-            p = cast(sessionmaker, self.provider)
-            with p() as session:
+            with self._get_session() as session:
                 deal = session.query(LockedDeal).filter_by(id=deal_id).first()
                 if deal:
                     return DealSchema.model_validate(deal).model_dump()
@@ -213,16 +193,11 @@ class StorageSkill(SkillProtocol[DatabaseSettings, sessionmaker, dict[str, Any],
         return Observation(success=False, error="deal_not_found")
 
     async def _get_deal_by_memo(self, memo: str | None) -> Observation:
-        if not self.provider or not memo:
-            return Observation(
-                success=False, error="memo_required" if not memo else "no_provider"
-            )
+        if not memo:
+            return Observation(success=False, error="memo_required")
 
         def fetch() -> dict[str, Any] | None:
-            from typing import cast
-
-            p = cast(sessionmaker, self.provider)
-            with p() as session:
+            with self._get_session() as session:
                 deal = session.query(LockedDeal).filter_by(payment_memo=memo).first()
                 if deal:
                     return DealSchema.model_validate(deal).model_dump()
@@ -234,18 +209,13 @@ class StorageSkill(SkillProtocol[DatabaseSettings, sessionmaker, dict[str, Any],
         return Observation(success=False, error="deal_not_found")
 
     async def _update_deal_status(self, params: dict[str, Any]) -> Observation:
-        if not self.provider:
-            return Observation(success=False, error="no_provider")
         deal_id = params.get("deal_id")
         status = params.get("status")
 
         try:
 
             def update() -> bool:
-                from typing import cast
-
-                p = cast(sessionmaker, self.provider)
-                with p() as session:
+                with self._get_session() as session:
                     deal = session.query(LockedDeal).filter_by(id=deal_id).first()
                     if not deal:
                         return False
@@ -267,16 +237,11 @@ class StorageSkill(SkillProtocol[DatabaseSettings, sessionmaker, dict[str, Any],
             return Observation(success=False, error=str(e))
 
     async def _upsert_item(self, params: dict[str, Any]) -> Observation:
-        if not self.provider:
-            return Observation(success=False, error="no_provider")
         item_id = params.get("id")
         try:
 
             def upsert() -> bool:
-                from typing import cast
-
-                p = cast(sessionmaker, self.provider)
-                with p() as session:
+                with self._get_session() as session:
                     item = session.query(InventoryItem).filter_by(id=item_id).first()
                     if item:
                         item.name = params.get("name", item.name)
@@ -303,17 +268,12 @@ class StorageSkill(SkillProtocol[DatabaseSettings, sessionmaker, dict[str, Any],
             return Observation(success=False, error=str(e))
 
     async def _vector_search(self, params: dict[str, Any]) -> Observation:
-        if not self.provider:
-            return Observation(success=False, error="no_provider")
         query_vector = params.get("query_vector")
         limit = params.get("limit", 5)
         min_similarity = params.get("min_similarity")
 
         def search() -> list[dict[str, Any]]:
-            from typing import cast
-
-            p = cast(sessionmaker, self.provider)
-            with p() as session:
+            with self._get_session() as session:
                 results = (
                     session.query(
                         InventoryItem,

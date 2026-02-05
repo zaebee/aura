@@ -371,7 +371,7 @@ async def serve() -> None:
     # --- Skill Instantiation & Binding ---
 
     storage_protein = StorageSkill()
-    storage_protein.bind(settings.database, SessionLocal)
+    storage_protein.bind(settings.database, (SessionLocal, engine))
 
     pulse_protein = PulseSkill()
     pulse_protein.bind(settings.server, nats_provider)

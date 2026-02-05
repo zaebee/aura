@@ -10,9 +10,10 @@ from config.database import DatabaseSettings
 async def test_storage_skill_initialize():
     skill = StorageSkill()
     settings = DatabaseSettings(url="postgresql://user:password@localhost:5432/aura_db")
-    mock_provider = MagicMock()
+    mock_sessionmaker = MagicMock()
+    mock_engine = MagicMock()
 
-    skill.bind(settings, mock_provider)
+    skill.bind(settings, (mock_sessionmaker, mock_engine))
     success = await skill.initialize()
     assert success is True
     assert skill.settings == settings
@@ -20,6 +21,8 @@ async def test_storage_skill_initialize():
 @pytest.mark.asyncio
 async def test_storage_skill_execute_unknown_intent():
     skill = StorageSkill()
+    settings = DatabaseSettings(url="postgresql://user:password@localhost:5432/aura_db")
+    skill.bind(settings, (MagicMock(), MagicMock()))
     obs = await skill.execute("unknown", {})
     assert obs.success is False
     assert "Unknown intent" in obs.error
