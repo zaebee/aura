@@ -58,6 +58,11 @@ generate:
 	# Uses buf.gen.yaml which leverages betterproto
 	mkdir -p packages/aura-core/src/aura_core/gen
 	buf generate
+	# Fix betterproto google import shim if needed
+	if [ -d "packages/aura-core/src/aura_core/gen/aura/dna" ]; then \
+		mkdir -p packages/aura-core/src/aura_core/gen/aura/dna/google; \
+		echo "from betterproto.lib.google import protobuf" > packages/aura-core/src/aura_core/gen/aura/dna/google/__init__.py; \
+	fi
 
 # --- 4. PUBLISH (CI ONLY) ---
 push: push-tg
