@@ -5,7 +5,7 @@ from config.server import ServerSettings
 
 
 @pytest.mark.asyncio
-async def test_telemetry_skill_initialize() -> None:
+async def test_telemetry_skill_initialize():
     skill = TelemetrySkill()
     settings = ServerSettings()
     skill.bind(settings, None)
@@ -15,7 +15,7 @@ async def test_telemetry_skill_initialize() -> None:
 
 
 @pytest.mark.asyncio
-async def test_telemetry_skill_health_check() -> None:
+async def test_telemetry_skill_health_check():
     skill = TelemetrySkill()
     obs = await skill.execute("health_check", {})
     assert obs.success is True
@@ -23,7 +23,7 @@ async def test_telemetry_skill_health_check() -> None:
 
 
 @pytest.mark.asyncio
-async def test_telemetry_skill_increment_counter() -> None:
+async def test_telemetry_skill_increment_counter():
     skill = TelemetrySkill()
     # This should work without crashing even if prometheus is not running
     obs = await skill.execute(

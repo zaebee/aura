@@ -6,7 +6,7 @@ from config.policy import SafetySettings
 
 
 @pytest.mark.asyncio
-async def test_guard_skill_initialize() -> None:
+async def test_guard_skill_initialize():
     skill = GuardSkill()
     settings = SafetySettings()
     skill.bind(settings, OutputGuard(safety_settings=settings))
@@ -16,7 +16,7 @@ async def test_guard_skill_initialize() -> None:
 
 
 @pytest.mark.asyncio
-async def test_guard_skill_validate_decision() -> None:
+async def test_guard_skill_validate_decision():
     skill = GuardSkill()
     settings = SafetySettings(min_profit_margin=0.1)
     skill.bind(settings, OutputGuard(safety_settings=settings))

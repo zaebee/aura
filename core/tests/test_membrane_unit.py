@@ -11,12 +11,14 @@ def test_output_guard_validate_decision_accept_above_floor():
     # (120 - 90) / 120 = 0.25 > 0.1
     assert guard.validate_decision(decision, context) is True
 
+
 def test_output_guard_validate_decision_below_floor():
     guard = OutputGuard(safety_settings=MagicMock(min_profit_margin=0.1))
     decision = {"action": "accept", "price": 90.0}
     context = {"floor_price": 100.0, "internal_cost": 80.0}
     with pytest.raises(SafetyViolation, match="Floor price violation"):
         guard.validate_decision(decision, context)
+
 
 def test_output_guard_validate_decision_below_margin():
     guard = OutputGuard(safety_settings=MagicMock(min_profit_margin=0.2))
@@ -25,6 +27,7 @@ def test_output_guard_validate_decision_below_margin():
     # (110 - 100) / 110 = 0.09 < 0.2
     with pytest.raises(SafetyViolation, match="Minimum profit margin violation"):
         guard.validate_decision(decision, context)
+
 
 def test_output_guard_invalid_price():
     guard = OutputGuard(safety_settings=MagicMock(min_profit_margin=0.1))

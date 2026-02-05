@@ -7,9 +7,12 @@ from config.database import DatabaseSettings
 
 
 @pytest.mark.asyncio
-async def test_persistence_skill_initialize() -> None:
+async def test_persistence_skill_initialize():
     skill = PersistenceSkill()
-    settings = DatabaseSettings(url="postgresql://user:password@localhost:5432/aura_db")
+    settings = DatabaseSettings(
+        url="postgresql://user:password@localhost:5432/aura_db",
+        redis_url="redis://localhost:6379/0",
+    )
     mock_sessionmaker = MagicMock()
     mock_engine = MagicMock()
 
@@ -20,9 +23,12 @@ async def test_persistence_skill_initialize() -> None:
 
 
 @pytest.mark.asyncio
-async def test_persistence_skill_execute_unknown_intent() -> None:
+async def test_persistence_skill_execute_unknown_intent():
     skill = PersistenceSkill()
-    settings = DatabaseSettings(url="postgresql://user:password@localhost:5432/aura_db")
+    settings = DatabaseSettings(
+        url="postgresql://user:password@localhost:5432/aura_db",
+        redis_url="redis://localhost:6379/0",
+    )
     skill.bind(settings, (MagicMock(), MagicMock()))
     obs = await skill.execute("unknown", {})
     assert obs.success is False

@@ -1,12 +1,11 @@
 import os
-from typing import Any
 
 import pytest
 from src.hive.proteins.reasoning.enzymes.reasoning_engine import AuraNegotiator
 
 
 @pytest.fixture
-def mock_dspy_lm(monkeypatch: Any) -> Any:
+def mock_dspy_lm(monkeypatch):
     """Bypass live API calls if MISTRAL_API_KEY is missing."""
     if not os.getenv("MISTRAL_API_KEY"):
         import dspy
@@ -17,14 +16,14 @@ def mock_dspy_lm(monkeypatch: Any) -> Any:
     return None
 
 
-def test_aura_negotiator_init() -> None:
+def test_aura_negotiator_init():
     negotiator = AuraNegotiator()
     assert hasattr(negotiator, "negotiate")
     assert negotiator.negotiate.signature.instructions is not None
 
 
 @pytest.mark.asyncio
-async def test_aura_negotiator_mock_call(mocker: Any, mock_dspy_lm: Any) -> None:
+async def test_aura_negotiator_mock_call(mocker, mock_dspy_lm):
     negotiator = AuraNegotiator()
 
     # Mock the underlying dspy.Predict call to avoid real LLM interaction
