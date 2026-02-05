@@ -54,7 +54,9 @@ build-tg:
 
 # --- 3. HELPER ---
 generate:
-	# Generate Protobuf code
+	# Generate Protobuf code directly into packages/aura-core/src/aura_core/gen/
+	# Uses buf.gen.yaml which leverages betterproto
+	mkdir -p packages/aura-core/src/aura_core/gen
 	buf generate
 
 # --- 4. PUBLISH (CI ONLY) ---

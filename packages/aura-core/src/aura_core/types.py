@@ -1,8 +1,10 @@
 import time
 from dataclasses import dataclass, field
-from typing import Any, Protocol, TypedDict, runtime_checkable
+from typing import Any, Protocol, TypedDict, cast, runtime_checkable
 
 from pydantic import BaseModel, SecretStr
+
+from .gen.aura.dna.v1 import ActionType
 
 
 def get_raw_key(key_field: SecretStr | str) -> str:
@@ -59,7 +61,7 @@ class HiveContext:
 class IntentAction:
     """Strictly typed intent returned by the Transformer."""
 
-    action: str  # "accept", "counter", "reject", "ui_required"
+    action: str | ActionType  # String for legacy, ActionType for crystalline
     price: float
     message: str
     thought: str = ""
@@ -72,7 +74,7 @@ class FailureIntent(IntentAction):
     """Specialized intent for when the LLM or processing fails."""
 
     error: str = ""
-    action: str = "error"
+    action: str | ActionType = cast(ActionType, ActionType.ACTION_TYPE_ERROR)
     price: float = 0.0
     message: str = "Internal processing error. Defaulting to safe state."
 
@@ -165,6 +167,7 @@ class TelegramContext:
     callback_data: str | None = None
     fsm_state: str | None = None
     fsm_data: dict[str, Any] = field(default_factory=dict)
+    metadata: dict[str, Any] = field(default_factory=dict)
 
 
 @dataclass

@@ -14,6 +14,7 @@ from .manifest import (
     get_allowed_chambers,
     get_allowed_root_files,
     get_macro_atcg_folders,
+    resolve_brain_path,
 )
 from .metabolism import (
     BaseConnector,
@@ -48,6 +49,7 @@ __all__ = [
     "get_macro_atcg_folders",
     "get_allowed_root_files",
     "get_allowed_chambers",
+    "resolve_brain_path",
     # Protocols (The Law)
     "Aggregator",
     "Transformer",

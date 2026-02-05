@@ -5,14 +5,15 @@ Provides backward-compatible access to MACRO_ATCG_FOLDERS, ALLOWED_ROOT_FILES,
 and ALLOWED_CHAMBERS from the language-agnostic YAML file.
 """
 
-import logging
+import os
 from functools import lru_cache
 from pathlib import Path
 from typing import Any
 
+import structlog
 import yaml
 
-logger = logging.getLogger(__name__)
+logger = structlog.get_logger(__name__)
 
 _DEFAULT_MANIFEST: dict[str, Any] = {
     "macro_atcg_folders": [],
@@ -91,3 +92,28 @@ def get_allowed_chambers() -> dict[str, str]:
 MACRO_ATCG_FOLDERS = get_macro_atcg_folders()
 ALLOWED_ROOT_FILES = get_allowed_root_files()
 ALLOWED_CHAMBERS = get_allowed_chambers()
+
+
+def resolve_brain_path(compiled_path: str | None = None) -> str:
+    """
+    Absolute Brain Discovery:
+    Priority: compiled_path -> /app/data/aura_brain.json -> /app/src/aura_brain.json -> ./data/aura_brain.json
+    """
+    search_paths = [
+        Path("/app/data/aura_brain.json"),
+        Path("/app/src/aura_brain.json"),
+        Path("./data/aura_brain.json"),
+    ]
+
+    if compiled_path:
+        search_paths.insert(0, Path(compiled_path))
+
+    for path in search_paths:
+        abs_path = os.path.abspath(path)
+        logger.info("loading_brain", path=abs_path)
+        try:
+            if path.exists() and path.is_file():
+                return str(abs_path)
+        except OSError:
+            continue
+    return "UNKNOWN"
