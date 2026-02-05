@@ -1,8 +1,8 @@
-name: storage
+name: persistence
 role: SecurityCitadel
 description: >
   Handles all persistent storage for the Hive, including inventory items and locked deals.
-  Isolates implementation details like SQLAlchemy and PostgreSQL from the rest of the system.
+  Isolates implementation details like SQLAlchemy and PostgreSQL in Postgres enzymes.
 capabilities:
   - read_item: Retrieve an item from the inventory.
   - create_deal: Persist a new negotiation agreement.

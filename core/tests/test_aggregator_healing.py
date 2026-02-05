@@ -4,7 +4,7 @@ import httpx
 import pytest
 from aura_core import SkillRegistry
 from hive.aggregator import HiveAggregator
-from hive.proteins.monitor import MonitorSkill
+from hive.proteins.telemetry import TelemetrySkill
 
 from config.server import ServerSettings
 
@@ -15,12 +15,12 @@ async def test_aggregator_healing_on_prometheus_timeout(mocker):
     Verify that the Aggregator returns UNKNOWN status when Prometheus times out.
     """
     registry = SkillRegistry()
-    monitor = MonitorSkill()
+    telemetry = TelemetrySkill()
     settings = ServerSettings()
-    monitor.bind(settings, None)
-    await monitor.initialize()
-    registry.register("monitor", monitor)
-    aggregator = HiveAggregator(registry=registry)
+    telemetry.bind(settings, None)
+    await telemetry.initialize()
+    registry.register("telemetry", telemetry)
+    aggregator = HiveAggregator(registry=registry, settings=None)
     mocker.patch(
         "httpx.AsyncClient.get", side_effect=httpx.TimeoutException("Timeout!")
     )
@@ -35,12 +35,12 @@ async def test_aggregator_healing_on_prometheus_connection_error(mocker):
     Verify that the Aggregator returns UNKNOWN status on connection error.
     """
     registry = SkillRegistry()
-    monitor = MonitorSkill()
+    telemetry = TelemetrySkill()
     settings = ServerSettings()
-    monitor.bind(settings, None)
-    await monitor.initialize()
-    registry.register("monitor", monitor)
-    aggregator = HiveAggregator(registry=registry)
+    telemetry.bind(settings, None)
+    await telemetry.initialize()
+    registry.register("telemetry", telemetry)
+    aggregator = HiveAggregator(registry=registry, settings=None)
     mocker.patch(
         "httpx.AsyncClient.get", side_effect=httpx.ConnectError("Connection refused")
     )
@@ -55,12 +55,12 @@ async def test_aggregator_healing_with_cache_fallback(mocker):
     Verify that the Aggregator returns cached data even if Prometheus fails.
     """
     registry = SkillRegistry()
-    monitor = MonitorSkill()
+    telemetry = TelemetrySkill()
     settings = ServerSettings()
-    monitor.bind(settings, None)
-    await monitor.initialize()
-    registry.register("monitor", monitor)
-    aggregator = HiveAggregator(registry=registry)
+    telemetry.bind(settings, None)
+    await telemetry.initialize()
+    registry.register("telemetry", telemetry)
+    aggregator = HiveAggregator(registry=registry, settings=None)
 
     # 1. Prime the cache with Mock objects that pass isinstance(..., httpx.Response)
     cpu_data = {"status": "success", "data": {"result": [{"value": [0, "42.0"]}]}}
@@ -88,7 +88,7 @@ async def test_aggregator_healing_with_cache_fallback(mocker):
     mock_get.side_effect = httpx.ConnectError("Failed now")
 
     # Manually expire the cache to trigger fetch and then failure fallback
-    monitor._metrics_cache._timestamp = 0
+    telemetry._metrics_cache._timestamp = 0
 
     metrics = await aggregator.get_system_metrics()
 

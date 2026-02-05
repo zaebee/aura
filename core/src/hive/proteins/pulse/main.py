@@ -5,14 +5,14 @@ from aura_core import Observation, SkillProtocol
 
 from config.server import ServerSettings
 
-from ._internal import NatsProvider
+from .enzymes.pulse_broker import NatsProvider
 from .schema import EventParams
 
 
 class PulseSkill(SkillProtocol[ServerSettings, NatsProvider, dict[str, Any], Observation]):
     """
     Pulse Protein: Handles NATS event emission and heartbeats.
-    Standardized following the Crystalline Protein Standard.
+    Standardized following the Crystalline Protein Standard and Enzyme pattern.
     """
 
     def __init__(self) -> None:

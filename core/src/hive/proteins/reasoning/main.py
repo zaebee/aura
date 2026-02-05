@@ -7,7 +7,7 @@ from aura_core import Observation, SkillProtocol
 
 from config.llm import LLMSettings
 
-from ._internal import load_brain
+from .enzymes.reasoning_engine import load_brain
 from .schema import EmbeddingParams, NegotiationParams, NegotiationResult
 
 logger = logging.getLogger(__name__)
@@ -16,7 +16,7 @@ logger = logging.getLogger(__name__)
 class ReasoningSkill(SkillProtocol[LLMSettings, dict[str, Any], dict[str, Any], Observation]):
     """
     Reasoning Protein: Handles LLM logic, DSPy negotiation, and embeddings.
-    Standardized following the Crystalline Protein Standard.
+    Standardized following the Crystalline Protein Standard and Enzyme pattern.
     """
 
     def __init__(self) -> None:
@@ -39,7 +39,7 @@ class ReasoningSkill(SkillProtocol[LLMSettings, dict[str, Any], dict[str, Any], 
         if not self.settings or not self.provider:
             return False
 
-        if "rule" not in self.settings.model:
+        if "rule" not in self.settings.model.lower():
             try:
                 lm = self.provider.get("lm")
                 if lm:
@@ -90,7 +90,7 @@ class ReasoningSkill(SkillProtocol[LLMSettings, dict[str, Any], dict[str, Any], 
                 if not self._embed_model:
                     return Observation(success=False, error="embed_model_not_ready")
                 p_emb = EmbeddingParams(**params)
-                from ._internal import generate_embedding
+                from .enzymes.reasoning_engine import generate_embedding
 
                 emb = await asyncio.to_thread(
                     generate_embedding, p_emb.text, self._embed_model

@@ -18,7 +18,6 @@ from hive.metabolism.logging_config import (
     configure_logging,
     get_logger,
 )
-from hive.proteins.monitor._internal import init_telemetry
 from hive.proto.aura.negotiation.v1 import negotiation_pb2, negotiation_pb2_grpc
 from hive.transformer import AuraTransformer
 from opentelemetry import trace
@@ -31,6 +30,9 @@ from config import settings
 # Configure structured logging on startup
 configure_logging(log_level=settings.server.log_level)
 logger = get_logger("core")
+
+# Late import of telemetry enzyme to avoid circularity if any
+from hive.proteins.telemetry.enzymes.prometheus import init_telemetry
 
 # Initialize OpenTelemetry tracing
 service_name = settings.server.otel_service_name
@@ -154,14 +156,14 @@ class NegotiationService(negotiation_pb2_grpc.NegotiationServiceServicer):
 
             query_vector = embed_obs.data
 
-            # Vector search via Storage Protein
-            storage = registry.get("storage")
-            if not storage:
+            # Vector search via Persistence Protein
+            persistence = registry.get("persistence")
+            if not persistence:
                 context.set_code(grpc.StatusCode.INTERNAL)
-                context.set_details("Storage protein not available")
+                context.set_details("Persistence protein not available")
                 return negotiation_pb2.SearchResponse()
 
-            obs = await storage.execute(
+            obs = await persistence.execute(
                 "vector_search",
                 {
                     "query_vector": query_vector,
@@ -316,36 +318,36 @@ async def serve() -> None:
 
     import dspy
     from aura_core import get_raw_key
-    from hive.proteins.crypto import CryptoSkill
-    from hive.proteins.crypto._internal import (
+    from hive.proteins.transaction import TransactionSkill
+    from hive.proteins.transaction.enzymes.solana import (
         PriceConverter,
         SecretEncryption,
         SolanaProvider,
     )
     from hive.proteins.guard import GuardSkill
-    from hive.proteins.guard._internal import OutputGuard
-    from hive.proteins.monitor import MonitorSkill
+    from hive.proteins.guard.enzymes.guard_logic import OutputGuard
+    from hive.proteins.telemetry import TelemetrySkill
     from hive.proteins.pulse import PulseSkill
-    from hive.proteins.pulse._internal import NatsProvider
+    from hive.proteins.pulse.enzymes.pulse_broker import NatsProvider
     from hive.proteins.reasoning import ReasoningSkill
-    from hive.proteins.reasoning._internal import get_embedding_model
-    from hive.proteins.storage import StorageSkill
+    from hive.proteins.reasoning.enzymes.reasoning_engine import get_embedding_model
+    from hive.proteins.persistence import PersistenceSkill
     from sqlalchemy import create_engine
     from sqlalchemy.orm import sessionmaker
 
     # --- Provider Factories (Trinity Pattern) ---
 
-    # Storage Provider
+    # Persistence Provider
     engine = create_engine(str(settings.database.url))
     SessionLocal = sessionmaker(bind=engine)
 
     # Pulse Provider
     nats_provider = NatsProvider(settings.server.nats_url)
 
-    # Crypto Provider (if enabled)
-    crypto_bundle = {}
+    # Transaction Provider (if enabled)
+    transaction_bundle = {}
     if settings.crypto.enabled:
-        crypto_bundle = {
+        transaction_bundle = {
             "provider": SolanaProvider(
                 private_key_base58=get_raw_key(settings.crypto.solana_private_key),
                 rpc_url=str(settings.crypto.solana_rpc_url),
@@ -360,7 +362,7 @@ async def serve() -> None:
     # Reasoning Provider
     lm = None
     embedder = None
-    if settings.llm.model != "rule":
+    if settings.llm.model.lower() != "rule":
         lm = dspy.LM(settings.llm.model)
         embedder = get_embedding_model(get_raw_key(settings.llm.api_key))
     reasoning_provider = {"lm": lm, "embedder": embedder}
@@ -370,8 +372,8 @@ async def serve() -> None:
 
     # --- Skill Instantiation & Binding ---
 
-    storage_protein = StorageSkill()
-    storage_protein.bind(settings.database, (SessionLocal, engine))
+    persistence_protein = PersistenceSkill()
+    persistence_protein.bind(settings.database, (SessionLocal, engine))
 
     pulse_protein = PulseSkill()
     pulse_protein.bind(settings.server, nats_provider)
@@ -379,29 +381,29 @@ async def serve() -> None:
     reasoning_protein = ReasoningSkill()
     reasoning_protein.bind(settings.llm, reasoning_provider)
 
-    monitor_protein = MonitorSkill()
-    monitor_protein.bind(settings.server, None)
+    telemetry_protein = TelemetrySkill()
+    telemetry_protein.bind(settings.server, None)
 
     guard_protein = GuardSkill()
     guard_protein.bind(settings.safety, guard_provider)
 
-    crypto_protein = None
+    transaction_protein = None
     if settings.crypto.enabled:
-        crypto_protein = CryptoSkill()
-        crypto_protein.bind(settings.crypto, crypto_bundle)
+        transaction_protein = TransactionSkill()
+        transaction_protein.bind(settings.crypto, transaction_bundle)
 
     # Register in registry
-    registry.register("storage", storage_protein)
-    if crypto_protein:
-        registry.register("crypto", crypto_protein)
+    registry.register("persistence", persistence_protein)
+    if transaction_protein:
+        registry.register("transaction", transaction_protein)
     registry.register("reasoning", reasoning_protein)
-    registry.register("monitor", monitor_protein)
+    registry.register("telemetry", telemetry_protein)
     registry.register("pulse", pulse_protein)
     registry.register("guard", guard_protein)
 
     # 7. Initialize and Verify Skills
-    await storage_protein.execute("init_db", {})
-    if await storage_protein.initialize():
+    await persistence_protein.execute("init_db", {})
+    if await persistence_protein.initialize():
         health_servicer.set("", health_pb2.HealthCheckResponse.SERVING)
         logger.info("db_verified_health_serving")
     else:
@@ -409,24 +411,24 @@ async def serve() -> None:
 
     await pulse_protein.initialize()
     await reasoning_protein.initialize()
-    await monitor_protein.initialize()
+    await telemetry_protein.initialize()
     await guard_protein.initialize()
-    if crypto_protein:
-        await crypto_protein.initialize()
+    if transaction_protein:
+        await transaction_protein.initialize()
 
     # 8. Initialize Nucleotides
-    aggregator = HiveAggregator(registry=registry)
-    transformer = AuraTransformer(registry=registry)
+    aggregator = HiveAggregator(registry=registry, settings=settings)
+    transformer = AuraTransformer(registry=registry, settings=settings)
 
     market_service = None
-    if crypto_protein:
+    if transaction_protein:
         from hive.services.market import MarketService
 
-        market_service = MarketService(storage=storage_protein, crypto=crypto_protein)
+        market_service = MarketService(storage=persistence_protein, crypto=transaction_protein)
         logger.info("market_service_initialized")
 
-    connector = HiveConnector(registry=registry, market_service=market_service)
-    generator = HiveGenerator(registry=registry)
+    connector = HiveConnector(registry=registry, market_service=market_service, settings=settings)
+    generator = HiveGenerator(registry=registry, settings=settings)
     membrane = HiveMembrane(registry=registry)
 
     metabolism = MetabolicLoop(
@@ -449,7 +451,7 @@ async def serve() -> None:
         while True:
             try:
                 logger.info("triggering_heartbeat_deal")
-                obs = await storage_protein.execute("get_first_item", {})
+                obs = await persistence_protein.execute("get_first_item", {})
 
                 if obs.success and obs.data:
                     item = obs.data

@@ -5,7 +5,7 @@ from aura_core import Observation, SkillProtocol
 
 from config.server import ServerSettings
 
-from ._internal import (
+from .enzymes.prometheus import (
     MetricsCache,
     fetch_vitals,
     negotiation_accepted_total,
@@ -16,10 +16,10 @@ from .schema import MetricIncrementParams
 logger = logging.getLogger(__name__)
 
 
-class MonitorSkill(SkillProtocol[ServerSettings, Any, dict[str, Any], Observation]):
+class TelemetrySkill(SkillProtocol[ServerSettings, Any, dict[str, Any], Observation]):
     """
-    Monitor Protein: Handles system metrics and health checks.
-    Standardized following the Crystalline Protein Standard.
+    Telemetry Protein: Handles system metrics and health checks.
+    Standardized following the Crystalline Protein Standard and Enzyme pattern.
     """
 
     def __init__(self) -> None:
@@ -28,10 +28,10 @@ class MonitorSkill(SkillProtocol[ServerSettings, Any, dict[str, Any], Observatio
         self._metrics_cache = MetricsCache(ttl_seconds=30)
 
     def get_name(self) -> str:
-        return "monitor"
+        return "telemetry"
 
     def get_capabilities(self) -> list[str]:
-        return ["fetch_metrics", "health_check", "increment_counter"]
+        return ["fetch_metrics", "health_check", "increment_counter", "get_vitals"]
 
     def bind(self, settings: ServerSettings, provider: Any) -> None:
         self.settings = settings
@@ -63,5 +63,5 @@ class MonitorSkill(SkillProtocol[ServerSettings, Any, dict[str, Any], Observatio
 
             return Observation(success=False, error=f"Unknown intent: {intent}")
         except Exception as e:
-            logger.error(f"Monitor skill error: {e}")
+            logger.error(f"Telemetry skill error: {e}")
             return Observation(success=False, error=str(e))

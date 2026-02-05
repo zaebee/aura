@@ -1,7 +1,7 @@
 name: guard
 role: SecurityCitadel
 description: >
-  Deterministic safety layer for negotiation decisions.
+  Deterministic safety layer for negotiation decisions via Guard enzymes.
   Validates LLM-generated prices against floor prices and minimum profit margins.
   Prevents economic hallucinations and ensure corporate compliance.
 capabilities:

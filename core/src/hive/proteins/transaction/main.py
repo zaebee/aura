@@ -5,16 +5,16 @@ from aura_core import Observation, SkillProtocol
 
 from config.crypto import CryptoSettings
 
-from ._internal import PriceConverter, SecretEncryption, SolanaProvider
+from .enzymes.solana import PriceConverter, SecretEncryption, SolanaProvider
 from .schema import PaymentProof, PaymentVerificationParams
 
 logger = logging.getLogger(__name__)
 
 
-class CryptoSkill(SkillProtocol[CryptoSettings, dict[str, Any], dict[str, Any], Observation]):
+class TransactionSkill(SkillProtocol[CryptoSettings, dict[str, Any], dict[str, Any], Observation]):
     """
-    Crypto Protein: Handles payments and encryption.
-    Standardized following the Crystalline Protein Standard.
+    Transaction Protein: Handles payments and encryption.
+    Standardized following the Crystalline Protein Standard and Enzyme pattern.
     """
 
     def __init__(self) -> None:
@@ -24,7 +24,7 @@ class CryptoSkill(SkillProtocol[CryptoSettings, dict[str, Any], dict[str, Any], 
         self.converter: PriceConverter | None = None
 
     def get_name(self) -> str:
-        return "crypto"
+        return "transaction"
 
     def get_capabilities(self) -> list[str]:
         return [
@@ -33,6 +33,7 @@ class CryptoSkill(SkillProtocol[CryptoSettings, dict[str, Any], dict[str, Any], 
             "decrypt_secret",
             "get_address",
             "convert_price",
+            "get_network_name",
         ]
 
     def bind(self, settings: CryptoSettings, provider: dict[str, Any]) -> None:
@@ -46,7 +47,7 @@ class CryptoSkill(SkillProtocol[CryptoSettings, dict[str, Any], dict[str, Any], 
 
     async def execute(self, intent: str, params: dict[str, Any]) -> Observation:
         if not self.provider or not self.encryption or not self.converter or not self.settings:
-            return Observation(success=False, error="crypto_not_initialized")
+            return Observation(success=False, error="transaction_not_initialized")
         try:
             if intent == "verify_payment":
                 p = PaymentVerificationParams(**params)
@@ -75,9 +76,13 @@ class CryptoSkill(SkillProtocol[CryptoSettings, dict[str, Any], dict[str, Any], 
             elif intent == "get_address":
                 return Observation(success=True, data=str(self.provider.keypair.pubkey()))
 
+            elif intent == "get_network_name":
+                # Return network name from settings (e.g., "solana-mainnet")
+                return Observation(success=True, data=self.settings.network or "solana")
+
             return Observation(success=False, error=f"Unknown intent: {intent}")
         except Exception as e:
-            logger.error(f"Crypto skill error: {e}")
+            logger.error(f"Transaction skill error: {e}")
             return Observation(success=False, error=str(e))
 
     async def close(self) -> None:

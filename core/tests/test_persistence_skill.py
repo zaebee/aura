@@ -1,14 +1,14 @@
 from unittest.mock import MagicMock
 
 import pytest
-from hive.proteins.storage.main import StorageSkill
+from hive.proteins.persistence.main import PersistenceSkill
 
 from config.database import DatabaseSettings
 
 
 @pytest.mark.asyncio
-async def test_storage_skill_initialize():
-    skill = StorageSkill()
+async def test_persistence_skill_initialize():
+    skill = PersistenceSkill()
     settings = DatabaseSettings(url="postgresql://user:password@localhost:5432/aura_db")
     mock_sessionmaker = MagicMock()
     mock_engine = MagicMock()
@@ -19,8 +19,8 @@ async def test_storage_skill_initialize():
     assert skill.settings == settings
 
 @pytest.mark.asyncio
-async def test_storage_skill_execute_unknown_intent():
-    skill = StorageSkill()
+async def test_persistence_skill_execute_unknown_intent():
+    skill = PersistenceSkill()
     settings = DatabaseSettings(url="postgresql://user:password@localhost:5432/aura_db")
     skill.bind(settings, (MagicMock(), MagicMock()))
     obs = await skill.execute("unknown", {})
