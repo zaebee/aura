@@ -57,9 +57,9 @@ spec:
                   name: "{{ .Release.Name }}-secrets"
                   key: "solana-private-key"
             - name: AURA_DATABASE__URL
-              value: "postgresql://{{ .Values.postgres.auth.username }}:{{ .Values.postgres.auth.password }}@{{ .Release.Name }}-postgres:5432/{{ .Values.postgres.auth.database }}"
+              value: "postgresql://{{ .Values.postgres.auth.username }}:{{ .Values.postgres.auth.password }}@{{ .Release.Name }}-postgres.{{ .Release.Namespace }}.svc.cluster.local:5432/{{ .Values.postgres.auth.database }}"
             - name: AURA_DATABASE__REDIS_URL
-              value: "redis://{{ .Release.Name }}-redis:6379/0"
+              value: "redis://{{ .Release.Name }}-redis.{{ .Release.Namespace }}.svc.cluster.local:6379/0"
             - name: AURA_LLM__API_KEY
               valueFrom:
                 secretKeyRef:
@@ -76,10 +76,12 @@ spec:
                   key: "openai-key"
                   optional: true  # Only required if LLM_MODEL starts with "openai/"
             - name: AURA_SERVER__NATS_URL
-              value: "nats://{{ .Release.Name }}-nats:4222"
+              value: "nats://{{ .Release.Name }}-nats.{{ .Release.Namespace }}.svc.cluster.local:4222"
             - name: AURA_SERVER__PROMETHEUS_URL
               value: "{{ .Values.monitoring.prometheus.url }}"
             - name: AURA_SERVER__OTEL_EXPORTER_OTLP_ENDPOINT
               value: {{ .Values.monitoring.jaeger.collectorUrl | default (include "aura.jaeger.collectorUrl" .) | quote }}
             - name: AURA_SERVER__OTEL_SERVICE_NAME
               value: "{{ .Release.Name }}-core"
+            - name: AURA_SERVER__LOG_LEVEL
+              value: "{{ .Values.core.env.AURA_SERVER__LOG_LEVEL }}"

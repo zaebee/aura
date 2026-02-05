@@ -21,8 +21,8 @@ class ReasoningSkill(SkillProtocol[dict[str, Any], Observation]):
 
     def __init__(self) -> None:
         self.settings: LLMSettings | None = None
-        self.negotiator = None
-        self._embed_model = None
+        self.negotiator: Any = None
+        self._embed_model: Any = None
 
     def get_name(self) -> str:
         return "reasoning"

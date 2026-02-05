@@ -7,6 +7,7 @@ from pgvector.sqlalchemy import Vector
 from sqlalchemy import (
     Boolean,
     DateTime,
+    Engine,
     Enum,
     Float,
     LargeBinary,
@@ -25,7 +26,7 @@ from sqlalchemy.orm import (
 
 # 1. Implementation Details: SQLAlchemy Setup
 # These will be initialized properly during Skill.initialize()
-engine = None
+engine: Engine | None = None
 SessionLocal = sessionmaker()
 
 

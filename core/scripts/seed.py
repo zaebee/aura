@@ -1,8 +1,10 @@
 import asyncio
 
-from hive.aggregator import generate_embedding
 from hive.metabolism.logging_config import configure_logging, get_logger
-from hive.proteins.storage import StorageProtein
+from hive.proteins.reasoning import ReasoningSkill
+from hive.proteins.storage import StorageSkill
+
+from config import settings
 
 # Configure structured logging on startup
 configure_logging()
@@ -10,8 +12,13 @@ logger = get_logger("seed")
 
 
 async def seed() -> None:
-    storage = StorageProtein()
+    # Initialize Skills
+    storage = StorageSkill()
+    await storage.initialize(settings.database)
     await storage.execute("init_db", {})
+
+    reasoning = ReasoningSkill()
+    await reasoning.initialize(settings.llm)
 
     # List of hotels to add
     raw_items = [
@@ -38,7 +45,18 @@ async def seed() -> None:
     for raw in raw_items:
         # Generate vector embedding
         logger.info("embedding_generation_started", item_id=raw["id"])
-        vector = generate_embedding(str(raw["desc"]))
+        emb_obs = await reasoning.execute(
+            "generate_embedding", {"text": str(raw["desc"])}
+        )
+        if emb_obs.success:
+            vector = emb_obs.data
+        else:
+            logger.warning(
+                "embedding_generation_failed_using_dummy",
+                item_id=raw["id"],
+                error=emb_obs.error,
+            )
+            vector = [0.0] * 1024
 
         # Upsert via Storage Protein
         obs = await storage.execute(

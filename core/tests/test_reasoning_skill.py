@@ -1,6 +1,8 @@
 import pytest
 from hive.proteins.reasoning.main import ReasoningSkill
+
 from config.llm import LLMSettings
+
 
 @pytest.mark.asyncio
 async def test_reasoning_skill_initialize_rule_mode(mocker):
@@ -9,6 +11,7 @@ async def test_reasoning_skill_initialize_rule_mode(mocker):
     settings = LLMSettings(model="rule")
     success = await skill.initialize(settings)
     assert success is True
+
 
 @pytest.mark.asyncio
 async def test_reasoning_skill_execute_no_negotiator():

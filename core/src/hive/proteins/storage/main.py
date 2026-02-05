@@ -14,7 +14,6 @@ from ._internal import (
     InventoryItem,
     LockedDeal,
     SessionLocal,
-    engine,
 )
 from .schema import DealSchema, ItemSchema
 
@@ -98,10 +97,19 @@ class StorageSkill(SkillProtocol[dict[str, Any], Observation]):
         return Observation(success=False, error=f"Unknown intent: {intent}")
 
     async def _init_db(self) -> Observation:
+        from ._internal import engine
+
+        if engine is None:
+            return Observation(success=False, error="engine_not_initialized")
+
         try:
 
             def create() -> None:
-                Base.metadata.create_all(bind=engine)
+                from typing import cast
+
+                from sqlalchemy import Engine
+
+                Base.metadata.create_all(bind=cast(Engine, engine))
 
             await asyncio.to_thread(create)
             return Observation(success=True)

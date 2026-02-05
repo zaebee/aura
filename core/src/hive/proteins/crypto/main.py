@@ -52,7 +52,12 @@ class CryptoSkill(SkillProtocol[dict[str, Any], Observation]):
         return True
 
     async def execute(self, intent: str, params: dict[str, Any]) -> Observation:
-        if not self.provider or not self.encryption or not self.converter or not self.settings:
+        if (
+            not self.provider
+            or not self.encryption
+            or not self.converter
+            or not self.settings
+        ):
             return Observation(success=False, error="crypto_not_initialized")
         try:
             if intent == "verify_payment":
@@ -80,7 +85,9 @@ class CryptoSkill(SkillProtocol[dict[str, Any], Observation]):
                 return Observation(success=True, data=amount)
 
             elif intent == "get_address":
-                return Observation(success=True, data=str(self.provider.keypair.pubkey()))
+                return Observation(
+                    success=True, data=str(self.provider.keypair.pubkey())
+                )
 
             return Observation(success=False, error=f"Unknown intent: {intent}")
         except Exception as e:

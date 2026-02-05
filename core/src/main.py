@@ -337,8 +337,8 @@ async def serve() -> None:
     registry.register("guard", guard_protein)
 
     # 7. Initialize and Verify Skills
-    await storage_protein.execute("init_db", {})
     if await storage_protein.initialize(settings.database):
+        await storage_protein.execute("init_db", {})
         health_servicer.set("", health_pb2.HealthCheckResponse.SERVING)
         logger.info("db_verified_health_serving")
     else:

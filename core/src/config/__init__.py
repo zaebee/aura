@@ -21,13 +21,13 @@ class Settings(BaseSettings):
         extra="ignore",
     )
 
-    database: DatabaseSettings = Field(default_factory=DatabaseSettings)
-    llm: LLMSettings = Field(default_factory=LLMSettings)
-    crypto: CryptoSettings = Field(default_factory=CryptoSettings)
-    logic: LogicSettings = Field(default_factory=LogicSettings)
-    safety: SafetySettings = Field(default_factory=SafetySettings)
-    server: ServerSettings = Field(default_factory=ServerSettings)
-    heartbeat: HeartbeatSettings = Field(default_factory=HeartbeatSettings)
+    database: DatabaseSettings = Field(default_factory=lambda: DatabaseSettings())  # type: ignore
+    llm: LLMSettings = Field(default_factory=lambda: LLMSettings())  # type: ignore
+    crypto: CryptoSettings = Field(default_factory=lambda: CryptoSettings())  # type: ignore
+    logic: LogicSettings = Field(default_factory=lambda: LogicSettings())  # type: ignore
+    safety: SafetySettings = Field(default_factory=lambda: SafetySettings())  # type: ignore
+    server: ServerSettings = Field(default_factory=lambda: ServerSettings())  # type: ignore
+    heartbeat: HeartbeatSettings = Field(default_factory=lambda: HeartbeatSettings())  # type: ignore
 
 
 @lru_cache

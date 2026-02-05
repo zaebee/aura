@@ -1,6 +1,8 @@
 import pytest
 from hive.proteins.guard.main import GuardSkill
+
 from config.policy import SafetySettings
+
 
 @pytest.mark.asyncio
 async def test_guard_skill_initialize():
@@ -9,6 +11,7 @@ async def test_guard_skill_initialize():
     success = await skill.initialize(settings)
     assert success is True
     assert skill.settings == settings
+
 
 @pytest.mark.asyncio
 async def test_guard_skill_validate_decision():
@@ -20,8 +23,8 @@ async def test_guard_skill_validate_decision():
         "validate_decision",
         {
             "decision": {"action": "accept", "price": 100.0},
-            "context": {"floor_price": 50.0, "internal_cost": 50.0}
-        }
+            "context": {"floor_price": 50.0, "internal_cost": 50.0},
+        },
     )
     assert obs.success is True
 
@@ -30,8 +33,8 @@ async def test_guard_skill_validate_decision():
         "validate_decision",
         {
             "decision": {"action": "accept", "price": 40.0},
-            "context": {"floor_price": 50.0, "internal_cost": 30.0}
-        }
+            "context": {"floor_price": 50.0, "internal_cost": 30.0},
+        },
     )
     assert obs2.success is False
     assert "floor" in obs2.error.lower()

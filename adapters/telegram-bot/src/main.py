@@ -1,5 +1,5 @@
 import asyncio
-import os
+import logging
 
 import nats
 import structlog
@@ -21,12 +21,14 @@ from opentelemetry.sdk.trace.export import BatchSpanProcessor
 from config import settings
 
 # Setup logging
+level = getattr(logging, settings.log_level.upper(), logging.INFO)
 structlog.configure(
     processors=[
         structlog.processors.TimeStamper(fmt="iso"),
         structlog.processors.add_log_level,
         structlog.processors.JSONRenderer(),
-    ]
+    ],
+    wrapper_class=structlog.make_filtering_bound_logger(level),
 )
 logger = structlog.get_logger()
 
@@ -51,7 +53,7 @@ async def main() -> None:
     # Initialize NATS
     nc = None
     try:
-        nats_url = os.getenv("NATS_URL", "nats://nats:4222")
+        nats_url = settings.nats_url
         nc = await nats.connect(
             nats_url,
             connect_timeout=5,

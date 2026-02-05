@@ -173,7 +173,7 @@
         "name": "The Key Mismatch",
         "symptom": "Configuration not loading",
         "cause": "Variable name misalignment between Helm and Pydantic",
-        "solution": "Strict alignment: AURA_DB__URL in both"
+        "solution": "Strict alignment: AURA_DATABASE__URL in both"
       },
       {
         "name": "The Memory Famine",

@@ -1,7 +1,10 @@
-import pytest
 from unittest.mock import AsyncMock
+
+import pytest
 from hive.proteins.pulse.main import PulseSkill
+
 from config.server import ServerSettings
+
 
 @pytest.mark.asyncio
 async def test_pulse_skill_initialize(mocker):
@@ -11,6 +14,7 @@ async def test_pulse_skill_initialize(mocker):
 
     success = await skill.initialize(ServerSettings())
     assert success is True
+
 
 @pytest.mark.asyncio
 async def test_pulse_skill_execute_not_initialized():

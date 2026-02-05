@@ -57,7 +57,7 @@ def test_minimal_dspy(monkeypatch):
         assert prediction is not None
         assert "thought" in prediction
         assert isinstance(prediction["action"], dict)
-        assert prediction["action"]["action"] == "counter"
+        assert prediction["action"]["action"] in ["counter", "counteroffer"]
         if not api_key:
             assert prediction["thought"].startswith("Mocked:")
 

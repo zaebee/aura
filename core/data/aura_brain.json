@@ -8,32 +8,32 @@
         "input_bid": "600",
         "context": "{\"base_price\": 1000, \"floor_price\": 800, \"occupancy\": \"high\", \"value_add_inventory\": [{\"item\": \"Breakfast for two\", \"internal_cost\": 20, \"perceived_value\": 60}, {\"item\": \"Late checkout\", \"internal_cost\": 0, \"perceived_value\": 40}, {\"item\": \"Room upgrade\", \"internal_cost\": 30, \"perceived_value\": 120}]}",
         "history": "[]",
-        "thought": "Bid is significantly below floor price during high occupancy. Must reject firmly but leave door open for future negotiation. Avoid revealing floor price or desperation. Offer a counter that maintains price integrity while providing perceived value.",
-        "action": "{\n  \"action\": \"reject\",\n  \"price\": 0,\n  \"message\": \"I appreciate your offer, but $600 is below our minimum acceptable rate during this high-demand period. Our current best available rate is $950 with breakfast included. If you'd like to discuss further options, I'm happy to assist.\"\n}"
+        "thought": "Bid is significantly below floor price during high occupancy. Need to firmly reject while leaving door open for future negotiation. Offer a counter that maintains price integrity but adds perceived value through low-cost perks.",
+        "action": "{\n  \"action\": \"counter\",\n  \"price\": 950,\n  \"message\": \"I appreciate your offer, but $600 is below our minimum acceptable rate during this busy period. I can offer $950 with complimentary breakfast for two and late checkout to make your stay more enjoyable.\"\n}"
       },
       {
         "augmented": true,
         "input_bid": "700",
         "context": "{\"base_price\": 1000, \"floor_price\": 800, \"occupancy\": \"high\", \"value_add_inventory\": [{\"item\": \"Breakfast for two\", \"internal_cost\": 20, \"perceived_value\": 60}, {\"item\": \"Late checkout\", \"internal_cost\": 0, \"perceived_value\": 40}, {\"item\": \"Room upgrade\", \"internal_cost\": 30, \"perceived_value\": 120}]}",
         "history": "[]",
-        "thought": "Bid is exactly at floor price during high occupancy. While technically acceptable, we should aim to preserve margin by countering slightly above floor while offering value-adds to justify the increase. This maintains profitability without risking the booking.",
-        "action": "{\n  \"action\": \"counter\",\n  \"price\": 850,\n  \"message\": \"Given the high demand, I can offer $850 and include breakfast for two along with late checkout.\"\n}"
+        "thought": "Bid is at floor price, but high occupancy allows us to push slightly higher while still offering value. We'll counter just above floor to maintain margin while sweetening the deal with a low-cost perk to encourage acceptance.",
+        "action": "{\n  \"action\": \"counter\",\n  \"price\": 830,\n  \"message\": \"Given the high demand, I can offer $830 and include complimentary breakfast for two and late checkout.\"\n}"
       },
       {
         "augmented": true,
         "input_bid": "900",
         "context": "{\"base_price\": 1000, \"floor_price\": 800, \"occupancy\": \"high\", \"value_add_inventory\": [{\"item\": \"Breakfast for two\", \"internal_cost\": 20, \"perceived_value\": 60}, {\"item\": \"Late checkout\", \"internal_cost\": 0, \"perceived_value\": 40}, {\"item\": \"Room upgrade\", \"internal_cost\": 30, \"perceived_value\": 120}]}",
         "history": "[]",
-        "thought": "Bid meets floor price during high occupancy. Accept immediately to secure booking while adding perceived value through low-cost perks to enhance guest satisfaction and perceived deal quality.",
-        "action": "{\n  \"action\": \"accept\",\n  \"price\": 900,\n  \"message\": \"Perfect. I’ll confirm your stay at $900 and include complimentary breakfast for two and late checkout.\"\n}"
+        "thought": "Bid meets floor price in high-occupancy context. Accept immediately while sweetening the deal with a high-perceived-value, low-cost add-on to reinforce value and close the negotiation.",
+        "action": "{\n  \"action\": \"accept\",\n  \"price\": 900,\n  \"message\": \"Perfect. I’ll confirm your stay at $900 and include a complimentary room upgrade.\"\n}"
       },
       {
         "augmented": true,
         "input_bid": "680",
         "context": "{\"base_price\": 850, \"floor_price\": 700, \"occupancy\": \"low\", \"value_add_inventory\": [{\"item\": \"Breakfast for two\", \"internal_cost\": 20, \"perceived_value\": 60}, {\"item\": \"Late checkout\", \"internal_cost\": 0, \"perceived_value\": 40}]}",
         "history": "[]",
-        "thought": "Offer is below floor but occupancy is low. Use low-cost perks to bridge gap and secure booking without eroding margin.",
-        "action": "{\n  \"action\": \"counter\",\n  \"price\": 720,\n  \"message\": \"Given our current availability, I can offer $720 with complimentary breakfast and late checkout included.\"\n}"
+        "thought": "Offer is below floor but occupancy is low. Use value-adds to bridge the gap without dropping price further.",
+        "action": "{\n  \"action\": \"counter\",\n  \"price\": 720,\n  \"message\": \"I can meet you at $720 and include breakfast for two plus late checkout to make it worthwhile.\"\n}"
       },
       {
         "input_bid": "710",
@@ -165,27 +165,27 @@
       }
     ],
     "signature": {
-      "instructions": "Negotiation decision signature with economic reasoning.\n\nThis signature defines the structure for the DSPy negotiation module,\nincluding economic context, negotiation history, and structured output.",
+      "instructions": "Negotiation decision signature.",
       "fields": [
         {
           "prefix": "Input Bid:",
-          "description": "Buyer's current offer amount in USD"
+          "description": "Current buyer bid"
         },
         {
           "prefix": "Context:",
-          "description": "Economic context as JSON string containing:\n        {\n            base_price: float,        # Standard listing price\n            floor_price: float,       # Minimum acceptable price (hidden)\n            occupancy: str,           # Current occupancy level (high/medium/low)\n            value_add_inventory: List[Dict[str, Any]], # Available perks\n            system_constraints: List[str] # Real-time system constraints (e.g. HIGH_LOAD)\n        }"
+          "description": "Economic context JSON"
         },
         {
           "prefix": "History:",
-          "description": "Previous negotiation turns as JSON list of {bid, response} pairs"
+          "description": "Negotiation history JSON"
         },
         {
           "prefix": "Thought:",
-          "description": "Ona's internal strategic analysis (monologue).\n        Analyzes margin, occupancy, and system constraints to derive the best strategy.\n        This is NOT shown to the user."
+          "description": "Strategic reasoning"
         },
         {
           "prefix": "Action:",
-          "description": "Jules' external action. MUST be a JSON-formatted string.\n        DO NOT use markdown code blocks (like ```json).\n        Output structure:\n        {\n            \"action\": str,              # One of: 'accept', 'counter', 'reject', 'ui_required'\n            \"price\": float,             # Final price or counter offer\n            \"message\": str              # Professional message to buyer agent\n        }"
+          "description": "Decision JSON with action, price, message"
         }
       ]
     },
