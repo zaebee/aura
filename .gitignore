@@ -13,7 +13,7 @@ wheels/
 # Generated Protobuf files
 **/gen/
 **/proto/
-!proto/
+!/proto/
 
 # Virtual environments
 .venv
