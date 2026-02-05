@@ -8,6 +8,7 @@ import pytest
 os.environ.setdefault(
     "AURA_DATABASE__URL", "postgresql://test:test@localhost:5432/test_db"
 )
+os.environ.setdefault("AURA_DATABASE__REDIS_URL", "redis://localhost:6379/0")
 os.environ.setdefault("AURA_LLM__API_KEY", "test-api-key")
 
 

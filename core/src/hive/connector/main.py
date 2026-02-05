@@ -10,6 +10,7 @@ from aura_core import (
     Observation,
     SkillRegistry,
 )
+from aura_core.gen.aura.dna.v1 import ActionType
 
 from hive.proto.aura.negotiation.v1 import negotiation_pb2
 
@@ -40,33 +41,45 @@ class HiveConnector(BaseConnector):
         response.session_token = "sess_" + (context.request_id or str(uuid.uuid4()))
         response.valid_until_timestamp = int(time.time() + 600)
 
-        if action.action == "accept":
+        # Handle both string and ActionType enum
+        action_val = action.action
+        if isinstance(action_val, ActionType):
+            raw_name = ActionType(action_val).name
+            action_name = raw_name.lower().replace("action_type_", "") if raw_name else "unspecified"
+        else:
+            action_name = str(action_val).lower() if action_val else "unknown"
+
+        if action_name == "accept":
             response.accepted.final_price = action.price
             response.accepted.reservation_code = f"HIVE-{uuid.uuid4()}"
 
             if self.settings and self.settings.crypto.enabled and self.market_service:
                 await self._handle_crypto_lock(response, action, context)
 
-        elif action.action == "counter":
+        elif action_name == "counter":
             response.countered.proposed_price = action.price
             response.countered.human_message = action.message
             response.countered.reason_code = "NEGOTIATION_ONGOING"
 
-        elif action.action == "reject":
+        elif action_name == "reject":
             response.rejected.reason_code = "OFFER_TOO_LOW"
 
-        elif action.action == "ui_required":
+        elif action_name == "ui_required":
             response.rejected.reason_code = "UI_REQUIRED"
 
         else:
-            logger.error("unknown_action_type", action=action.action)
+            logger.error("unknown_action_type", action=action_name)
             response.rejected.reason_code = "INTERNAL_ERROR"
 
         return Observation(
             success=True,
             data=response,
-            event_type=f"negotiation_{action.action}",
-            metadata={"decision": action},
+            event_type=f"negotiation_{action_name}",
+            metadata={
+                "decision": action,
+                "item_id": context.item_id,
+                "agent_did": context.offer.agent_did,
+            },
         )
 
     async def _handle_crypto_lock(

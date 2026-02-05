@@ -59,6 +59,7 @@ jobs:
               with:
                   name: proto-stubs
                   path: |
+                      packages/aura-core/src/aura_core/gen
                       core/src/hive/proto
                       api-gateway/src/proto
                       frontend/src/lib/aura
