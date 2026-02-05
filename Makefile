@@ -13,7 +13,7 @@ lint:
 	# Python Lint (Ruff)
 	uv run ruff check .
 	# Python Type Check (Mypy)
-	MYPYPATH=core/src:packages/aura-core/src uv run mypy core/src
+	MYPYPATH=$(CORE_PATH) uv run mypy core/src
 	MYPYPATH=api-gateway/src:packages/aura-core/src uv run mypy api-gateway/src
 	MYPYPATH=adapters/telegram-bot/src:adapters/telegram-bot/src/proto:packages/aura-core/src uv run mypy adapters/telegram-bot/src
 	MYPYPATH=agents/bee-keeper/src:packages/aura-core/src uv run mypy agents/bee-keeper/main.py agents/bee-keeper/src
