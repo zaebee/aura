@@ -1,34 +1,168 @@
 // DNA Protocol Buffers - Universal Language for the Hive
 // 
+// Binary Bloodstream: Strictly typed messages for NATS JetStream.
+// NO google.protobuf.Struct - all payloads are explicit.
+// 
 // These definitions can be generated for TS/Go/Rust/Python.
-// They represent the fundamental data structures of the ATCG metabolic loop.
 
 syntax = "proto3";
 
 package aura.dna.v1;
 
-import "google/protobuf/struct.proto";
 import "google/protobuf/timestamp.proto";
+import "google/protobuf/any.proto";
 
-// Signal - Inbound stimulus to the Hive
+// =============================================================================
+// METADATA - Common fields for OTel propagation
+// =============================================================================
+
+message TraceContext {
+  string trace_id = 1;      // W3C Trace Context trace-id
+  string span_id = 2;       // W3C Trace Context span-id
+  string trace_flags = 3;   // Sampling flags
+  string trace_state = 4;   // Vendor-specific trace state
+}
+
+// =============================================================================
+// SIGNAL - Inbound stimulus to the Hive (A - Aggregator input)
+// =============================================================================
+
 message Signal {
   string signal_id = 1;
-  string signal_type = 2;  // e.g., "negotiation", "audit", "telegram"
-  google.protobuf.Struct payload = 3;
-  google.protobuf.Timestamp timestamp = 4;
-  map<string, string> metadata = 5;
+  SignalType signal_type = 2;
+  google.protobuf.Timestamp timestamp = 3;
+  map<string, string> metadata = 4;
+  TraceContext trace = 5;
+  
+  // Strictly typed payload - no Struct
+  oneof payload {
+    NegotiationSignal negotiation = 10;
+    AuditSignal audit = 11;
+    TelegramSignal telegram = 12;
+    HeartbeatSignal heartbeat = 13;
+  }
 }
 
-// Context - Enriched understanding after Aggregator processing
+enum SignalType {
+  SIGNAL_TYPE_UNSPECIFIED = 0;
+  SIGNAL_TYPE_NEGOTIATION = 1;
+  SIGNAL_TYPE_AUDIT = 2;
+  SIGNAL_TYPE_TELEGRAM = 3;
+  SIGNAL_TYPE_HEARTBEAT = 4;
+}
+
+message NegotiationSignal {
+  string item_id = 1;
+  double bid_amount = 2;
+  string currency_code = 3;
+  AgentIdentity agent = 4;
+}
+
+message AgentIdentity {
+  string did = 1;
+  float reputation_score = 2;
+}
+
+message AuditSignal {
+  string repo_name = 1;
+  string git_diff = 2;
+  repeated string filesystem_map = 3;
+  string event_name = 4;
+}
+
+message TelegramSignal {
+  int64 user_id = 1;
+  int64 chat_id = 2;
+  string message_text = 3;
+  string callback_data = 4;
+}
+
+message HeartbeatSignal {
+  string service_name = 1;
+  string instance_id = 2;
+}
+
+// =============================================================================
+// CONTEXT - Enriched understanding after Aggregator processing
+// =============================================================================
+
 message Context {
   string context_id = 1;
-  string context_type = 2;  // e.g., "hive", "bee", "telegram"
-  google.protobuf.Struct data = 3;
-  SystemVitals system_health = 4;
-  map<string, string> metadata = 5;
+  ContextType context_type = 2;
+  SystemVitals system_health = 3;
+  map<string, string> metadata = 4;
+  TraceContext trace = 5;
+  
+  // Strictly typed context data
+  oneof data {
+    HiveContextData hive = 10;
+    BeeContextData bee = 11;
+    TelegramContextData telegram = 12;
+  }
 }
 
-// ActionType - Enumeration of possible intent actions
+enum ContextType {
+  CONTEXT_TYPE_UNSPECIFIED = 0;
+  CONTEXT_TYPE_HIVE = 1;
+  CONTEXT_TYPE_BEE = 2;
+  CONTEXT_TYPE_TELEGRAM = 3;
+}
+
+message HiveContextData {
+  string item_id = 1;
+  NegotiationOffer offer = 2;
+  ItemData item = 3;
+  string request_id = 4;
+}
+
+message NegotiationOffer {
+  double bid_amount = 1;
+  float reputation = 2;
+  string agent_did = 3;
+}
+
+message ItemData {
+  string id = 1;
+  string name = 2;
+  double base_price = 3;
+  double floor_price = 4;
+  map<string, string> meta = 5;
+}
+
+message BeeContextData {
+  string repo_name = 1;
+  string git_diff = 2;
+  repeated string filesystem_map = 3;
+  map<string, double> hive_metrics = 4;
+}
+
+message TelegramContextData {
+  int64 user_id = 1;
+  int64 chat_id = 2;
+  string message_text = 3;
+  string fsm_state = 4;
+}
+
+// =============================================================================
+// INTENT - Decision made by the Transformer (T output)
+// =============================================================================
+
+message Intent {
+  string intent_id = 1;
+  ActionType action = 2;
+  string reasoning = 3;
+  repeated IntentStep steps = 4;
+  map<string, string> metadata = 5;
+  TraceContext trace = 6;
+  
+  // Strictly typed action params
+  oneof params {
+    NegotiationIntent negotiation = 10;
+    AuditIntent audit = 11;
+    UIIntent ui = 12;
+  }
+}
+
 enum ActionType {
   ACTION_TYPE_UNSPECIFIED = 0;
   ACTION_TYPE_ACCEPT = 1;
@@ -39,41 +173,169 @@ enum ActionType {
   ACTION_TYPE_ERROR = 6;
 }
 
-// Intent - Decision made by the Transformer
-message Intent {
-  string intent_id = 1;
-  ActionType action = 2;
-  google.protobuf.Struct params = 3;
-  string reasoning = 4;
-  repeated IntentStep steps = 5;
-  map<string, string> metadata = 6;
+message NegotiationIntent {
+  double price = 1;
+  string message = 2;
+  string thought = 3;
 }
 
-// IntentStep - A single step in a multi-step Intent
+message AuditIntent {
+  bool is_pure = 1;
+  repeated string heresies = 2;
+  string narrative = 3;
+}
+
+message UIIntent {
+  string template_id = 1;
+  string text = 2;
+  string parse_mode = 3;
+}
+
 message IntentStep {
   string skill = 1;
   string intent = 2;
-  google.protobuf.Struct params = 3;
+  // Use Any for step params since they vary by skill
+  google.protobuf.Any params = 3;
 }
 
-// Observation - Result of Connector execution
+// =============================================================================
+// OBSERVATION - Result of Connector execution (C output)
+// =============================================================================
+
 message Observation {
   bool success = 1;
-  google.protobuf.Struct data = 2;
-  optional int64 message_id = 3;
-  optional string error = 4;
-  string event_type = 5;
-  map<string, string> metadata = 6;
+  optional int64 message_id = 2;
+  optional string error = 3;
+  string event_type = 4;
+  map<string, string> metadata = 5;
+  TraceContext trace = 6;
+  
+  // Strictly typed observation data
+  oneof data {
+    NegotiationObservation negotiation = 10;
+    AuditObservation audit = 11;
+    TelegramObservation telegram = 12;
+  }
 }
 
-// Event - Emitted to the Hive's bloodstream (NATS)
+message NegotiationObservation {
+  string session_token = 1;
+  int64 valid_until_timestamp = 2;
+  
+  oneof result {
+    OfferAccepted accepted = 3;
+    OfferCountered countered = 4;
+    OfferRejected rejected = 5;
+  }
+}
+
+message OfferAccepted {
+  double final_price = 1;
+  string reservation_code = 2;
+  CryptoPaymentInstructions crypto_payment = 3;
+}
+
+message OfferCountered {
+  double proposed_price = 1;
+  string reason_code = 2;
+  string human_message = 3;
+}
+
+message OfferRejected {
+  string reason_code = 1;
+}
+
+message CryptoPaymentInstructions {
+  string deal_id = 1;
+  string wallet_address = 2;
+  double amount = 3;
+  string currency = 4;
+  string memo = 5;
+  string network = 6;
+  int64 expires_at = 7;
+}
+
+message AuditObservation {
+  bool is_pure = 1;
+  repeated string heresies = 2;
+  string narrative = 3;
+  string reasoning = 4;
+  double execution_time = 5;
+  int32 token_usage = 6;
+}
+
+message TelegramObservation {
+  int64 message_id = 1;
+  bool delivered = 2;
+}
+
+// =============================================================================
+// EVENT - Emitted to the Hive's bloodstream (G output -> NATS JetStream)
+// =============================================================================
+
 message Event {
-  string topic = 1;
-  google.protobuf.Struct payload = 2;
+  string event_id = 1;
+  string topic = 2;
   google.protobuf.Timestamp timestamp = 3;
+  map<string, string> metadata = 4;
+  TraceContext trace = 5;
+  
+  // Strictly typed event payload
+  oneof payload {
+    NegotiationEvent negotiation = 10;
+    VitalsEvent vitals = 11;
+    AlertEvent alert = 12;
+    HeartbeatEvent heartbeat = 13;
+    AuditEvent audit = 14;
+  }
 }
 
-// VitalsStatus - Enumeration of system health states
+message NegotiationEvent {
+  string session_token = 1;
+  ActionType action = 2;
+  double price = 3;
+  string item_id = 4;
+  string agent_did = 5;
+}
+
+message VitalsEvent {
+  string service = 1;
+  VitalsStatus status = 2;
+  double cpu_usage_percent = 3;
+  double memory_usage_mb = 4;
+}
+
+message AlertEvent {
+  AlertSeverity severity = 1;
+  string message = 2;
+  string source = 3;
+}
+
+enum AlertSeverity {
+  ALERT_SEVERITY_UNSPECIFIED = 0;
+  ALERT_SEVERITY_INFO = 1;
+  ALERT_SEVERITY_WARNING = 2;
+  ALERT_SEVERITY_ERROR = 3;
+  ALERT_SEVERITY_CRITICAL = 4;
+}
+
+message HeartbeatEvent {
+  string service = 1;
+  string instance_id = 2;
+  VitalsStatus status = 3;
+}
+
+message AuditEvent {
+  string repo_name = 1;
+  bool is_pure = 2;
+  repeated string heresies = 3;
+  double negotiation_success_rate = 4;
+}
+
+// =============================================================================
+// SYSTEM VITALS - Health metrics for proprioception
+// =============================================================================
+
 enum VitalsStatus {
   VITALS_STATUS_UNSPECIFIED = 0;
   VITALS_STATUS_OK = 1;
@@ -81,7 +343,6 @@ enum VitalsStatus {
   VITALS_STATUS_ERROR = 3;
 }
 
-// SystemVitals - Health metrics for proprioception
 message SystemVitals {
   VitalsStatus status = 1;
   double cpu_usage_percent = 2;

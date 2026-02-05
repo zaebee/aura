@@ -115,6 +115,21 @@ services:
       timeout: 3s
       retries: 5
 
+  nats:
+    image: nats:2.10-alpine
+    restart: always
+    command: ["--jetstream", "--store_dir=/data", "-m", "8222"]
+    ports:
+      - "4222:4222"   # Client connections
+      - "8222:8222"   # HTTP monitoring
+    volumes:
+      - nats_data:/data
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:8222/healthz"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
   prometheus:
     image: prom/prometheus:latest
     restart: always
@@ -138,3 +153,4 @@ services:
 
 volumes:
   postgres_data:
+  nats_data:

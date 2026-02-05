@@ -430,7 +430,7 @@ async def serve() -> None:
     connector = HiveConnector(
         registry=registry, market_service=market_service, settings=settings
     )
-    generator = HiveGenerator(registry=registry, settings=settings)
+    generator = HiveGenerator(registry=registry)
     membrane = HiveMembrane(registry=registry)
 
     metabolism = MetabolicLoop(
