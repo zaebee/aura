@@ -137,34 +137,8 @@ telegram:
 # For production, it is strongly recommended to use a secret management solution
 # like Vault or External Secrets Operator instead of providing plain-text secrets here.
 secrets:
-  # Primary LLM API key, required by the core service.
-  # This value must be provided during installation via CI/CD.
-  # Injected via: --set secrets.llmApiKey="your-key"
-  llmApiKey: ""
-  # Fernet key (Base64-encoded, 32 bytes) for encrypting deal secrets.
-  # Required by the core service for crypto payment features.
-  # Injected via: --set secrets.secretEncryptionKey="your-key"
-  secretEncryptionKey: ""
-  # Solana Private Key (Base58-encoded) for crypto payments.
-  # Required if AURA_CRYPTO__ENABLED is true.
-  # Injected via: --set secrets.solanaPrivateKey="your-key"
-  solanaPrivateKey: ""
-  # Telegram Bot Token, required by the telegram bot service.
-  # This value must be provided during installation via CI/CD.
-  # Injected via: --set secrets.telegramToken="your-token"
-  telegramToken: ""
-  # API key for OpenAI (optional, only if using openai/* models)
-  # Injected via: --set secrets.openaiApiKey="your-key"
-  openaiApiKey: ""
-  # Image pull secrets for private container registries
   imagePullSecrets:
   - name: ghcr-secret
-  # FRP client authentication token for tunnel access
-  # This value must be provided during installation via:
-  # helm install --set secrets.frpClientToken.value="your-token-here"
-  frpClientToken:
-    name: frp-client-token
-    value: ""  # Must be set during deployment
 
 # Monitoring Stack Configuration (Cross-namespace)
 monitoring:
