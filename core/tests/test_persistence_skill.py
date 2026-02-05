@@ -7,7 +7,7 @@ from config.database import DatabaseSettings
 
 
 @pytest.mark.asyncio
-async def test_persistence_skill_initialize() -> None:
+async def test_persistence_skill_initialize():
     skill = PersistenceSkill()
     settings = DatabaseSettings(
         url="postgresql://user:password@localhost:5432/aura_db",
@@ -23,7 +23,7 @@ async def test_persistence_skill_initialize() -> None:
 
 
 @pytest.mark.asyncio
-async def test_persistence_skill_execute_unknown_intent() -> None:
+async def test_persistence_skill_execute_unknown_intent():
     skill = PersistenceSkill()
     settings = DatabaseSettings(
         url="postgresql://user:password@localhost:5432/aura_db",

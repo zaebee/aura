@@ -54,7 +54,6 @@ async def main() -> None:
     # Initialize NATS
     nc = None
     try:
-        nats_url = settings.nats_url
         nc = await nats.connect(
             settings.nats_url,
             connect_timeout=5,
