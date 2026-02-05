@@ -56,7 +56,7 @@ async def seed() -> None:
                 item_id=raw["id"],
                 error=emb_obs.error,
             )
-            vector = [0.0] * 1024
+            vector = [0.0] * settings.database.vector_dimension
 
         # Upsert via Storage Protein
         obs = await storage.execute(

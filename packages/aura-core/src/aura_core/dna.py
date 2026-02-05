@@ -40,14 +40,12 @@ class Transformer[C_inv, I_inv](Protocol):
 
 
 @runtime_checkable
-class SkillProtocol[T_settings, T_provider, P_inv, R_cov](Protocol):
+class SkillProtocol[P_inv, R_cov](Protocol):
     """Protocol for specialized Proteins used by the Connector."""
 
     def get_name(self) -> str: ...
 
     def get_capabilities(self) -> list[str]: ...
-
-    def bind(self, settings: T_settings, provider: T_provider) -> None: ...
 
     async def initialize(self) -> bool: ...
 

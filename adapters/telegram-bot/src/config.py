@@ -21,7 +21,7 @@ class TelegramSettings(BaseSettings):
     negotiation_timeout: float = 60.0
     webhook_domain: str | None = None
     log_level: str = "info"
-    nats_url: str = "nats://nats:4222"
+    nats_url: str = Field(...)  # type: ignore
 
 
 @lru_cache

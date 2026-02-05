@@ -1,7 +1,6 @@
 import asyncio
 import logging
 
-import grpc
 import nats
 import structlog
 from aiogram import Bot, Dispatcher
@@ -70,15 +69,11 @@ async def main() -> None:
     # Initialize Bot
     bot = Bot(token=settings.token.get_secret_value())
 
-    # --- Provider Factories (Trinity Pattern) ---
-    aura_channel = grpc.aio.insecure_channel(settings.core_url)
-
-    # --- Skill Instantiation & Binding ---
-    telegram_protein = TelegramProtein()
-    telegram_protein.bind({}, bot)
-
-    aura_protein = GRPCNegotiationClient()
-    aura_protein.bind({"timeout": settings.negotiation_timeout}, aura_channel)
+    # Initialize Proteins
+    telegram_protein = TelegramProtein(bot)
+    aura_protein = GRPCNegotiationClient(
+        settings.core_url, timeout=settings.negotiation_timeout
+    )
 
     # Initialize Skill Registry
     registry = SkillRegistry()

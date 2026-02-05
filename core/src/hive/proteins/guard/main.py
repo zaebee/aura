@@ -13,7 +13,7 @@ logger = logging.getLogger(__name__)
 DEFAULT_MIN_MARGIN = 0.1
 
 
-class GuardSkill(SkillProtocol[SafetySettings, OutputGuard, dict[str, Any], Observation]):
+class GuardSkill(SkillProtocol[dict[str, Any], Observation]):
     """
     Guard Protein: Handles safety validation and safe price calculation.
     Standardized following the Crystalline Protein Standard.
@@ -21,7 +21,7 @@ class GuardSkill(SkillProtocol[SafetySettings, OutputGuard, dict[str, Any], Obse
 
     def __init__(self) -> None:
         self.settings: SafetySettings | None = None
-        self.provider: OutputGuard | None = None
+        self.guard = OutputGuard()
 
     def get_name(self) -> str:
         return "guard"
@@ -29,20 +29,16 @@ class GuardSkill(SkillProtocol[SafetySettings, OutputGuard, dict[str, Any], Obse
     def get_capabilities(self) -> list[str]:
         return ["validate_decision", "get_safe_price"]
 
-    def bind(self, settings: SafetySettings, provider: OutputGuard) -> None:
+    async def initialize(self, settings: SafetySettings | None = None) -> bool:
         self.settings = settings
-        self.provider = provider
-
-    async def initialize(self) -> bool:
+        self.guard = OutputGuard(safety_settings=self.settings)
         return True
 
     async def execute(self, intent: str, params: dict[str, Any]) -> Observation:
-        if not self.provider:
-            return Observation(success=False, error="provider_not_initialized")
         try:
             if intent in ["validate_decision", "validate_margin", "validate_floor"]:
                 p = ValidationParams(**params)
-                self.provider.validate_decision(p.decision, p.context)
+                self.guard.validate_decision(p.decision, p.context)
                 return Observation(success=True)
 
             elif intent == "get_safe_price":

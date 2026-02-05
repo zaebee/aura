@@ -1,11 +1,10 @@
 import asyncio
 import logging
 from datetime import UTC, datetime
-from typing import Any, cast
+from typing import Any
 
 from aura_core import Observation, SkillProtocol
-from sqlalchemy import Engine, text
-from sqlalchemy.orm import Session, sessionmaker
+from sqlalchemy import text
 
 from config.database import DatabaseSettings
 
@@ -14,15 +13,14 @@ from ._internal import (
     DealStatus,
     InventoryItem,
     LockedDeal,
+    SessionLocal,
 )
 from .schema import DealSchema, ItemSchema
 
 logger = logging.getLogger(__name__)
 
 
-class StorageSkill(
-    SkillProtocol[DatabaseSettings, tuple[sessionmaker, Engine], dict[str, Any], Observation]
-):
+class StorageSkill(SkillProtocol[dict[str, Any], Observation]):
     """
     Storage Protein: Handles all database operations.
     Standardized following the Crystalline Protein Standard.
@@ -30,8 +28,6 @@ class StorageSkill(
 
     def __init__(self) -> None:
         self.settings: DatabaseSettings | None = None
-        self.provider: sessionmaker | None = None
-        self.engine: Engine | None = None
 
     def get_name(self) -> str:
         return "storage"
@@ -50,31 +46,26 @@ class StorageSkill(
             "get_first_item",
         ]
 
-    def bind(
-        self, settings: DatabaseSettings, provider: tuple[sessionmaker, Engine]
-    ) -> None:
+    async def initialize(self, settings: DatabaseSettings | None = None) -> bool:
         self.settings = settings
-        self.provider, self.engine = provider
+        if self.settings:
+            from pgvector.sqlalchemy import Vector
+            from sqlalchemy import create_engine
 
-    def _get_session(self) -> Session:
-        if not self.provider:
-            raise RuntimeError("provider_not_initialized")
-        return cast(Session, self.provider())
+            from . import _internal
 
-    async def initialize(self) -> bool:
-        if not self.settings or not self.provider:
-            return False
+            _internal.engine = create_engine(str(self.settings.url))
+            _internal.SessionLocal.configure(bind=_internal.engine)
 
-        from pgvector.sqlalchemy import Vector
-        # DNA Rule: Dynamic configuration of vector dimension
-        InventoryItem.__table__.c.embedding.type = Vector(
-            self.settings.vector_dimension
-        )
+            # DNA Rule: Dynamic configuration of vector dimension
+            InventoryItem.__table__.c.embedding.type = Vector(
+                self.settings.vector_dimension
+            )
 
         try:
 
             def check() -> bool:
-                with self._get_session() as session:
+                with SessionLocal() as session:
                     session.execute(text("SELECT 1"))
                 return True
 
@@ -84,9 +75,6 @@ class StorageSkill(
             return False
 
     async def execute(self, intent: str, params: dict[str, Any]) -> Observation:
-        if not self.provider:
-            return Observation(success=False, error="provider_not_initialized")
-
         if intent == "init_db":
             return await self._init_db()
         elif intent == "read_item":
@@ -109,12 +97,19 @@ class StorageSkill(
         return Observation(success=False, error=f"Unknown intent: {intent}")
 
     async def _init_db(self) -> Observation:
-        if not self.engine:
+        from ._internal import engine
+
+        if engine is None:
             return Observation(success=False, error="engine_not_initialized")
+
         try:
 
             def create() -> None:
-                Base.metadata.create_all(bind=cast(Engine, self.engine))
+                from typing import cast
+
+                from sqlalchemy import Engine
+
+                Base.metadata.create_all(bind=cast(Engine, engine))
 
             await asyncio.to_thread(create)
             return Observation(success=True)
@@ -126,7 +121,7 @@ class StorageSkill(
             return Observation(success=False, error="item_id_required")
 
         def fetch() -> dict[str, Any] | None:
-            with self._get_session() as session:
+            with SessionLocal() as session:
                 item = session.query(InventoryItem).filter_by(id=item_id).first()
                 if item:
                     return ItemSchema.model_validate(item).model_dump()
@@ -139,7 +134,7 @@ class StorageSkill(
 
     async def _get_first_item(self) -> Observation:
         def fetch() -> dict[str, Any] | None:
-            with self._get_session() as session:
+            with SessionLocal() as session:
                 item = session.query(InventoryItem).first()
                 if item:
                     return ItemSchema.model_validate(item).model_dump()
@@ -154,7 +149,7 @@ class StorageSkill(
         try:
 
             def create() -> bool:
-                with self._get_session() as session:
+                with SessionLocal() as session:
                     deal = LockedDeal(
                         id=params["id"],
                         item_id=params["item_id"],
@@ -181,7 +176,7 @@ class StorageSkill(
             return Observation(success=False, error="deal_id_required")
 
         def fetch() -> dict[str, Any] | None:
-            with self._get_session() as session:
+            with SessionLocal() as session:
                 deal = session.query(LockedDeal).filter_by(id=deal_id).first()
                 if deal:
                     return DealSchema.model_validate(deal).model_dump()
@@ -197,7 +192,7 @@ class StorageSkill(
             return Observation(success=False, error="memo_required")
 
         def fetch() -> dict[str, Any] | None:
-            with self._get_session() as session:
+            with SessionLocal() as session:
                 deal = session.query(LockedDeal).filter_by(payment_memo=memo).first()
                 if deal:
                     return DealSchema.model_validate(deal).model_dump()
@@ -215,7 +210,7 @@ class StorageSkill(
         try:
 
             def update() -> bool:
-                with self._get_session() as session:
+                with SessionLocal() as session:
                     deal = session.query(LockedDeal).filter_by(id=deal_id).first()
                     if not deal:
                         return False
@@ -241,7 +236,7 @@ class StorageSkill(
         try:
 
             def upsert() -> bool:
-                with self._get_session() as session:
+                with SessionLocal() as session:
                     item = session.query(InventoryItem).filter_by(id=item_id).first()
                     if item:
                         item.name = params.get("name", item.name)
@@ -273,7 +268,7 @@ class StorageSkill(
         min_similarity = params.get("min_similarity")
 
         def search() -> list[dict[str, Any]]:
-            with self._get_session() as session:
+            with SessionLocal() as session:
                 results = (
                     session.query(
                         InventoryItem,

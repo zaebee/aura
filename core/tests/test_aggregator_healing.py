@@ -16,9 +16,7 @@ async def test_aggregator_healing_on_prometheus_timeout(mocker):
     """
     registry = SkillRegistry()
     monitor = MonitorSkill()
-    settings = ServerSettings()
-    monitor.bind(settings, None)
-    await monitor.initialize()
+    await monitor.initialize(ServerSettings())
     registry.register("monitor", monitor)
     aggregator = HiveAggregator(registry=registry)
     mocker.patch(
@@ -36,9 +34,7 @@ async def test_aggregator_healing_on_prometheus_connection_error(mocker):
     """
     registry = SkillRegistry()
     monitor = MonitorSkill()
-    settings = ServerSettings()
-    monitor.bind(settings, None)
-    await monitor.initialize()
+    await monitor.initialize(ServerSettings())
     registry.register("monitor", monitor)
     aggregator = HiveAggregator(registry=registry)
     mocker.patch(
@@ -56,9 +52,7 @@ async def test_aggregator_healing_with_cache_fallback(mocker):
     """
     registry = SkillRegistry()
     monitor = MonitorSkill()
-    settings = ServerSettings()
-    monitor.bind(settings, None)
-    await monitor.initialize()
+    await monitor.initialize(ServerSettings())
     registry.register("monitor", monitor)
     aggregator = HiveAggregator(registry=registry)
 

@@ -8,8 +8,7 @@ from config.server import ServerSettings
 async def test_monitor_skill_initialize():
     skill = MonitorSkill()
     settings = ServerSettings()
-    skill.bind(settings, None)
-    success = await skill.initialize()
+    success = await skill.initialize(settings)
     assert success is True
     assert skill.settings == settings
 

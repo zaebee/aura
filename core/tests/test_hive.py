@@ -60,15 +60,11 @@ async def test_aggregator_perceive(mocker):
 
 @pytest.mark.asyncio
 async def test_membrane_outbound_override(mocker):
-    from hive.proteins.guard._internal import OutputGuard
-
     from config.policy import SafetySettings
 
     registry = SkillRegistry()
     guard = GuardSkill()
-    settings = SafetySettings(min_profit_margin=0.1)
-    guard.bind(settings, OutputGuard(safety_settings=settings))
-    await guard.initialize()
+    await guard.initialize(SafetySettings(min_profit_margin=0.1))
     registry.register("guard", guard)
     membrane = HiveMembrane(registry=registry)
 
@@ -123,15 +119,11 @@ async def test_membrane_inbound_invalid_bid():
 
 @pytest.mark.asyncio
 async def test_membrane_invalid_min_margin(mocker):
-    from hive.proteins.guard._internal import OutputGuard
-
     from config.policy import SafetySettings
 
     registry = SkillRegistry()
     guard = GuardSkill()
-    settings = SafetySettings(min_profit_margin=1.5)
-    guard.bind(settings, OutputGuard(safety_settings=settings))
-    await guard.initialize()
+    await guard.initialize(SafetySettings(min_profit_margin=1.5))
     registry.register("guard", guard)
     membrane = HiveMembrane(registry=registry)
 

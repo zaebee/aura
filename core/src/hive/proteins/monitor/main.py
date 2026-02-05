@@ -16,7 +16,7 @@ from .schema import MetricIncrementParams
 logger = logging.getLogger(__name__)
 
 
-class MonitorSkill(SkillProtocol[ServerSettings, Any, dict[str, Any], Observation]):
+class MonitorSkill(SkillProtocol[dict[str, Any], Observation]):
     """
     Monitor Protein: Handles system metrics and health checks.
     Standardized following the Crystalline Protein Standard.
@@ -24,7 +24,6 @@ class MonitorSkill(SkillProtocol[ServerSettings, Any, dict[str, Any], Observatio
 
     def __init__(self) -> None:
         self.settings: ServerSettings | None = None
-        self.provider: Any = None
         self._metrics_cache = MetricsCache(ttl_seconds=30)
 
     def get_name(self) -> str:
@@ -33,11 +32,8 @@ class MonitorSkill(SkillProtocol[ServerSettings, Any, dict[str, Any], Observatio
     def get_capabilities(self) -> list[str]:
         return ["fetch_metrics", "health_check", "increment_counter"]
 
-    def bind(self, settings: ServerSettings, provider: Any) -> None:
+    async def initialize(self, settings: ServerSettings | None = None) -> bool:
         self.settings = settings
-        self.provider = provider
-
-    async def initialize(self) -> bool:
         return True
 
     async def execute(self, intent: str, params: dict[str, Any]) -> Observation:

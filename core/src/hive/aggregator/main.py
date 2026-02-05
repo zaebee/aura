@@ -60,7 +60,7 @@ class HiveAggregator(Aggregator[Any, HiveContext]):
     async def get_system_metrics(self) -> dict[str, Any]:
         """Backward compatibility for legacy status calls."""
         vitals = await self.get_vitals()
-        return dict(vitals.model_dump())
+        return vitals.model_dump()
 
     async def perceive(self, signal: Any, **kwargs: Any) -> HiveContext:
         item_id = signal.item_id

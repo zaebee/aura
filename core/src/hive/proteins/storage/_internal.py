@@ -1,29 +1,37 @@
 import enum
 import uuid
 from datetime import UTC, datetime
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from pgvector.sqlalchemy import Vector
 from sqlalchemy import (
     Boolean,
     DateTime,
-    Engine,
     Enum,
     Float,
     LargeBinary,
     String,
 )
+
+if TYPE_CHECKING:
+    from sqlalchemy import Engine
 from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import (
     DeclarativeBase,
     Mapped,
     mapped_column,
+    sessionmaker,
 )
 
 # DNA Rule: Proteins must not import global settings.
 # Models will be initialized during Skill.initialize()
 
 # 1. Implementation Details: SQLAlchemy Setup
+# These will be initialized properly during Skill.initialize()
+engine: "Engine | None" = None
+SessionLocal = sessionmaker()
+
+
 class Base(DeclarativeBase):
     pass
 

@@ -12,11 +12,6 @@ class RuleBasedStrategy:
 
     def __init__(
         self,
-        # TODO: The trigger_price is hardcoded with a default value of 1000.0.
-        # This value acts as a security threshold for requiring UI confirmation
-        # on high-value bids. For better maintainability and flexibility,
-        # consider making this value configurable through a settings class,
-        # such as SafetySettings.
         trigger_price: float = 1000.0,
     ):
         self.trigger_price = trigger_price

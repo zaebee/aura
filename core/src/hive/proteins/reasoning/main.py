@@ -3,17 +3,17 @@ import logging
 from typing import Any
 
 import dspy
-from aura_core import Observation, SkillProtocol
+from aura_core import Observation, SkillProtocol, get_raw_key
 
 from config.llm import LLMSettings
 
-from ._internal import load_brain
+from ._internal import get_embedding_model, load_brain
 from .schema import EmbeddingParams, NegotiationParams, NegotiationResult
 
 logger = logging.getLogger(__name__)
 
 
-class ReasoningSkill(SkillProtocol[LLMSettings, dict[str, Any], dict[str, Any], Observation]):
+class ReasoningSkill(SkillProtocol[dict[str, Any], Observation]):
     """
     Reasoning Protein: Handles LLM logic, DSPy negotiation, and embeddings.
     Standardized following the Crystalline Protein Standard.
@@ -21,9 +21,8 @@ class ReasoningSkill(SkillProtocol[LLMSettings, dict[str, Any], dict[str, Any], 
 
     def __init__(self) -> None:
         self.settings: LLMSettings | None = None
-        self.provider: dict[str, Any] | None = None
-        self.negotiator = None
-        self._embed_model = None
+        self.negotiator: Any = None
+        self._embed_model: Any = None
 
     def get_name(self) -> str:
         return "reasoning"
@@ -31,26 +30,19 @@ class ReasoningSkill(SkillProtocol[LLMSettings, dict[str, Any], dict[str, Any], 
     def get_capabilities(self) -> list[str]:
         return ["negotiate", "generate_embedding"]
 
-    def bind(self, settings: LLMSettings, provider: dict[str, Any]) -> None:
+    async def initialize(self, settings: LLMSettings | None = None) -> bool:
         self.settings = settings
-        self.provider = provider
-
-    async def initialize(self) -> bool:
-        if not self.settings or not self.provider:
-            return False
-
-        if "rule" not in self.settings.model:
+        if self.settings and self.settings.model != "rule":
             try:
-                lm = self.provider.get("lm")
-                if lm:
-                    dspy.configure(lm=lm)
-
+                dspy.configure(lm=dspy.LM(self.settings.model))
                 self.negotiator = load_brain(
                     getattr(self.settings, "compiled_program_path", None)
                 )
-                self._embed_model = self.provider.get("embedder")
+                self._embed_model = get_embedding_model(
+                    get_raw_key(self.settings.api_key)
+                )
             except Exception as e:
-                logger.error(f"Failed to initialize Reasoning: {e}")
+                logger.error(f"Failed to configure DSPy: {e}")
                 return False
         return True
 
