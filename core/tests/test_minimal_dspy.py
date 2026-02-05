@@ -1,6 +1,8 @@
 import os
+
 import pytest
 from src.hive.proteins.reasoning.enzymes.reasoning_engine import AuraNegotiator
+
 
 @pytest.fixture
 def mock_dspy_lm(monkeypatch):

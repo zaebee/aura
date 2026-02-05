@@ -1,9 +1,9 @@
-from unittest.mock import MagicMock, patch
+from unittest.mock import patch
 
-import pytest
-from src.hive.proteins.reasoning.enzymes.reasoning_engine import AI_Decision, LiteLLMStrategy
-
-from hive.proto.aura.negotiation.v1 import negotiation_pb2
+from src.hive.proteins.reasoning.enzymes.reasoning_engine import (
+    AI_Decision,
+    LiteLLMStrategy,
+)
 
 
 class TestLiteLLMStrategy:

@@ -1,10 +1,12 @@
 import tempfile
 from pathlib import Path
 from unittest.mock import patch
+
 from src.hive.proteins.reasoning.enzymes.reasoning_engine import (
     AuraNegotiator,
     DSPyStrategy,
 )
+
 
 def test_dspy_strategy_init_minimal():
     # Create a temporary compiled program for testing

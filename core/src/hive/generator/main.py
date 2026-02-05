@@ -1,7 +1,7 @@
 import time
+from typing import Any
 
 import structlog
-from typing import Any
 from aura_core import Event, Generator, Observation, SkillRegistry
 
 logger = structlog.get_logger(__name__)

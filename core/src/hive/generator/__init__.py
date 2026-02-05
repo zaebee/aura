@@ -1,1 +1,1 @@
-from .main import HiveGenerator
+from .main import HiveGenerator as HiveGenerator

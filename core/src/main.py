@@ -18,6 +18,7 @@ from hive.metabolism.logging_config import (
     configure_logging,
     get_logger,
 )
+from hive.proteins.telemetry.enzymes.prometheus import init_telemetry
 from hive.proto.aura.negotiation.v1 import negotiation_pb2, negotiation_pb2_grpc
 from hive.transformer import AuraTransformer
 from opentelemetry import trace
@@ -30,9 +31,6 @@ from config import settings
 # Configure structured logging on startup
 configure_logging(log_level=settings.server.log_level)
 logger = get_logger("core")
-
-# Late import of telemetry enzyme to avoid circularity if any
-from hive.proteins.telemetry.enzymes.prometheus import init_telemetry
 
 # Initialize OpenTelemetry tracing
 service_name = settings.server.otel_service_name
@@ -318,20 +316,20 @@ async def serve() -> None:
 
     import dspy
     from aura_core import get_raw_key
+    from hive.proteins.guard import GuardSkill
+    from hive.proteins.guard.enzymes.guard_logic import OutputGuard
+    from hive.proteins.persistence import PersistenceSkill
+    from hive.proteins.pulse import PulseSkill
+    from hive.proteins.pulse.enzymes.pulse_broker import NatsProvider
+    from hive.proteins.reasoning import ReasoningSkill
+    from hive.proteins.reasoning.enzymes.reasoning_engine import get_embedding_model
+    from hive.proteins.telemetry import TelemetrySkill
     from hive.proteins.transaction import TransactionSkill
     from hive.proteins.transaction.enzymes.solana import (
         PriceConverter,
         SecretEncryption,
         SolanaProvider,
     )
-    from hive.proteins.guard import GuardSkill
-    from hive.proteins.guard.enzymes.guard_logic import OutputGuard
-    from hive.proteins.telemetry import TelemetrySkill
-    from hive.proteins.pulse import PulseSkill
-    from hive.proteins.pulse.enzymes.pulse_broker import NatsProvider
-    from hive.proteins.reasoning import ReasoningSkill
-    from hive.proteins.reasoning.enzymes.reasoning_engine import get_embedding_model
-    from hive.proteins.persistence import PersistenceSkill
     from sqlalchemy import create_engine
     from sqlalchemy.orm import sessionmaker
 

@@ -1,1 +1,1 @@
-from .main import HiveConnector
+from .main import HiveConnector as HiveConnector

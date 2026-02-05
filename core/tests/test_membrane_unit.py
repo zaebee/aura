@@ -1,4 +1,5 @@
 from unittest.mock import MagicMock
+
 import pytest
 from src.hive.proteins.guard.enzymes.guard_logic import OutputGuard, SafetyViolation
 
