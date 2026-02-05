@@ -90,6 +90,10 @@ jobs:
             - name: Run Linters
               run: make lint
             - name: Run Tests
+              env:
+                  AURA_DATABASE__URL: postgresql://test:test@localhost:5432/test_db
+                  AURA_DATABASE__REDIS_URL: redis://localhost:6379/0
+                  AURA_LLM__API_KEY: test-key-for-ci
               run: make test
 
     # === STAGE 2: THE FAN-OUT (PARALLEL BUILD) ===
