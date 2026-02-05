@@ -7,7 +7,7 @@ from aura_core import Observation, SkillProtocol
 
 from config.llm import LLMSettings
 
-from .enzymes.reasoning_engine import load_brain
+from .enzymes.reasoning_engine import generate_embedding, load_brain
 from .schema import EmbeddingParams, NegotiationParams, NegotiationResult
 
 logger = logging.getLogger(__name__)
@@ -90,7 +90,6 @@ class ReasoningSkill(SkillProtocol[LLMSettings, dict[str, Any], dict[str, Any], 
                 if not self._embed_model:
                     return Observation(success=False, error="embed_model_not_ready")
                 p_emb = EmbeddingParams(**params)
-                from .enzymes.reasoning_engine import generate_embedding
 
                 emb = await asyncio.to_thread(
                     generate_embedding, p_emb.text, self._embed_model

@@ -104,7 +104,9 @@ class AuraTransformer(Transformer[HiveContext, IntentAction]):
 
         # Rule-based fallback if requested
         if self.settings and self.settings.llm.model == "rule":
-            strategy = RuleBasedStrategy()
+            strategy = RuleBasedStrategy(
+                trigger_price=self.settings.safety.ui_trigger_price
+            )
             return strategy.evaluate(
                 context.item_data,
                 context.offer.bid_amount,

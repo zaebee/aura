@@ -422,7 +422,9 @@ async def serve() -> None:
     if transaction_protein:
         from hive.services.market import MarketService
 
-        market_service = MarketService(storage=persistence_protein, crypto=transaction_protein)
+        market_service = MarketService(
+            persistence=persistence_protein, transaction=transaction_protein
+        )
         logger.info("market_service_initialized")
 
     connector = HiveConnector(registry=registry, market_service=market_service, settings=settings)

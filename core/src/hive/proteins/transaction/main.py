@@ -78,7 +78,7 @@ class TransactionSkill(SkillProtocol[CryptoSettings, dict[str, Any], dict[str, A
 
             elif intent == "get_network_name":
                 # Return network name from settings (e.g., "solana-mainnet")
-                return Observation(success=True, data=self.settings.network or "solana")
+                return Observation(success=True, data=self.settings.solana_network or "solana")
 
             return Observation(success=False, error=f"Unknown intent: {intent}")
         except Exception as e:

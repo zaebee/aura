@@ -30,18 +30,18 @@ class MarketService:
 
     def __init__(
         self,
-        storage: SkillProtocol,
-        crypto: SkillProtocol,
+        persistence: SkillProtocol,
+        transaction: SkillProtocol,
     ):
         """
         Initialize market service.
 
         Args:
-            storage: Persistence Protein for database operations
-            crypto: Transaction Protein for blockchain verification and encryption
+            persistence: Persistence Protein for database operations
+            transaction: Transaction Protein for blockchain verification and encryption
         """
-        self.persistence = storage
-        self.transaction = crypto
+        self.persistence = persistence
+        self.transaction = transaction
 
     async def create_offer(
         self,
