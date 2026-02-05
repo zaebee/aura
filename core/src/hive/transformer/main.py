@@ -103,7 +103,7 @@ class AuraTransformer(Transformer[HiveContext, IntentAction]):
         """Reason about the negotiation by calling the Reasoning Protein."""
 
         # Rule-based fallback if requested
-        if self.settings and self.settings.llm.model == "rule":
+        if self.settings and self.settings.llm.model.lower() == "rule":
             strategy = RuleBasedStrategy(
                 trigger_price=self.settings.safety.ui_trigger_price
             )
