@@ -1,15 +1,19 @@
+from unittest.mock import AsyncMock, MagicMock
+
 import pytest
-from unittest.mock import AsyncMock
 from hive.proteins.pulse.main import PulseSkill
+
 from config.server import ServerSettings
+
 
 @pytest.mark.asyncio
 async def test_pulse_skill_initialize(mocker):
     skill = PulseSkill()
-    mock_provider = mocker.patch("hive.proteins.pulse.main.NatsProvider").return_value
+    mock_provider = MagicMock()
     mock_provider.connect = AsyncMock(return_value=True)
 
-    success = await skill.initialize(ServerSettings())
+    skill.bind(ServerSettings(), mock_provider)
+    success = await skill.initialize()
     assert success is True
 
 @pytest.mark.asyncio

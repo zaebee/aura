@@ -15,7 +15,8 @@ from aura_core import (
     SkillRegistry,
     find_hive_root,
 )
-from .proteins.gh_client import GitHubClient
+import httpx
+from .proteins.vcs import VCS_Skill
 
 logger = structlog.get_logger(__name__)
 
@@ -29,15 +30,16 @@ class BeeConnector(Connector[AuditObservation, BeeObservation, BeeContext]):
         self.github_token = settings.github_token
         self.repo_name = settings.github_repository
         self.nats_url = settings.nats_url
+        self._http_client = httpx.AsyncClient(timeout=30.0)
 
         self.gh = None
         if self.github_token and self.github_token != "mock":  # nosec
-            self.gh = GitHubClient(self.github_token)
+            self.gh = VCS_Skill()
+            self.gh.bind(settings, self._http_client)
 
     async def close(self) -> None:
         """Cleanup resources."""
-        if self.gh:
-            await self.gh.close()
+        await self._http_client.aclose()
 
     async def act(
         self, action: AuditObservation, context: BeeContext

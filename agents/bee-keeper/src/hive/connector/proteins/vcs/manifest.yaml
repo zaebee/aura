@@ -1,0 +1,4 @@
+name: vcs
+description: Version Control System Protein for GitHub interactions.
+capabilities:
+  - post_comment

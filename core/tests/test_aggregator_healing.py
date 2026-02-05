@@ -5,6 +5,7 @@ import pytest
 from aura_core import SkillRegistry
 from hive.aggregator import HiveAggregator
 from hive.proteins.monitor import MonitorSkill
+
 from config.server import ServerSettings
 
 
@@ -15,7 +16,9 @@ async def test_aggregator_healing_on_prometheus_timeout(mocker):
     """
     registry = SkillRegistry()
     monitor = MonitorSkill()
-    await monitor.initialize(ServerSettings())
+    settings = ServerSettings()
+    monitor.bind(settings, None)
+    await monitor.initialize()
     registry.register("monitor", monitor)
     aggregator = HiveAggregator(registry=registry)
     mocker.patch(
@@ -33,7 +36,9 @@ async def test_aggregator_healing_on_prometheus_connection_error(mocker):
     """
     registry = SkillRegistry()
     monitor = MonitorSkill()
-    await monitor.initialize(ServerSettings())
+    settings = ServerSettings()
+    monitor.bind(settings, None)
+    await monitor.initialize()
     registry.register("monitor", monitor)
     aggregator = HiveAggregator(registry=registry)
     mocker.patch(
@@ -51,7 +56,9 @@ async def test_aggregator_healing_with_cache_fallback(mocker):
     """
     registry = SkillRegistry()
     monitor = MonitorSkill()
-    await monitor.initialize(ServerSettings())
+    settings = ServerSettings()
+    monitor.bind(settings, None)
+    await monitor.initialize()
     registry.register("monitor", monitor)
     aggregator = HiveAggregator(registry=registry)
 

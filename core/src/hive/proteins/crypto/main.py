@@ -11,7 +11,7 @@ from .schema import PaymentProof, PaymentVerificationParams
 logger = logging.getLogger(__name__)
 
 
-class CryptoSkill(SkillProtocol[dict[str, Any], Observation]):
+class CryptoSkill(SkillProtocol[CryptoSettings, dict[str, Any], dict[str, Any], Observation]):
     """
     Crypto Protein: Handles payments and encryption.
     Standardized following the Crystalline Protein Standard.
@@ -35,20 +35,13 @@ class CryptoSkill(SkillProtocol[dict[str, Any], Observation]):
             "convert_price",
         ]
 
-    async def initialize(self, settings: CryptoSettings | None = None) -> bool:
+    def bind(self, settings: CryptoSettings, provider: dict[str, Any]) -> None:
         self.settings = settings
-        if self.settings:
-            from aura_core import get_raw_key
+        self.provider = provider.get("provider")
+        self.encryption = provider.get("encryption")
+        self.converter = provider.get("converter")
 
-            self.provider = SolanaProvider(
-                private_key_base58=get_raw_key(self.settings.solana_private_key),
-                rpc_url=str(self.settings.solana_rpc_url),
-                usdc_mint=self.settings.solana_usdc_mint,
-            )
-            self.encryption = SecretEncryption(
-                get_raw_key(self.settings.secret_encryption_key)
-            )
-            self.converter = PriceConverter()
+    async def initialize(self) -> bool:
         return True
 
     async def execute(self, intent: str, params: dict[str, Any]) -> Observation:

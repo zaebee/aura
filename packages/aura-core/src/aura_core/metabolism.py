@@ -26,12 +26,12 @@ class SkillRegistry:
     """Registry for Proteins (Skills) used by the Connector."""
 
     def __init__(self) -> None:
-        self._skills: dict[str, SkillProtocol[Any, Any]] = {}
+        self._skills: dict[str, SkillProtocol[Any, Any, Any, Any]] = {}
 
-    def register(self, name: str, skill: SkillProtocol[Any, Any]) -> None:
+    def register(self, name: str, skill: SkillProtocol[Any, Any, Any, Any]) -> None:
         self._skills[name] = skill
 
-    def get(self, name: str) -> SkillProtocol[Any, Any] | None:
+    def get(self, name: str) -> SkillProtocol[Any, Any, Any, Any] | None:
         return self._skills.get(name)
 
     async def execute(self, skill_name: str, intent: str, params: Any) -> Observation:

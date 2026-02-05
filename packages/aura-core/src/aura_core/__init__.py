@@ -28,7 +28,6 @@ from .types import (
     FailureIntent,
     HiveContext,
     IntentAction,
-    get_raw_key,
     NegotiationOffer,
     NegotiationResult,
     Observation,
@@ -37,6 +36,7 @@ from .types import (
     SystemVitals,
     TelegramContext,
     UIAction,
+    get_raw_key,
 )
 
 __all__ = [
