@@ -9,7 +9,7 @@ from sqlalchemy.orm import Session, sessionmaker
 
 from config.database import DatabaseSettings
 
-from ._internal import (
+from .enzymes.postgres import (
     Base,
     DealStatus,
     InventoryItem,
@@ -20,14 +20,14 @@ from .schema import DealSchema, ItemSchema
 logger = logging.getLogger(__name__)
 
 
-class StorageSkill(
+class PersistenceSkill(
     SkillProtocol[
         DatabaseSettings, tuple[sessionmaker, Engine], dict[str, Any], Observation
     ]
 ):
     """
-    Storage Protein: Handles all database operations.
-    Standardized following the Crystalline Protein Standard.
+    Persistence Protein: Handles all database operations.
+    Standardized following the Crystalline Protein Standard and Enzyme pattern.
     """
 
     def __init__(self) -> None:
@@ -36,7 +36,7 @@ class StorageSkill(
         self.engine: Engine | None = None
 
     def get_name(self) -> str:
-        return "storage"
+        return "persistence"
 
     def get_capabilities(self) -> list[str]:
         return [
@@ -83,7 +83,7 @@ class StorageSkill(
 
             return await asyncio.to_thread(check)
         except Exception as e:
-            logger.error(f"storage_initialization_failed: {e}")
+            logger.error(f"persistence_initialization_failed: {e}")
             return False
 
     async def execute(self, intent: str, params: dict[str, Any]) -> Observation:

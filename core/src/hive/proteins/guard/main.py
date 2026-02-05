@@ -5,7 +5,7 @@ from aura_core import Observation, SkillProtocol
 
 from config.policy import SafetySettings
 
-from ._internal import OutputGuard, SafetyViolation
+from .enzymes.guard_logic import OutputGuard, SafetyViolation
 from .schema import SafePriceParams, ValidationParams
 
 logger = logging.getLogger(__name__)
@@ -16,7 +16,7 @@ DEFAULT_MIN_MARGIN = 0.1
 class GuardSkill(SkillProtocol[SafetySettings, OutputGuard, dict[str, Any], Observation]):
     """
     Guard Protein: Handles safety validation and safe price calculation.
-    Standardized following the Crystalline Protein Standard.
+    Standardized following the Crystalline Protein Standard and Enzyme pattern.
     """
 
     def __init__(self) -> None:

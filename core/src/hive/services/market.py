@@ -1,5 +1,5 @@
 """
-Market service for managing crypto-locked negotiation deals.
+Market service for managing transaction-locked negotiation deals.
 Handles deal creation, payment verification, and secret revelation.
 """
 
@@ -22,7 +22,7 @@ class MarketService:
 
     Responsibilities:
     - Creating locked deals with unique payment memos
-    - Encrypting secrets via Crypto Protein
+    - Encrypting secrets via Transaction Protein
     - Checking payment status via blockchain verification
     - Revealing decrypted secrets after payment confirmation
     - Managing deal expiration
@@ -30,18 +30,18 @@ class MarketService:
 
     def __init__(
         self,
-        storage: SkillProtocol,
-        crypto: SkillProtocol,
+        persistence: SkillProtocol,
+        transaction: SkillProtocol,
     ):
         """
         Initialize market service.
 
         Args:
-            storage: Storage Protein for database operations
-            crypto: Crypto Protein for blockchain verification and encryption
+            persistence: Persistence Protein for database operations
+            transaction: Transaction Protein for blockchain verification and encryption
         """
-        self.storage = storage
-        self.crypto = crypto
+        self.persistence = persistence
+        self.transaction = transaction
 
     async def create_offer(
         self,
@@ -63,15 +63,15 @@ class MarketService:
         now = datetime.now(UTC)
         expires_at = now + timedelta(seconds=ttl_seconds)
 
-        # Encrypt secret via Crypto Protein
-        encrypt_obs = await self.crypto.execute("encrypt_secret", {"secret": secret})
+        # Encrypt secret via Transaction Protein
+        encrypt_obs = await self.transaction.execute("encrypt_secret", {"secret": secret})
         if not encrypt_obs.success:
             raise ValueError(f"Encryption failed: {encrypt_obs.error}")
         encrypted_secret = encrypt_obs.data
 
         deal_id = uuid.uuid4()
-        # Create locked deal record via Storage Protein
-        obs = await self.storage.execute(
+        # Create locked deal record via Persistence Protein
+        obs = await self.persistence.execute(
             "create_deal",
             {
                 "id": deal_id,
@@ -103,9 +103,9 @@ class MarketService:
             },
         )
 
-        # Get crypto provider info
-        addr_obs = await self.crypto.execute("get_address", {})
-        network_obs = await self.crypto.execute("get_network_name", {})
+        # Get transaction provider info
+        addr_obs = await self.transaction.execute("get_address", {})
+        network_obs = await self.transaction.execute("get_network_name", {})
 
         # Return payment instructions
         return negotiation_pb2.CryptoPaymentInstructions(
@@ -126,8 +126,8 @@ class MarketService:
         """
         deal_uuid = uuid.UUID(deal_id)
 
-        # Query deal from Storage Protein
-        obs = await self.storage.execute("get_deal_by_id", {"deal_id": deal_uuid})
+        # Query deal from Persistence Protein
+        obs = await self.persistence.execute("get_deal_by_id", {"deal_id": deal_uuid})
 
         if not obs.success or not obs.data:
             logger.info("Deal not found", extra={"deal_id": deal_id})
@@ -137,7 +137,7 @@ class MarketService:
         now = datetime.now(UTC)
         expires_at = datetime.fromisoformat(deal["expires_at"])
         if deal["status"] == "PENDING" and now > expires_at:
-            await self.storage.execute(
+            await self.persistence.execute(
                 "update_deal_status", {"deal_id": deal_uuid, "status": "EXPIRED"}
             )
             return negotiation_pb2.CheckDealStatusResponse(status="EXPIRED")
@@ -146,7 +146,7 @@ class MarketService:
             return await self._build_paid_response(deal)
 
         if deal["status"] == "PENDING":
-            proof_obs = await self.crypto.execute(
+            proof_obs = await self.transaction.execute(
                 "verify_payment",
                 {
                     "amount": deal["final_price"],
@@ -157,7 +157,7 @@ class MarketService:
 
             if proof_obs.success and proof_obs.data:
                 proof = proof_obs.data
-                await self.storage.execute(
+                await self.persistence.execute(
                     "update_deal_status",
                     {
                         "deal_id": deal_uuid,
@@ -188,9 +188,9 @@ class MarketService:
         self, deal: dict[str, Any]
     ) -> negotiation_pb2.CheckDealStatusResponse:
         """
-        Builds response for PAID deals with decrypted secret via Crypto Protein.
+        Builds response for PAID deals with decrypted secret via Transaction Protein.
         """
-        decrypt_obs = await self.crypto.execute(
+        decrypt_obs = await self.transaction.execute(
             "decrypt_secret", {"encrypted_secret": deal["secret_content"]}
         )
         if not decrypt_obs.success:
@@ -220,8 +220,8 @@ class MarketService:
     async def _build_pending_response(
         self, deal: dict[str, Any]
     ) -> negotiation_pb2.CheckDealStatusResponse:
-        addr_obs = await self.crypto.execute("get_address", {})
-        network_obs = await self.crypto.execute("get_network_name", {})
+        addr_obs = await self.transaction.execute("get_address", {})
+        network_obs = await self.transaction.execute("get_network_name", {})
 
         instructions = negotiation_pb2.CryptoPaymentInstructions(
             deal_id=str(deal["id"]),

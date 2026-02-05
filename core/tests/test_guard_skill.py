@@ -1,12 +1,12 @@
 import pytest
-from hive.proteins.guard._internal import OutputGuard
+from hive.proteins.guard.enzymes.guard_logic import OutputGuard
 from hive.proteins.guard.main import GuardSkill
 
 from config.policy import SafetySettings
 
 
 @pytest.mark.asyncio
-async def test_guard_skill_initialize():
+async def test_guard_skill_initialize() -> None:
     skill = GuardSkill()
     settings = SafetySettings()
     skill.bind(settings, OutputGuard(safety_settings=settings))
@@ -16,7 +16,7 @@ async def test_guard_skill_initialize():
 
 
 @pytest.mark.asyncio
-async def test_guard_skill_validate_decision():
+async def test_guard_skill_validate_decision() -> None:
     skill = GuardSkill()
     settings = SafetySettings(min_profit_margin=0.1)
     skill.bind(settings, OutputGuard(safety_settings=settings))

@@ -1,7 +1,6 @@
 from pathlib import Path
 from typing import Any
 
-import httpx
 import structlog
 from aura_core import (
     Aggregator,
@@ -11,19 +10,20 @@ from aura_core import (
     SystemVitals,
 )
 
-from config import get_settings
-
 logger = structlog.get_logger(__name__)
 
 
 class HiveAggregator(Aggregator[Any, HiveContext]):
-    """A - Aggregator: Consolidates database and system health signals."""
+    """A - Aggregator: Consolidates persistence and telemetry signals."""
 
-    def __init__(self, registry: SkillRegistry) -> None:
-        self.settings = get_settings()
+    def __init__(self, registry: SkillRegistry, settings: Any = None) -> None:
+        self.settings = settings
         self.registry = registry
 
     def _resolve_brain_path(self) -> str:
+        if not self.settings:
+            return "UNKNOWN"
+
         search_paths = []
         if hasattr(self.settings.llm, "compiled_program_path"):
             search_paths.append(Path(self.settings.llm.compiled_program_path))
@@ -43,16 +43,13 @@ class HiveAggregator(Aggregator[Any, HiveContext]):
         return "UNKNOWN"
 
     async def get_vitals(self) -> SystemVitals:
-        """Standardized proprioception (self-healing metrics)."""
+        """Standardized proprioception (self-healing metrics) via Telemetry Protein."""
         try:
-            # Call Monitor Protein via SkillRegistry
-            obs = await self.registry.execute("monitor", "fetch_metrics", {})
+            # Call Telemetry Protein via SkillRegistry
+            obs = await self.registry.execute("telemetry", "fetch_metrics", {})
             if obs.success:
                 return SystemVitals(**obs.data)
             return SystemVitals(status="unstable", timestamp="", error=obs.error)
-        except (httpx.TimeoutException, httpx.ConnectError) as http_err:
-            logger.warning("aggregator_vitals_http_error", error=str(http_err))
-            return SystemVitals(status="unstable", timestamp="", error=str(http_err))
         except Exception as e:
             logger.error("aggregator_vitals_unexpected_error", error=str(e))
             return SystemVitals(status="error", timestamp="", error=str(e))
@@ -72,9 +69,9 @@ class HiveAggregator(Aggregator[Any, HiveContext]):
         )
         item_data = {}
         try:
-            # Call Storage Protein via SkillRegistry
+            # Call Persistence Protein via SkillRegistry
             obs = await self.registry.execute(
-                "storage", "read_item", {"item_id": item_id}
+                "persistence", "read_item", {"item_id": item_id}
             )
             if obs.success and obs.data:
                 item = obs.data
@@ -86,7 +83,7 @@ class HiveAggregator(Aggregator[Any, HiveContext]):
                     "meta": item["meta"] or {},
                 }
         except Exception as e:
-            logger.error("aggregator_storage_error", error=str(e))
+            logger.error("aggregator_persistence_error", error=str(e))
 
         return HiveContext(
             item_id=item_id,

@@ -25,6 +25,7 @@ from sqlalchemy.orm import (
 # DNA Rule: Proteins must not import global settings.
 # Models will be initialized during Skill.initialize()
 
+
 # 1. Implementation Details: SQLAlchemy Setup
 class Base(DeclarativeBase):
     pass

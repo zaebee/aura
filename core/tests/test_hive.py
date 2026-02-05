@@ -16,10 +16,10 @@ from hive.proteins.guard import GuardSkill
 
 @pytest.mark.asyncio
 async def test_aggregator_perceive(mocker):
-    # Mock Storage Protein
+    # Mock Persistence Protein
     registry = SkillRegistry()
-    mock_storage = MagicMock()
-    mock_storage.execute = AsyncMock(
+    mock_persistence = MagicMock()
+    mock_persistence.execute = AsyncMock(
         return_value=Observation(
             success=True,
             data={
@@ -31,9 +31,9 @@ async def test_aggregator_perceive(mocker):
             },
         )
     )
-    registry.register("storage", mock_storage)
+    registry.register("persistence", mock_persistence)
 
-    aggregator = HiveAggregator(registry=registry)
+    aggregator = HiveAggregator(registry=registry, settings=None)
     mocker.patch.object(
         aggregator,
         "get_vitals",
@@ -60,7 +60,7 @@ async def test_aggregator_perceive(mocker):
 
 @pytest.mark.asyncio
 async def test_membrane_outbound_override(mocker):
-    from hive.proteins.guard._internal import OutputGuard
+    from hive.proteins.guard.enzymes.guard_logic import OutputGuard
 
     from config.policy import SafetySettings
 
@@ -123,7 +123,7 @@ async def test_membrane_inbound_invalid_bid():
 
 @pytest.mark.asyncio
 async def test_membrane_invalid_min_margin(mocker):
-    from hive.proteins.guard._internal import OutputGuard
+    from hive.proteins.guard.enzymes.guard_logic import OutputGuard
 
     from config.policy import SafetySettings
 

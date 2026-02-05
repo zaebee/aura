@@ -21,11 +21,11 @@ class SecretEncryption:
             raise ValueError(f"Invalid encryption key: {e}") from e
 
     def encrypt(self, plaintext: str) -> bytes:
-        return self.fernet.encrypt(plaintext.encode())
+        return bytes(self.fernet.encrypt(plaintext.encode()))
 
     def decrypt(self, ciphertext: bytes) -> str:
         try:
-            return self.fernet.decrypt(ciphertext).decode()
+            return str(self.fernet.decrypt(ciphertext).decode())
         except InvalidToken:
             raise ValueError("Decryption failed: invalid token") from None
 
