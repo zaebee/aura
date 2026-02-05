@@ -18,7 +18,7 @@ logger = get_logger("seed")
 
 async def seed() -> None:
     # Initialize database persistence
-    engine = create_engine(str(settings.database.url))
+    engine = create_engine(str(settings.database.url), hide_parameters=True)
     SessionLocal = sessionmaker(bind=engine)
     persistence = PersistenceSkill()
     persistence.bind(settings.database, (SessionLocal, engine))
@@ -30,7 +30,7 @@ async def seed() -> None:
     # Initialize embedding model
     api_key = settings.llm.api_key.get_secret_value()
     embedding_model = get_embedding_model(api_key)
-    logger.info("embedding_model_initialized", model="mistral-embed")
+    logger.info("embedding_model_initialized", model=embedding_model.model)
 
     # List of hotels to add
     raw_items = [
