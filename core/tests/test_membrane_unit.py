@@ -1,6 +1,7 @@
 import pytest
-from config.policy import SafetySettings
 from src.hive.proteins.guard._internal import OutputGuard, SafetyViolation
+
+from config.policy import SafetySettings
 
 
 def test_margin_violation():

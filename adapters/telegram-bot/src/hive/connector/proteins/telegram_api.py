@@ -8,17 +8,22 @@ from aura_core import Observation, SkillProtocol
 logger = structlog.get_logger(__name__)
 
 
-class TelegramProtein(SkillProtocol[dict[str, Any], Observation]):
+class TelegramProtein(SkillProtocol[dict[str, Any], Bot, dict[str, Any], Observation]):
     """Protein for Telegram API interactions."""
 
-    def __init__(self, bot: Bot):
-        self.bot = bot
+    def __init__(self) -> None:
+        self.bot: Bot | None = None
+        self.settings: dict[str, Any] | None = None
 
     def get_name(self) -> str:
         return "telegram-api"
 
     def get_capabilities(self) -> list[str]:
         return ["send_message"]
+
+    def bind(self, settings: dict[str, Any], provider: Bot) -> None:
+        self.settings = settings
+        self.bot = provider
 
     async def initialize(self) -> bool:
         return True
@@ -34,6 +39,8 @@ class TelegramProtein(SkillProtocol[dict[str, Any], Observation]):
         if intent == "send_message":
             if not chat_id:
                 return Observation(success=False, error="chat_id is missing")
+            if not self.bot:
+                return Observation(success=False, error="bot_not_initialized")
             try:
                 msg = await self.bot.send_message(
                     chat_id=chat_id,

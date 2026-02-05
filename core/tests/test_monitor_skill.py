@@ -1,12 +1,15 @@
 import pytest
 from hive.proteins.monitor.main import MonitorSkill
+
 from config.server import ServerSettings
+
 
 @pytest.mark.asyncio
 async def test_monitor_skill_initialize():
     skill = MonitorSkill()
     settings = ServerSettings()
-    success = await skill.initialize(settings)
+    skill.bind(settings, None)
+    success = await skill.initialize()
     assert success is True
     assert skill.settings == settings
 
