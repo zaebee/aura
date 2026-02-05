@@ -4,6 +4,7 @@
 TAG ?= latest
 REGISTRY ?= ghcr.io/zaebee
 PLATFORM ?= linux/amd64
+CORE_PATH ?= core:core/src
 
 # --- 1. CODE QUALITY ---
 lint:
@@ -29,31 +30,17 @@ setup-hooks:
 # Run tests
 test:
 	# Run core tests
-	PYTHONPATH=core:core/src uv run pytest core/tests/ -v
+	PYTHONPATH=$(CORE_PATH) uv run pytest core/tests/ -v
 	# Run telegram-bot tests with isolated path to avoid 'src' collision
 	PYTHONPATH=adapters/telegram-bot/src:adapters/telegram-bot/src/proto uv run pytest adapters/telegram-bot/tests/ -v
 
 # Run tests with coverage report
 test-cov:
-	PYTHONPATH=core:core/src uv run pytest core/tests/ -v --cov=core/src --cov-report=term-missing
+	PYTHONPATH=$(CORE_PATH) uv run pytest core/tests/ -v --cov=core/src --cov-report=term-missing
 
 # Run tests with verbose output
 test-verbose:
-	PYTHONPATH=core:core/src uv run pytest core/tests/ -vv -s
-
-# Test health endpoints
-test-health:
-	# Test health check endpoints (requires running services)
-	uv run python tools/test_health_endpoints.py
-
-simulate:
-	# Run agent negotiation simulation
-	uv run python tools/simulators/agent_sim.py
-
-
-telemetry:
-	# Trigger a manual NegotiationAccepted event
-	PYTHONPATH=core:core/src uv run python core/scripts/trigger_pulse.py
+	PYTHONPATH=$(CORE_PATH) uv run pytest core/tests/ -vv -s
 
 # --- 2. BUILD ---
 build: generate build-tg
@@ -83,16 +70,28 @@ push-tg:
 # --- 5. DEV TASKS ---
 seed:
 	# Seed the database with initial inventory
-	PYTHONPATH=core:core/src uv run python core/scripts/seed.py
+	PYTHONPATH=$(CORE_PATH) uv run python core/scripts/seed.py
 
 train:
 	# Train the DSPy negotiation engine
-	PYTHONPATH=core:core/src uv run python core/scripts/training/train_dspy.py
+	PYTHONPATH=$(CORE_PATH) uv run python core/scripts/training/train_dspy.py
 
 pulse:
 	# Trigger a manual NegotiationAccepted event
-	PYTHONPATH=core:core/src uv run python core/scripts/trigger_pulse.py
+	PYTHONPATH=$(CORE_PATH) uv run python core/scripts/trigger_pulse.py
 
+simulate:
+	# Run agent negotiation simulation
+	PYTHONPATH=:.$(CORE_PATH) uv run python tools/simulators/agent_sim.py
+
+buyer:
+	# Run agent negotiation simulation
+	PYTHONPATH=:.$(CORE_PATH) uv run python tools/simulators/autonomous_buyer.py
+
+# Test health endpoints
+health:
+	# Test health check endpoints (requires running services)
+	PYTHONPATH=.:$(CORE_PATH) uv run python tools/test_health_endpoints.py
 install-dev:
 	# Install development dependencies
 	uv sync --group dev
