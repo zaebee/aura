@@ -40,6 +40,7 @@ class HiveConnector(BaseConnector):
         response = negotiation_pb2.NegotiateResponse()
         response.session_token = "sess_" + (context.request_id or str(uuid.uuid4()))
         response.valid_until_timestamp = int(time.time() + 600)
+        response.thought = action.thought
 
         # Handle both string and ActionType enum
         action_val = action.action
