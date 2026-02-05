@@ -30,6 +30,8 @@ spec:
                   key: "telegram-token"
             - name: AURA_TG__CORE_URL
               value: "{{ .Release.Name }}-core:50051"
+            - name: AURA_TG__NATS_URL
+              value: "nats://{{ .Release.Name }}-nats:4222"
             - name: OTEL_EXPORTER_OTLP_ENDPOINT
               value: {{ .Values.monitoring.jaeger.collectorUrl | default (include "aura.jaeger.collectorUrl" .) | quote }}
             - name: LOG_LEVEL

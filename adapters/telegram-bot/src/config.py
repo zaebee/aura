@@ -14,6 +14,7 @@ class TelegramSettings(BaseSettings):
 
     token: SecretStr = Field("")  # type: ignore
     core_url: str = "core:50051"
+    nats_url: str = "nats://nats:4222"
     otel_exporter_otlp_endpoint: str = (
         "http://aura-jaeger.monitoring.svc.cluster.local:4317"
     )

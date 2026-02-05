@@ -1,5 +1,4 @@
 import asyncio
-import os
 
 import grpc
 import nats
@@ -52,14 +51,13 @@ async def main() -> None:
     # Initialize NATS
     nc = None
     try:
-        nats_url = os.getenv("NATS_URL", "nats://nats:4222")
         nc = await nats.connect(
-            nats_url,
+            settings.nats_url,
             connect_timeout=5,
             reconnect_time_wait=2,
             max_reconnect_attempts=3,
         )
-        logger.info("Connected to NATS", url=nats_url)
+        logger.info("Connected to NATS", url=settings.nats_url)
     except (nats.errors.NoServersError, nats.errors.TimeoutError) as e:
         logger.error("Failed to connect to NATS (service might be down)", error=str(e))
     except Exception as e:
