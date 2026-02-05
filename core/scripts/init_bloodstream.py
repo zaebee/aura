@@ -28,7 +28,9 @@ from nats.js.api import (
     StreamConfig,
 )
 
-logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
+logging.basicConfig(
+    level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s"
+)
 logger = logging.getLogger(__name__)
 
 # Stream definitions
@@ -137,7 +139,9 @@ async def init_bloodstream(nats_url: str) -> bool:
                 logger.info(f"Creating stream {stream_config.name}...")
                 await js.add_stream(config=stream_config)
 
-            logger.info(f"  ✓ Stream {stream_config.name}: subjects={stream_config.subjects}")
+            logger.info(
+                f"  ✓ Stream {stream_config.name}: subjects={stream_config.subjects}"
+            )
 
         # Create/update consumers
         for consumer_def in CONSUMERS:
@@ -147,7 +151,9 @@ async def init_bloodstream(nats_url: str) -> bool:
                 await js.consumer_info(stream_name, config.durable_name)
                 logger.info(f"Consumer {config.durable_name} exists on {stream_name}")
             except nats.js.errors.NotFoundError:
-                logger.info(f"Creating consumer {config.durable_name} on {stream_name}...")
+                logger.info(
+                    f"Creating consumer {config.durable_name} on {stream_name}..."
+                )
                 await js.add_consumer(stream_name, config=config)
 
             logger.info(f"  ✓ Consumer {config.durable_name} on {stream_name}")
@@ -175,14 +181,18 @@ async def verify_bloodstream(nats_url: str) -> bool:
         # Check all streams exist
         for stream_config in STREAMS:
             info = await js.stream_info(stream_config.name)
-            logger.info(f"  ✓ Stream {stream_config.name}: {info.state.messages} messages")
+            logger.info(
+                f"  ✓ Stream {stream_config.name}: {info.state.messages} messages"
+            )
 
         # Check all consumers exist
         for consumer_def in CONSUMERS:
             stream_name = consumer_def["stream"]
             config = consumer_def["config"]
             info = await js.consumer_info(stream_name, config.durable_name)
-            logger.info(f"  ✓ Consumer {config.durable_name}: pending={info.num_pending}")
+            logger.info(
+                f"  ✓ Consumer {config.durable_name}: pending={info.num_pending}"
+            )
 
         await nc.close()
         logger.info("Bloodstream verification complete!")
@@ -236,7 +246,9 @@ async def publish_test_event(nats_url: str) -> bool:
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Initialize NATS JetStream for Aura Hive")
+    parser = argparse.ArgumentParser(
+        description="Initialize NATS JetStream for Aura Hive"
+    )
     parser.add_argument(
         "--nats-url",
         default="nats://localhost:4222",

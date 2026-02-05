@@ -41,7 +41,7 @@ class HiveGenerator(Generator[Observation, Event]):
                     "price": price,
                     "item_id": item_id,
                     "agent_did": agent_did,
-                }
+                },
             )
 
             # 2. Metric Normalization (The 0.0 Success Rate Fix)
@@ -50,7 +50,10 @@ class HiveGenerator(Generator[Observation, Event]):
                 await self.registry.execute(
                     "telemetry",
                     "increment_counter",
-                    {"name": "negotiation_accepted_total", "labels": {"status": "success"}}
+                    {
+                        "name": "negotiation_accepted_total",
+                        "labels": {"status": "success"},
+                    },
                 )
 
         # 3. System Heartbeat

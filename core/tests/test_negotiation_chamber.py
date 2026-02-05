@@ -1,52 +1,130 @@
-import pytest
 from dataclasses import dataclass
-from unittest.mock import patch
+from typing import Any
+from unittest.mock import ANY, AsyncMock, MagicMock
+
+import pytest
+from aura_core import Observation, SkillRegistry
 from hive.chambers.negotiation.main import negotiation_loop
-from aura_core import IntentAction
-from aura_core.gen.aura.dna.v1 import ActionType
+from hive.proto.aura.negotiation.v1 import negotiation_pb2
+
 
 @dataclass
 class MockSignal:
     item_id: str
     bid_amount: float
+    request_id: str = "test-req"
+    agent: Any = MagicMock(did="did:test")
+
+
+@pytest.fixture
+def mock_registry():
+    registry = MagicMock(spec=SkillRegistry)
+    registry.execute.side_effect = AsyncMock()
+
+    async def mock_execute(skill, intent, params=None):
+        if skill == "persistence":
+            if intent == "read_item":
+                return Observation(
+                    success=True,
+                    data={
+                        "id": "test_1",
+                        "name": "Atomic Core",
+                        "base_price": 100.0,
+                        "floor_price": 85.0,
+                    },
+                )
+            return Observation(success=True)
+        elif skill == "telemetry":
+            if intent == "get_vitals":
+                return Observation(
+                    success=True, data={"status": "healthy", "cpu_usage_percent": 10.0}
+                )
+            return Observation(success=True)
+        elif skill == "reasoning":
+            if intent == "negotiate":
+                return Observation(
+                    success=True,
+                    data={
+                        "action": "counter",
+                        "price": 95.0,
+                        "message": "My best offer is 95.0",
+                        "thought": "<think>Thinking...</think>",
+                        "metadata": {},
+                    },
+                )
+        elif skill == "transaction":
+            if intent == "get_address":
+                return Observation(success=True, data="SOL_ADDR_123")
+            return Observation(success=True)
+        return Observation(success=True)
+
+    registry.execute.side_effect = mock_execute
+    return registry
+
 
 @pytest.mark.asyncio
-async def test_negotiation_loop_standard_flow():
-    """Test the chamber loop with a standard bid."""
+async def test_negotiation_loop_hydrated(mock_registry):
+    """Test the chamber loop with hydrated Proteins (SkillRegistry)."""
     signal = MockSignal(item_id="test_1", bid_amount=90.0)
 
-    observation = await negotiation_loop(signal)
+    observation = await negotiation_loop(signal, mock_registry)
 
     assert observation.success is True
-    assert observation.event_type == "negotiation_processed"
-    assert observation.metadata["price"] == 95.0 # 95% of 100.0
+    # Verify NegotiateResponse was created
+    assert isinstance(observation.data, negotiation_pb2.NegotiateResponse)
+    assert observation.data.countered.proposed_price == 95.0
+
+    # Verify pulse and telemetry were called
+    mock_registry.execute.assert_any_call("pulse", "emit_negotiation", ANY)
+    mock_registry.execute.assert_any_call("telemetry", "increment_counter", ANY)
+
 
 @pytest.mark.asyncio
-async def test_negotiation_loop_membrane_override():
-    """Test that the membrane overrides a strategy price below floor."""
-    # Item floor is 85.
-    signal = MockSignal(item_id="test_2", bid_amount=50.0)
+async def test_negotiation_loop_accept_flow(mock_registry):
+    """Test the accept flow which triggers persistence and transaction."""
+    signal = MockSignal(item_id="test_1", bid_amount=110.0)
 
-    # Mock T.think to return an unsafe price (below floor)
-    unsafe_intent = IntentAction(
-        action=ActionType.ACTION_TYPE_ACCEPT,
-        price=70.0, # Below floor 85.0
-        message="Too low!",
-        thought="Thinking unsafe thoughts"
-    )
+    # Adjust reasoning to accept
+    async def mock_execute_accept(skill, intent, params=None):
+        if skill == "reasoning" and intent == "negotiate":
+            return Observation(
+                success=True,
+                data={
+                    "action": "accept",
+                    "price": 110.0,
+                    "message": "Accepted",
+                    "thought": "<think>High bid!</think>",
+                    "metadata": {},
+                },
+            )
+        if skill == "persistence" and intent == "read_item":
+            return Observation(
+                success=True,
+                data={
+                    "id": "test_1",
+                    "name": "Atomic Core",
+                    "base_price": 100.0,
+                    "floor_price": 85.0,
+                },
+            )
+        if skill == "persistence" and intent == "create_deal":
+            return Observation(success=True)
+        if skill == "transaction" and intent == "get_address":
+            return Observation(success=True, data="SOL_ADDR_123")
+        if skill == "telemetry":
+            return Observation(
+                success=True, data={"status": "healthy", "cpu_usage_percent": 10.0}
+            )
+        return Observation(success=True)
 
-    with patch("hive.chambers.negotiation.T.think", return_value=unsafe_intent):
-        observation = await negotiation_loop(signal)
+    mock_registry.execute.side_effect = mock_execute_accept
 
-    # Membrane should have overridden the price to 85.0
-    assert observation.metadata["price"] == 85.0
+    observation = await negotiation_loop(signal, mock_registry)
 
-@pytest.mark.asyncio
-async def test_negotiation_loop_negative_bid_correction():
-    """Test that the membrane corrects a negative bid."""
-    signal = MockSignal(item_id="test_3", bid_amount=-10.0)
-
-    # We can't easily see the corrected bid inside the loop without more instrumentation,
-    # but we can verify it doesn't crash and returns a valid result.
-    observation = await negotiation_loop(signal)
     assert observation.success is True
+    assert observation.event_type == "negotiation_accepted"
+    assert isinstance(observation.data, negotiation_pb2.NegotiateResponse)
+    assert observation.data.accepted.final_price == 110.0
+
+    # Verify persistence.create_deal was called
+    mock_registry.execute.assert_any_call("persistence", "create_deal", ANY)

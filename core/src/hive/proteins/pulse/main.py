@@ -8,7 +8,9 @@ from .enzymes.pulse_broker import JetStreamProvider
 from .schema import EventParams, NegotiationEventParams
 
 
-class PulseSkill(SkillProtocol[ServerSettings, JetStreamProvider, dict[str, Any], Observation]):
+class PulseSkill(
+    SkillProtocol[ServerSettings, JetStreamProvider, dict[str, Any], Observation]
+):
     """
     Pulse Protein: Handles NATS JetStream event emission with binary proto.
 
@@ -24,12 +26,12 @@ class PulseSkill(SkillProtocol[ServerSettings, JetStreamProvider, dict[str, Any]
 
     def get_capabilities(self) -> list[str]:
         return [
-            "emit_event",           # Generic event (deprecated, use typed methods)
-            "emit_heartbeat",       # Binary heartbeat
-            "emit_negotiation",     # Binary negotiation event
-            "emit_vitals",          # Binary vitals event
-            "emit_alert",           # Binary alert event
-            "emit_audit",           # Binary audit event
+            "emit_event",  # Generic event (deprecated, use typed methods)
+            "emit_heartbeat",  # Binary heartbeat
+            "emit_negotiation",  # Binary negotiation event
+            "emit_vitals",  # Binary vitals event
+            "emit_alert",  # Binary alert event
+            "emit_audit",  # Binary audit event
         ]
 
     def bind(self, settings: ServerSettings, provider: JetStreamProvider) -> None:
@@ -68,7 +70,9 @@ class PulseSkill(SkillProtocol[ServerSettings, JetStreamProvider, dict[str, Any]
                         trace_id=params.get("trace_id"),
                         span_id=params.get("span_id"),
                     )
-                    return Observation(success=success, event_type=f"negotiation_{p.action}")
+                    return Observation(
+                        success=success, event_type=f"negotiation_{p.action}"
+                    )
 
                 case "emit_vitals":
                     success = await self.provider.publish_vitals(
@@ -96,7 +100,9 @@ class PulseSkill(SkillProtocol[ServerSettings, JetStreamProvider, dict[str, Any]
                         repo_name=params.get("repo_name", ""),
                         is_pure=params.get("is_pure", False),
                         heresies=params.get("heresies", []),
-                        negotiation_success_rate=params.get("negotiation_success_rate", 0.0),
+                        negotiation_success_rate=params.get(
+                            "negotiation_success_rate", 0.0
+                        ),
                         trace_id=params.get("trace_id"),
                         span_id=params.get("span_id"),
                     )
@@ -105,7 +111,9 @@ class PulseSkill(SkillProtocol[ServerSettings, JetStreamProvider, dict[str, Any]
                 case "emit_event":
                     # Deprecated: fallback to raw JSON publish
                     event_params = EventParams(**params)
-                    success = await self.provider.publish_raw(event_params.topic, event_params.payload)
+                    success = await self.provider.publish_raw(
+                        event_params.topic, event_params.payload
+                    )
                     return Observation(success=success, event_type="raw")
 
                 case _:

@@ -45,7 +45,11 @@ class HiveConnector(BaseConnector):
         action_val = action.action
         if isinstance(action_val, ActionType):
             raw_name = ActionType(action_val).name
-            action_name = raw_name.lower().replace("action_type_", "") if raw_name else "unspecified"
+            action_name = (
+                raw_name.lower().replace("action_type_", "")
+                if raw_name
+                else "unspecified"
+            )
         else:
             action_name = str(action_val).lower() if action_val else "unknown"
 

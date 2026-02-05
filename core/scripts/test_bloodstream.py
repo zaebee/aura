@@ -34,6 +34,7 @@ async def test_basic_nats(nats_url: str) -> bool:
     try:
         # Import proto
         from hive.proto.aura.dna.v1 import dna_pb2
+
         print("  ✓ Proto module imported")
     except ImportError as e:
         print(f"  ✗ Failed to import proto: {e}")
@@ -97,7 +98,9 @@ async def test_basic_nats(nats_url: str) -> bool:
         print(f"    event_id: {received_event.event_id}")
         print(f"    topic: {received_event.topic}")
         print(f"    heartbeat.service: {received_event.heartbeat.service}")
-        print(f"    heartbeat.status: {dna_pb2.VitalsStatus.Name(received_event.heartbeat.status)}")
+        print(
+            f"    heartbeat.status: {dna_pb2.VitalsStatus.Name(received_event.heartbeat.status)}"
+        )
 
         if received_event.event_id == event.event_id:
             print("  ✓ Round-trip verified: event_id matches")
@@ -122,6 +125,7 @@ async def test_jetstream(nats_url: str) -> bool:
 
     try:
         from hive.proto.aura.dna.v1 import dna_pb2
+
         print("  ✓ Proto module imported")
     except ImportError as e:
         print(f"  ✗ Failed to import proto: {e}")
