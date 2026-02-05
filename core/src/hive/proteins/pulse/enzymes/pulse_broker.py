@@ -157,7 +157,7 @@ class JetStreamProvider:
 
             # Set vitals payload
             event.vitals.service = service
-            event.vitals.status = self._status_to_enum(status)
+            event.vitals.status = self._status_to_enum(status)  # type: ignore[assignment]
             event.vitals.cpu_usage_percent = cpu_usage
             event.vitals.memory_usage_mb = memory_usage
 
@@ -191,7 +191,7 @@ class JetStreamProvider:
             event.trace.CopyFrom(self._create_trace_context(trace_id, span_id))
 
             # Set alert payload
-            event.alert.severity = self._severity_to_enum(severity)
+            event.alert.severity = self._severity_to_enum(severity)  # type: ignore[assignment]
             event.alert.message = message
             event.alert.source = source
 
@@ -403,8 +403,8 @@ class JetStreamSubscriber:
         for _key, psub in self._subscriptions.items():
             try:
                 await psub.unsubscribe()
-            except Exception:
-                pass
+            except Exception:  # nosec B110
+                pass  # Ignore errors during cleanup
         self._subscriptions.clear()
 
         if self.nc:

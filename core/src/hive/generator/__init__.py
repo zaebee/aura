@@ -41,7 +41,7 @@ class HiveGenerator(Generator[Observation, Event]):
             action = observation.event_type.replace("negotiation_", "")
 
             # Extract negotiation data from observation
-            session_token = ""
+            session_token = ""  # nosec B105
             price = 0.0
             item_id = ""
             agent_did = ""
