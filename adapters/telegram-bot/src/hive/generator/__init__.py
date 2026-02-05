@@ -2,7 +2,7 @@ import time
 from typing import Any
 
 import structlog
-from aura_core import Event, Generator, Observation
+from aura_core import Event, Generator, Observation, map_action
 from aura_core.gen.aura.dna.v1 import ActionType, NegotiationEvent
 from aura_core.gen.aura.dna.v1 import Event as ProtoEvent
 from opentelemetry import trace
@@ -16,20 +16,6 @@ class TelegramGenerator(Generator[Observation, Event]):
 
     def __init__(self, nats_client: Any = None):
         self.nc = nats_client
-
-    def _map_action(self, action_str: str) -> ActionType:
-        """Map action string to ActionType enum."""
-        from typing import cast
-
-        mapping = {
-            "accept": ActionType.ACTION_TYPE_ACCEPT,
-            "counter": ActionType.ACTION_TYPE_COUNTER,
-            "reject": ActionType.ACTION_TYPE_REJECT,
-            "ui_required": ActionType.ACTION_TYPE_UI_REQUIRED,
-            "error": ActionType.ACTION_TYPE_ERROR,
-        }
-        val = mapping.get(action_str.lower(), ActionType.ACTION_TYPE_UNSPECIFIED)
-        return cast(ActionType, val)
 
     async def pulse(self, observation: Observation) -> list[Event]:
         with tracer.start_as_current_span("generator_pulse") as span:
@@ -52,9 +38,10 @@ class TelegramGenerator(Generator[Observation, Event]):
 
                 if "negotiation" in event_type:
                     action_name = event_type.replace("negotiation_", "")
+                    from typing import cast
                     proto_event.negotiation = NegotiationEvent(
                         session_token=observation.metadata.get("session_token", ""),
-                        action=self._map_action(action_name),
+                        action=cast(ActionType, map_action(action_name)),
                         price=observation.metadata.get("price", 0.0),
                         item_id=observation.metadata.get("item_id", ""),
                         agent_did=observation.metadata.get("agent_did", ""),

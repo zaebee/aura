@@ -7,6 +7,28 @@ from pydantic import BaseModel, SecretStr
 from .gen.aura.dna.v1 import ActionType
 
 
+def map_action(action_str: str | None) -> ActionType:
+    """
+    Standardized mapper for negotiation actions.
+    Converts LLM strings to strict ActionType enum.
+    """
+    from typing import cast
+
+    if not action_str:
+        return cast(ActionType, ActionType.ACTION_TYPE_UNSPECIFIED)
+
+    mapping = {
+        "accept": ActionType.ACTION_TYPE_ACCEPT,
+        "counter": ActionType.ACTION_TYPE_COUNTER,
+        "counteroffer": ActionType.ACTION_TYPE_COUNTER,
+        "reject": ActionType.ACTION_TYPE_REJECT,
+        "ui_required": ActionType.ACTION_TYPE_UI_REQUIRED,
+        "error": ActionType.ACTION_TYPE_ERROR,
+    }
+    val = mapping.get(action_str.lower(), ActionType.ACTION_TYPE_UNSPECIFIED)
+    return cast(ActionType, val)
+
+
 def get_raw_key(key_field: SecretStr | str) -> str:
     """
     Safely retrieve the raw string value from a SecretStr or a plain string.

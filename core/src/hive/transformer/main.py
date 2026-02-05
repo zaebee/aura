@@ -9,6 +9,7 @@ from aura_core import (
     SkillRegistry,
     SystemVitals,
     Transformer,
+    map_action,
     resolve_brain_path,
 )
 from aura_core.gen.aura.dna.v1 import ActionType
@@ -86,22 +87,6 @@ class AuraTransformer(Transformer[HiveContext, IntentAction]):
             compiled_path = settings.llm.compiled_program_path
         self.brain_path = resolve_brain_path(compiled_path)
 
-    def _map_action(self, action_str: str | None) -> ActionType:
-        """Map LLM strings to strict ActionType enum."""
-        if not action_str:
-            return cast(ActionType, ActionType.ACTION_TYPE_UNSPECIFIED)
-
-        mapping = {
-            "accept": ActionType.ACTION_TYPE_ACCEPT,
-            "counter": ActionType.ACTION_TYPE_COUNTER,
-            "counteroffer": ActionType.ACTION_TYPE_COUNTER,
-            "reject": ActionType.ACTION_TYPE_REJECT,
-            "ui_required": ActionType.ACTION_TYPE_UI_REQUIRED,
-            "error": ActionType.ACTION_TYPE_ERROR,
-        }
-        val = mapping.get(action_str.lower(), ActionType.ACTION_TYPE_UNSPECIFIED)
-        return cast(ActionType, val)
-
     def _get_cpu_load(self, system_health: SystemVitals | dict[str, Any]) -> float:
         if isinstance(system_health, SystemVitals):
             return float(system_health.cpu_usage_percent)
@@ -159,7 +144,7 @@ class AuraTransformer(Transformer[HiveContext, IntentAction]):
             wrapped_thought = f"<think>\n{raw_thought}\n</think>" if raw_thought else ""
 
             return IntentAction(
-                action=self._map_action(result["action"]),
+                action=cast(ActionType, map_action(result["action"])),
                 price=result["price"],
                 message=result["message"],
                 thought=wrapped_thought,

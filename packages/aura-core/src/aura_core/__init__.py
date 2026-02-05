@@ -38,6 +38,7 @@ from .types import (
     TelegramContext,
     UIAction,
     get_raw_key,
+    map_action,
 )
 
 __all__ = [
@@ -73,6 +74,7 @@ __all__ = [
     "SearchResult",
     "SystemVitals",
     "NegotiationResult",
+    "map_action",
     "BeeContext",
     "AuditObservation",
     "BeeObservation",
