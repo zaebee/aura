@@ -75,12 +75,3 @@ class Membrane[S_inv, I_inv, C_inv](Protocol):
     async def inspect_inbound(self, signal: S_inv) -> S_inv: ...
 
     async def inspect_outbound(self, decision: I_inv, context: C_inv) -> I_inv: ...
-
-
-@runtime_checkable
-class ViewProtocol(Protocol):
-    """Protocol for the V-Nucleotide (Visual)."""
-
-    template_id: str
-    required_data_schema: dict[str, Any]
-    action_callbacks: list[str]

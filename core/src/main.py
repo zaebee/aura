@@ -19,7 +19,10 @@ from hive.metabolism.logging_config import (
     get_logger,
 )
 from hive.proteins.telemetry.enzymes.prometheus import init_telemetry
-from hive.proto.aura.negotiation.v1 import negotiation_pb2, negotiation_pb2_grpc
+from hive.proto.aura.negotiation.v1 import (
+    negotiation_pb2,
+    negotiation_pb2_grpc,  # type: ignore
+)
 from hive.transformer import AuraTransformer
 from opentelemetry import trace
 from opentelemetry.instrumentation.grpc import GrpcInstrumentorServer

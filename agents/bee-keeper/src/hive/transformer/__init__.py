@@ -239,6 +239,7 @@ class BeeTransformer(Transformer[BeeContext, AuditObservation]):
             litellm.exceptions.ServiceUnavailableError,
             litellm.exceptions.Timeout,
             litellm.exceptions.AuthenticationError,
+            litellm.exceptions.RateLimitError,
             json.JSONDecodeError,
         ) as e:
             logger.warning("primary_llm_failed_trying_fallback", error=str(e))

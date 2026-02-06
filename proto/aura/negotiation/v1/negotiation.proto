@@ -34,7 +34,6 @@ message AgentIdentity {
 message NegotiateResponse {
   string session_token = 1;   // Token for the negotiation session.
   int64 valid_until_timestamp = 2; // Timestamp until the session is valid.
-  string thought = 7;         // Internal reasoning monologue.
 
   // Polymorphic result: either acceptance, counteroffer, rejection, or UI request.
   oneof result {

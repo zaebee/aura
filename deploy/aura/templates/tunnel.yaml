@@ -1,18 +1,6 @@
 apiVersion: v1
 kind: ConfigMap
 metadata:
-  name: "{{ .Release.Name }}-frpc-entrypoint-config"
-data:
-  entrypoint.sh: |
-    #!/bin/sh
-    # Append the secretKey to the frpc.toml file
-    echo "secretKey = \"$FRP_STCP_SECRET_KEY\"" >> /etc/frp/frpc.toml
-    # Execute the original frpc command
-    exec frpc -c /etc/frp/frpc.toml
----
-apiVersion: v1
-kind: ConfigMap
-metadata:
   name: "{{ .Release.Name }}-frpc-config"
 data:
   frpc.toml: |
@@ -31,16 +19,16 @@ data:
     [[proxies]]
     name = "frontend"
     type = "tcp"
-    localIP = {{ tpl .Values.tunnel.frontend.localIP . | quote }}
+    localIP = "{{ .Release.Name }}-frontend"
     localPort = {{ .Values.frontend.service.port }}
-    remotePort = {{ .Values.tunnel.frontend.remotePort }}
+    remotePort = 8081
 
     [[proxies]]
     name = "gateway"
     type = "tcp"
-    localIP = {{ tpl .Values.tunnel.gateway.localIP . | quote }}
-    localPort = {{ .Values.gateway.service.port }}
-    remotePort = {{ .Values.tunnel.gateway.remotePort }}
+    localIP = "aura-gateway"
+    localPort = 8000
+    remotePort = 8082
 
     [[proxies]]
     name = "grafana"
@@ -49,18 +37,6 @@ data:
     localPort = {{ .Values.tunnel.grafana.localPort }}
     remotePort = {{ .Values.tunnel.grafana.remotePort }}
 
-    [[proxies]]
-    name = "loki"
-    type = "tcp"
-    localIP = {{ .Values.tunnel.loki.localIP | quote }}
-    localPort = {{ .Values.tunnel.loki.localPort }}
-    remotePort = {{ .Values.tunnel.loki.remotePort }}
-
-    [[proxies]]
-    name = "nats-hidden"
-    type = "stcp"
-    localIP = "{{ .Release.Name }}-nats"
-    localPort = 4222
 ---
 apiVersion: apps/v1
 kind: Deployment
@@ -80,13 +56,6 @@ spec:
       - name: frpc
         image: "{{ .Values.tunnel.image.repository }}:{{ .Values.tunnel.image.tag }}"
         imagePullPolicy: {{ .Values.tunnel.image.pullPolicy | default "IfNotPresent" }}
-        env:
-        - name: FRP_STCP_SECRET_KEY
-          valueFrom:
-            secretKeyRef:
-              name: "{{ .Release.Name }}-secrets"
-              key: "stcp-key"
-        command: ["/usr/local/bin/entrypoint.sh"]
         volumeMounts:
         - name: config-volume
           mountPath: /etc/frp/frpc.toml
@@ -94,10 +63,6 @@ spec:
         - name: token-volume
           mountPath: /etc/frp/token
           subPath: frp-token
-        - name: entrypoint-volume
-          mountPath: /usr/local/bin/entrypoint.sh
-          subPath: entrypoint.sh
-          readOnly: true
       volumes:
       - name: config-volume
         configMap:
@@ -108,7 +73,3 @@ spec:
           items:
           - key: frp-client-token
             path: frp-token
-      - name: entrypoint-volume
-        configMap:
-          name: {{ .Release.Name }}-frpc-entrypoint-config
-          defaultMode: 0755

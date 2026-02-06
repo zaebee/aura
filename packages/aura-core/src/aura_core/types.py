@@ -29,15 +29,27 @@ def map_action(action_str: str | None) -> ActionType:
     return cast(ActionType, val)
 
 
-def get_action_name(action_value: ActionType | str | None) -> str:
-    """Safely gets a lowercase action name from an ActionType or string."""
-    if isinstance(action_value, ActionType):
-        raw_name = action_value.name
-        return (
-            raw_name.lower().replace("action_type_", "") if raw_name else "unspecified"
-        )
+def get_action_name(action_value: ActionType | str | int | None) -> str:
+    """Safely gets a lowercase action name from an ActionType, string, or int."""
+    if action_value is None:
+        return "unknown"
+
     if isinstance(action_value, str):
         return action_value.lower()
+
+    # Handle both ActionType members and raw integers
+    try:
+        if isinstance(action_value, (int, ActionType)):
+            # cast to ActionType to get the name property if it's a raw int
+            raw_name = ActionType(int(action_value)).name
+            return (
+                raw_name.lower().replace("action_type_", "")
+                if raw_name
+                else "unspecified"
+            )
+    except (ValueError, TypeError):
+        pass
+
     return "unknown"
 
 

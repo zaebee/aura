@@ -197,7 +197,6 @@ async def negotiate(
             "session_token": response.session_token,
             "status": result_type,
             "valid_until": response.valid_until_timestamp,
-            "thought": response.thought,
         }
 
         if result_type == "accepted":
