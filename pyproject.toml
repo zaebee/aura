@@ -74,6 +74,7 @@ target-version = "py313"
 line-length = 88
 exclude = [
     "**/proto/**",  # Auto-generated protobuf files
+    "**/gen/**",  # Auto-generated dataclass files
 ]
 
 [tool.ruff.lint]
@@ -101,7 +102,7 @@ check_untyped_defs = true
 warn_return_any = true
 warn_unused_configs = true
 plugins = ["pydantic.mypy"]
-exclude = [".*/proto/.*", "tests/.*"]
+exclude = [".*/proto/.*", ".*/gen/.*", "tests/.*"]
 
 [[tool.mypy.overrides]]
 module = [

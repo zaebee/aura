@@ -2,12 +2,12 @@ import asyncio
 
 import dspy
 from aura_core import get_raw_key
+from hive.metabolism.logging_config import configure_logging, get_logger
+from hive.proteins.persistence.main import PersistenceSkill
+from hive.proteins.reasoning.enzymes.reasoning_engine import get_embedding_model
+from hive.proteins.reasoning.main import ReasoningSkill
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
-from src.hive.metabolism.logging_config import configure_logging, get_logger
-from src.hive.proteins.persistence.main import PersistenceSkill
-from src.hive.proteins.reasoning.enzymes.reasoning_engine import get_embedding_model
-from src.hive.proteins.reasoning.main import ReasoningSkill
 
 from config import settings
 
