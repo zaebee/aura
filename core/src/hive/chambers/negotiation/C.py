@@ -11,7 +11,9 @@ from config import settings
 
 logger = structlog.get_logger(__name__)
 
-DEFAULT_ITEM_ID = "unknown"
+DEFAULT_UNKNOWN_ITEM_ID = "unknown_item"
+DEFAULT_UNKNOWN_SOLANA_ADDRESS = "unknown_address"
+DEFAULT_UNKNOWN_AGENT_DID = "did:unknown"
 DEFAULT_ITEM_NAME = "Aura Item"
 
 
@@ -58,7 +60,7 @@ async def act(
 
         deal_params = {
             "id": deal_id,
-            "item_id": context.item_id if context else DEFAULT_ITEM_ID,
+            "item_id": context.item_id if context else DEFAULT_UNKNOWN_ITEM_ID,
             "item_name": (
                 context.item_data.get("name", DEFAULT_ITEM_NAME)
                 if context and context.item_data
@@ -74,7 +76,7 @@ async def act(
 
         # Hydrate transaction (Solana)
         addr_obs = await registry.execute("transaction", "get_address", {})
-        solana_address = addr_obs.data if addr_obs.success else DEFAULT_ITEM_ID
+        solana_address = addr_obs.data if addr_obs.success else DEFAULT_UNKNOWN_SOLANA_ADDRESS
 
         obs_data = {"deal_id": deal_id, "solana_address": solana_address}
         event_type = "negotiation_accepted"
@@ -94,8 +96,10 @@ async def act(
         metadata={
             "price": action.price,
             "session_token": response.session_token,
-            "item_id": context.item_id if context else DEFAULT_ITEM_ID,
-            "agent_did": context.offer.agent_did if context else DEFAULT_ITEM_ID,
+            "item_id": context.item_id if context else DEFAULT_UNKNOWN_ITEM_ID,
+            "agent_did": (
+                context.offer.agent_did if context else DEFAULT_UNKNOWN_AGENT_DID
+            ),
             **obs_data,
         },
     )

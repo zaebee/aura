@@ -1,6 +1,6 @@
 from dataclasses import dataclass
 from typing import Any
-from unittest.mock import ANY, AsyncMock, MagicMock
+from unittest.mock import ANY, MagicMock
 
 import pytest
 from aura_core import Observation, SkillRegistry
@@ -19,7 +19,6 @@ class MockSignal:
 @pytest.fixture
 def mock_registry():
     registry = MagicMock(spec=SkillRegistry)
-    registry.execute.side_effect = AsyncMock()
 
     async def mock_execute(skill, intent, params=None):
         if skill == "persistence":
