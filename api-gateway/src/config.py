@@ -21,6 +21,9 @@ class Settings(BaseSettings):
     http_port: int = 8000
     log_level: str = "info"
 
+    # Redis Configuration (required from Helm deployment)
+    redis_url: str = Field(...)  # type: ignore
+
     # OpenTelemetry Configuration
     otel_service_name: str = "aura-gateway"
     # DNA Rule: FQDN for cross-namespace services

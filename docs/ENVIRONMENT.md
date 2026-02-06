@@ -1,53 +1,61 @@
-# Environment Variable Signal Map
+# Aura Platform Signal Map (Environment Variables)
 
-This document lists all environment variables used across the Aura Hive, their purpose, their service, and their required status.
+This document serves as the single source of truth for all environment variables used across the Aura platform.
 
-## Prefix and Delimiter
+## Global Standards
+
 - **Prefix:** `AURA_`
-- **Nested Delimiter:** `__`
+- **Nested Delimiter:** `__` (double underscore)
+- **Convention:** Pydantic `BaseSettings` validation is enforced. Required fields without defaults will cause the service to fail-fast at startup if missing.
 
-## Strict Rule: FQDN for Internal URLs
-All internal service-to-service communication must use Full Qualified Domain Names (FQDN) in the format:
-`<service-name>.<namespace>.svc.cluster.local`
+---
 
-## Signal Map Table
+## 1. Core Service (`core`)
 
-| Variable | Service | Required | Purpose |
-|----------|---------|----------|---------|
-| `AURA_DATABASE__URL` | Core | Yes | PostgreSQL connection DSN. Must use FQDN in cluster. |
-| `AURA_DATABASE__REDIS_URL` | Core | Yes | Redis connection DSN. Must use FQDN in cluster. |
-| `AURA_DATABASE__VECTOR_DIMENSION` | Core | No | Dimension for vector embeddings (default: 1024). |
-| `AURA_LLM__API_KEY` | Core | Yes | API Key for the primary LLM (e.g., Mistral). |
-| `AURA_LLM__MODEL` | Core | No | LLM model name (default: mistral/mistral-large-latest). |
-| `AURA_LLM__OPENAI_API_KEY` | Core | No | API Key for OpenAI (if using OpenAI models). |
-| `AURA_CRYPTO__ENABLED` | Core | No | Toggle for crypto payment features (default: false). |
-| `AURA_CRYPTO__SECRET_ENCRYPTION_KEY` | Core | Yes* | Fernet key for encrypting deal secrets. (*Required if enabled) |
-| `AURA_CRYPTO__SOLANA_PRIVATE_KEY` | Core | Yes* | Solana private key for payments. (*Required if enabled) |
-| `AURA_SERVER__PORT` | Core | No | gRPC server port (default: 50051). |
-| `AURA_SERVER__LOG_LEVEL` | Core | No | Logging level (default: info). |
-| `AURA_SERVER__NATS_URL` | Core | No | NATS server URL. Must use FQDN in cluster. |
-| `AURA_SERVER__PROMETHEUS_URL` | Core | No | Prometheus URL for metrics. (Uses FQDN). |
-| `AURA_SERVER__OTEL_EXPORTER_OTLP_ENDPOINT` | Core | No | Jaeger OTLP exporter endpoint. (Uses FQDN). |
-| `AURA_GATEWAY__CORE_SERVICE_HOST` | Gateway | Yes | Address of the Core gRPC service. Must use FQDN in cluster. |
-| `AURA_GATEWAY__HTTP_PORT` | Gateway | No | HTTP port for the API Gateway (default: 8000). |
-| `AURA_GATEWAY__LOG_LEVEL` | Gateway | No | Logging level (default: info). |
-| `AURA_GATEWAY__CORS_ORIGINS` | Gateway | No | Allowed CORS origins (comma-separated). |
-| `AURA_GATEWAY__OTEL_EXPORTER_OTLP_ENDPOINT` | Gateway | No | Jaeger OTLP exporter endpoint. (Uses FQDN). |
-| `AURA_TG__TOKEN` | Telegram | Yes | Telegram Bot Token. |
-| `AURA_TG__CORE_URL` | Telegram | Yes | Address of the Core gRPC service. Must use FQDN in cluster. |
-| `AURA_TG__NATS_URL` | Telegram | No | NATS server URL. Must use FQDN in cluster. |
-| `AURA_TG__LOG_LEVEL` | Telegram | No | Logging level (default: info). |
-| `AURA_TG__OTEL_EXPORTER_OTLP_ENDPOINT` | Telegram | No | Jaeger OTLP exporter endpoint. (Uses FQDN). |
+| Variable | Type | Required | Default | Description |
+| :--- | :--- | :---: | :--- | :--- |
+| `AURA_SERVER__PORT` | `int` | No | `50051` | gRPC server port |
+| `AURA_SERVER__LOG_LEVEL` | `str` | No | `info` | Logging verbosity |
+| `AURA_SERVER__NATS_URL` | `str` | **Yes** | - | NATS connection URL |
+| `AURA_SERVER__OTEL_EXPORTER_OTLP_ENDPOINT` | `str` | No | `http://localhost:4317` | OpenTelemetry collector endpoint |
+| `AURA_DATABASE__URL` | `str` | **Yes** | - | PostgreSQL connection string |
+| `AURA_DATABASE__REDIS_URL` | `str` | **Yes** | - | Redis connection string |
+| `AURA_LLM__MODEL` | `str` | No | `mistral/mistral-large-latest` | LLM model identifier |
+| `AURA_LLM__API_KEY` | `Secret` | **Yes** | - | Primary LLM API Key (Mistral/OpenAI) |
+| `AURA_LLM__OPENAI_API_KEY` | `Secret` | No | - | Optional secondary OpenAI key |
+| `AURA_CRYPTO__ENABLED` | `bool` | No | `false` | Enable/Disable crypto payments |
+| `AURA_CRYPTO__SOLANA_PRIVATE_KEY` | `Secret` | No | - | Platform Solana wallet key |
+| `AURA_CRYPTO__SECRET_ENCRYPTION_KEY` | `Secret` | No | - | Key for encrypting deal secrets |
 
-## CI/CD and Helm Secret Keys
+## 2. API Gateway (`gateway`)
 
-The following keys are used within the Kubernetes `aura-secrets` Secret, populated by Helm during deployment:
+| Variable | Type | Required | Default | Description |
+| :--- | :--- | :---: | :--- | :--- |
+| `AURA_GATEWAY__CORE_SERVICE_HOST` | `str` | **Yes** | - | Core gRPC endpoint (FQDN) |
+| `AURA_GATEWAY__LOG_LEVEL` | `str` | No | `info` | Logging verbosity |
+| `AURA_GATEWAY__CORS_ORIGINS` | `str` | No | `*` | Allowed CORS origins (comma-sep) |
+| `AURA_GATEWAY__OTEL_EXPORTER_OTLP_ENDPOINT` | `str` | No | - | OpenTelemetry collector endpoint |
 
-| Secret Key | Helm Value | CI/CD Secret |
-|------------|------------|--------------|
-| `api-key` | `secrets.llmApiKey` | `MISTRAL_API_KEY` |
-| `openai-key` | `secrets.openaiApiKey` | `OPENAI_API_KEY` |
-| `telegram-token` | `secrets.telegramToken` | `AURA_TELEGRAM_TOKEN` |
-| `secret-encryption-key` | `secrets.secretEncryptionKey` | `AURA_SECRET_ENCRYPTION_KEY` |
-| `solana-private-key` | `secrets.solanaPrivateKey` | `SOLANA_PRIVATE_KEY` |
-| `frp-client-token` | `secrets.frpClientToken.value` | `FRP_CLIENT_TOKEN` |
+## 3. Telegram Bot (`tg`)
+
+| Variable | Type | Required | Default | Description |
+| :--- | :--- | :---: | :--- | :--- |
+| `AURA_TG__TOKEN` | `Secret` | **Yes** | - | Telegram Bot API Token |
+| `AURA_TG__CORE_URL` | `str` | **Yes** | - | Core gRPC endpoint (FQDN) |
+| `AURA_TG__NATS_URL` | `str` | **Yes** | - | NATS connection URL |
+| `AURA_TG__LOG_LEVEL` | `str` | No | `info` | Logging verbosity |
+
+---
+
+## Kubernetes Secret Mapping
+
+The CI/CD pipeline maps GitHub Secrets to a unified Kubernetes secret named `aura-secrets`.
+
+| K8s Secret Key | Source (GitHub Secret) | Used By |
+| :--- | :--- | :--- |
+| `telegram-token` | `AURA_TELEGRAM_TOKEN` | `telegram-bot` |
+| `api-key` | `MISTRAL_API_KEY` | `core` |
+| `openai-key` | `OPENAI_API_KEY` | `core` |
+| `secret-encryption-key` | `AURA_SECRET_ENCRYPTION_KEY` | `core` |
+| `frp-client-token` | `FRP_CLIENT_TOKEN` | `tunnel` |
+| `solana-private-key` | `SOLANA_PRIVATE_KEY` | `core` |
