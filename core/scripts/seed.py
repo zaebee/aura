@@ -1,12 +1,11 @@
 import asyncio
 
+import dspy
+from aura_core import get_raw_key
 from hive.metabolism.logging_config import configure_logging, get_logger
-from hive.proteins.persistence import PersistenceSkill
-from hive.proteins.reasoning.enzymes.reasoning_engine import (
-    generate_embedding,
-    get_embedding_model,
-)
-from langchain_mistralai import MistralAIEmbeddings
+from hive.proteins.persistence.main import PersistenceSkill
+from hive.proteins.reasoning.enzymes.reasoning_engine import get_embedding_model
+from hive.proteins.reasoning.main import ReasoningSkill
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
@@ -17,33 +16,40 @@ configure_logging()
 logger = get_logger("seed")
 
 
-async def setup_database() -> PersistenceSkill:
-    """Initialize database persistence and create tables."""
-    engine = create_engine(str(settings.database.url), hide_parameters=True)
+async def seed() -> None:
+    # --- Provider Factories (Trinity Pattern) ---
+
+    # Persistence Provider
+    engine = create_engine(str(settings.database.url))
     SessionLocal = sessionmaker(bind=engine)
+
+    # Reasoning Provider
+    lm = None
+    embedder = None
+    if settings.llm.model.lower() != "rule":
+        lm = dspy.LM(settings.llm.model)
+        embedder = get_embedding_model(get_raw_key(settings.llm.api_key))
+    reasoning_provider = {"lm": lm, "embedder": embedder}
+
+    # --- Skill Instantiation & Binding ---
+
     persistence = PersistenceSkill()
     persistence.bind(settings.database, (SessionLocal, engine))
 
-    await persistence.execute("init_db", {})
-    logger.info("database_initialized")
+    reasoning = ReasoningSkill()
+    reasoning.bind(settings.llm, reasoning_provider)
 
-    return persistence
+    # Initialize Skills
+    if await persistence.initialize():
+        await persistence.execute("init_db", {})
+        logger.info("db_initialized")
+    else:
+        logger.error("db_initialization_failed")
+        return
 
-
-def setup_embedding_model() -> MistralAIEmbeddings:
-    """Initialize and configure the embedding model."""
-    api_key = settings.llm.api_key.get_secret_value()
-    embedding_model = get_embedding_model(api_key)
-    logger.info("embedding_model_initialized", model=embedding_model.model)
-
-    return embedding_model
-
-
-async def seed() -> None:
-    """Seed the database with initial inventory items."""
-    # Setup infrastructure
-    persistence = await setup_database()
-    embedding_model = setup_embedding_model()
+    if not await reasoning.initialize():
+        logger.error("reasoning_initialization_failed")
+        return
 
     # List of hotels to add
     raw_items = [
@@ -70,9 +76,20 @@ async def seed() -> None:
     for raw in raw_items:
         # Generate vector embedding
         logger.info("embedding_generation_started", item_id=raw["id"])
-        vector = generate_embedding(str(raw["desc"]), embedding_model)
+        emb_obs = await reasoning.execute(
+            "generate_embedding", {"text": str(raw["desc"])}
+        )
+        if emb_obs.success:
+            vector = emb_obs.data
+        else:
+            logger.warning(
+                "embedding_generation_failed_using_dummy",
+                item_id=raw["id"],
+                error=emb_obs.error,
+            )
+            vector = [0.0] * settings.database.vector_dimension
 
-        # Upsert via Persistence Skill
+        # Upsert via Persistence Protein
         obs = await persistence.execute(
             "upsert_item",
             {

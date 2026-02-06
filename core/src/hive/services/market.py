@@ -137,7 +137,10 @@ class MarketService:
 
         deal = obs.data
         now = datetime.now(UTC)
-        expires_at = datetime.fromisoformat(deal["expires_at"])
+        expires_at = deal["expires_at"]
+        if isinstance(expires_at, str):
+            expires_at = datetime.fromisoformat(expires_at)
+
         if deal["status"] == "PENDING" and now > expires_at:
             await self.persistence.execute(
                 "update_deal_status", {"deal_id": deal_uuid, "status": "EXPIRED"}

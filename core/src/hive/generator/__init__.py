@@ -117,7 +117,7 @@ class HiveGenerator(Generator[Observation, Event]):
                 "status": status,
             },
         )
-        return obs.success
+        return bool(obs.success)
 
     async def emit_alert(
         self, severity: str, message: str, source: str = "core"
@@ -132,4 +132,4 @@ class HiveGenerator(Generator[Observation, Event]):
                 "source": source,
             },
         )
-        return obs.success
+        return bool(obs.success)
