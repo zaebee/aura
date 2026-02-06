@@ -1,7 +1,7 @@
 import enum
 import uuid
 from datetime import UTC, datetime
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from pgvector.sqlalchemy import Vector
 from sqlalchemy import (
@@ -12,6 +12,9 @@ from sqlalchemy import (
     LargeBinary,
     String,
 )
+
+if TYPE_CHECKING:
+    pass
 from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import (
     DeclarativeBase,

@@ -27,11 +27,11 @@ from proto.aura.negotiation.v1 import (
     negotiation_pb2_grpc,  # type: ignore
 )
 
-# Configure structured logging on startup
-configure_logging()
-logger = get_logger("api-gateway")
-
 settings = get_settings()
+
+# Configure structured logging on startup
+configure_logging(log_level=settings.log_level)
+logger = get_logger("api-gateway")
 
 # Initialize OpenTelemetry tracing
 service_name = settings.otel_service_name
