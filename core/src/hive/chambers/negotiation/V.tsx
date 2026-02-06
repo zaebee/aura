@@ -1,4 +1,5 @@
 import { CheckCircle, XCircle } from 'lucide-react';
+import type { JitUiRequest } from '../../../lib/aura/negotiation/v1/negotiation_pb';
 import { Button } from '../../../components/ui/button';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from '../../../components/ui/card';
 import { Badge } from '../../../components/ui/badge';
@@ -11,7 +12,7 @@ interface JITActions {
 /**
  * Negotiation Chamber Visual Nucleotide (V).
  */
-export const NegotiationView = ({ request, actions }: { request: any, actions: JITActions }) => {
+export const NegotiationView = ({ request, actions }: { request: JitUiRequest, actions: JITActions }) => {
   const { templateId } = request;
 
   switch (templateId) {
@@ -22,7 +23,7 @@ export const NegotiationView = ({ request, actions }: { request: any, actions: J
   }
 };
 
-const HighValueConfirm = ({ request, actions }: { request: any, actions: JITActions }) => {
+const HighValueConfirm = ({ request, actions }: { request: JitUiRequest, actions: JITActions }) => {
   const context = request.contextData || {};
 
   return (
@@ -82,7 +83,7 @@ const HighValueConfirm = ({ request, actions }: { request: any, actions: JITActi
   );
 };
 
-const DefaultTemplate = ({ request, actions }: { request: any, actions: JITActions }) => {
+const DefaultTemplate = ({ request, actions }: { request: JitUiRequest, actions: JITActions }) => {
   return (
     <Card className="bg-card-bg border border-gray-600">
       <CardHeader>

@@ -13,6 +13,23 @@ import { ScrollArea } from '@/components/ui/scroll-area'
 import { Badge } from '@/components/ui/badge'
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
 
+const ThoughtBlock = ({ thought }: { thought?: string }) => {
+  if (!thought) {
+    return null;
+  }
+  return (
+    <details className="mt-2 group">
+      <summary className="text-[10px] text-cyberpunk-purple cursor-pointer list-none flex items-center">
+        <span className="group-open:rotate-90 transition-transform mr-1">▶</span>
+        Sub-optical Layer
+      </summary>
+      <pre className="mt-1 p-2 bg-black/40 rounded text-[10px] text-gray-400 whitespace-pre-wrap font-mono">
+        {thought}
+      </pre>
+    </details>
+  );
+};
+
 // Hive Modules
 import { AgentWallet } from '@/hive/connector/wallet'
 import { SearchAggregator } from '@/hive/aggregator/search'
@@ -309,17 +326,7 @@ export default function AgentConsole() {
                               <div>
                                 <p className="text-sm font-medium">Counter Offer: ${entry.amount}</p>
                                 <p className="text-xs text-gray-400">{entry.message}</p>
-                                {entry.thought && (
-                                  <details className="mt-2 group">
-                                    <summary className="text-[10px] text-cyberpunk-purple cursor-pointer list-none flex items-center">
-                                      <span className="group-open:rotate-90 transition-transform mr-1">▶</span>
-                                      Sub-optical Layer
-                                    </summary>
-                                    <pre className="mt-1 p-2 bg-black/40 rounded text-[10px] text-gray-400 whitespace-pre-wrap font-mono">
-                                      {entry.thought}
-                                    </pre>
-                                  </details>
-                                )}
+                                <ThoughtBlock thought={entry.thought} />
                                 <p className="text-xs text-gray-400 mt-1">{new Date(entry.timestamp).toLocaleTimeString()}</p>
                               </div>
                             )}
@@ -328,17 +335,7 @@ export default function AgentConsole() {
                                 <p className="text-sm font-medium text-green-400">✅ Deal Accepted!</p>
                                 <p className="text-sm">Final Price: ${entry.amount}</p>
                                 <p className="text-xs text-gray-400">Reservation: {entry.reservationCode}</p>
-                                {entry.thought && (
-                                  <details className="mt-2 group">
-                                    <summary className="text-[10px] text-cyberpunk-purple cursor-pointer list-none flex items-center">
-                                      <span className="group-open:rotate-90 transition-transform mr-1">▶</span>
-                                      Sub-optical Layer
-                                    </summary>
-                                    <pre className="mt-1 p-2 bg-black/40 rounded text-[10px] text-gray-400 whitespace-pre-wrap font-mono">
-                                      {entry.thought}
-                                    </pre>
-                                  </details>
-                                )}
+                                <ThoughtBlock thought={entry.thought} />
                                 <p className="text-xs text-gray-400 mt-1">{new Date(entry.timestamp).toLocaleTimeString()}</p>
                               </div>
                             )}

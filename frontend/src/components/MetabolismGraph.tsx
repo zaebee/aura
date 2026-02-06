@@ -5,7 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
 mermaid.initialize({
   startOnLoad: true,
   theme: 'dark',
-  securityLevel: 'loose',
+  securityLevel: 'strict',
   flowchart: {
     useMaxWidth: true,
     htmlLabels: true,
