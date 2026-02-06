@@ -31,23 +31,30 @@ data:
     [[proxies]]
     name = "frontend"
     type = "tcp"
-    localIP = "{{ .Release.Name }}-frontend"
     localPort = {{ .Values.frontend.service.port }}
-    remotePort = 8081
+    localIP = {{ .Values.tunnel.frontend.localIP | quote }}
+    remotePort = {{ .Values.tunnel.frontend.remotePort }}
 
     [[proxies]]
     name = "gateway"
     type = "tcp"
-    localIP = "{{ .Release.Name }}-gateway"
-    localPort = 8000
-    remotePort = 8082
+    localPort = {{ .Values.gateway.service.port }}
+    localIP = {{ .Values.tunnel.gateway.localIP | quote }}
+    remotePort = {{ .Values.tunnel.gateway.remotePort }}
 
     [[proxies]]
     name = "grafana"
     type = "tcp"
-    localIP = {{ .Values.tunnel.grafana.localIP | quote }}
     localPort = {{ .Values.tunnel.grafana.localPort }}
+    localIP = {{ .Values.tunnel.grafana.localIP | quote }}
     remotePort = {{ .Values.tunnel.grafana.remotePort }}
+
+    [[proxies]]
+    name = "loki"
+    type = "tcp"
+    localPort = {{ .Values.tunnel.loki.localPort }}
+    localIP = {{ .Values.tunnel.loki.localIP | quote }}
+    remotePort = {{ .Values.tunnel.loki.remotePort }}
 
     [[proxies]]
     name = "nats-hidden"
