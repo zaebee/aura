@@ -31,6 +31,8 @@ const MetabolismGraph: React.FC = () => {
   }, []);
 
   useEffect(() => {
+    let isMounted = true;
+
     if (mermaidRef.current) {
       const graphDefinition = `
         graph LR
@@ -52,11 +54,15 @@ const MetabolismGraph: React.FC = () => {
       `;
 
       mermaid.render('mermaid-graph', graphDefinition).then((result) => {
-        if (mermaidRef.current) {
+        if (isMounted && mermaidRef.current) {
           mermaidRef.current.innerHTML = result.svg;
         }
       });
     }
+
+    return () => {
+      isMounted = false;
+    };
   }, [activeNode]);
 
   return (

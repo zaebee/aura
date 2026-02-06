@@ -1,8 +1,8 @@
 import { CheckCircle, XCircle } from 'lucide-react';
-import type { JitUiRequest } from '../../../lib/aura/negotiation/v1/negotiation_pb';
-import { Button } from '../../../components/ui/button';
-import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from '../../../components/ui/card';
-import { Badge } from '../../../components/ui/badge';
+import type { JitUiRequest } from '@/lib/aura/negotiation/v1/negotiation_pb';
+import { Button } from '@/components/ui/button';
+import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
 
 interface JITActions {
   onApprove: () => void;
@@ -24,7 +24,7 @@ export const NegotiationView = ({ request, actions }: { request: JitUiRequest, a
 };
 
 const HighValueConfirm = ({ request, actions }: { request: JitUiRequest, actions: JITActions }) => {
-  const context = request.contextData || {};
+  const context = request.contextData;
 
   return (
     <Card className="bg-card-bg border-2 border-cyberpunk-purple">
