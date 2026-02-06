@@ -7,7 +7,7 @@ tunnel:
     repository: snowdreamtech/frpc
     tag: alpine3.22
     pullPolicy: IfNotPresent
-  frontned:
+  frontend:
     localIP: "{{ .Release.Name }}-frontend"
     remotePort: 8081
   gateway:

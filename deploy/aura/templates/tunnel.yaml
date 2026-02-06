@@ -31,29 +31,29 @@ data:
     [[proxies]]
     name = "frontend"
     type = "tcp"
+    localIP = {{ tpl .Values.tunnel.frontend.localIP . | quote }}
     localPort = {{ .Values.frontend.service.port }}
-    localIP = {{ .Values.tunnel.frontend.localIP | quote }}
     remotePort = {{ .Values.tunnel.frontend.remotePort }}
 
     [[proxies]]
     name = "gateway"
     type = "tcp"
+    localIP = {{ tpl .Values.tunnel.gateway.localIP . | quote }}
     localPort = {{ .Values.gateway.service.port }}
-    localIP = {{ .Values.tunnel.gateway.localIP | quote }}
     remotePort = {{ .Values.tunnel.gateway.remotePort }}
 
     [[proxies]]
     name = "grafana"
     type = "tcp"
-    localPort = {{ .Values.tunnel.grafana.localPort }}
     localIP = {{ .Values.tunnel.grafana.localIP | quote }}
+    localPort = {{ .Values.tunnel.grafana.localPort }}
     remotePort = {{ .Values.tunnel.grafana.remotePort }}
 
     [[proxies]]
     name = "loki"
     type = "tcp"
-    localPort = {{ .Values.tunnel.loki.localPort }}
     localIP = {{ .Values.tunnel.loki.localIP | quote }}
+    localPort = {{ .Values.tunnel.loki.localPort }}
     remotePort = {{ .Values.tunnel.loki.remotePort }}
 
     [[proxies]]
