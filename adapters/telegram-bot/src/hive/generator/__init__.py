@@ -2,7 +2,7 @@ import time
 from typing import Any
 
 import structlog
-from aura_core import Event, Generator, Observation, map_action
+from aura_core import Event, Generator, Observation, get_action_name, map_action
 from aura_core.gen.aura.dna.v1 import ActionType, NegotiationEvent
 from aura_core.gen.aura.dna.v1 import Event as ProtoEvent
 from opentelemetry import trace
@@ -37,7 +37,9 @@ class TelegramGenerator(Generator[Observation, Event]):
                 # timestamp is handled by betterproto datetime or manual set
 
                 if "negotiation" in event_type:
-                    action_name = event_type.replace("negotiation_", "")
+                    action_name = get_action_name(observation.metadata.get("action"))
+                    if not action_name or action_name == "unknown":
+                        action_name = event_type.replace("negotiation_", "")
                     from typing import cast
 
                     proto_event.negotiation = NegotiationEvent(

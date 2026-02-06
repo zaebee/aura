@@ -9,8 +9,8 @@ from aura_core import (
     IntentAction,
     Observation,
     SkillRegistry,
+    get_action_name,
 )
-from aura_core.gen.aura.dna.v1 import ActionType
 
 from hive.proto.aura.negotiation.v1 import negotiation_pb2
 
@@ -42,16 +42,7 @@ class HiveConnector(BaseConnector):
         response.valid_until_timestamp = int(time.time() + 600)
 
         # Handle both string and ActionType enum
-        action_val = action.action
-        if isinstance(action_val, ActionType):
-            raw_name = ActionType(action_val).name
-            action_name = (
-                raw_name.lower().replace("action_type_", "")
-                if raw_name
-                else "unspecified"
-            )
-        else:
-            action_name = str(action_val).lower() if action_val else "unknown"
+        action_name = get_action_name(action.action)
 
         if action_name == "accept":
             response.accepted.final_price = action.price

@@ -3,7 +3,7 @@ from datetime import UTC, datetime, timedelta
 from typing import Any
 
 import structlog
-from aura_core import IntentAction, Observation, SkillRegistry
+from aura_core import IntentAction, Observation, SkillRegistry, get_action_name
 from aura_core.gen.aura.dna.v1 import ActionType
 from hive.proto.aura.negotiation.v1 import negotiation_pb2
 
@@ -27,13 +27,7 @@ async def act(
     - Returns NegotiateResponse proto in Observation.data
     """
     # 1. Extract action name for logging and event_type
-    action_val = action.action
-    if isinstance(action_val, ActionType):
-        raw_action_name = action_val.name
-    else:
-        raw_action_name = str(action_val)
-
-    action_name = str(raw_action_name).lower().replace("action_type_", "")
+    action_name = get_action_name(action.action)
     event_type = f"negotiation_{action_name}"
 
     logger.info("chamber_act", action=action_name, price=action.price)
@@ -95,6 +89,7 @@ async def act(
         event_type=event_type,
         metadata={
             "price": action.price,
+            "action": action.action,
             "session_token": response.session_token,
             "item_id": context.item_id if context else DEFAULT_UNKNOWN_ITEM_ID,
             "agent_did": (

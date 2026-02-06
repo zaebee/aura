@@ -29,6 +29,18 @@ def map_action(action_str: str | None) -> ActionType:
     return cast(ActionType, val)
 
 
+def get_action_name(action_value: ActionType | str | None) -> str:
+    """Safely gets a lowercase action name from an ActionType or string."""
+    if isinstance(action_value, ActionType):
+        raw_name = action_value.name
+        return (
+            raw_name.lower().replace("action_type_", "") if raw_name else "unspecified"
+        )
+    if isinstance(action_value, str):
+        return action_value.lower()
+    return "unknown"
+
+
 def get_raw_key(key_field: SecretStr | str) -> str:
     """
     Safely retrieve the raw string value from a SecretStr or a plain string.

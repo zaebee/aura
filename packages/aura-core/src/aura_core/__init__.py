@@ -37,6 +37,7 @@ from .types import (
     SystemVitals,
     TelegramContext,
     UIAction,
+    get_action_name,
     get_raw_key,
     map_action,
 )
@@ -75,6 +76,7 @@ __all__ = [
     "SystemVitals",
     "NegotiationResult",
     "map_action",
+    "get_action_name",
     "BeeContext",
     "AuditObservation",
     "BeeObservation",
