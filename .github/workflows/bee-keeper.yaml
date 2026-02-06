@@ -15,7 +15,7 @@ on:
       - 'CHRONICLES.md'
       - 'llms.txt'
   schedule:
-    - cron: '0 */6 * * *' # Every 6 hours
+    - cron: '0 */18 * * *' # Every 6 hours
 
 jobs:
   audit:
@@ -68,7 +68,7 @@ jobs:
           AURA_LLM__OLLAMA_BASE_URL: "http://localhost:11434"
           AURA_PROMETHEUS_URL: "http://localhost:9090"
           AURA_NATS_URL: "nats://localhost:4222"
-          AURA_BEE_KEEPER__MAX_TOKENS: 1000
+          AURA_BEE_KEEPER__MAX_TOKENS: 500
 
           MISTRAL_API_KEY: ${{ secrets.MISTRAL_API_KEY }}
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
@@ -77,4 +77,4 @@ jobs:
           git config --global user.name "bee.Keeper"
           git config --global user.email "keeper@aura.hive"
 
-          uv run --directory agents/bee-keeper python main.py
+          # SKIP: uv run --directory agents/bee-keeper python main.py
