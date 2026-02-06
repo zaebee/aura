@@ -9,18 +9,18 @@ tunnel:
     pullPolicy: IfNotPresent
   frontend:
     localIP: "{{ .Release.Name }}-frontend"
-    remotePort: 8081
+    remotePort: 8081 # Default remote port for frontend tunnel
   gateway:
     localIP: "{{ .Release.Name }}-gateway"
-    remotePort: 8082
+    remotePort: 8082 # Default remote port for gateway tunnel
   grafana:
     localIP: "monitoring-grafana.monitoring.svc.cluster.local"
     localPort: 80
-    remotePort: 8083
+    remotePort: 8083 # Default remote port for grafana tunnel
   loki:
     localIP: "loki.monitoring.svc.cluster.local"
     localPort: 3100
-    remotePort: 8084
+    remotePort: 8084 # Default remote port for loki tunnel
 
 # API Gateway Service Configuration
 gateway:
