@@ -73,13 +73,13 @@ spec:
       - name: frpc
         image: "{{ .Values.tunnel.image.repository }}:{{ .Values.tunnel.image.tag }}"
         imagePullPolicy: {{ .Values.tunnel.image.pullPolicy | default "IfNotPresent" }}
-        env:
-        - name: FRP_STCP_SECRET_KEY
-          valueFrom:
-            secretKeyRef:
-              name: "{{ .Release.Name }}-secrets"
-              key: "stcp-key"
         command: ["/usr/local/bin/entrypoint.sh"]
+        env:
+          - name: FRP_STCP_SECRET_KEY
+            valueFrom:
+              secretKeyRef:
+                name: "{{ .Release.Name }}-secrets"
+                key: "stcp-key"
         volumeMounts:
         - name: config-volume
           mountPath: /etc/frp/frpc.toml
