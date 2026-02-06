@@ -9,12 +9,11 @@ and saves the compiled program for production use.
 import json
 import sys
 from pathlib import Path
-from typing import Any
 
 import dspy
 import structlog
 from dspy.teleprompt import BootstrapFewShot
-from hive.proteins.reasoning.enzymes.reasoning_engine import (
+from src.hive.proteins.reasoning.enzymes.reasoning_engine import (
     AuraNegotiator,
     clean_and_parse_json,
 )
@@ -65,7 +64,7 @@ def load_training_data() -> list[dict]:
     return examples
 
 
-def economic_metric(gold: Any, pred: Any, trace: Any = None) -> float:
+def economic_metric(gold, pred, trace=None):
     """Economic metric for negotiation quality.
 
     Evaluates decisions based on:
@@ -81,7 +80,7 @@ def economic_metric(gold: Any, pred: Any, trace: Any = None) -> float:
         try:
             gold_resp = json.loads(gold_resp)
         except json.JSONDecodeError:
-            return 0.0  # Skip broken data
+            return 0  # Skip broken data
 
     # 2 Expected answer Context (to know floor_price)
     gold_ctx = gold.context
@@ -101,15 +100,15 @@ def economic_metric(gold: Any, pred: Any, trace: Any = None) -> float:
 
     # Constraint: No Markdown tags in raw output
     if isinstance(raw_action, str) and "```" in raw_action:
-        return 0.0
+        return 0
 
     if isinstance(pred_resp, str):
         try:
             pred_resp = clean_and_parse_json(pred_resp)
         except (ValueError, json.JSONDecodeError):
-            return 0.0
+            return 0
 
-    score = 0.0
+    score = 0
 
     # A. Structure valid (passed parsing)
     score += 0.2
@@ -125,7 +124,7 @@ def economic_metric(gold: Any, pred: Any, trace: Any = None) -> float:
 
         # If sold lower market - PAIN (reset score)
         if pred_resp.get("action") in ["accept", "counter"] and my_price < floor_price:
-            return 0.0
+            return 0
 
         # If sold higher marker - GAIN (give bonus)
         if pred_resp.get("action") in ["accept", "counter"] and my_price >= floor_price:
@@ -137,7 +136,7 @@ def economic_metric(gold: Any, pred: Any, trace: Any = None) -> float:
     return min(score, 1.0)  # Normalize to 1.0
 
 
-def train_negotiator() -> Any:
+def train_negotiator():
     """Train and save the DSPy negotiator."""
     logger.info("starting_dspy_training")
 

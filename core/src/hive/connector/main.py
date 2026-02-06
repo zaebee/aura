@@ -19,7 +19,9 @@ logger = structlog.get_logger(__name__)
 class HiveConnector(BaseConnector):
     """C - Connector: Maps internal IntentAction to gRPC responses and external systems."""
 
-    def __init__(self, registry: SkillRegistry, market_service: Any = None, settings: Any = None) -> None:
+    def __init__(
+        self, registry: SkillRegistry, market_service: Any = None, settings: Any = None
+    ) -> None:
         super().__init__(registry)
         self.market_service = market_service
         self.settings = settings

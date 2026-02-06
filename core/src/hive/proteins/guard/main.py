@@ -13,7 +13,9 @@ logger = logging.getLogger(__name__)
 DEFAULT_MIN_MARGIN = 0.1
 
 
-class GuardSkill(SkillProtocol[SafetySettings, OutputGuard, dict[str, Any], Observation]):
+class GuardSkill(
+    SkillProtocol[SafetySettings, OutputGuard, dict[str, Any], Observation]
+):
     """
     Guard Protein: Handles safety validation and safe price calculation.
     Standardized following the Crystalline Protein Standard and Enzyme pattern.

@@ -1,6 +1,7 @@
 from typing import Optional
 from pydantic import BaseModel
 
+
 class CommentParams(BaseModel):
     repo: str
     issue_number: Optional[int] = None

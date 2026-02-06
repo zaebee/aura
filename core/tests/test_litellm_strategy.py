@@ -19,11 +19,15 @@ class TestLiteLLMStrategy:
             action="accept",
             price=150.0,
             message="We accept your offer.",
-            reasoning="Bid meets our requirements."
+            reasoning="Bid meets our requirements.",
         )
 
-        with patch("src.hive.proteins.reasoning.enzymes.reasoning_engine.Template"), \
-             patch("src.hive.proteins.reasoning.enzymes.reasoning_engine.open", create=True):
+        with (
+            patch("src.hive.proteins.reasoning.enzymes.reasoning_engine.Template"),
+            patch(
+                "src.hive.proteins.reasoning.enzymes.reasoning_engine.open", create=True
+            ),
+        ):
             strategy = LiteLLMStrategy(model="gpt-3.5-turbo")
             response = strategy.evaluate(item=mock_item, bid=150.0, reputation=0.8)
 
@@ -37,11 +41,15 @@ class TestLiteLLMStrategy:
             action="counter",
             price=180.0,
             message="Can you do 180?",
-            reasoning="Bid is a bit low."
+            reasoning="Bid is a bit low.",
         )
 
-        with patch("src.hive.proteins.reasoning.enzymes.reasoning_engine.Template"), \
-             patch("src.hive.proteins.reasoning.enzymes.reasoning_engine.open", create=True):
+        with (
+            patch("src.hive.proteins.reasoning.enzymes.reasoning_engine.Template"),
+            patch(
+                "src.hive.proteins.reasoning.enzymes.reasoning_engine.open", create=True
+            ),
+        ):
             strategy = LiteLLMStrategy(model="gpt-3.5-turbo")
             response = strategy.evaluate(item=mock_item, bid=150.0, reputation=0.8)
 
@@ -52,14 +60,15 @@ class TestLiteLLMStrategy:
     def test_evaluate_reject(self, mock_engine_class, mock_item):
         mock_engine = mock_engine_class.return_value
         mock_engine.complete.return_value = AI_Decision(
-            action="reject",
-            price=0.0,
-            message="No thanks.",
-            reasoning="Way too low."
+            action="reject", price=0.0, message="No thanks.", reasoning="Way too low."
         )
 
-        with patch("src.hive.proteins.reasoning.enzymes.reasoning_engine.Template"), \
-             patch("src.hive.proteins.reasoning.enzymes.reasoning_engine.open", create=True):
+        with (
+            patch("src.hive.proteins.reasoning.enzymes.reasoning_engine.Template"),
+            patch(
+                "src.hive.proteins.reasoning.enzymes.reasoning_engine.open", create=True
+            ),
+        ):
             strategy = LiteLLMStrategy(model="gpt-3.5-turbo")
             response = strategy.evaluate(item=mock_item, bid=50.0, reputation=0.8)
 
@@ -70,8 +79,12 @@ class TestLiteLLMStrategy:
         mock_engine = mock_engine_class.return_value
         mock_engine.complete.side_effect = Exception("API error")
 
-        with patch("src.hive.proteins.reasoning.enzymes.reasoning_engine.Template"), \
-             patch("src.hive.proteins.reasoning.enzymes.reasoning_engine.open", create=True):
+        with (
+            patch("src.hive.proteins.reasoning.enzymes.reasoning_engine.Template"),
+            patch(
+                "src.hive.proteins.reasoning.enzymes.reasoning_engine.open", create=True
+            ),
+        ):
             strategy = LiteLLMStrategy(model="gpt-3.5-turbo")
             response = strategy.evaluate(item=mock_item, bid=150.0, reputation=0.8)
 
