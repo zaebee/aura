@@ -1,5 +1,5 @@
 import structlog
-from aura_core import Observation, SkillRegistry
+from aura_core import Observation, SkillRegistry, get_action_name
 
 logger = structlog.get_logger(__name__)
 
@@ -12,12 +12,16 @@ async def emit_nats_event(obs: Observation, registry: SkillRegistry) -> None:
     logger.info("chamber_nats_emit", event_name=obs.event_type)
 
     # Hydrate Pulse Protein
+    action_name = get_action_name(obs.metadata.get("action"))
+    if not action_name or action_name == "unknown":
+        action_name = obs.event_type.replace("negotiation_", "")
+
     await registry.execute(
         "pulse",
         "emit_negotiation",
         {
             "session_token": obs.metadata.get("session_token", "unknown-session"),
-            "action": obs.event_type.replace("negotiation_", ""),
+            "action": action_name,
             "price": obs.metadata.get("price", 0.0),
             "item_id": obs.metadata.get("item_id", "unknown-item"),
             "agent_did": obs.metadata.get("agent_did", "unknown-agent"),

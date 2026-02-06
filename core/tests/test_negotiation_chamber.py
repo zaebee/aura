@@ -83,8 +83,10 @@ async def test_negotiation_loop_accept_flow(mock_registry):
     """Test the accept flow which triggers persistence and transaction."""
     signal = MockSignal(item_id="test_1", bid_amount=110.0)
 
-    # Adjust reasoning to accept
-    async def mock_execute_accept(skill, intent, params=None):
+    # Override the mock for the reasoning skill for this specific test
+    original_side_effect = mock_registry.execute.side_effect
+
+    async def mock_execute_override(skill, intent, params=None):
         if skill == "reasoning" and intent == "negotiate":
             return Observation(
                 success=True,
@@ -96,27 +98,10 @@ async def test_negotiation_loop_accept_flow(mock_registry):
                     "metadata": {},
                 },
             )
-        if skill == "persistence" and intent == "read_item":
-            return Observation(
-                success=True,
-                data={
-                    "id": "test_1",
-                    "name": "Atomic Core",
-                    "base_price": 100.0,
-                    "floor_price": 85.0,
-                },
-            )
-        if skill == "persistence" and intent == "create_deal":
-            return Observation(success=True)
-        if skill == "transaction" and intent == "get_address":
-            return Observation(success=True, data="SOL_ADDR_123")
-        if skill == "telemetry":
-            return Observation(
-                success=True, data={"status": "healthy", "cpu_usage_percent": 10.0}
-            )
-        return Observation(success=True)
+        # Fall back to the original mock for all other calls
+        return await original_side_effect(skill, intent, params)
 
-    mock_registry.execute.side_effect = mock_execute_accept
+    mock_registry.execute.side_effect = mock_execute_override
 
     observation = await negotiation_loop(signal, mock_registry)
 
