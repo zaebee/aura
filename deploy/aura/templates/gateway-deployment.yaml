@@ -49,15 +49,17 @@ spec:
           resources:
             {{ toYaml .Values.gateway.resources | nindent 12 }}
           env:
-            - name: CORE_SERVICE_HOST
-              value: "{{ .Release.Name }}-core:50051"
-            - name: REDIS_URL
-              value: "redis://{{ .Release.Name }}-redis:6379/0"
-            - name: OTEL_SERVICE_NAME
+            - name: AURA_GATEWAY__CORE_SERVICE_HOST
+              value: "{{ .Release.Name }}-core.{{ .Release.Namespace }}.svc.cluster.local:50051"
+            - name: AURA_GATEWAY__HTTP_PORT
+              value: "8000"
+            - name: AURA_GATEWAY__LOG_LEVEL
+              value: "{{ .Values.gateway.env.LOG_LEVEL }}"
+            - name: AURA_GATEWAY__REDIS_URL
+              value: "redis://{{ .Release.Name }}-redis.{{ .Release.Namespace }}.svc.cluster.local:6379/0"
+            - name: AURA_GATEWAY__OTEL_SERVICE_NAME
               value: "{{ .Release.Name }}-gateway"
-            - name: OTEL_EXPORTER_OTLP_ENDPOINT
+            - name: AURA_GATEWAY__OTEL_EXPORTER_OTLP_ENDPOINT
               value: {{ .Values.monitoring.jaeger.collectorUrl | default (include "aura.jaeger.collectorUrl" .) | quote }}
-            - name: CORS_ORIGINS
+            - name: AURA_GATEWAY__CORS_ORIGINS
               value: "{{ .Values.gateway.corsOrigins }}"
-            - name: LOG_LEVEL
-              value: {{ .Values.gateway.env.LOG_LEVEL | default "info" | quote }}

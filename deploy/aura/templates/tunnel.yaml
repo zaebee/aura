@@ -19,16 +19,16 @@ data:
     [[proxies]]
     name = "frontend"
     type = "tcp"
-    localIP = "{{ .Release.Name }}-frontend"
+    localIP = {{ tpl .Values.tunnel.frontend.localIP . | quote }}
     localPort = {{ .Values.frontend.service.port }}
-    remotePort = 8081
+    remotePort = {{ .Values.tunnel.frontend.remotePort }}
 
     [[proxies]]
     name = "gateway"
     type = "tcp"
-    localIP = "aura-gateway"
-    localPort = 8000
-    remotePort = 8082
+    localIP = {{ tpl .Values.tunnel.gateway.localIP . | quote }}
+    localPort = {{ .Values.gateway.service.port }}
+    remotePort = {{ .Values.tunnel.gateway.remotePort }}
 
     [[proxies]]
     name = "grafana"
@@ -37,6 +37,18 @@ data:
     localPort = {{ .Values.tunnel.grafana.localPort }}
     remotePort = {{ .Values.tunnel.grafana.remotePort }}
 
+    [[proxies]]
+    name = "loki"
+    type = "tcp"
+    localIP = {{ .Values.tunnel.loki.localIP | quote }}
+    localPort = {{ .Values.tunnel.loki.localPort }}
+    remotePort = {{ .Values.tunnel.loki.remotePort }}
+
+    [[proxies]]
+    name = "nats-hidden"
+    type = "stcp"
+    localIP = "{{ .Release.Name }}-nats"
+    localPort = 4222
 ---
 apiVersion: apps/v1
 kind: Deployment

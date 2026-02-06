@@ -9,17 +9,19 @@ class TelegramSettings(BaseSettings):
         env_file=".env",
         env_file_encoding="utf-8",
         env_prefix="AURA_TG__",
+        env_nested_delimiter="__",
         extra="ignore",
     )
 
-    token: SecretStr = Field("")  # type: ignore
-    core_url: str = "core:50051"
-    nats_url: str = "nats://nats:4222"
+    token: SecretStr = Field(...)  # type: ignore
+    core_url: str = Field(...)  # type: ignore
+    nats_url: str = Field(...)  # type: ignore
     otel_exporter_otlp_endpoint: str = (
         "http://aura-jaeger.monitoring.svc.cluster.local:4317"
     )
     negotiation_timeout: float = 60.0
     webhook_domain: str | None = None
+    log_level: str = "info"
 
 
 @lru_cache

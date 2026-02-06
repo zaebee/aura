@@ -14,7 +14,7 @@ from typing import Any
 import dspy
 import structlog
 from dspy.teleprompt import BootstrapFewShot
-from hive.proteins.reasoning.enzymes.reasoning_engine import (
+from src.hive.proteins.reasoning.enzymes.reasoning_engine import (
     AuraNegotiator,
     clean_and_parse_json,
 )
@@ -65,7 +65,7 @@ def load_training_data() -> list[dict]:
     return examples
 
 
-def economic_metric(gold: Any, pred: Any, trace: Any = None) -> float:
+def economic_metric(gold: Any, pred: Any, trace: Any | None = None) -> float:
     """Economic metric for negotiation quality.
 
     Evaluates decisions based on:

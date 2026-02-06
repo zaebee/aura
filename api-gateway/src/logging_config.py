@@ -1,3 +1,4 @@
+import logging
 from collections.abc import MutableMapping
 from contextvars import ContextVar
 from typing import Any
@@ -9,8 +10,10 @@ from opentelemetry.trace import get_current_span
 request_id_ctx: ContextVar[str | None] = ContextVar("request_id", default=None)
 
 
-def configure_logging() -> None:
+def configure_logging(log_level: str = "info") -> None:
     """Configure structlog to output JSON format for structured logging."""
+    level = getattr(logging, log_level.upper(), logging.INFO)
+
     structlog.configure(
         processors=[
             structlog.contextvars.merge_contextvars,
@@ -21,7 +24,7 @@ def configure_logging() -> None:
             structlog.processors.format_exc_info,
             structlog.processors.JSONRenderer(),
         ],
-        wrapper_class=structlog.make_filtering_bound_logger(0),
+        wrapper_class=structlog.make_filtering_bound_logger(level),
         context_class=dict,
         logger_factory=structlog.PrintLoggerFactory(),
         cache_logger_on_first_use=True,

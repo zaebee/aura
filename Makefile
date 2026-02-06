@@ -5,6 +5,9 @@ TAG ?= latest
 REGISTRY ?= ghcr.io/zaebee
 PLATFORM ?= linux/amd64
 CORE_PATH ?= core:core/src
+GATEWAY_PATH ?= api-gateway/src
+TG_PATH ?= adapters/telegram-bot/src:adapters/telegram-bot/src/proto
+KEEPER_PATH ?= agents/bee-keeper/src
 
 # --- 1. CODE QUALITY ---
 lint:
@@ -14,9 +17,9 @@ lint:
 	uv run ruff check .
 	# Python Type Check (Mypy)
 	MYPYPATH=$(CORE_PATH) uv run mypy core/src
-	MYPYPATH=api-gateway/src:packages/aura-core/src uv run mypy api-gateway/src
-	MYPYPATH=adapters/telegram-bot/src:adapters/telegram-bot/src/proto:packages/aura-core/src uv run mypy adapters/telegram-bot/src
-	MYPYPATH=agents/bee-keeper/src:packages/aura-core/src uv run mypy agents/bee-keeper/main.py agents/bee-keeper/src
+	MYPYPATH=$(GATEWAY_PATH):packages/aura-core/src uv run mypy api-gateway/src
+	MYPYPATH=$(TG_PATH):packages/aura-core/src uv run mypy adapters/telegram-bot/src
+	MYPYPATH=$(KEEPER_PATH):packages/aura-core/src uv run mypy agents/bee-keeper/main.py agents/bee-keeper/src
 	MYPYPATH=packages/aura-core/src uv run mypy packages/aura-core/src
 	# Security Audit (Bandit)
 	uv run bandit -r . -c pyproject.toml
@@ -32,7 +35,7 @@ test:
 	# Run core tests
 	PYTHONPATH=$(CORE_PATH) uv run pytest core/tests/ -v
 	# Run telegram-bot tests with isolated path to avoid 'src' collision
-	PYTHONPATH=adapters/telegram-bot/src:adapters/telegram-bot/src/proto uv run pytest adapters/telegram-bot/tests/ -v
+	PYTHONPATH=$(TG_PATH) uv run pytest adapters/telegram-bot/tests/ -v
 
 # Run tests with coverage report
 test-cov:
@@ -75,30 +78,6 @@ push-tg:
 	docker push $(REGISTRY)/aura-telegram-bot:$(TAG)
 
 # --- 5. DEV TASKS ---
-seed:
-	# Seed the database with initial inventory
-	PYTHONPATH=$(CORE_PATH) uv run python core/scripts/seed.py
-
-train:
-	# Train the DSPy negotiation engine
-	PYTHONPATH=$(CORE_PATH) uv run python core/scripts/training/train_dspy.py
-
-pulse:
-	# Trigger a manual NegotiationAccepted event
-	PYTHONPATH=$(CORE_PATH) uv run python core/scripts/trigger_pulse.py
-
-simulate:
-	# Run agent negotiation simulation
-	PYTHONPATH=:.$(CORE_PATH) uv run python tools/simulators/agent_sim.py
-
-buyer:
-	# Run agent negotiation simulation
-	PYTHONPATH=:.$(CORE_PATH) uv run python tools/simulators/autonomous_buyer.py
-
-# Test health endpoints
-health:
-	# Test health check endpoints (requires running services)
-	PYTHONPATH=.:$(CORE_PATH) uv run python tools/test_health_endpoints.py
 install-dev:
 	# Install development dependencies
 	uv sync --group dev
@@ -106,3 +85,29 @@ install-dev:
 format:
 	# Format code
 	uv run ruff format .
+
+# --- 6. CORE TASKS ---
+core-seed:
+	# Seed the database with initial inventory
+	PYTHONPATH=$(CORE_PATH) uv run python core/scripts/seed.py
+
+core-pulse:
+	# Trigger a manual NegotiationAccepted event
+	PYTHONPATH=$(CORE_PATH) uv run python core/scripts/trigger_pulse.py
+
+core-train:
+	# Train the DSPy negotiation engine
+	PYTHONPATH=$(CORE_PATH) uv run python core/scripts/training/train_dspy.py
+
+# Test health endpoints
+tools-health:
+	# Test health check endpoints (requires running services)
+	PYTHONPATH=.:$(CORE_PATH) uv run python tools/test_health_endpoints.py
+
+tools-simulate:
+	# Run agent negotiation simulation
+	PYTHONPATH=:.$(CORE_PATH) uv run python tools/simulators/agent_sim.py
+
+tools-buyer:
+	# Run agent negotiation simulation
+	PYTHONPATH=:.$(CORE_PATH) uv run python tools/simulators/autonomous_buyer.py
