@@ -55,11 +55,11 @@ spec:
               value: "8000"
             - name: AURA_GATEWAY__LOG_LEVEL
               value: "{{ .Values.gateway.env.LOG_LEVEL }}"
+            - name: AURA_GATEWAY__REDIS_URL
+              value: "redis://{{ .Release.Name }}-redis.{{ .Release.Namespace }}.svc.cluster.local:6379/0"
             - name: AURA_GATEWAY__OTEL_SERVICE_NAME
               value: "{{ .Release.Name }}-gateway"
             - name: AURA_GATEWAY__OTEL_EXPORTER_OTLP_ENDPOINT
               value: {{ .Values.monitoring.jaeger.collectorUrl | default (include "aura.jaeger.collectorUrl" .) | quote }}
             - name: AURA_GATEWAY__CORS_ORIGINS
               value: "{{ .Values.gateway.corsOrigins }}"
-            - name: LOG_LEVEL
-              value: {{ .Values.gateway.env.LOG_LEVEL | default "info" | quote }}
