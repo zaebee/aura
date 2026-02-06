@@ -18,6 +18,8 @@ import asyncio
 import sys
 import uuid
 
+import structlog
+
 # Add core/src to path for imports
 sys.path.insert(0, "core/src")
 
@@ -26,27 +28,28 @@ from datetime import UTC, datetime
 import nats
 from google.protobuf.timestamp_pb2 import Timestamp
 
+logger = structlog.get_logger(__name__)
+
 
 async def test_basic_nats(nats_url: str) -> bool:
     """Test binary proto publish/subscribe with basic NATS (no JetStream)."""
-    print(f"🩸 Testing Binary Bloodstream (Basic NATS) at {nats_url}")
+    logger.info("testing_binary_bloodstream_basic", nats_url=nats_url)
 
     try:
         # Import proto
         from hive.proto.aura.dna.v1 import dna_pb2
 
-        print("  ✓ Proto module imported")
+        logger.info("proto_module_imported")
     except ImportError as e:
-        print(f"  ✗ Failed to import proto: {e}")
-        print("    Run: buf generate proto")
+        logger.error("proto_import_failed", error=str(e), hint="Run: make generate")
         return False
 
     try:
         # Connect to NATS
         nc = await nats.connect(nats_url)
-        print("  ✓ Connected to NATS")
+        logger.info("connected_to_nats")
     except Exception as e:
-        print(f"  ✗ Failed to connect: {e}")
+        logger.error("nats_connection_failed", error=str(e))
         return False
 
     # Create a test event
@@ -68,9 +71,12 @@ async def test_basic_nats(nats_url: str) -> bool:
 
     # Serialize to binary
     binary_data = event.SerializeToString()
-    print(f"  ✓ Event serialized: {len(binary_data)} bytes")
-    print(f"    event_id: {event.event_id}")
-    print(f"    trace_id: {event.trace.trace_id}")
+    logger.info(
+        "event_serialized",
+        size_bytes=len(binary_data),
+        event_id=event.event_id,
+        trace_id=event.trace.trace_id,
+    )
 
     # Set up subscriber first
     received_events = []
@@ -81,12 +87,12 @@ async def test_basic_nats(nats_url: str) -> bool:
         received_events.append(received_event)
 
     sub = await nc.subscribe("aura.test.>", cb=message_handler)
-    print("  ✓ Subscribed to aura.test.>")
+    logger.info("subscribed_to_topic", subject="aura.test.>")
 
     # Publish
     await nc.publish(event.topic, binary_data)
     await nc.flush()
-    print(f"  ✓ Published binary event to {event.topic}")
+    logger.info("published_binary_event", topic=event.topic)
 
     # Wait for message
     await asyncio.sleep(0.5)
@@ -94,66 +100,70 @@ async def test_basic_nats(nats_url: str) -> bool:
     # Verify
     if len(received_events) > 0:
         received_event = received_events[0]
-        print("  ✓ Received and deserialized event")
-        print(f"    event_id: {received_event.event_id}")
-        print(f"    topic: {received_event.topic}")
-        print(f"    heartbeat.service: {received_event.heartbeat.service}")
-        print(
-            f"    heartbeat.status: {dna_pb2.VitalsStatus.Name(received_event.heartbeat.status)}"
+        logger.info(
+            "received_deserialized_event",
+            event_id=received_event.event_id,
+            topic=received_event.topic,
+            heartbeat_service=received_event.heartbeat.service,
+            heartbeat_status=dna_pb2.VitalsStatus.Name(received_event.heartbeat.status),
         )
 
         if received_event.event_id == event.event_id:
-            print("  ✓ Round-trip verified: event_id matches")
+            logger.info("round_trip_verified", event_id=received_event.event_id)
         else:
-            print("  ✗ Round-trip failed: event_id mismatch")
+            logger.error(
+                "round_trip_failed",
+                expected_id=event.event_id,
+                actual_id=received_event.event_id,
+            )
             await nc.close()
             return False
     else:
-        print("  ✗ No message received")
+        logger.error("no_message_received")
         await nc.close()
         return False
 
     await sub.unsubscribe()
     await nc.close()
-    print("\n🩸 Binary Bloodstream test PASSED!")
+    logger.info("binary_bloodstream_test_passed")
     return True
 
 
 async def test_jetstream(nats_url: str) -> bool:
     """Test binary proto publish/subscribe with JetStream."""
-    print(f"🩸 Testing Binary Bloodstream (JetStream) at {nats_url}")
+    logger.info("testing_binary_bloodstream_jetstream", nats_url=nats_url)
 
     try:
         from hive.proto.aura.dna.v1 import dna_pb2
 
-        print("  ✓ Proto module imported")
+        logger.info("proto_module_imported")
     except ImportError as e:
-        print(f"  ✗ Failed to import proto: {e}")
+        logger.error("proto_import_failed", error=str(e))
         return False
 
     try:
         nc = await nats.connect(nats_url)
         js = nc.jetstream()
-        print("  ✓ Connected to NATS JetStream")
+        logger.info("connected_to_nats_jetstream")
     except Exception as e:
-        print(f"  ✗ Failed to connect: {e}")
+        logger.error("nats_connection_failed", error=str(e))
         return False
 
     # Create test stream
     try:
         await js.stream_info("AURA_TEST")
-        print("  ✓ Test stream exists")
+        logger.info("test_stream_exists")
     except nats.js.errors.NotFoundError:
-        print("  Creating test stream...")
+        logger.info("creating_test_stream")
         await js.add_stream(
             name="AURA_TEST",
             subjects=["aura.test.>"],
             max_age=60 * 1_000_000_000,
         )
-        print("  ✓ Test stream created")
+        logger.info("test_stream_created")
     except Exception as e:
-        print(f"  ✗ JetStream not available: {e}")
-        print("    Falling back to basic NATS test...")
+        logger.warning("jetstream_not_available", error=str(e))
+        logger.info("falling_back_to_basic_nats")
         await nc.close()
         return await test_basic_nats(nats_url)
 
@@ -171,13 +181,13 @@ async def test_jetstream(nats_url: str) -> bool:
     event.heartbeat.status = dna_pb2.VITALS_STATUS_OK
 
     binary_data = event.SerializeToString()
-    print(f"  ✓ Event serialized: {len(binary_data)} bytes")
+    logger.info("event_serialized", size_bytes=len(binary_data))
 
     try:
         ack = await js.publish(event.topic, binary_data)
-        print(f"  ✓ Published to stream={ack.stream}, seq={ack.seq}")
+        logger.info("published_to_jetstream", stream=ack.stream, seq=ack.seq)
     except Exception as e:
-        print(f"  ✗ Publish failed: {e}")
+        logger.error("publish_failed", error=str(e))
         await nc.close()
         return False
 
@@ -189,22 +199,21 @@ async def test_jetstream(nats_url: str) -> bool:
         received_event = dna_pb2.Event()
         received_event.ParseFromString(msg.data)
 
-        print("  ✓ Received and deserialized event")
-        print(f"    event_id: {received_event.event_id}")
+        logger.info("received_deserialized_event", event_id=received_event.event_id)
 
         if received_event.event_id == event.event_id:
-            print("  ✓ Round-trip verified")
+            logger.info("round_trip_verified")
 
         await msg.ack()
         await sub.unsubscribe()
 
     except Exception as e:
-        print(f"  ✗ Subscribe/read failed: {e}")
+        logger.error("subscribe_read_failed", error=str(e))
         await nc.close()
         return False
 
     await nc.close()
-    print("\n🩸 Binary Bloodstream (JetStream) test PASSED!")
+    logger.info("binary_bloodstream_jetstream_test_passed")
     return True
 
 
