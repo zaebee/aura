@@ -7,7 +7,12 @@ from aura_core import IntentAction, Observation, SkillRegistry
 from aura_core.gen.aura.dna.v1 import ActionType
 from hive.proto.aura.negotiation.v1 import negotiation_pb2
 
+from config import settings
+
 logger = structlog.get_logger(__name__)
+
+DEFAULT_ITEM_ID = "unknown"
+DEFAULT_ITEM_NAME = "Aura Item"
 
 
 async def act(
@@ -19,20 +24,28 @@ async def act(
     - Uses 'persistence' Skill (Storage)
     - Returns NegotiateResponse proto in Observation.data
     """
-    logger.info("chamber_act", action=str(action.action), price=action.price)
+    # 1. Extract action name for logging and event_type
+    action_val = action.action
+    if isinstance(action_val, ActionType):
+        raw_action_name = action_val.name
+    else:
+        raw_action_name = str(action_val)
 
-    # 1. Initialize gRPC Response
+    action_name = str(raw_action_name).lower().replace("action_type_", "")
+    event_type = f"negotiation_{action_name}"
+
+    logger.info("chamber_act", action=action_name, price=action.price)
+
+    # 2. Initialize gRPC Response
     response = negotiation_pb2.NegotiateResponse()
     response.session_token = "sess_" + (
         getattr(context, "request_id", str(uuid.uuid4()))
         if context
         else str(uuid.uuid4())
     )
-
-    event_type = f"negotiation_{str(action.action).lower()}"
     obs_data: dict[str, Any] = {}
 
-    # 2. Map IntentAction to gRPC and Proteins
+    # 3. Map IntentAction to gRPC and Proteins
     if action.action == ActionType.ACTION_TYPE_ACCEPT:
         logger.info("chamber_finalizing_deal")
         response.accepted.final_price = action.price
@@ -40,15 +53,16 @@ async def act(
 
         # Hydrate persistence (Storage) to create the deal
         deal_id = str(uuid.uuid4())
-        expires_at = datetime.now(UTC) + timedelta(minutes=10)
+        ttl_seconds = settings.crypto.deal_ttl_seconds
+        expires_at = datetime.now(UTC) + timedelta(seconds=ttl_seconds)
 
         deal_params = {
             "id": deal_id,
-            "item_id": context.item_id if context else "unknown",
+            "item_id": context.item_id if context else DEFAULT_ITEM_ID,
             "item_name": (
-                context.item_data.get("name", "Aura Item")
+                context.item_data.get("name", DEFAULT_ITEM_NAME)
                 if context and context.item_data
-                else "Aura Item"
+                else DEFAULT_ITEM_NAME
             ),
             "final_price": action.price,
             "currency": "USD",
@@ -60,7 +74,7 @@ async def act(
 
         # Hydrate transaction (Solana)
         addr_obs = await registry.execute("transaction", "get_address", {})
-        solana_address = addr_obs.data if addr_obs.success else "unknown"
+        solana_address = addr_obs.data if addr_obs.success else DEFAULT_ITEM_ID
 
         obs_data = {"deal_id": deal_id, "solana_address": solana_address}
         event_type = "negotiation_accepted"
@@ -72,7 +86,7 @@ async def act(
     elif action.action == ActionType.ACTION_TYPE_REJECT:
         response.rejected.reason_code = "OFFER_TOO_LOW"
 
-    # 3. Final Observation
+    # 4. Final Observation
     return Observation(
         success=True,
         data=response,
@@ -80,8 +94,8 @@ async def act(
         metadata={
             "price": action.price,
             "session_token": response.session_token,
-            "item_id": context.item_id if context else "unknown",
-            "agent_did": context.offer.agent_did if context else "unknown",
+            "item_id": context.item_id if context else DEFAULT_ITEM_ID,
+            "agent_did": context.offer.agent_did if context else DEFAULT_ITEM_ID,
             **obs_data,
         },
     )

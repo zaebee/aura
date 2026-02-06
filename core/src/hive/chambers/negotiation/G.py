@@ -16,11 +16,11 @@ async def emit_nats_event(obs: Observation, registry: SkillRegistry) -> None:
         "pulse",
         "emit_negotiation",
         {
-            "session_token": obs.metadata.get("session_token", "test-token"),
+            "session_token": obs.metadata.get("session_token", "unknown-session"),
             "action": obs.event_type.replace("negotiation_", ""),
             "price": obs.metadata.get("price", 0.0),
-            "item_id": obs.metadata.get("item_id", "unknown"),
-            "agent_did": obs.metadata.get("agent_did", "unknown"),
+            "item_id": obs.metadata.get("item_id", "unknown-item"),
+            "agent_did": obs.metadata.get("agent_did", "unknown-agent"),
         },
     )
 

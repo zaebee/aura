@@ -49,7 +49,9 @@ class TelegramGenerator(Generator[Observation, Event]):
                     )
 
                 event = Event(
-                    topic=topic, payload=observation.metadata, timestamp=time.time()
+                    topic=topic,
+                    payload=observation.metadata,
+                    timestamp=time.time(),
                 )
                 events.append(event)
 

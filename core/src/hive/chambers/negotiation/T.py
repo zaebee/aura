@@ -42,8 +42,8 @@ async def think(context: HiveContext, registry: SkillRegistry) -> IntentAction:
 
     return IntentAction(
         action=cast(Any, map_action(result.get("action"))),
-        price=float(result["price"]),
-        message=result["message"],
+        price=float(result.get("price", 0.0)),
+        message=result.get("message", ""),
         thought=result.get("thought", ""),
         metadata=result.get("metadata", {}),
     )

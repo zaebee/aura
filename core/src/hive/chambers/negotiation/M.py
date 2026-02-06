@@ -22,7 +22,10 @@ async def filter_out(intent: IntentAction, context: HiveContext) -> IntentAction
     logger.info("chamber_membrane_out")
 
     # Logic: If price is below floor price, override with floor price
-    floor_price = context.item_data.get("floor_price", 0.0)
+    floor_price = context.item_data.get("floor_price")
+    if floor_price is None:
+        logger.warn("chamber_membrane_floor_price_missing", item_id=context.item_id)
+        floor_price = 0.0
 
     if intent.price < floor_price:
         logger.info(

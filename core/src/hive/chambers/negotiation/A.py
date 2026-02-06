@@ -5,6 +5,8 @@ from aura_core import HiveContext, NegotiationOffer, SkillRegistry, SystemVitals
 
 logger = structlog.get_logger(__name__)
 
+DEFAULT_ITEM_ID = "default_item"
+
 
 async def perceive(signal: Any, registry: SkillRegistry) -> HiveContext:
     """
@@ -12,7 +14,7 @@ async def perceive(signal: Any, registry: SkillRegistry) -> HiveContext:
     - Uses 'persistence' Skill (Storage)
     - Uses 'telemetry' Skill (Monitor)
     """
-    item_id = getattr(signal, "item_id", "default_item")
+    item_id = getattr(signal, "item_id", DEFAULT_ITEM_ID)
     bid = getattr(signal, "bid_amount", 0.0)
     request_id = getattr(signal, "request_id", "")
 
