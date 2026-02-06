@@ -7,9 +7,9 @@ import grpc
 import grpc.aio
 from aura_core import SkillRegistry
 from grpc_health.v1 import health_pb2, health_pb2_grpc
-from hive.aggregator import Aggregator as HiveAggregator
-from hive.connector import BaseConnector as HiveConnector
-from hive.generator import Generator as HiveGenerator
+from hive.aggregator import HiveAggregator
+from hive.connector import HiveConnector
+from hive.generator import HiveGenerator
 from hive.membrane import HiveMembrane
 from hive.metabolism import MetabolicLoop
 from hive.metabolism.logging_config import (
@@ -23,7 +23,7 @@ from hive.proto.aura.negotiation.v1 import (
     negotiation_pb2,
     negotiation_pb2_grpc,  # type: ignore
 )
-from hive.transformer import Transformer as AuraTransformer
+from hive.transformer import AuraTransformer
 from opentelemetry import trace
 from opentelemetry.instrumentation.grpc import GrpcInstrumentorServer
 from opentelemetry.instrumentation.langchain import LangchainInstrumentor

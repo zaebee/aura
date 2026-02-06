@@ -2,7 +2,9 @@ from typing import Any
 
 import structlog
 from aura_core import (
-    Aggregator,
+    Aggregator as BaseAggregator,
+)
+from aura_core import (
     HiveContext,
     NegotiationOffer,
     SkillRegistry,
@@ -14,7 +16,7 @@ from aura_core.gen.aura.dna.v1 import Signal
 logger = structlog.get_logger(__name__)
 
 
-class HiveAggregator(Aggregator[Any, HiveContext]):
+class HiveAggregator(BaseAggregator[Any, HiveContext]):
     """A - Aggregator: Consolidates persistence and telemetry signals."""
 
     def __init__(self, registry: SkillRegistry, settings: Any = None) -> None:
