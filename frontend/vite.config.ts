@@ -11,4 +11,9 @@ export default defineConfig({
     },
     preserveSymlinks: true,
   },
+  server: {
+    fs: {
+      allow: ['..'],
+    },
+  },
 })

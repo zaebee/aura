@@ -16,6 +16,7 @@ mermaid.initialize({
 const MetabolismGraph: React.FC = () => {
   const mermaidRef = useRef<HTMLDivElement>(null);
   const [activeNode, setActiveNode] = useState<string | null>(null);
+  const graphId = React.useId().replace(/:/g, "-");
 
   // Simulation of the ATCG-M cycle
   useEffect(() => {
@@ -53,7 +54,7 @@ const MetabolismGraph: React.FC = () => {
           ${activeNode ? `class ${activeNode} pulse` : ''}
       `;
 
-      mermaid.render('mermaid-graph', graphDefinition).then((result) => {
+      mermaid.render(`mermaid-${graphId}`, graphDefinition).then((result) => {
         if (isMounted && mermaidRef.current) {
           mermaidRef.current.innerHTML = result.svg;
         }
