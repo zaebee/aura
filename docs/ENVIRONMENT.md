@@ -195,7 +195,7 @@ The CI/CD pipeline (`ci-cd.yaml`) creates Kubernetes secrets from GitHub secrets
 | `AURA_SECRET_ENCRYPTION_KEY` | `secret-encryption-key` | `AURA_CRYPTO__SECRET_ENCRYPTION_KEY` | Core | ✅ OK |
 | `SOLANA_PRIVATE_KEY` | `solana-private-key` | `AURA_CRYPTO__SOLANA_PRIVATE_KEY` | Core | ✅ OK |
 | `FRP_CLIENT_TOKEN` | `frp-client-token` | N/A | None | 🟡 Unused |
-| `AURA_INFRA_STCP_KEY` | `stcp-key` | N/A | ona-dance.toml | 🟡 Local only |
+| `AURA_INFRA_STCP_KEY` | `stcp-key` | `FRP_STCP_SECRET_KEY` | frpc tunnel | ✅ OK |
 
 ### Secret Creation (CI/CD)
 
@@ -220,9 +220,9 @@ kubectl create secret generic aura-secrets \
 
 **STCP_KEY (AURA_INFRA_STCP_KEY)**
 - Used in `ona-dance.toml` for local FRP tunneling
-- Not used in production deployments
-- **Purpose**: Local development tool for exposing Kubernetes services
-- **Decision**: Keep for local development convenience
+- **Now used in production**: Injected as `FRP_STCP_SECRET_KEY` env var in frpc tunnel deployment
+- **Purpose**: Secures STCP connection for NATS hidden tunnel
+- **Decision**: Required secret, properly managed via Kubernetes Secret
 
 ---
 
