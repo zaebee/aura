@@ -112,6 +112,25 @@ jobs:
               with:
                   name: proto-stubs
 
+            - name: Set up Python
+              uses: actions/setup-python@v5
+              with:
+                  python-version: "3.12"
+            - name: Install uv
+              uses: astral-sh/setup-uv@v6
+              with:
+                  version: "0.9.26"
+                  enable-cache: true
+            - name: Train the Brain
+              env:
+                  AURA_LLM__MODEL: "mistral/mistral-large-latest"
+                  AURA_LLM__API_KEY: ${{ secrets.MISTRAL_API_KEY }}
+                  MISTRAL_API_KEY: ${{ secrets.MISTRAL_API_KEY }}
+                  AURA_DATABASE__URL: postgresql://test:test@localhost:5432/test_db
+                  AURA_DATABASE__REDIS_URL: redis://localhost:6379/0
+              run: |
+                make train
+
             - name: Log in to the Container registry
               uses: docker/login-action@v3
               with:
@@ -193,7 +212,7 @@ jobs:
 
                   echo "🚀 Deploying to Cluster..."
                   helm dependency update ./deploy/aura
-                  helm upgrade aura ./deploy/aura --install --atomic --wait --timeout 10m \
+                  helm upgrade aura ./deploy/aura --install --atomic --wait --timeout 20m \
                     --set core.image.tag=sha-$SHORT_SHA \
                     --set gateway.image.tag=sha-$SHORT_SHA \
                     --set frontend.image.tag=sha-$SHORT_SHA \

@@ -29,6 +29,10 @@ event: manual
 -->
 
 ## 🧬 Active Mutations
+- [ ] **Task 71: Binary Heart (NATS JetStream)**
+  - *Assignee:* bee.Ona
+  - *Goal:* Replace JSON with Binary Protobuf across the bloodstream.
+  - *Status:* 💉 INJECTING (Ona connected via STCP).
 - [x] **Operation Genesis** - 100% COMPLETE.
 - [x] **DNA Crystallization** - COMPLETE.
 - [x] **Aggregator Decoupling** - COMPLETE.
@@ -40,6 +44,8 @@ event: manual
 - [ ] Move `aura_brain.json` to a persistent /data/ volume (Planned).
 
 ## 🔋 System Vitals (Senses)
+- **NATS Connection:** 🟢 SECURE (STCP Tunnel established).
+- **Metabolism:** 🟡 EVOLVING (From JSON to Binary).
 - **Aggregator (A):** 🟢 PURE.
 - **Transformer (T):** 🟢 PURE.
 - **Connector (C):** 🟢 PURE.
