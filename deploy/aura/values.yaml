@@ -7,10 +7,20 @@ tunnel:
     repository: snowdreamtech/frpc
     tag: alpine3.22
     pullPolicy: IfNotPresent
+  frontend:
+    localIP: "{{ .Release.Name }}-frontend"
+    remotePort: 8081 # Default remote port for frontend tunnel
+  gateway:
+    localIP: "{{ .Release.Name }}-gateway"
+    remotePort: 8082 # Default remote port for gateway tunnel
   grafana:
     localIP: "monitoring-grafana.monitoring.svc.cluster.local"
     localPort: 80
-    remotePort: 8083
+    remotePort: 8083 # Default remote port for grafana tunnel
+  loki:
+    localIP: "loki.monitoring.svc.cluster.local"
+    localPort: 3100
+    remotePort: 8084 # Default remote port for loki tunnel
 
 # API Gateway Service Configuration
 gateway:
@@ -27,7 +37,7 @@ gateway:
     timeoutSeconds: 2
     failureThreshold: 3
   image:
-    repository: ghcr.io/zaebee/aura-gateway # Docker image repository for the API Gateway
+    repository: ghcr.io/zaebee/aura-gateway
     tag: latest
     pullPolicy: Always # Image pull policy
   service:
