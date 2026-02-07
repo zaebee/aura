@@ -49,10 +49,13 @@ class TelegramReceptor:
             "receptor_cmd_search",
             user_id=message.from_user.id if message.from_user else 0,
         )
-        # Search is currently handled by direct call to metabolism or specific protein
-        # For simplicity in this refactor, we'll keep it as is but it should eventually
-        # go through the same translator -> metabolism flow.
-        await self.metabolism.execute(message)
+        # 1. Translate external event to Internal Signal
+        signal = self.translator.to_signal(message, command=command)
+
+        # 2. Execute Metabolic Loop
+        await self.metabolism.execute(
+            signal.SerializeToString(), is_nats=True, original_message=message
+        )
 
     async def process_select_hotel(
         self, callback: CallbackQuery, state: FSMContext

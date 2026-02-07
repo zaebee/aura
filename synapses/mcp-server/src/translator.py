@@ -37,7 +37,9 @@ class MCPTranslator:
             # For search, we might use metadata to pass the query
             return Signal(
                 signal_id=signal_id,
-                signal_type=cast(SignalType, SignalType.SIGNAL_TYPE_NEGOTIATION),  # Generic negotiation flow for now
+                signal_type=cast(
+                    SignalType, SignalType.SIGNAL_TYPE_UNSPECIFIED
+                ),  # TODO: Create a dedicated SIGNAL_TYPE_SEARCH
                 timestamp=datetime.now(UTC),
                 metadata={
                     "query": kwargs.get("query", ""),

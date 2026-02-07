@@ -28,13 +28,28 @@ class TelegramTranslator:
 
         if isinstance(event, Message):
             text = event.text or ""
+            user_id = event.from_user.id if event.from_user else 0
+            chat_id = event.chat.id
+            command = kwargs.get("command")
+
+            if command and command.command == "search":
+                return Signal(
+                    signal_id=signal_id,
+                    signal_type=cast(SignalType, SignalType.SIGNAL_TYPE_UNSPECIFIED),
+                    timestamp=datetime.now(UTC),
+                    metadata={
+                        "chat_id": str(chat_id),
+                        "user_id": str(user_id),
+                        "source": "telegram",
+                        "intent": "search",
+                        "query": command.args or "",
+                    },
+                )
+
             # Simple heuristic: if it's a number, it's a bid
             bid_amount = 0.0
             if text.replace(".", "", 1).isdigit():
                 bid_amount = float(text)
-
-            user_id = event.from_user.id if event.from_user else 0
-            chat_id = event.chat.id
 
             return Signal(
                 signal_id=signal_id,

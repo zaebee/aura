@@ -36,7 +36,7 @@ async def main() -> None:
 
     # 2. Initialize Synaptic Components
     translator = MCPTranslator()
-    _receptor = MCPReceptor(mcp, metabolism, translator)
+    _ = MCPReceptor(mcp, metabolism, translator)
     effector = MCPEffector()  # No NATS for now in MCP
 
     # 3. Start background tasks

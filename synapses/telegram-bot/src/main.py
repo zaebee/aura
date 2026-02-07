@@ -36,6 +36,8 @@ async def main() -> None:
         nc = await nats.connect(
             tg_settings.nats_url,
             connect_timeout=5,
+            reconnect_time_wait=2,
+            max_reconnect_attempts=60,
         )
         logger.info("connected_to_nats", url=tg_settings.nats_url)
     except Exception as e:
