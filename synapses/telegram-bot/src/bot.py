@@ -6,7 +6,7 @@ from aiogram.types import (
     CallbackQuery,
     Message,
 )
-from receptor import TelegramReceptor
+from receptor import NegotiationStatus, TelegramReceptor
 
 router = Router()
 
@@ -59,11 +59,11 @@ async def process_bid(
         await message.answer("Error: No item selected. Use /search first.")
         return
 
-    response_text = await receptor.negotiate(message, item_id, bid_amount)
-    await message.answer(response_text, parse_mode="Markdown")
+    response = await receptor.negotiate(message, item_id, bid_amount)
+    await message.answer(response.text, parse_mode="Markdown")
 
-    # Optional: Clear state if accepted or rejected
-    if "Accepted" in response_text or "Rejected" in response_text:
+    # Clear state if negotiation is finalized
+    if response.status in [NegotiationStatus.SUCCESS, NegotiationStatus.REJECTED]:
         await state.clear()
 
 

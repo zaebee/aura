@@ -2,31 +2,18 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 from aiogram import types
-from interfaces import NegotiationProvider, NegotiationResult, SearchResult
-
-
-class MockNegotiationProvider(NegotiationProvider):
-    def __init__(self):
-        self.search_results = []
-        self.negotiation_result = {}
-
-    async def search(self, query: str, limit: int = 5) -> list[SearchResult]:
-        return self.search_results
-
-    async def negotiate(self, item_id: str, bid: float) -> NegotiationResult:
-        return self.negotiation_result
-
-
-@pytest.fixture
-def mock_client():
-    return MockNegotiationProvider()
+from receptor import NegotiationStatus, StructuredResponse
 
 
 @pytest.fixture
 def mock_receptor():
     receptor = AsyncMock()
     receptor.search = AsyncMock(return_value="🏨 *Search Results:*")
-    receptor.negotiate = AsyncMock(return_value="✅ *Bid Accepted!*")
+    receptor.negotiate = AsyncMock(
+        return_value=StructuredResponse(
+            text="✅ *Bid Accepted!*", status=NegotiationStatus.SUCCESS
+        )
+    )
     return receptor
 
 

@@ -9,6 +9,7 @@ from bot import (
     process_bid,
     process_select_hotel,
 )
+from receptor import NegotiationStatus, StructuredResponse
 
 
 @pytest.mark.asyncio
@@ -47,7 +48,9 @@ async def test_process_bid_accepted(message, mock_receptor):
     state.get_data.return_value = {"item_id": "hotel_1"}
     message.text = "90"
 
-    mock_receptor.negotiate.return_value = "✅ *Bid Accepted!*"
+    mock_receptor.negotiate.return_value = StructuredResponse(
+        text="✅ *Bid Accepted!*", status=NegotiationStatus.SUCCESS
+    )
 
     await process_bid(message, state, mock_receptor)
 

@@ -1,3 +1,5 @@
+import asyncio
+
 from fastmcp import FastMCP
 
 from .config import settings
@@ -47,9 +49,4 @@ if __name__ == "__main__":
     try:
         mcp.run()
     finally:
-        import asyncio
-        loop = asyncio.get_event_loop()
-        if loop.is_running():
-            loop.create_task(receptor.close())
-        else:
-            asyncio.run(receptor.close())
+        asyncio.run(receptor.close())

@@ -9,6 +9,7 @@ from .connector import HiveConnector
 from .generator import HiveGenerator
 from .membrane import HiveMembrane
 from .metabolism import MetabolicLoop
+from .services.market import MarketService
 from .transformer import AuraTransformer
 
 logger = structlog.get_logger(__name__)
@@ -35,8 +36,6 @@ class HiveCortex:
         persistence = registry.get("persistence")
         transaction = registry.get("transaction")
         if transaction and persistence:
-            from .services.market import MarketService
-
             market_service = MarketService(persistence=persistence, transaction=transaction)
 
         connector = HiveConnector(
