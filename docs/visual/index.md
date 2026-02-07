@@ -94,12 +94,12 @@ Aura Hive uses **Technical Folklore** — bio-organic metaphors layered over pre
 | **G (Generator)** | Event/Chronicle Layer | Pulses state updates and events | `dna.py:174-177` |
 | **M (Membrane)** | Input/Output Guards | Immune system: validates inputs, enforces rules | `core/src/hive/membrane.py` |
 | **Bloodstream** | NATS Event Bus | Circulatory system distributes signals | `FOUNDATION.md:14` |
-| **Proteins** | Skill Adapters (SkillProtocol) | Enzymes enable specific external interactions | `dna.py:184-202` |
+| **Proteins** | Skill Synapses (SkillProtocol) | Enzymes enable specific external interactions | `dna.py:184-202` |
 | **Sacred Chambers** | Directory Roles | Poetic names for filesystem organization | `dna.py:50-75` |
 | **Genome** | `aura-core` package | Immutable DNA (Protocols, BaseModels, Types) | `packages/aura-core/` |
 | **Nucleus** | `core` | The sovereign brain | `core/` |
 | **Organs** | `components/proteins` | Specialized skills (Solana, Telegram, GitHub) | `components/proteins/` |
-| **Citizens** | `agents/` + `adapters/` | Active Subjects (goals) + Passive Servants (translation) | `agents/`, `adapters/` |
+| **Citizens** | `agents/` + `synapses/` | Active Subjects (goals) + Passive Servants (translation) | `agents/`, `synapses/` |
 | **Ona** | LLM Reasoning Engine | The thinking substrate (DSPy, LangChain) | N/A (conceptual) |
 | **Jules** | External Action Engine | The doing substrate (API calls, I/O) | N/A (conceptual) |
 

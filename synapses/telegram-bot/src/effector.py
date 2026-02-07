@@ -1,3 +1,4 @@
+from typing import Any
 
 import nats
 import structlog
@@ -10,12 +11,12 @@ class TelegramEffector:
     Efferent logic: NATS Bloodstream -> External World (Telegram).
     """
 
-    def __init__(self, nats_url: str, bot: Bot):
+    def __init__(self, nats_url: str, bot: Bot) -> None:
         self.nats_url = nats_url
         self.bot = bot
-        self.nc = None
+        self.nc: Any = None
 
-    async def start(self):
+    async def start(self) -> None:
         self.nc = await nats.connect(self.nats_url)
         logger.info("effector_nats_connected", url=self.nats_url)
 
@@ -23,7 +24,7 @@ class TelegramEffector:
         self.sub = await self.nc.subscribe("aura.hive.events.>", cb=self.handle_event)
         logger.info("effector_subscribed", subject="aura.hive.events.>")
 
-    async def handle_event(self, msg):
+    async def handle_event(self, msg: Any) -> None:
         subject = msg.subject
 
         logger.info("effector_received_event", subject=subject)
@@ -32,6 +33,6 @@ class TelegramEffector:
         # For now, let's just log it.
         # In a real scenario, the event would contain the agent_did which we could map back to a user_id.
 
-    async def stop(self):
+    async def stop(self) -> None:
         if self.nc:
             await self.nc.close()

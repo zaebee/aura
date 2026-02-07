@@ -22,13 +22,13 @@ plugins:
   - remote: buf.build/protocolbuffers/python
     out: api-gateway/src/proto
 
-  # Agents/Adaptors proto
+  # Synapses proto
   - remote: buf.build/protocolbuffers/pyi
-    out: adapters/telegram-bot/src/proto
+    out: synapses/telegram-bot/src/proto
   - remote: buf.build/grpc/python:v1.76.0
-    out: adapters/telegram-bot/src/proto
+    out: synapses/telegram-bot/src/proto
   - remote: buf.build/protocolbuffers/python
-    out: adapters/telegram-bot/src/proto
+    out: synapses/telegram-bot/src/proto
 
   # Frontend ts proto
   - remote: buf.build/bufbuild/es

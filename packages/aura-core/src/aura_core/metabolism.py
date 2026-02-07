@@ -105,7 +105,7 @@ class BaseConnector(Connector[Any, Observation, Any]):
 class MetabolicLoop[S_inv, C_cov, I_inv, O_cov, E_cov]:
     """
     Generic ATCG Metabolic Loop.
-    Can be used by both core and adapters.
+    Can be used by both core and synapses.
     """
 
     def __init__(

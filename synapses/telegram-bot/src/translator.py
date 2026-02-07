@@ -1,3 +1,4 @@
+
 from aiogram.types import Message
 from aura_core.gen.aura.negotiation.v1 import (
     AgentIdentity,

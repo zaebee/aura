@@ -1,3 +1,5 @@
+from typing import Any
+
 import grpc
 import structlog
 from aura_core.gen.aura.negotiation.v1 import NegotiationServiceStub
@@ -11,11 +13,11 @@ class TelegramReceptor:
     Afferent logic: External World (Telegram) -> Metabolism (Core gRPC).
     """
 
-    def __init__(self, core_url: str):
+    def __init__(self, core_url: str) -> None:
         self.channel = grpc.aio.insecure_channel(core_url)
         self.stub = NegotiationServiceStub(self.channel)
 
-    async def negotiate(self, message, item_id: str, bid_amount: float):
+    async def negotiate(self, message: Any, item_id: str, bid_amount: float) -> str:
         request = TelegramTranslator.to_negotiate_request(message, item_id, bid_amount)
         try:
             response = await self.stub.negotiate(request)
@@ -24,7 +26,7 @@ class TelegramReceptor:
             logger.error("receptor_negotiate_error", error=str(e))
             return f"Error connecting to Core: {e}"
 
-    async def search(self, query: str, limit: int = 5):
+    async def search(self, query: str, limit: int = 5) -> str:
         request = TelegramTranslator.to_search_request(query, limit)
         try:
             response = await self.stub.search(request)
@@ -33,5 +35,5 @@ class TelegramReceptor:
             logger.error("receptor_search_error", error=str(e))
             return f"Error connecting to Core: {e}"
 
-    async def close(self):
+    async def close(self) -> None:
         await self.channel.close()

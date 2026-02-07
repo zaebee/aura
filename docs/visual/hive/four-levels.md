@@ -30,7 +30,7 @@ flowchart TB
     subgraph Level4["👥 Level 4: The Citizens"]
         direction TB
         Agents["agents/<br/>━━━━━━━━━━━━━━━━<br/>bee-keeper • chronicler<br/>━━━━━━━━━━━━━━━━<br/>ACTIVE SUBJECTS"]
-        Adapters["adapters/<br/>━━━━━━━━━━━━━━━━<br/>api-gateway • telegram-bot<br/>━━━━━━━━━━━━━━━━<br/>PASSIVE SERVANTS"]
+        Synapses["synapses/<br/>━━━━━━━━━━━━━━━━<br/>api-gateway • telegram-bot<br/>━━━━━━━━━━━━━━━━<br/>PASSIVE SERVANTS"]
     end
 
     Level1 -.->|"Types define contracts"| Level2
@@ -174,7 +174,7 @@ grep -r "from aura_core.dna import.*Skill" components/proteins/  # Should succee
 
 ---
 
-### 👥 Level 4: The Citizens (`/agents` & `/adapters`)
+### 👥 Level 4: The Citizens (`/agents` & `/synapses`)
 
 **Status:** Active Subjects & Passive Servants
 
@@ -182,13 +182,13 @@ grep -r "from aura_core.dna import.*Skill" components/proteins/  # Should succee
 - **Agents** (`/agents/`): Composed entities (Brain + Proteins) with **goals**
   - `bee-keeper/` — Architectural auditor
   - `chronicler/` — Documentation maintainer
-- **Adapters** (`/adapters/`): Translation layers with **no goals**
+- **Synapses** (`/synapses/`): Translation layers with **no goals**
   - `api-gateway/` — HTTP ↔ gRPC protocol translator
   - `telegram-bot/` — Telegram ↔ NATS event bridge
 
 **Rule:**
 - **Agents have agency** — They pursue objectives (audit code, maintain docs)
-- **Adapters are passive** — They only translate signals between protocols
+- **Synapses are passive** — They only translate signals between protocols
 
 **Key Difference:**
 
@@ -212,9 +212,9 @@ agents/bee-keeper/
     └── bee_keeper.md      # Agent's behavioral DNA
 ```
 
-**Directory Structure (Adapters):**
+**Directory Structure (Synapses):**
 ```
-adapters/api-gateway/
+synapses/api-gateway/
 ├── src/
 │   ├── main.py            # FastAPI ↔ gRPC translation
 │   ├── config.py
@@ -227,8 +227,8 @@ adapters/api-gateway/
 # Agents MUST have hive/ directory (ATCG-M structure)
 ls agents/*/src/hive/  # Should list aggregator.py, transformer.py, etc.
 
-# Adapters MUST NOT have hive/ directory (no internal reasoning)
-ls adapters/*/src/hive/  # Should return "No such file or directory"
+# Synapses MUST NOT have hive/ directory (no internal reasoning)
+ls synapses/*/src/hive/  # Should return "No such file or directory"
 ```
 
 ---
@@ -276,7 +276,7 @@ flowchart TB
     Genome["🧬 GENOME<br/>(aura-core)"]
     Nucleus["🧠 NUCLEUS<br/>(core)"]
     Organs["🔬 ORGANS<br/>(proteins)"]
-    Citizens["👥 CITIZENS<br/>(agents + adapters)"]
+    Citizens["👥 CITIZENS<br/>(agents + synapses)"]
 
     Genome -.->|"defines protocols for"| Nucleus
     Genome -.->|"defines protocols for"| Organs
@@ -308,13 +308,13 @@ flowchart TD
     Q3 -->|Yes| Organs["🔬 ORGANS<br/>components/proteins/"]
     Q3 -->|No| Q4{Does it have<br/>goals/agency?}
     Q4 -->|Yes| Agents["👥 AGENTS<br/>agents/"]
-    Q4 -->|No| Adapters["👥 ADAPTERS<br/>adapters/"]
+    Q4 -->|No| Synapses["👥 ADAPTERS<br/>synapses/"]
 
     style Genome fill:#1565c0,color:#fff
     style Nucleus fill:#e65100,color:#fff
     style Organs fill:#6a1b9a,color:#fff
     style Agents fill:#2e7d32,color:#fff
-    style Adapters fill:#2e7d32,color:#fff
+    style Synapses fill:#2e7d32,color:#fff
 ```
 
 ---
@@ -327,7 +327,7 @@ This diagram implements the ontological hierarchy defined in:
 - `packages/aura-core/src/aura_core/dna.py` (Genome implementation)
 - `core/src/hive/` (Nucleus implementation)
 - `components/proteins/` (Organs implementation)
-- `agents/`, `adapters/` (Citizens implementation)
+- `agents/`, `synapses/` (Citizens implementation)
 
 ---
 

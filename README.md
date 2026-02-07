@@ -146,7 +146,7 @@ aura/
 ├── proto/                 # Protocol Buffer definitions
 ├── api-gateway/          # API Gateway service (FastAPI)
 ├── core/         # Core business logic service (DSPy Engine)
-├── adapters/             # External interface adapters
+├── synapses/             # External interface synapses (Receptor-Effector)
 │   ├── telegram-bot/     # Telegram Bot interface
 │   └── mcp-server/       # Model Context Protocol (MCP) server
 ├── docs/                 # Detailed documentation
@@ -156,7 +156,7 @@ aura/
 └── Makefile              # Common development tasks
 ```
 
-### Services & Adapters
+### Services & Synapses
 
 - **Core Service**: The brain of the platform. Uses DSPy for ML-optimized negotiation strategies and PostgreSQL/pgvector for semantic search.
 - **API Gateway**: Secure entry point for autonomous agents. Handles signature verification and rate limiting.

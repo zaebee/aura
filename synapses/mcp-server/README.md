@@ -39,7 +39,7 @@ Add this to your Claude Desktop configuration file:
         "--with", "httpx", 
         "--with", "pynacl",
         "--with", "python-dotenv",
-        "https://github.com/zaebee/aura/blob/main/adapters/mcp-server/src/aura_mcp/main.py" 
+        "https://github.com/zaebee/aura/blob/main/synapses/mcp-server/src/main.py"
         # Note: In a real release, you would point to a PyPI package name
       ],
       "env": {
@@ -50,7 +50,7 @@ Add this to your Claude Desktop configuration file:
 }
 ```
 
-*(Note: If you are developing locally, replace the URL with the local path to the `adapters/mcp-server` directory).*
+*(Note: If you are developing locally, replace the URL with the local path to the `synapses/mcp-server` directory).*
 
 ---
 
@@ -66,10 +66,10 @@ If you are contributing to Aura or running the platform locally.
 
 ### 2. Installation
 
-Navigate to the adapter directory:
+Navigate to the synapse directory:
 
 ```bash
-cd adapters/mcp-server
+cd synapses/mcp-server
 uv sync
 ```
 
@@ -82,7 +82,7 @@ You can run the server in development mode (with hot reload capabilities provide
 uv run aura-mcp
 
 # Or via direct file execution (if needed for debug)
-uv run src/aura_mcp/main.py
+uv run src/main.py
 ```
 
 ---
@@ -164,7 +164,7 @@ Or run a manual test script:
 
 ```python
 # test_flow.py
-from aura_mcp.main import mcp
+from src.main import mcp
 
 # Simulate a tool call
 result = mcp.call_tool("search_hotels", arguments={"query": "luxury"})

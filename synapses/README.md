@@ -1,1 +1,1 @@
-# adapters
+# Synapses
