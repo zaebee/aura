@@ -4,6 +4,7 @@
 TAG ?= latest
 REGISTRY ?= ghcr.io/zaebee
 PLATFORM ?= linux/amd64
+DNA_PATH ?= packages/aura-core/src
 CORE_PATH ?= core:core/src
 GATEWAY_PATH ?= api-gateway/src
 TG_PATH ?= adapters/telegram-bot/src:adapters/telegram-bot/src/proto
@@ -14,13 +15,13 @@ lint:
 	# Protobuf Lint
 	cd proto && buf lint
 	# Python Lint (Ruff)
-	uv run ruff check .
+	PYTHONPYPATH=$(DNA_PATH) uv run ruff check .
 	# Python Type Check (Mypy)
 	MYPYPATH=$(CORE_PATH) uv run mypy core/src
 	MYPYPATH=$(GATEWAY_PATH):packages/aura-core/src uv run mypy api-gateway/src
 	MYPYPATH=$(TG_PATH):packages/aura-core/src uv run mypy adapters/telegram-bot/src
 	MYPYPATH=$(KEEPER_PATH):packages/aura-core/src uv run mypy agents/bee-keeper/main.py agents/bee-keeper/src
-	MYPYPATH=packages/aura-core/src uv run mypy packages/aura-core/src
+	MYPYPATH=$(DNA_PATH) uv run mypy packages/aura-core/src
 	# Security Audit (Bandit)
 	uv run bandit -r . -c pyproject.toml
 	# Frontend Lint

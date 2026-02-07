@@ -24,3 +24,7 @@ wheels/
 
 # FRP client configuration (contains secrets)
 ona-dance.toml
+
+# Knowledge distillation artifacts (generated in CI/CD)
+docs/knowledge/*.bin
+docs/knowledge/*.json
