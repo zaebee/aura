@@ -66,7 +66,7 @@ allowed_chambers:
   core/src/hive/connector/__init__.py: AuthorizedEnzyme
   core/src/hive/generator/__init__.py: AuthorizedEnzyme
   core/src/hive/services/market.py: AuthorizedEnzyme
-  adapters: HiveExtensions
+  synapses: HiveExtensions
   frontend: HiveWindow
   tools: ToolShed
   tests: OuterValidationPollen

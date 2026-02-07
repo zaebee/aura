@@ -1,4 +1,5 @@
 import uuid
+from typing import Any
 
 import structlog
 from aura_core import Event, Generator, Observation, SkillRegistry
@@ -15,9 +16,9 @@ class HiveGenerator(Generator[Observation, Event]):
     Binary Bloodstream: All events are serialized as protobuf, not JSON.
     """
 
-    def __init__(self, registry: SkillRegistry) -> None:
+    def __init__(self, registry: SkillRegistry, settings: Any = None) -> None:
         self.registry = registry
-        self.settings = get_settings()
+        self.settings = settings or get_settings()
         self._instance_id = uuid.uuid4().hex[:8]
 
     async def pulse(self, observation: Observation) -> list[Event]:

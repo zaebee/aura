@@ -84,7 +84,7 @@ class HiveCell:
             market_service=market_service,
             settings=self.settings,
         )
-        generator = HiveGenerator(registry=self.registry)
+        generator = HiveGenerator(registry=self.registry, settings=self.settings)
         membrane = HiveMembrane(registry=self.registry)
 
         # 3. Form the Metabolic Loop
