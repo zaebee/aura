@@ -1,5 +1,6 @@
 import asyncio
 import logging
+import os
 
 import nats
 import structlog
@@ -14,11 +15,18 @@ from config import Settings as CoreSettings
 
 # Setup logging
 level = getattr(logging, tg_settings.log_level.upper(), logging.INFO)
+log_format = os.getenv("AURA_LOG_FORMAT", "json").lower()
+renderer = (
+    structlog.dev.ConsoleRenderer()
+    if log_format == "console"
+    else structlog.processors.JSONRenderer()
+)
+
 structlog.configure(
     processors=[
         structlog.processors.TimeStamper(fmt="iso"),
         structlog.processors.add_log_level,
-        structlog.processors.JSONRenderer(),
+        renderer,
     ],
     wrapper_class=structlog.make_filtering_bound_logger(level),
 )

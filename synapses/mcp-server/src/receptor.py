@@ -37,7 +37,9 @@ class MCPReceptor:
             # but the goal is to use MetabolicLoop.execute.
             # Assuming metabolism has a way to handle search signals.
             signal = self.translator.to_signal("search", query=query, limit=limit)
-            observation = await self.metabolism.execute(signal)
+            observation = await self.metabolism.execute(
+                signal.SerializeToString(), is_nats=True
+            )
             return cast(str, self.translator.from_observation(observation))
 
         @self.mcp.tool
@@ -47,5 +49,7 @@ class MCPReceptor:
             """
             logger.info("mcp_receptor_negotiate", item_id=item_id, bid=bid)
             signal = self.translator.to_signal("negotiate", item_id=item_id, bid=bid)
-            observation = await self.metabolism.execute(signal)
+            observation = await self.metabolism.execute(
+                signal.SerializeToString(), is_nats=True
+            )
             return cast(str, self.translator.from_observation(observation))

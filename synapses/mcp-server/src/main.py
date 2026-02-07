@@ -1,4 +1,5 @@
 import asyncio
+import os
 
 import structlog
 from config import Settings as CoreSettings
@@ -10,11 +11,18 @@ from receptor import MCPReceptor
 from translator import MCPTranslator
 
 # Setup logging
+log_format = os.getenv("AURA_LOG_FORMAT", "json").lower()
+renderer = (
+    structlog.dev.ConsoleRenderer()
+    if log_format == "console"
+    else structlog.processors.JSONRenderer()
+)
+
 structlog.configure(
     processors=[
         structlog.processors.TimeStamper(fmt="iso"),
         structlog.processors.add_log_level,
-        structlog.dev.ConsoleRenderer(),
+        renderer,
     ]
 )
 logger = structlog.get_logger("mcp-synapse")
