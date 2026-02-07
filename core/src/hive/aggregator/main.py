@@ -92,11 +92,14 @@ class HiveAggregator(Aggregator[Any, HiveContext]):
         except Exception as e:
             logger.error("aggregator_persistence_error", error=str(e))
 
+        # Fetch vitals (Proprioception)
+        system_health = await self.get_vitals()
+
         return HiveContext(
             item_id=item_id,
             offer=offer,
             item_data=item_data,
-            # system_health will be automatically injected by MetabolicLoop
+            system_health=system_health,
             request_id=request_id,
             metadata={"brain_path": self.brain_path},
         )

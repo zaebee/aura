@@ -2,7 +2,7 @@ name: reasoning
 role: FrontalLobe
 description: >
   The primary cognitive engine for negotiation.
-  Uses DSPy for self-optimizing strategic decisions and Mistral for semantic embeddings via Reasoning enzymes.
+  Uses DSPy for self-optimizing strategic decisions and Mistral for semantic embeddings via Reasoning skills.
   Provides structured negotiation outcomes with economic transparency (thought tags).
 capabilities:
   - negotiate: Make an optimized decision (accept/counter/reject) based on context.

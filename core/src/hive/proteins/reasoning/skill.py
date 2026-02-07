@@ -7,7 +7,7 @@ from aura_core import Observation, SkillProtocol
 
 from config.llm import LLMSettings
 
-from .enzymes.reasoning_engine import generate_embedding, load_brain
+from .engine import generate_embedding, load_brain
 from .schema import EmbeddingParams, NegotiationParams, NegotiationResult
 
 logger = logging.getLogger(__name__)

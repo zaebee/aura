@@ -5,7 +5,7 @@ from aura_core import Observation, SkillProtocol
 
 from config.crypto import CryptoSettings
 
-from .enzymes.solana import PriceConverter, SecretEncryption, SolanaProvider
+from .solana import PriceConverter, SecretEncryption, SolanaProvider
 from .schema import PaymentProof, PaymentVerificationParams
 
 logger = logging.getLogger(__name__)

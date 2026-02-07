@@ -2,7 +2,7 @@ name: telemetry
 role: SensoryOrgan
 description: >
   Standardized proprioception for the Hive.
-  Fetches metrics from Prometheus and initializes OpenTelemetry tracing via Prometheus enzymes.
+  Fetches metrics from Prometheus and initializes OpenTelemetry tracing via Prometheus skills.
   Tracks economic counters like negotiation successes and heartbeats.
 capabilities:
   - fetch_metrics: Retrieve system CPU, memory, and status vitals.
