@@ -51,6 +51,11 @@ spec:
               value: "postgresql://{{ .Values.postgres.auth.username }}:{{ .Values.postgres.auth.password }}@{{ .Release.Name }}-postgres.{{ .Release.Namespace }}.svc.cluster.local:5432/{{ .Values.postgres.auth.database }}"
             - name: AURA_DATABASE__REDIS_URL
               value: "redis://{{ .Release.Name }}-redis.{{ .Release.Namespace }}.svc.cluster.local:6379/0"
+            - name: MISTRAL_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: "{{ .Release.Name }}-secrets"
+                  key: "api-key"
             - name: AURA_LLM__API_KEY
               valueFrom:
                 secretKeyRef:
