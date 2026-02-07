@@ -47,7 +47,7 @@ dependencies = [
 ]
 
 [tool.uv.workspace]
-members = ["packages/*", "core", "api-gateway", "adapters/*", "agents/*"]
+members = ["packages/*", "core", "api-gateway", "synapses/*", "agents/*"]
 
 [tool.uv.sources]
 aura-core = { workspace = true }

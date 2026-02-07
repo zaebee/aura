@@ -11,7 +11,7 @@ from typing import Any
 
 from aura_core import SkillProtocol
 
-from hive.proto.aura.negotiation.v1 import negotiation_pb2
+from hive.proto.aura.negotiation.v1 import negotiation_pb2  # type: ignore
 
 logger = logging.getLogger(__name__)
 

@@ -37,6 +37,6 @@ hive:
     proto: "SacredScrolls"
     docs: "ChroniclersArchive"
     agents: "WorkerCells"
-    adapters: "HiveExtensions"
+    synapses: "HiveExtensions"
     frontend: "HiveWindow"
     tools: "ToolShed"

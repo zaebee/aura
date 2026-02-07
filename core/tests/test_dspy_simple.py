@@ -16,9 +16,7 @@ def test_dspy_strategy_init_minimal():
 
     try:
         # Mock the loading to avoid file issues
-        with patch(
-            "src.hive.proteins.reasoning.engine.dspy.load"
-        ) as mock_load:
+        with patch("src.hive.proteins.reasoning.engine.dspy.load") as mock_load:
             mock_load.return_value = AuraNegotiator()
 
             strategy = DSPyStrategy(

@@ -39,7 +39,7 @@ Add this to your Claude Desktop configuration file:
         "--with", "httpx", 
         "--with", "pynacl",
         "--with", "python-dotenv",
-        "https://github.com/zaebee/aura/blob/main/adapters/mcp-server/src/aura_mcp/main.py" 
+        "https://github.com/zaebee/aura/blob/main/synapses/mcp-server/src/aura_mcp/main.py"
         # Note: In a real release, you would point to a PyPI package name
       ],
       "env": {
@@ -50,7 +50,7 @@ Add this to your Claude Desktop configuration file:
 }
 ```
 
-*(Note: If you are developing locally, replace the URL with the local path to the `adapters/mcp-server` directory).*
+*(Note: If you are developing locally, replace the URL with the local path to the `synapses/mcp-server` directory).*
 
 ---
 
@@ -69,7 +69,7 @@ If you are contributing to Aura or running the platform locally.
 Navigate to the adapter directory:
 
 ```bash
-cd adapters/mcp-server
+cd synapses/mcp-server
 uv sync
 ```
 

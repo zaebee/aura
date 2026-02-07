@@ -30,7 +30,7 @@ flowchart TB
     subgraph Level4["👥 Level 4: The Citizens"]
         direction TB
         Agents["agents/<br/>━━━━━━━━━━━━━━━━<br/>bee-keeper • chronicler<br/>━━━━━━━━━━━━━━━━<br/>ACTIVE SUBJECTS"]
-        Adapters["adapters/<br/>━━━━━━━━━━━━━━━━<br/>api-gateway • telegram-bot<br/>━━━━━━━━━━━━━━━━<br/>PASSIVE SERVANTS"]
+        Adapters["synapses/<br/>━━━━━━━━━━━━━━━━<br/>api-gateway • telegram-bot<br/>━━━━━━━━━━━━━━━━<br/>PASSIVE SERVANTS"]
     end
 
     Level1 -.->|"Types define contracts"| Level2
@@ -182,7 +182,7 @@ grep -r "from aura_core.dna import.*Skill" components/proteins/  # Should succee
 - **Agents** (`/agents/`): Composed entities (Brain + Proteins) with **goals**
   - `bee-keeper/` — Architectural auditor
   - `chronicler/` — Documentation maintainer
-- **Adapters** (`/adapters/`): Translation layers with **no goals**
+- **Adapters** (`/synapses/`): Translation layers with **no goals**
   - `api-gateway/` — HTTP ↔ gRPC protocol translator
   - `telegram-bot/` — Telegram ↔ NATS event bridge
 
@@ -214,7 +214,7 @@ agents/bee-keeper/
 
 **Directory Structure (Adapters):**
 ```
-adapters/api-gateway/
+synapses/api-gateway/
 ├── src/
 │   ├── main.py            # FastAPI ↔ gRPC translation
 │   ├── config.py
@@ -228,7 +228,7 @@ adapters/api-gateway/
 ls agents/*/src/hive/  # Should list aggregator.py, transformer.py, etc.
 
 # Adapters MUST NOT have hive/ directory (no internal reasoning)
-ls adapters/*/src/hive/  # Should return "No such file or directory"
+ls synapses/*/src/hive/  # Should return "No such file or directory"
 ```
 
 ---
@@ -308,7 +308,7 @@ flowchart TD
     Q3 -->|Yes| Organs["🔬 ORGANS<br/>components/proteins/"]
     Q3 -->|No| Q4{Does it have<br/>goals/agency?}
     Q4 -->|Yes| Agents["👥 AGENTS<br/>agents/"]
-    Q4 -->|No| Adapters["👥 ADAPTERS<br/>adapters/"]
+    Q4 -->|No| Adapters["👥 ADAPTERS<br/>synapses/"]
 
     style Genome fill:#1565c0,color:#fff
     style Nucleus fill:#e65100,color:#fff
@@ -327,7 +327,7 @@ This diagram implements the ontological hierarchy defined in:
 - `packages/aura-core/src/aura_core/dna.py` (Genome implementation)
 - `core/src/hive/` (Nucleus implementation)
 - `components/proteins/` (Organs implementation)
-- `agents/`, `adapters/` (Citizens implementation)
+- `agents/`, `synapses/` (Citizens implementation)
 
 ---
 

@@ -15,7 +15,7 @@ ENV UV_LINK_MODE=copy
 # Copy workspace and dependency files
 COPY pyproject.toml uv.lock /app/
 COPY packages/aura-core /app/packages/aura-core
-COPY adapters/telegram-bot/pyproject.toml /app/adapters/telegram-bot/
+COPY synapses/telegram-bot/pyproject.toml /app/synapses/telegram-bot/
 
 # Install dependencies including dev for stub generation, scoped to telegram-bot
 RUN uv sync --frozen --no-install-project --group dev --package telegram-bot
@@ -24,11 +24,11 @@ RUN uv sync --frozen --no-install-project --group dev --package telegram-bot
 COPY proto/ /app/proto/
 
 # Generate gRPC stubs
-RUN mkdir -p /app/adapters/telegram-bot/src/proto && \
+RUN mkdir -p /app/synapses/telegram-bot/src/proto && \
     uv run python -m grpc_tools.protoc -I /app/proto \
-    --python_out=/app/adapters/telegram-bot/src/proto \
-    --grpc_python_out=/app/adapters/telegram-bot/src/proto \
-    --pyi_out=/app/adapters/telegram-bot/src/proto \
+    --python_out=/app/synapses/telegram-bot/src/proto \
+    --grpc_python_out=/app/synapses/telegram-bot/src/proto \
+    --pyi_out=/app/synapses/telegram-bot/src/proto \
     /app/proto/aura/negotiation/v1/negotiation.proto
 
 # Final sync for production (no-dev, no-editable, scoped to package)
@@ -43,14 +43,14 @@ WORKDIR /app
 COPY --from=builder /app/.venv /app/.venv
 
 # Copy source code and generated stubs to the same relative path as builder
-COPY adapters/telegram-bot/src /app/adapters/telegram-bot/src
-COPY --from=builder /app/adapters/telegram-bot/src/proto /app/adapters/telegram-bot/src/proto
+COPY synapses/telegram-bot/src /app/synapses/telegram-bot/src
+COPY --from=builder /app/synapses/telegram-bot/src/proto /app/synapses/telegram-bot/src/proto
 
-WORKDIR /app/adapters/telegram-bot
+WORKDIR /app/synapses/telegram-bot
 
 # Set PATH to use the virtual environment
 ENV PATH="/app/.venv/bin:$PATH"
-ENV PYTHONPATH=/app/adapters/telegram-bot/src:/app/adapters/telegram-bot/src/proto
+ENV PYTHONPATH=/app/synapses/telegram-bot/src:/app/synapses/telegram-bot/src/proto
 
 # Command to run the bot
 CMD ["python", "src/main.py"]

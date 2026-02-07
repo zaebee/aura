@@ -1,5 +1,5 @@
 import pytest
-from hive.proteins.guard.logic import OutputGuard
+from hive.proteins.guard.engine import OutputGuard
 from hive.proteins.guard.skill import GuardSkill
 
 from config.policy import SafetySettings

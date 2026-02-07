@@ -2,3 +2,4 @@ name: vcs
 description: Version Control System Protein for GitHub interactions.
 capabilities:
   - post_comment
+  - reply_to_comment

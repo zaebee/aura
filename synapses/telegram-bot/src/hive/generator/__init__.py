@@ -39,6 +39,7 @@ class TelegramGenerator(Generator[Observation, Event]):
                 if "negotiation" in event_type:
                     action_name = event_type.replace("negotiation_", "")
                     from typing import cast
+
                     proto_event.negotiation = NegotiationEvent(
                         session_token=observation.metadata.get("session_token", ""),
                         action=cast(ActionType, map_action(action_name)),
@@ -48,9 +49,7 @@ class TelegramGenerator(Generator[Observation, Event]):
                     )
 
                 event = Event(
-                    topic=topic,
-                    payload=observation.metadata,
-                    timestamp=time.time()
+                    topic=topic, payload=observation.metadata, timestamp=time.time()
                 )
                 events.append(event)
 
@@ -61,7 +60,9 @@ class TelegramGenerator(Generator[Observation, Event]):
                     try:
                         binary_data = proto_event.SerializeToString()
                         await self.nc.publish(topic, binary_data)
-                        logger.info("event_published_binary", topic=topic, size=len(binary_data))
+                        logger.info(
+                            "event_published_binary", topic=topic, size=len(binary_data)
+                        )
                     except Exception as e:
                         logger.error("failed_to_publish_event", error=str(e))
                         span.record_exception(e)

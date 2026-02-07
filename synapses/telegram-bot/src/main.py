@@ -111,7 +111,9 @@ async def main() -> None:
                 logger.info("nats_bloodstream_subscribed", subject="aura.hive.events.>")
                 bot_tracer = trace.get_tracer(__name__)
                 async for msg in sub.messages:
-                    with bot_tracer.start_as_current_span("nats_event_received") as span:
+                    with bot_tracer.start_as_current_span(
+                        "nats_event_received"
+                    ) as span:
                         span.set_attribute("subject", msg.subject)
                         logger.info("nats_event_received", subject=msg.subject)
                         # Process via Unified Metabolism Aggregator

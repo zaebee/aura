@@ -21,7 +21,11 @@ class HiveAggregator(Aggregator[Any, HiveContext]):
         self.settings = settings
         self.registry = registry
         compiled_path = None
-        if settings and hasattr(settings, "llm") and hasattr(settings.llm, "compiled_program_path"):
+        if (
+            settings
+            and hasattr(settings, "llm")
+            and hasattr(settings.llm, "compiled_program_path")
+        ):
             compiled_path = settings.llm.compiled_program_path
         self.brain_path = resolve_brain_path(compiled_path)
 
