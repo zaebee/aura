@@ -17,10 +17,11 @@ lint:
 	# Python Lint (Ruff)
 	uv run ruff check .
 	# Python Type Check (Mypy)
-	MYPYPATH=$(CORE_PATH) uv run mypy core/src
-	MYPYPATH=$(GATEWAY_PATH):packages/aura-core/src uv run mypy api-gateway/src
-	MYPYPATH=$(TG_PATH):core/src:packages/aura-core/src uv run mypy synapses/telegram-bot/src
-	MYPYPATH=$(MCP_PATH):core/src:packages/aura-core/src uv run mypy synapses/mcp-server/src
+	# We use --explicit-package-bases to avoid double discovery when multiple paths overlap
+	MYPYPATH=$(CORE_PATH) uv run mypy --explicit-package-bases core/src
+	MYPYPATH=$(GATEWAY_PATH):packages/aura-core/src uv run mypy --explicit-package-bases api-gateway/src
+	MYPYPATH=$(TG_PATH):core/src:packages/aura-core/src uv run mypy --explicit-package-bases synapses/telegram-bot/src
+	MYPYPATH=$(MCP_PATH):core/src:packages/aura-core/src uv run mypy --explicit-package-bases synapses/mcp-server/src
 	MYPYPATH=$(KEEPER_PATH):packages/aura-core/src uv run mypy agents/bee-keeper/main.py agents/bee-keeper/src
 	MYPYPATH=packages/aura-core/src uv run mypy packages/aura-core/src
 	# Security Audit (Bandit)
