@@ -18,7 +18,6 @@ wheels/
 
 # Virtual environments
 .venv
-node_modules/
 
 # Environment variables (secrets)
 .env

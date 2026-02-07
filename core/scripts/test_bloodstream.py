@@ -17,11 +17,16 @@ import argparse
 import asyncio
 import sys
 import uuid
+
+import structlog
+
+# Add core/src to path for imports
+sys.path.insert(0, "core/src")
+
 from datetime import UTC, datetime
 from typing import Any
 
 import nats
-import structlog
 from google.protobuf.timestamp_pb2 import Timestamp
 
 logger = structlog.get_logger(__name__)
@@ -80,7 +85,7 @@ async def test_basic_nats(nats_url: str) -> bool:
     async def message_handler(msg: Any) -> Any:
         await msg_queue.put(msg)
 
-    await nc.subscribe("aura.test.>", cb=message_handler)
+    sub = await nc.subscribe("aura.test.>", cb=message_handler)
     logger.info("subscribed_to_topic", subject="aura.test.>")
 
     # Publish
@@ -92,7 +97,7 @@ async def test_basic_nats(nats_url: str) -> bool:
     try:
         msg = await asyncio.wait_for(msg_queue.get(), timeout=2.0)
     except TimeoutError:
-        print("  ✗ No message received")
+        logger.error("no_message_received")
         await nc.close()
         return False
 
@@ -100,20 +105,29 @@ async def test_basic_nats(nats_url: str) -> bool:
     received_event = dna_pb2.Event()
     received_event.ParseFromString(msg.data)
     logger.info(
-            "received_deserialized_event",
-            event_id=received_event.event_id,
-            topic=received_event.topic,
-            heartbeat_service=received_event.heartbeat.service,
-            heartbeat_status=dna_pb2.VitalsStatus.Name(received_event.heartbeat.status),
-        )
+        "received_deserialized_event",
+        event_id=received_event.event_id,
+        topic=received_event.topic,
+        heartbeat_service=received_event.heartbeat.service,
+        heartbeat_status=dna_pb2.VitalsStatus.Name(received_event.heartbeat.status),
+    )
 
     if received_event.event_id == event.event_id:
-        print("  ✓ Round-trip verified: event_id matches")
-        return True
+        logger.info("round_trip_verified", event_id=received_event.event_id)
+        result = True
     else:
-        print("  ✗ Round-trip failed: event_id mismatch")
-        await nc.close()
-        return False
+        logger.error(
+            "round_trip_failed",
+            expected_id=event.event_id,
+            actual_id=received_event.event_id,
+        )
+        result = False
+
+    await sub.unsubscribe()
+    await nc.close()
+    if result:
+        logger.info("binary_bloodstream_test_passed")
+    return result
 
 
 async def test_jetstream(nats_url: str) -> bool:

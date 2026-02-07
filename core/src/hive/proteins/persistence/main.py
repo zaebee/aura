@@ -9,7 +9,7 @@ from sqlalchemy.orm import Session, sessionmaker
 
 from config.database import DatabaseSettings
 
-from .db import (
+from .enzymes.postgres import (
     Base,
     DealStatus,
     InventoryItem,

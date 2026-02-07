@@ -5,7 +5,7 @@ from aura_core import Observation, SkillProtocol
 
 from config.policy import SafetySettings
 
-from .guard_logic import OutputGuard, SafetyViolation
+from .enzymes.guard_logic import OutputGuard, SafetyViolation
 from .schema import SafePriceParams, ValidationParams
 
 logger = logging.getLogger(__name__)

@@ -2,9 +2,7 @@ from typing import Any
 
 import structlog
 from aura_core import (
-    Aggregator as BaseAggregator,
-)
-from aura_core import (
+    Aggregator,
     HiveContext,
     NegotiationOffer,
     SkillRegistry,
@@ -16,7 +14,7 @@ from aura_core.gen.aura.dna.v1 import Signal
 logger = structlog.get_logger(__name__)
 
 
-class HiveAggregator(BaseAggregator[Any, HiveContext]):
+class HiveAggregator(Aggregator[Any, HiveContext]):
     """A - Aggregator: Consolidates persistence and telemetry signals."""
 
     def __init__(self, registry: SkillRegistry, settings: Any = None) -> None:
@@ -98,14 +96,11 @@ class HiveAggregator(BaseAggregator[Any, HiveContext]):
         except Exception as e:
             logger.error("aggregator_persistence_error", error=str(e))
 
-        # Internal Proprioception: Collect vitals directly in Aggregator
-        vitals = await self.get_vitals()
-
         return HiveContext(
             item_id=item_id,
             offer=offer,
             item_data=item_data,
-            system_health=vitals,
+            # system_health will be automatically injected by MetabolicLoop
             request_id=request_id,
             metadata={"brain_path": self.brain_path},
         )

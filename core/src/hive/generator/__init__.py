@@ -24,43 +24,51 @@ class HiveGenerator(Generator[Observation, Event]):
 
     async def pulse(self, observation: Observation) -> list[Event]:
         """
-        Generate binary proto events based on the observation using Pattern Matching.
+        Generate binary proto events based on the observation.
 
-        Flow: Observation -> Pulse Protein -> Binary Proto -> JetStream
+        Flow: Observation -> Proto Event -> .SerializeToString() -> JetStream.publish()
         """
-        # Purified Pulse: No manual extraction of trace_id or session_token.
-        # Use Python 3.10+ match for dispatching.
+        # Extract trace context from observation metadata for OTel propagation
+        trace_id = (
+            observation.metadata.get("trace_id") if observation.metadata else None
+        )
+        span_id = observation.metadata.get("span_id") if observation.metadata else None
 
-        match observation.event_type:
-            case str(et) if et.startswith("negotiation_"):
-                action = et.replace("negotiation_", "")
+        # 1. Negotiation Event (binary proto)
+        if observation.event_type and observation.event_type.startswith("negotiation_"):
+            action = observation.event_type.replace("negotiation_", "")
 
-                # Map observation to Pulse params via holistic metadata spread
-                await self.registry.execute(
-                    "pulse",
-                    "emit_negotiation",
-                    {
-                        "action": action,
-                        "session_token": getattr(observation.data, "session_token", ""),
-                        "price": getattr(observation.metadata.get("decision"), "price", 0.0)
-                                if observation.metadata and observation.metadata.get("decision") else 0.0,
-                        **(observation.metadata or {}),
-                    },
-                )
+            # Extract negotiation data from observation
+            session_token = ""  # nosec B105
+            price = 0.0
+            item_id = ""
+            agent_did = ""
 
-            case "vitals":
-                # Handle vitals events if emitted via observation
-                await self.registry.execute(
-                    "pulse",
-                    "emit_vitals",
-                    {
-                        "service": "core",
-                        **(observation.data or {}),
-                        **(observation.metadata or {}),
-                    }
-                )
+            if hasattr(observation.data, "session_token"):
+                session_token = observation.data.session_token
+            if observation.metadata:
+                decision = observation.metadata.get("decision")
+                if decision:
+                    price = getattr(decision, "price", 0.0)
+                item_id = observation.metadata.get("item_id", "")
+                agent_did = observation.metadata.get("agent_did", "")
 
-        # System Heartbeat (Always emitted)
+            # Emit binary negotiation event via Pulse Protein
+            await self.registry.execute(
+                "pulse",
+                "emit_negotiation",
+                {
+                    "session_token": session_token,
+                    "action": action,
+                    "price": price,
+                    "item_id": item_id,
+                    "agent_did": agent_did,
+                    "trace_id": trace_id,
+                    "span_id": span_id,
+                },
+            )
+
+        # 2. System Heartbeat (binary proto)
         await self.registry.execute(
             "pulse",
             "emit_heartbeat",
@@ -68,7 +76,8 @@ class HiveGenerator(Generator[Observation, Event]):
                 "service": "core",
                 "instance_id": self._instance_id,
                 "status": "ok",
-                **(observation.metadata or {}),
+                "trace_id": trace_id,
+                "span_id": span_id,
             },
         )
         return []

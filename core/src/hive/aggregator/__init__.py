@@ -1,4 +1,4 @@
-from .main import HiveAggregator as HiveAggregator
+from .main import HiveAggregator
 
 __all__ = [
     "HiveAggregator",

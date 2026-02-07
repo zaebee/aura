@@ -14,7 +14,7 @@ from typing import Any
 import dspy
 import structlog
 from dspy.teleprompt import BootstrapFewShot
-from src.hive.proteins.reasoning.reasoning_engine import (
+from src.hive.proteins.reasoning.enzymes.reasoning_engine import (
     AuraNegotiator,
     clean_and_parse_json,
 )

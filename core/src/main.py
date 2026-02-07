@@ -5,8 +5,12 @@ from typing import Any
 
 import grpc
 import grpc.aio
+from aura_core import SkillRegistry
 from grpc_health.v1 import health_pb2, health_pb2_grpc
-from hive.cortex import HiveCortex
+from hive.aggregator import HiveAggregator
+from hive.connector import HiveConnector
+from hive.generator import HiveGenerator
+from hive.membrane import HiveMembrane
 from hive.metabolism import MetabolicLoop
 from hive.metabolism.logging_config import (
     bind_request_id,
@@ -14,11 +18,12 @@ from hive.metabolism.logging_config import (
     configure_logging,
     get_logger,
 )
-from hive.proteins.telemetry.prometheus import init_telemetry
+from hive.proteins.telemetry.enzymes.prometheus import init_telemetry
 from hive.proto.aura.negotiation.v1 import (
     negotiation_pb2,
     negotiation_pb2_grpc,  # type: ignore
 )
+from hive.transformer import AuraTransformer
 from opentelemetry import trace
 from opentelemetry.instrumentation.grpc import GrpcInstrumentorServer
 from opentelemetry.instrumentation.langchain import LangchainInstrumentor
@@ -41,6 +46,7 @@ logger.info(
 
 # Instrument gRPC server for distributed tracing
 GrpcInstrumentorServer().instrument()
+
 
 # Instrument LangChain for LLM call tracing
 LangchainInstrumentor().instrument()
@@ -114,7 +120,7 @@ class NegotiationService(negotiation_pb2_grpc.NegotiationServiceServicer):
     async def Search(
         self, request: Any, context: Any
     ) -> negotiation_pb2.SearchResponse:
-        """Semantic search implementation via Skills."""
+        """Semantic search implementation."""
         request_id = extract_request_id(context)
         if request_id:
             bind_request_id(request_id)
@@ -122,33 +128,53 @@ class NegotiationService(negotiation_pb2_grpc.NegotiationServiceServicer):
         try:
             logger.info("search_started", query=request.query, limit=request.limit)
 
-            registry = getattr(self.metabolism, "registry", None)
+            # Generate query vector via Reasoning Protein
+            aggregator = getattr(self.metabolism, "aggregator", None)
+            registry = getattr(aggregator, "registry", None) if aggregator else None
             if not registry:
                 context.set_code(grpc.StatusCode.INTERNAL)
                 context.set_details("Skill Registry not available")
                 return negotiation_pb2.SearchResponse()
 
-            # Reasoning Protein: Generate Query Vector
-            embed_obs = await registry.execute(
-                "reasoning", "generate_embedding", {"text": request.query}
+            reasoning = registry.get("reasoning")
+            if not reasoning:
+                context.set_code(grpc.StatusCode.INTERNAL)
+                context.set_details("Reasoning protein not available")
+                return negotiation_pb2.SearchResponse()
+
+            embed_obs = await reasoning.execute(
+                "generate_embedding", {"text": request.query}
             )
             if not embed_obs.success:
+                logger.error(
+                    "embedding_generation_failed",
+                    query=request.query,
+                    error=embed_obs.error,
+                )
                 context.set_code(grpc.StatusCode.INTERNAL)
                 context.set_details("Failed to generate embeddings")
                 return negotiation_pb2.SearchResponse()
 
-            # Persistence Protein: Vector Search
-            obs = await registry.execute(
-                "persistence",
+            query_vector = embed_obs.data
+
+            # Vector search via Persistence Protein
+            persistence = registry.get("persistence")
+            if not persistence:
+                context.set_code(grpc.StatusCode.INTERNAL)
+                context.set_details("Persistence protein not available")
+                return negotiation_pb2.SearchResponse()
+
+            obs = await persistence.execute(
                 "vector_search",
                 {
-                    "query_vector": embed_obs.data,
+                    "query_vector": query_vector,
                     "limit": request.limit or 5,
                     "min_similarity": request.min_similarity,
                 },
             )
 
             if not obs.success:
+                logger.error("search_failed", error=obs.error)
                 context.set_code(grpc.StatusCode.INTERNAL)
                 context.set_details(obs.error)
                 return negotiation_pb2.SearchResponse()
@@ -187,6 +213,7 @@ class NegotiationService(negotiation_pb2_grpc.NegotiationServiceServicer):
             return negotiation_pb2.GetSystemStatusResponse(status="initializing")
 
         try:
+            # Use standardized get_vitals() from the Aggregator protocol
             vitals = await self.metabolism.aggregator.get_vitals()
             return negotiation_pb2.GetSystemStatusResponse(
                 status=vitals.status,
@@ -196,8 +223,9 @@ class NegotiationService(negotiation_pb2_grpc.NegotiationServiceServicer):
                 cached=vitals.cached,
             )
         except Exception as e:
-            logger.error("system_status_error", error=str(e))
+            logger.error("system_status_error", error=str(e), exc_info=True)
             context.set_code(grpc.StatusCode.INTERNAL)
+            context.set_details("Failed to retrieve system metrics")
             return negotiation_pb2.GetSystemStatusResponse(status="error")
 
     async def CheckDealStatus(
@@ -209,22 +237,43 @@ class NegotiationService(negotiation_pb2_grpc.NegotiationServiceServicer):
             bind_request_id(request_id)
 
         try:
+            # Feature toggle check
             if not settings.crypto.enabled or not self.market_service:
+                logger.warning("crypto_disabled", deal_id=request.deal_id)
                 context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+                context.set_details("Crypto payments not enabled")
                 return negotiation_pb2.CheckDealStatusResponse(status="NOT_FOUND")
 
+            # Validate UUID format
             try:
                 uuid.UUID(request.deal_id)
             except ValueError:
+                logger.warning("invalid_deal_id", deal_id=request.deal_id)
                 context.set_code(grpc.StatusCode.INVALID_ARGUMENT)
+                context.set_details("Invalid deal_id format")
                 return negotiation_pb2.CheckDealStatusResponse(status="NOT_FOUND")
 
+            logger.info("check_deal_status_started", deal_id=request.deal_id)
+
+            # Check payment status via MarketService
             response = await self.market_service.check_status(deal_id=request.deal_id)
+
+            logger.info(
+                "check_deal_status_completed",
+                deal_id=request.deal_id,
+                status=response.status,
+            )
             return response  # type: ignore
 
         except Exception as e:
-            logger.error("check_deal_status_error", deal_id=request.deal_id, error=str(e))
+            logger.error(
+                "check_deal_status_error",
+                deal_id=request.deal_id,
+                error=str(e),
+                exc_info=True,
+            )
             context.set_code(grpc.StatusCode.INTERNAL)
+            context.set_details("Payment verification failed")
             return negotiation_pb2.CheckDealStatusResponse(status="NOT_FOUND")
         finally:
             if request_id:
@@ -252,7 +301,11 @@ async def serve() -> None:
     # 4. Bind and Start the server
     server.add_insecure_port(f"[::]:{settings.server.port}")
     await server.start()
-    logger.info("server_started_early", port=settings.server.port, status="INITIALIZING")
+    logger.info(
+        "server_started_early",
+        port=settings.server.port,
+        status="INITIALIZING",
+    )
 
     # 5. Start Prometheus metrics server
     try:
@@ -261,39 +314,156 @@ async def serve() -> None:
     except Exception as e:
         logger.error("metrics_server_failed", error=str(e))
 
-    # 6. Initialize the Hive Cell (Cortex) and build the Organism
-    cell = HiveCortex(settings)
-    metabolism = await cell.build_organism()
+    # 6. Initialize Skills (Proteins)
+    registry = SkillRegistry()
 
-    # 7. Update health status based on persistence initialization
-    if cell.is_healthy:
+    import dspy
+    from aura_core import get_raw_key
+    from hive.proteins.guard import GuardSkill
+    from hive.proteins.guard.enzymes.guard_logic import OutputGuard
+    from hive.proteins.persistence import PersistenceSkill
+    from hive.proteins.pulse import PulseSkill
+    from hive.proteins.pulse.enzymes.pulse_broker import NatsProvider
+    from hive.proteins.reasoning import ReasoningSkill
+    from hive.proteins.reasoning.enzymes.reasoning_engine import get_embedding_model
+    from hive.proteins.telemetry import TelemetrySkill
+    from hive.proteins.transaction import TransactionSkill
+    from hive.proteins.transaction.enzymes.solana import (
+        PriceConverter,
+        SecretEncryption,
+        SolanaProvider,
+    )
+    from sqlalchemy import create_engine
+    from sqlalchemy.orm import sessionmaker
+
+    # --- Provider Factories (Trinity Pattern) ---
+
+    # Persistence Provider
+    engine = create_engine(str(settings.database.url))
+    SessionLocal = sessionmaker(bind=engine)
+
+    # Pulse Provider
+    nats_provider = NatsProvider(settings.server.nats_url)
+
+    # Transaction Provider (if enabled)
+    transaction_bundle = {}
+    if settings.crypto.enabled:
+        transaction_bundle = {
+            "provider": SolanaProvider(
+                private_key_base58=get_raw_key(settings.crypto.solana_private_key),
+                rpc_url=str(settings.crypto.solana_rpc_url),
+                usdc_mint=settings.crypto.solana_usdc_mint,
+            ),
+            "encryption": SecretEncryption(
+                get_raw_key(settings.crypto.secret_encryption_key)
+            ),
+            "converter": PriceConverter(),
+        }
+
+    # Reasoning Provider
+    lm = None
+    embedder = None
+    if settings.llm.model.lower() != "rule":
+        lm = dspy.LM(settings.llm.model)
+        embedder = get_embedding_model(get_raw_key(settings.llm.api_key))
+    reasoning_provider = {"lm": lm, "embedder": embedder}
+
+    # Guard Provider
+    guard_provider = OutputGuard(safety_settings=settings.safety)
+
+    # --- Skill Instantiation & Binding ---
+
+    persistence_protein = PersistenceSkill()
+    persistence_protein.bind(settings.database, (SessionLocal, engine))
+
+    pulse_protein = PulseSkill()
+    pulse_protein.bind(settings.server, nats_provider)
+
+    reasoning_protein = ReasoningSkill()
+    reasoning_protein.bind(settings.llm, reasoning_provider)
+
+    telemetry_protein = TelemetrySkill()
+    telemetry_protein.bind(settings.server, None)
+
+    guard_protein = GuardSkill()
+    guard_protein.bind(settings.safety, guard_provider)
+
+    transaction_protein = None
+    if settings.crypto.enabled:
+        transaction_protein = TransactionSkill()
+        transaction_protein.bind(settings.crypto, transaction_bundle)
+
+    # Register in registry
+    registry.register("persistence", persistence_protein)
+    if transaction_protein:
+        registry.register("transaction", transaction_protein)
+    registry.register("reasoning", reasoning_protein)
+    registry.register("telemetry", telemetry_protein)
+    registry.register("pulse", pulse_protein)
+    registry.register("guard", guard_protein)
+
+    # 7. Initialize and Verify Skills
+    if await persistence_protein.initialize():
+        await persistence_protein.execute("init_db", {})
         health_servicer.set("", health_pb2.HealthCheckResponse.SERVING)
-        logger.info("organism_wired_and_serving")
+        logger.info("db_verified_health_serving")
     else:
-        logger.error("organism_initialization_failed_unhealthy")
+        logger.error("db_verification_failed")
 
-    # 8. Wire fully initialized components into the NegotiationService
+    await pulse_protein.initialize()
+    await reasoning_protein.initialize()
+    await telemetry_protein.initialize()
+    await guard_protein.initialize()
+    if transaction_protein:
+        await transaction_protein.initialize()
+
+    # 8. Initialize Nucleotides
+    aggregator = HiveAggregator(registry=registry, settings=settings)
+    transformer = AuraTransformer(registry=registry, settings=settings)
+
+    market_service = None
+    if transaction_protein:
+        from hive.services.market import MarketService
+
+        market_service = MarketService(
+            persistence=persistence_protein, transaction=transaction_protein
+        )
+        logger.info("market_service_initialized")
+
+    connector = HiveConnector(
+        registry=registry, market_service=market_service, settings=settings
+    )
+    generator = HiveGenerator(registry=registry)
+    membrane = HiveMembrane(registry=registry)
+
+    metabolism = MetabolicLoop(
+        aggregator=aggregator,
+        transformer=transformer,
+        connector=connector,
+        generator=generator,
+        membrane=membrane,
+        registry=registry,
+    )
+
+    # 9. Wire fully initialized components into the NegotiationService
     negotiation_service.metabolism = metabolism
-    negotiation_service.market_service = cell.market_service
+    negotiation_service.market_service = market_service
 
-    # 9. Start Heartbeat Deal (Honey Stimulus)
+    # 10. Start Heartbeat Deal (Honey Stimulus)
     async def heartbeat_deal_loop() -> None:
         """Trigger a mock successful negotiation periodically."""
         await asyncio.sleep(60)
         while True:
             try:
-                registry = cell.registry
-                persistence = registry.get("persistence")
-                if not persistence:
-                    break
-
-                obs = await persistence.execute("get_first_item", {})
+                logger.info("triggering_heartbeat_deal")
+                obs = await persistence_protein.execute("get_first_item", {})
 
                 if obs.success and obs.data:
                     item = obs.data
                     mock_signal = negotiation_pb2.NegotiateRequest(
                         item_id=item["id"],
-                        bid_amount=item["base_price"] * settings.heartbeat.bid_multiplier,
+                        bid_amount=item["base_price"]
+                        * settings.heartbeat.bid_multiplier,
                         currency_code="USD",
                         agent=negotiation_pb2.AgentIdentity(
                             did=settings.heartbeat.agent_did,
@@ -303,6 +473,8 @@ async def serve() -> None:
                     )
                     await metabolism.execute(mock_signal, is_heartbeat=True)
                     logger.info("heartbeat_deal_successful")
+                else:
+                    logger.warning("heartbeat_deal_failed_no_items")
             except Exception as e:
                 logger.error("heartbeat_deal_error", error=str(e))
 
@@ -310,12 +482,17 @@ async def serve() -> None:
 
     asyncio.create_task(heartbeat_deal_loop())
 
-    logger.info("initialization_complete", metabolism="Cellular Architecture")
+    logger.info(
+        "initialization_complete",
+        services=["NegotiationService", "Health"],
+        crypto_enabled=settings.crypto.enabled,
+        metabolism="ATCG",
+    )
 
     try:
         await server.wait_for_termination()
     finally:
-        await cell.registry.close()
+        await registry.close()
         logger.info("all_skills_closed")
 
 
