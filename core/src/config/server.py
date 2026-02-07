@@ -34,6 +34,10 @@ class ServerSettings(BaseModel):
         "http://monitoring-kube-prometheus-prometheus.monitoring.svc.cluster.local:9090",  # type: ignore
         validation_alias=AliasChoices("AURA_SERVER__PROMETHEUS_URL", "PROMETHEUS_URL"),
     )
+    metrics_port: int = Field(
+        9091,
+        validation_alias=AliasChoices("AURA_SERVER__METRICS_PORT", "METRICS_PORT"),
+    )
 
     nats_url: str = Field(
         "nats://nats:4222",

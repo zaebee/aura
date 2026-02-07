@@ -1,6 +1,7 @@
 import asyncio
 import time
 from typing import Any, Optional
+
 import httpx
 import structlog
 
@@ -62,4 +63,32 @@ class GitHubProvider:
             return ""
         except Exception as e:
             logger.error("github_post_comment_exception", error=str(e))
+            return ""
+
+    async def reply_to_comment(
+        self,
+        repo: str,
+        pull_number: int,
+        comment_id: int,
+        body: str,
+    ) -> str:
+        """
+        Reply to a Pull Request review comment.
+        Endpoint: POST /repos/{owner}/{repo}/pulls/{pull_number}/comments/{comment_id}/replies
+        """
+        path = f"repos/{repo}/pulls/{pull_number}/comments/{comment_id}/replies"
+
+        try:
+            response = await self._request("POST", path, json={"body": body})
+            if response.status_code == 201:
+                return str(response.json().get("html_url", ""))
+
+            logger.warning(
+                "github_reply_comment_failed",
+                status_code=response.status_code,
+                body=response.text,
+            )
+            return ""
+        except Exception as e:
+            logger.error("github_reply_comment_exception", error=str(e))
             return ""

@@ -9,7 +9,7 @@ from sqlalchemy.orm import Session, sessionmaker
 
 from config.database import DatabaseSettings
 
-from .db import (
+from .engine import (
     Base,
     DealStatus,
     InventoryItem,
@@ -27,30 +27,31 @@ class PersistenceSkill(
 ):
     """
     Persistence Protein: Handles all database operations.
-    Standardized following the Crystalline Protein Standard and Enzyme pattern.
+    Standardized following the Trinity Structure.
     """
 
     def __init__(self) -> None:
         self.settings: DatabaseSettings | None = None
         self.provider: sessionmaker | None = None
         self.engine: Engine | None = None
+        self._capabilities = {
+            "init_db": self._init_db,
+            "read_item": self._read_item_handler,
+            "create_deal": self._create_deal,
+            "get_deal_by_memo": self._get_deal_by_memo_handler,
+            "get_deal_by_id": self._get_deal_by_id_handler,
+            "update_deal_status": self._update_deal_status,
+            "vector_search": self._vector_search,
+            "list_items_semantic_search": self._vector_search,
+            "get_first_item": self._get_first_item,
+            "upsert_item": self._upsert_item,
+        }
 
     def get_name(self) -> str:
         return "persistence"
 
     def get_capabilities(self) -> list[str]:
-        return [
-            "read_item",
-            "create_deal",
-            "get_deal_by_memo",
-            "get_deal_by_id",
-            "update_deal_status",
-            "vector_search",
-            "list_items_semantic_search",
-            "init_db",
-            "upsert_item",
-            "get_first_item",
-        ]
+        return list(self._capabilities.keys())
 
     def bind(
         self, settings: DatabaseSettings, provider: tuple[sessionmaker, Engine]
@@ -88,34 +89,23 @@ class PersistenceSkill(
 
     async def post_initialize(self) -> None:
         """Handle database schema creation after successful connection."""
-        await self._init_db()
+        await self._init_db({})
 
     async def execute(self, intent: str, params: dict[str, Any]) -> Observation:
         if not self.provider:
             return Observation(success=False, error="provider_not_initialized")
 
-        if intent == "init_db":
-            return await self._init_db()
-        elif intent == "read_item":
-            return await self._read_item(params.get("item_id"))
-        elif intent == "create_deal":
-            return await self._create_deal(params)
-        elif intent == "get_deal_by_memo":
-            return await self._get_deal_by_memo(params.get("memo"))
-        elif intent == "get_deal_by_id":
-            return await self._get_deal_by_id(params.get("deal_id"))
-        elif intent == "update_deal_status":
-            return await self._update_deal_status(params)
-        elif intent in ["vector_search", "list_items_semantic_search"]:
-            return await self._vector_search(params)
-        elif intent == "get_first_item":
-            return await self._get_first_item()
-        elif intent == "upsert_item":
-            return await self._upsert_item(params)
+        handler = self._capabilities.get(intent)
+        if not handler:
+            return Observation(success=False, error=f"Unknown intent: {intent}")
 
-        return Observation(success=False, error=f"Unknown intent: {intent}")
+        try:
+            return await handler(params)
+        except Exception as e:
+            logger.error(f"Persistence skill error: {e}")
+            return Observation(success=False, error=str(e))
 
-    async def _init_db(self) -> Observation:
+    async def _init_db(self, params: dict[str, Any]) -> Observation:
         if not self.engine:
             return Observation(success=False, error="engine_not_initialized")
         try:
@@ -128,7 +118,8 @@ class PersistenceSkill(
         except Exception as e:
             return Observation(success=False, error=str(e))
 
-    async def _read_item(self, item_id: str | None) -> Observation:
+    async def _read_item_handler(self, params: dict[str, Any]) -> Observation:
+        item_id = params.get("item_id")
         if not item_id:
             return Observation(success=False, error="item_id_required")
 
@@ -144,7 +135,7 @@ class PersistenceSkill(
             return Observation(success=True, data=result)
         return Observation(success=False, error="item_not_found")
 
-    async def _get_first_item(self) -> Observation:
+    async def _get_first_item(self, params: dict[str, Any]) -> Observation:
         def fetch() -> dict[str, Any] | None:
             with self._get_session() as session:
                 item = session.query(InventoryItem).first()
@@ -183,7 +174,8 @@ class PersistenceSkill(
         except Exception as e:
             return Observation(success=False, error=str(e))
 
-    async def _get_deal_by_id(self, deal_id: Any) -> Observation:
+    async def _get_deal_by_id_handler(self, params: dict[str, Any]) -> Observation:
+        deal_id = params.get("deal_id")
         if not deal_id:
             return Observation(success=False, error="deal_id_required")
 
@@ -199,7 +191,8 @@ class PersistenceSkill(
             return Observation(success=True, data=result)
         return Observation(success=False, error="deal_not_found")
 
-    async def _get_deal_by_memo(self, memo: str | None) -> Observation:
+    async def _get_deal_by_memo_handler(self, params: dict[str, Any]) -> Observation:
+        memo = params.get("memo")
         if not memo:
             return Observation(success=False, error="memo_required")
 
