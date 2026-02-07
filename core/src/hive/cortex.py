@@ -1,13 +1,15 @@
 import asyncio
-import structlog
 from typing import Any
+
+import structlog
 from aura_core import SkillRegistry
-from .metabolism import MetabolicLoop
+
 from .aggregator import HiveAggregator
-from .transformer import AuraTransformer
 from .connector import HiveConnector
 from .generator import HiveGenerator
 from .membrane import HiveMembrane
+from .metabolism import MetabolicLoop
+from .transformer import AuraTransformer
 
 logger = structlog.get_logger(__name__)
 
@@ -30,12 +32,12 @@ class HiveCortex:
         # Market service might need to be injected or built here
         # For simplicity in this refactor, we assume it's handled externally or we build a stub
         market_service = None
-        if registry.get("transaction") and registry.get("persistence"):
-             from .services.market import MarketService
-             market_service = MarketService(
-                 persistence=registry.get("persistence"),
-                 transaction=registry.get("transaction")
-             )
+        persistence = registry.get("persistence")
+        transaction = registry.get("transaction")
+        if transaction and persistence:
+            from .services.market import MarketService
+
+            market_service = MarketService(persistence=persistence, transaction=transaction)
 
         connector = HiveConnector(
             registry=registry,
@@ -61,9 +63,9 @@ class HiveCell:
 
     def __init__(self, organism: MetabolicLoop):
         self.organism = organism
-        self.tasks = []
+        self.tasks: list[asyncio.Task[Any]] = []
 
-    async def run_synapse(self, synapse_main: Any):
+    async def run_synapse(self, synapse_main: Any) -> asyncio.Task[Any]:
         """
         Starts a synapse as a background task.
         """
@@ -72,7 +74,7 @@ class HiveCell:
         self.tasks.append(task)
         return task
 
-    async def stop(self):
+    async def stop(self) -> None:
         """
         Gracefully stop all components.
         """

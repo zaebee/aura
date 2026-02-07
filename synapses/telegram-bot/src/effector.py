@@ -1,6 +1,6 @@
+
 import nats
 import structlog
-import json
 from aiogram import Bot
 
 logger = structlog.get_logger(__name__)
@@ -25,7 +25,6 @@ class TelegramEffector:
 
     async def handle_event(self, msg):
         subject = msg.subject
-        data = msg.data # Usually binary protobuf if following PulseSkill standard
 
         logger.info("effector_received_event", subject=subject)
 

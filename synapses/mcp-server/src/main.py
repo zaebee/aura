@@ -1,6 +1,7 @@
 from fastmcp import FastMCP
-from .receptor import MCPReceptor
+
 from .config import settings
+from .receptor import MCPReceptor
 
 mcp = FastMCP(
     name="Aura",

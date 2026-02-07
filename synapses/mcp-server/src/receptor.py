@@ -1,6 +1,7 @@
 import grpc
 import structlog
 from aura_core.gen.aura.negotiation.v1 import NegotiationServiceStub
+
 from .translator import MCPTranslator
 from .wallet import AgentWallet
 

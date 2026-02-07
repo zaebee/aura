@@ -1,12 +1,12 @@
-from typing import Any
 from aiogram.types import Message
 from aura_core.gen.aura.negotiation.v1 import (
-    NegotiateRequest,
-    SearchRequest,
     AgentIdentity,
+    NegotiateRequest,
     NegotiateResponse,
-    SearchResponse
+    SearchRequest,
+    SearchResponse,
 )
+
 
 class TelegramTranslator:
     """

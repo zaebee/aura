@@ -1,8 +1,7 @@
 import grpc
 import structlog
-from aura_core.gen.aura.negotiation.v1 import (
-    NegotiationServiceStub
-)
+from aura_core.gen.aura.negotiation.v1 import NegotiationServiceStub
+
 from .translator import TelegramTranslator
 
 logger = structlog.get_logger(__name__)

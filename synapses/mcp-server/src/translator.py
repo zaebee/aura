@@ -1,11 +1,11 @@
-from typing import Any
 from aura_core.gen.aura.negotiation.v1 import (
-    NegotiateResponse,
-    SearchResponse,
+    AgentIdentity,
     NegotiateRequest,
+    NegotiateResponse,
     SearchRequest,
-    AgentIdentity
+    SearchResponse,
 )
+
 
 class MCPTranslator:
     """

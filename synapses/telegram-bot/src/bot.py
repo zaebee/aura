@@ -6,6 +6,7 @@ from aiogram.types import (
     CallbackQuery,
     Message,
 )
+
 from .receptor import TelegramReceptor
 
 router = Router()
