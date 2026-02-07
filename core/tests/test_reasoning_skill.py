@@ -1,5 +1,5 @@
 import pytest
-from hive.proteins.reasoning.main import ReasoningSkill
+from hive.proteins.reasoning.skill import ReasoningSkill
 
 from config.llm import LLMSettings
 
@@ -7,7 +7,7 @@ from config.llm import LLMSettings
 @pytest.mark.asyncio
 async def test_reasoning_skill_initialize_rule_mode(mocker):
     skill = ReasoningSkill()
-    mocker.patch("hive.proteins.reasoning.main.load_brain")
+    mocker.patch("hive.proteins.reasoning.skill.load_brain")
     settings = LLMSettings(model="rule")
     skill.bind(settings, {"lm": None, "embedder": None})
     success = await skill.initialize()

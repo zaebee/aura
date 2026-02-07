@@ -1,3 +1,3 @@
-from .main import GuardSkill
+from .skill import GuardSkill
 
 __all__ = ["GuardSkill"]

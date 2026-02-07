@@ -1,3 +1,3 @@
-from .main import TransactionSkill
+from .skill import TransactionSkill
 
 __all__ = ["TransactionSkill"]

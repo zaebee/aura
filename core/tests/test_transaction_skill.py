@@ -1,5 +1,5 @@
 import pytest
-from hive.proteins.transaction.main import TransactionSkill
+from hive.proteins.transaction.skill import TransactionSkill
 
 
 @pytest.mark.asyncio

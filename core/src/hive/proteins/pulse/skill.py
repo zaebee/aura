@@ -4,7 +4,7 @@ from aura_core import Observation, SkillProtocol
 
 from config.server import ServerSettings
 
-from .enzymes.pulse_broker import JetStreamProvider
+from .broker import JetStreamProvider
 from .schema import EventParams, NegotiationEventParams
 
 
