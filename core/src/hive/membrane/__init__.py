@@ -50,7 +50,7 @@ class HiveMembrane(Membrane[Any, IntentAction, HiveContext]):
     async def inspect_outbound(
         self, decision: IntentAction, context: HiveContext
     ) -> IntentAction:
-        floor_price = context.item_data.get("floor_price", 0.0)
+        floor_price = context.item.floor_price
 
         # 1. Handle explicit failures
         if isinstance(decision, FailureIntent) or decision.action == "error":
@@ -64,8 +64,8 @@ class HiveMembrane(Membrane[Any, IntentAction, HiveContext]):
                         "reason": "FAILURE_RECOVERY",
                     },
                 )
-                if obs_safe.success:
-                    safe_price = obs_safe.data["safe_price"]
+                if obs_safe.success and obs_safe.metadata:
+                    safe_price = float(obs_safe.metadata.get("safe_price", safe_price))
 
             return self._override_with_safe_offer(
                 decision, safe_price, "FAILURE_RECOVERY"
@@ -83,9 +83,9 @@ class HiveMembrane(Membrane[Any, IntentAction, HiveContext]):
         if not self.registry:
             return decision
 
-        internal_cost = context.item_data.get("meta", {}).get(
+        internal_cost = float(context.item.meta.get(
             "internal_cost", floor_price
-        )
+        ))
         guard_context = {"floor_price": floor_price, "internal_cost": internal_cost}
 
         obs = await self.registry.execute(
@@ -99,10 +99,10 @@ class HiveMembrane(Membrane[Any, IntentAction, HiveContext]):
 
         if not obs.success:
             # Determine reason for logging/override using structured error code
-            reason = obs.data.get("error_code", "SAFETY_VIOLATION")
+            reason = obs.metadata.get("error_code", "SAFETY_VIOLATION")
 
             # Use safe price provided by the Guard Protein
-            safe_price = obs.data.get("safe_price", floor_price * 1.05)
+            safe_price = float(obs.metadata.get("safe_price", floor_price * 1.05))
             return self._override_with_safe_offer(decision, safe_price, reason)
 
         return decision

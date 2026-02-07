@@ -5,7 +5,6 @@ from aura_core import Observation, SkillProtocol
 from config.server import ServerSettings
 
 from .enzymes.pulse_broker import JetStreamProvider
-from .schema import EventParams, NegotiationEventParams
 
 
 class PulseSkill(SkillProtocol[ServerSettings, JetStreamProvider, dict[str, Any], Observation]):
@@ -58,17 +57,16 @@ class PulseSkill(SkillProtocol[ServerSettings, JetStreamProvider, dict[str, Any]
                     return Observation(success=success, event_type="heartbeat")
 
                 case "emit_negotiation":
-                    p = NegotiationEventParams(**params)
                     success = await self.provider.publish_negotiation_event(
-                        session_token=p.session_token,
-                        action=p.action,
-                        price=p.price,
-                        item_id=p.item_id,
-                        agent_did=p.agent_did,
+                        session_token=params.get("session_token", "unknown"),
+                        action=params.get("action", "unknown"),
+                        price=float(params.get("price", 0.0)),
+                        item_id=params.get("item_id", "unknown"),
+                        agent_did=params.get("agent_did", "unknown"),
                         trace_id=params.get("trace_id"),
                         span_id=params.get("span_id"),
                     )
-                    return Observation(success=success, event_type=f"negotiation_{p.action}")
+                    return Observation(success=success, event_type=f"negotiation_{params.get('action')}")
 
                 case "emit_vitals":
                     success = await self.provider.publish_vitals(
@@ -104,8 +102,7 @@ class PulseSkill(SkillProtocol[ServerSettings, JetStreamProvider, dict[str, Any]
 
                 case "emit_event":
                     # Deprecated: fallback to raw JSON publish
-                    event_params = EventParams(**params)
-                    success = await self.provider.publish_raw(event_params.topic, event_params.payload)
+                    success = await self.provider.publish_raw(params.get("topic", "unknown"), params.get("payload", {}))
                     return Observation(success=success, event_type="raw")
 
                 case _:

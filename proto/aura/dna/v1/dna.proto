@@ -113,6 +113,8 @@ message HiveContextData {
   NegotiationOffer offer = 2;
   ItemData item = 3;
   string request_id = 4;
+  SystemVitals system_health = 5;
+  map<string, string> metadata = 6;
 }
 
 message NegotiationOffer {
@@ -127,6 +129,46 @@ message ItemData {
   double base_price = 3;
   double floor_price = 4;
   map<string, string> meta = 5;
+  bool is_active = 6;
+}
+
+message DealData {
+  string id = 1;
+  string item_id = 2;
+  string item_name = 3;
+  double final_price = 4;
+  string currency = 5;
+  string payment_memo = 6;
+  string status = 7;
+  string buyer_did = 8;
+  google.protobuf.Timestamp expires_at = 9;
+  string transaction_hash = 10;
+  google.protobuf.Timestamp paid_at = 11;
+}
+
+message PaymentProof {
+  string transaction_hash = 1;
+  string block_number = 2;
+  string from_address = 3;
+  google.protobuf.Timestamp confirmed_at = 4;
+}
+
+message MetricParams {
+  string name = 1;
+  map<string, string> labels = 2;
+}
+
+message HealthStatus {
+  string status = 1;
+  map<string, string> details = 2;
+}
+
+message NegotiationResult {
+  string action = 1;
+  double price = 2;
+  string message = 3;
+  string thought = 4;
+  map<string, string> metadata = 5;
 }
 
 message BeeContextData {
@@ -134,6 +176,8 @@ message BeeContextData {
   string git_diff = 2;
   repeated string filesystem_map = 3;
   map<string, double> hive_metrics = 4;
+  SystemVitals system_health = 5;
+  map<string, string> metadata = 6;
 }
 
 message TelegramContextData {
@@ -141,6 +185,9 @@ message TelegramContextData {
   int64 chat_id = 2;
   string message_text = 3;
   string fsm_state = 4;
+  HiveContextData hive_context = 5;
+  SystemVitals system_health = 6;
+  map<string, string> metadata = 7;
 }
 
 // =============================================================================
@@ -215,7 +262,23 @@ message Observation {
     NegotiationObservation negotiation = 10;
     AuditObservation audit = 11;
     TelegramObservation telegram = 12;
+    ItemData item = 13;
+    DealData deal = 14;
+    PaymentProof payment_proof = 15;
+    SystemVitals system_vitals = 16;
+    ItemList item_list = 17;
+    NegotiationResult negotiation_result = 18;
+    FloatList float_list = 19;
+    google.protobuf.Any raw_data = 20;
   }
+}
+
+message FloatList {
+  repeated float values = 1;
+}
+
+message ItemList {
+  repeated ItemData items = 1;
 }
 
 message NegotiationObservation {
@@ -226,6 +289,7 @@ message NegotiationObservation {
     OfferAccepted accepted = 3;
     OfferCountered countered = 4;
     OfferRejected rejected = 5;
+    UIIntent ui_required = 6;
   }
 }
 

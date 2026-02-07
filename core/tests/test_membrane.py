@@ -1,5 +1,6 @@
 import pytest
 from aura_core import HiveContext, IntentAction, NegotiationOffer, SkillRegistry
+from aura_core.gen.aura.dna.v1 import ItemData
 from hive.membrane import HiveMembrane
 from hive.proteins.guard import GuardSkill
 
@@ -23,7 +24,7 @@ async def test_membrane_rule1_floor_price_override():
     context = HiveContext(
         item_id="item1",
         offer=NegotiationOffer(bid_amount=50.0, agent_did="did1", reputation=0.9),
-        item_data={"floor_price": 100.0},
+        item=ItemData(id="item1", floor_price=100.0),
     )
 
     # Proposing price below floor
@@ -57,7 +58,7 @@ async def test_membrane_rule2_data_leak_prevention():
     context = HiveContext(
         item_id="item1",
         offer=NegotiationOffer(bid_amount=150.0, agent_did="did1", reputation=0.9),
-        item_data={"floor_price": 100.0},
+        item=ItemData(id="item1", floor_price=100.0),
     )
 
     # Message containing sensitive info
@@ -92,7 +93,7 @@ async def test_membrane_combined_violations():
     context = HiveContext(
         item_id="item1",
         offer=NegotiationOffer(bid_amount=50.0, agent_did="did1", reputation=0.9),
-        item_data={"floor_price": 100.0},
+        item=ItemData(id="item1", floor_price=100.0),
     )
 
     # Proposing price below floor AND leaking floor_price

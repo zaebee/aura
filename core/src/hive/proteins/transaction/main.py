@@ -2,11 +2,11 @@ import logging
 from typing import Any
 
 from aura_core import Observation, SkillProtocol
+from aura_core.gen.aura.dna.v1 import PaymentProof
 
 from config.crypto import CryptoSettings
 
 from .enzymes.solana import PriceConverter, SecretEncryption, SolanaProvider
-from .schema import PaymentProof, PaymentVerificationParams
 
 logger = logging.getLogger(__name__)
 
@@ -57,11 +57,21 @@ class TransactionSkill(
             return Observation(success=False, error="transaction_not_initialized")
         try:
             if intent == "verify_payment":
-                p = PaymentVerificationParams(**params)
-                proof = await self.provider.verify_payment(p.amount, p.memo, p.currency)
-                if proof:
+                amount = params.get("amount", 0.0)
+                memo = params.get("memo", "")
+                currency = params.get("currency", "SOL")
+                proof_data = await self.provider.verify_payment(amount, memo, currency)
+                if proof_data:
+                    # DNA Rule: Import data structures EXCLUSIVELY from aura_core.gen
+                    from datetime import UTC, datetime
+                    proof = PaymentProof(
+                        transaction_hash=proof_data["transaction_hash"],
+                        block_number=proof_data["block_number"],
+                        from_address=proof_data["from_address"],
+                        confirmed_at=proof_data.get("confirmed_at", datetime.now(UTC)),
+                    )
                     return Observation(
-                        success=True, data=PaymentProof(**proof).model_dump()
+                        success=True, data=proof.to_dict()
                     )
                 return Observation(success=False, error="payment_not_found")
 

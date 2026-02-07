@@ -7,8 +7,7 @@ from aura_core import Observation, SkillProtocol
 
 from config.llm import LLMSettings
 
-from .enzymes.reasoning_engine import generate_embedding, load_brain
-from .schema import EmbeddingParams, NegotiationParams, NegotiationResult
+from .enzymes.engine import generate_embedding, load_brain
 
 logger = logging.getLogger(__name__)
 
@@ -61,7 +60,9 @@ class ReasoningSkill(
             if intent == "negotiate":
                 if not self.negotiator:
                     return Observation(success=False, error="negotiator_not_ready")
-                p_neg = NegotiationParams(**params)
+                bid = params.get("bid", 0.0)
+                context = params.get("context", {})
+                history = params.get("history", [])
 
                 def call() -> dict[str, Any]:
                     from typing import cast
@@ -70,33 +71,33 @@ class ReasoningSkill(
                     return cast(
                         dict[str, Any],
                         neg(
-                            input_bid=p_neg.bid,
-                            context=p_neg.context,
-                            history=p_neg.history,
+                            input_bid=bid,
+                            context=context,
+                            history=history,
                         ),
                     )
 
+                from aura_core.gen.aura.dna.v1 import NegotiationResult
                 result = await asyncio.to_thread(call)
-                data = {
-                    "action": result["action"]["action"],
-                    "price": result["action"]["price"],
-                    "message": result["action"]["message"],
-                    "thought": result.get("thought", ""),
-                    "metadata": result.get("metadata", {}),
-                }
-                return Observation(
-                    success=True, data=NegotiationResult(**data).model_dump()
+                res = NegotiationResult(
+                    action=result["action"]["action"],
+                    price=result["action"]["price"],
+                    message=result["action"]["message"],
+                    thought=result.get("thought", ""),
+                    metadata={str(k): str(v) for k, v in result.get("metadata", {}).items()},
                 )
+                return Observation(success=True, negotiation_result=res)
 
             elif intent == "generate_embedding":
                 if not self._embed_model:
                     return Observation(success=False, error="embed_model_not_ready")
-                p_emb = EmbeddingParams(**params)
+                text = params.get("text", "")
 
                 emb = await asyncio.to_thread(
-                    generate_embedding, p_emb.text, self._embed_model
+                    generate_embedding, text, self._embed_model
                 )
-                return Observation(success=True, data=emb)
+                from aura_core.gen.aura.dna.v1 import FloatList
+                return Observation(success=True, float_list=FloatList(values=emb))
 
             return Observation(success=False, error=f"Unknown intent: {intent}")
         except Exception as e:

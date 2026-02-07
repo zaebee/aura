@@ -18,16 +18,18 @@ class HiveGenerator(Generator[Observation, Event]):
         """
         Generate events based on the observation and emit them via Pulse Protein.
         """
+        from datetime import UTC, datetime
         events = []
-        now = time.time()
+        now = datetime.now(UTC)
 
         # 1. Negotiation Event (Binary Bloodstream)
         if observation.event_type and "negotiation" in observation.event_type:
             action_name = observation.event_type.replace("negotiation_", "")
-            session_token = getattr(observation.data, "session_token", "unknown")
+            session_token = "unknown"
+            if observation.negotiation:
+                session_token = observation.negotiation.session_token
 
-            decision = observation.metadata.get("decision")
-            price = getattr(decision, "price", 0.0)
+            price = float(observation.metadata.get("price", 0.0))
             item_id = observation.metadata.get("item_id", "unknown")
             agent_did = observation.metadata.get("agent_did", "unknown")
 
@@ -54,19 +56,14 @@ class HiveGenerator(Generator[Observation, Event]):
                 )
 
         # 3. System Heartbeat
-        heartbeat_topic = "aura.hive.heartbeat"
-        heartbeat_payload = {
-            "status": "active",
-            "timestamp": now,
-            "service": "core",
-        }
-        events.append(
-            Event(
-                topic=heartbeat_topic,
-                payload=heartbeat_payload,
-                timestamp=now,
-            )
+        # In the new architecture, we emit a proto event
+        heartbeat_event = Event(
+            topic="aura.hive.heartbeat",
+            timestamp=now,
         )
+        # We don't have a generic payload anymore, but we can use metadata
+        heartbeat_event.metadata = {"status": "active", "service": "core"}
+        events.append(heartbeat_event)
 
         # Emit heartbeat via Pulse Protein
         await self.registry.execute("pulse", "emit_heartbeat", {})

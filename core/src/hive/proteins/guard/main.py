@@ -6,7 +6,6 @@ from aura_core import Observation, SkillProtocol
 from config.policy import SafetySettings
 
 from .enzymes.guard_logic import OutputGuard, SafetyViolation
-from .schema import SafePriceParams, ValidationParams
 
 logger = logging.getLogger(__name__)
 
@@ -43,14 +42,16 @@ class GuardSkill(
             return Observation(success=False, error="provider_not_initialized")
         try:
             if intent in ["validate_decision", "validate_margin", "validate_floor"]:
-                p = ValidationParams(**params)
-                self.provider.validate_decision(p.decision, p.context)
+                decision = params.get("decision", {})
+                context = params.get("context", {})
+                self.provider.validate_decision(decision, context)
                 return Observation(success=True)
 
             elif intent == "get_safe_price":
-                p_safe = SafePriceParams(**params)
-                price = self._calculate_safe_price(p_safe.context, p_safe.reason)
-                return Observation(success=True, data={"safe_price": price})
+                context = params.get("context", {})
+                reason = params.get("reason", "")
+                price = self._calculate_safe_price(context, reason)
+                return Observation(success=True, metadata={"safe_price": str(price)})
 
             return Observation(success=False, error=f"Unknown intent: {intent}")
         except SafetyViolation as e:
@@ -65,7 +66,7 @@ class GuardSkill(
             return Observation(
                 success=False,
                 error=err_msg,
-                data={"error_code": code, "safe_price": safe_p},
+                metadata={"error_code": code, "safe_price": str(safe_p)},
             )
         except Exception as e:
             return Observation(success=False, error=str(e))
