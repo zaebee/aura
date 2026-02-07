@@ -103,20 +103,20 @@ core-train:
 # Test health endpoints
 tools-health:
 	# Test health check endpoints (requires running services)
-	PYTHONPATH=.:$(CORE_PATH) uv run python tools/test_health_endpoints.py
+	PYTHONPATH=$(CORE_PATH) uv run python tools/test_health_endpoints.py
 
-tools-distill: tools-validate
-	# Test health check endpoints (requires running services)
-	PYTHONPATH=.:$(CORE_PATH) uv run python tools/distill_knowledge.py
+tools-distill:
+	# Distill architectural knowledge from the codebase into binary/JSON artifacts
+	PYTHONPATH=$(CORE_PATH) uv run python tools/distill_knowledge.py
 
 tools-validate:
-	# Test health check endpoints (requires running services)
-	PYTHONPATH=.:$(CORE_PATH) uv run python tools/validate_knowledge.py
+	# Validate knowledge artifacts against the markdown architectural anchor
+	PYTHONPATH=$(CORE_PATH) uv run python tools/validate_knowledge.py
 
 tools-simulate:
 	# Run agent negotiation simulation
-	PYTHONPATH=:.$(CORE_PATH) uv run python tools/simulators/agent_sim.py
+	PYTHONPATH=.(CORE_PATH) uv run python tools/simulators/agent_sim.py
 
 tools-buyer:
 	# Run agent negotiation simulation
-	PYTHONPATH=:.$(CORE_PATH) uv run python tools/simulators/autonomous_buyer.py
+	PYTHONPATH=$(CORE_PATH) uv run python tools/simulators/autonomous_buyer.py
