@@ -21,6 +21,26 @@ on:
       - 'docs/ARCHITECTURAL_ANCHOR.md'
 
 jobs:
+  prepare:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Buf
+        uses: bufbuild/buf-setup-action@v1
+        with:
+            github_token: ${{ github.token }}
+      - name: Generate Protos
+        run: make generate
+      - name: Upload Protos
+        uses: actions/upload-artifact@v4
+        with:
+            name: proto-stubs
+            path: |
+                packages/aura-core/src/aura_core/gen
+                core/src/hive/proto
+                api-gateway/src/proto
+                frontend/src/lib/aura
+
   distill-and-validate:
     name: Extract and Validate Architecture
     runs-on: ubuntu-latest
@@ -40,16 +60,7 @@ jobs:
           enable-cache: true
 
       - name: Install dependencies
-        run: uv sync
-
-      - name: Generate Protocol Buffers
-        run: |
-          # Install buf if not cached
-          if ! command -v buf &> /dev/null; then
-            curl -sSL "https://github.com/bufbuild/buf/releases/download/v1.28.1/buf-$(uname -s)-$(uname -m)" -o /usr/local/bin/buf
-            chmod +x /usr/local/bin/buf
-          fi
-          buf generate
+        run: uv sync --all-extras
 
       - name: Extract Architecture Knowledge
         run: make tools-distill
@@ -145,12 +156,10 @@ jobs:
         uses: astral-sh/setup-uv@v3
 
       - name: Install dependencies
-        run: uv sync
+        run: uv sync --all-extras
 
       - name: Generate artifacts
-        run: |
-          buf generate
-          uv run tools/distill_knowledge.py
+        run: make generate tools-distill
 
       - name: Create Release Assets
         uses: softprops/action-gh-release@v1
