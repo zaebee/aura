@@ -1,21 +1,22 @@
-import logging
-from typing import Any
+from typing import Any, cast
 
-from aura_core import SkillRegistry
+import structlog
+from aura_core import SkillProtocol, SkillRegistry
+
 from hive.aggregator import HiveAggregator
 from hive.connector import HiveConnector
 from hive.generator import HiveGenerator
 from hive.membrane import HiveMembrane
 from hive.metabolism import MetabolicLoop
-from hive.transformer import AuraTransformer
+from hive.proteins.guard import GuardSkill
 from hive.proteins.persistence import PersistenceSkill
 from hive.proteins.pulse import PulseSkill
 from hive.proteins.reasoning import ReasoningSkill
 from hive.proteins.telemetry import TelemetrySkill
-from hive.proteins.guard import GuardSkill
 from hive.proteins.transaction import TransactionSkill
+from hive.transformer import AuraTransformer
 
-logger = logging.getLogger("hive.cortex")
+logger = structlog.get_logger("hive.cortex")
 
 class HiveCortex:
     """
@@ -47,8 +48,8 @@ class HiveCortex:
         market_service = None
         if self.settings.crypto.enabled:
             from hive.services.market import MarketService
-            persistence = self.registry.get("persistence")
-            transaction = self.registry.get("transaction")
+            persistence = cast(SkillProtocol, self.registry.get("persistence"))
+            transaction = cast(SkillProtocol, self.registry.get("transaction"))
             market_service = MarketService(
                 persistence=persistence,
                 transaction=transaction
@@ -84,10 +85,11 @@ class HiveCortex:
         from sqlalchemy import create_engine
         from sqlalchemy.orm import sessionmaker
 
+        from hive.proteins.guard.logic import OutputGuard
+
         # --- Implementation Details (Flattened) ---
         from hive.proteins.pulse.broker import NatsProvider
         from hive.proteins.reasoning.engine import get_embedding_model
-        from hive.proteins.guard.logic import OutputGuard
         from hive.proteins.transaction.solana import (
             PriceConverter,
             SecretEncryption,
@@ -153,7 +155,7 @@ class HiveCortex:
             if skill:
                 success = await skill.initialize()
                 if not success:
-                    logger.error(f"protein_initialization_failed", protein=name)
+                    logger.error("protein_initialization_failed", protein=name)
 
                 # Special case: DB init
                 if name == "persistence" and success:

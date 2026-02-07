@@ -1,7 +1,7 @@
 import asyncio
 import uuid
 from concurrent import futures
-from typing import Any
+from typing import Any, cast
 
 import grpc
 import grpc.aio
@@ -202,7 +202,10 @@ class NegotiationService(negotiation_pb2_grpc.NegotiationServiceServicer):
 
         try:
             uuid.UUID(request.deal_id)
-            return await self.market_service.check_status(deal_id=request.deal_id)
+            return cast(
+                negotiation_pb2.CheckDealStatusResponse,
+                await self.market_service.check_status(deal_id=request.deal_id),
+            )
         except Exception as e:
             logger.error("check_deal_status_error", error=str(e))
             return negotiation_pb2.CheckDealStatusResponse(status="NOT_FOUND")
@@ -254,6 +257,8 @@ async def serve() -> None:
         while True:
             try:
                 persistence = cell.registry.get("persistence")
+                if not persistence:
+                    continue
                 obs = await persistence.execute("get_first_item", {})
                 if obs.success and obs.data:
                     item = obs.data
