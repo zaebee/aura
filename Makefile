@@ -6,7 +6,7 @@ REGISTRY ?= ghcr.io/zaebee
 PLATFORM ?= linux/amd64
 CORE_PATH ?= core:core/src
 GATEWAY_PATH ?= api-gateway/src
-TG_PATH ?= adapters/telegram-bot/src:adapters/telegram-bot/src/proto
+TG_PATH ?= synapses/telegram-bot:synapses/telegram-bot/proto
 KEEPER_PATH ?= agents/bee-keeper/src
 
 # --- 1. CODE QUALITY ---
@@ -18,7 +18,7 @@ lint:
 	# Python Type Check (Mypy)
 	MYPYPATH=$(CORE_PATH) uv run mypy core/src
 	MYPYPATH=$(GATEWAY_PATH):packages/aura-core/src uv run mypy api-gateway/src
-	MYPYPATH=$(TG_PATH):packages/aura-core/src uv run mypy adapters/telegram-bot/src
+	MYPYPATH=$(TG_PATH):packages/aura-core/src uv run mypy synapses/telegram-bot
 	MYPYPATH=$(KEEPER_PATH):packages/aura-core/src uv run mypy agents/bee-keeper/main.py agents/bee-keeper/src
 	MYPYPATH=packages/aura-core/src uv run mypy packages/aura-core/src
 	# Security Audit (Bandit)
@@ -33,9 +33,9 @@ setup-hooks:
 # Run tests
 test:
 	# Run core tests
-	PYTHONPATH=$(CORE_PATH) uv run pytest core/tests/ -v
+	PYTHONPATH=$(CORE_PATH):packages/aura-core/src uv run pytest core/tests/ -v
 	# Run telegram-bot tests with isolated path to avoid 'src' collision
-	PYTHONPATH=$(TG_PATH) uv run pytest adapters/telegram-bot/tests/ -v
+	PYTHONPATH=$(TG_PATH):packages/aura-core/src uv run pytest synapses/telegram-bot/tests/ -v
 
 # Run tests with coverage report
 test-cov:
@@ -53,7 +53,7 @@ build: generate build-tg
 	docker build --platform $(PLATFORM) -t $(REGISTRY)/aura-frontend:$(TAG) -f frontend/Dockerfile .
 
 build-tg:
-	docker build --platform $(PLATFORM) -t $(REGISTRY)/aura-telegram-bot:$(TAG) -f adapters/telegram-bot/Dockerfile .
+	docker build --platform $(PLATFORM) -t $(REGISTRY)/aura-telegram-bot:$(TAG) -f synapses/telegram-bot/Dockerfile .
 
 # --- 3. HELPER ---
 generate:

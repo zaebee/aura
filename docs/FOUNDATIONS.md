@@ -15,10 +15,10 @@ Every element of the Hive exists at one of four levels:
 
 3. **Level 3: The Organs (`/components/proteins`)**
    - **Status:** Specialized Skills.
-   - **Content:** Reusable adapters for external worlds (Solana, Telegram, GitHub, Prometheus).
+   - **Content:** Reusable synapses for external worlds (Solana, Telegram, GitHub, Prometheus).
    - **Rule:** Implements specific `SkillProtocols`. Decoupled from the Brain.
 
-4. **Level 4: The Citizens (`/agents` & `/adapters`)**
+4. **Level 4: The Citizens (`/agents` & `/synapses`)**
    - **Status:** Active Subjects & Passive Servants.
    - **Content:** Composed entities (Brain + specific Proteins).
    - **Rule:** Agents (Keeper, Chronicler) have goals. Adapters (Gateway, Bot) only translate signals.

@@ -99,7 +99,7 @@ Aura Hive uses **Technical Folklore** — bio-organic metaphors layered over pre
 | **Genome** | `aura-core` package | Immutable DNA (Protocols, BaseModels, Types) | `packages/aura-core/` |
 | **Nucleus** | `core` | The sovereign brain | `core/` |
 | **Organs** | `components/proteins` | Specialized skills (Solana, Telegram, GitHub) | `components/proteins/` |
-| **Citizens** | `agents/` + `adapters/` | Active Subjects (goals) + Passive Servants (translation) | `agents/`, `adapters/` |
+| **Citizens** | `agents/` + `synapses/` | Active Subjects (goals) + Passive Servants (translation) | `agents/`, `synapses/` |
 | **Ona** | LLM Reasoning Engine | The thinking substrate (DSPy, LangChain) | N/A (conceptual) |
 | **Jules** | External Action Engine | The doing substrate (API calls, I/O) | N/A (conceptual) |
 

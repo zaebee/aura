@@ -34,7 +34,7 @@ if TYPE_CHECKING:
 
 logger = structlog.get_logger("hive.cortex")
 
-class HiveCortex:
+class HiveCell:
     """
     Cellular Assembly Unit (The Cell).
     Handles the initialization and wiring of all Hive components.
@@ -91,8 +91,46 @@ class HiveCortex:
             registry=self.registry,
         )
 
+        # 4. Start Synapses (optional background tasks)
+        await self._init_synapses()
+
         logger.info("organism_assembly_complete")
         return self.metabolism
+
+    async def _init_synapses(self) -> None:
+        """Initialize and start all configured synapses as background tasks."""
+        if not self.settings.synapses.enabled:
+            return
+
+        import asyncio
+        import importlib.util
+        from pathlib import Path
+
+        for synapse_name in self.settings.synapses.active_synapses:
+            logger.info("starting_synapse", synapse=synapse_name)
+
+            # Convention: synapses/<name>/main.py
+            synapse_path = Path(__file__).resolve().parents[3] / "synapses" / synapse_name / "main.py"
+            if not synapse_path.exists():
+                logger.error("synapse_main_not_found", synapse=synapse_name, path=str(synapse_path))
+                continue
+
+            # Start as a background task
+            # In a real system, we'd use a more robust orchestration
+            async def run_synapse(name, path):
+                try:
+                    spec = importlib.util.spec_from_file_location(f"synapse.{name}", path)
+                    if spec and spec.loader:
+                        module = importlib.util.module_from_spec(spec)
+                        spec.loader.exec_module(module)
+                        if hasattr(module, "main"):
+                            await module.main()
+                        elif hasattr(module, "run"):
+                            await module.run()
+                except Exception as e:
+                    logger.error("synapse_crashed", synapse=name, error=str(e))
+
+            asyncio.create_task(run_synapse(synapse_name, synapse_path))
 
     async def _init_proteins(self) -> None:
         """Instantiate and bind all Proteins according to the Trinity Pattern."""

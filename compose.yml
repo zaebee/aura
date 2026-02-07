@@ -141,7 +141,7 @@ services:
   telegram-bot:
     build:
       context: .
-      dockerfile: adapters/telegram-bot/Dockerfile
+      dockerfile: synapses/telegram-bot/Dockerfile
     restart: on-failure
     environment:
       NATS_URL: ${NATS_URL}

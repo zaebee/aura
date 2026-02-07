@@ -36,14 +36,22 @@ This document serves as the single source of truth for all environment variables
 | `AURA_GATEWAY__CORS_ORIGINS` | `str` | No | `*` | Allowed CORS origins (comma-sep) |
 | `AURA_GATEWAY__OTEL_EXPORTER_OTLP_ENDPOINT` | `str` | No | - | OpenTelemetry collector endpoint |
 
-## 3. Telegram Bot (`tg`)
+## 3. Telegram Bot (`telegram`)
 
 | Variable | Type | Required | Default | Description |
 | :--- | :--- | :---: | :--- | :--- |
-| `AURA_TG__TOKEN` | `Secret` | **Yes** | - | Telegram Bot API Token |
-| `AURA_TG__CORE_URL` | `str` | **Yes** | - | Core gRPC endpoint (FQDN) |
-| `AURA_TG__NATS_URL` | `str` | **Yes** | - | NATS connection URL |
-| `AURA_TG__LOG_LEVEL` | `str` | No | `info` | Logging verbosity |
+| `AURA_TELEGRAM__TOKEN` | `Secret` | **Yes** | - | Telegram Bot API Token |
+| `AURA_TELEGRAM__CORE_URL` | `str` | **Yes** | - | Core gRPC endpoint (FQDN) |
+| `AURA_TELEGRAM__NATS_URL` | `str` | **Yes** | - | NATS connection URL |
+| `AURA_TELEGRAM__LOG_LEVEL` | `str` | No | `info` | Logging verbosity |
+
+## 4. MCP Server (`mcp`)
+
+| Variable | Type | Required | Default | Description |
+| :--- | :--- | :---: | :--- | :--- |
+| `AURA_MCP__GATEWAY_URL` | `str` | No | `http://localhost:8000` | URL of the Aura API Gateway |
+| `AURA_MCP__NATS_URL` | `str` | No | `nats://localhost:4222` | NATS connection URL |
+| `AURA_MCP__LOG_LEVEL` | `str` | No | `INFO` | Logging verbosity |
 
 ---
 

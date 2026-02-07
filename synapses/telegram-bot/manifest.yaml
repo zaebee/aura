@@ -1,0 +1,9 @@
+name: telegram-bot
+role: Synapse
+description: Telegram interface for the Aura Platform.
+capabilities:
+  - chat: Real-time negotiation via Telegram.
+  - search: Item discovery via Telegram.
+nats_subjects:
+  - aura.hive.events.>
+manifest_version: 1.0

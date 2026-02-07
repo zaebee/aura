@@ -30,7 +30,7 @@ flowchart TB
     subgraph Level4["👥 Level 4: The Citizens"]
         direction TB
         Agents["agents/<br/>━━━━━━━━━━━━━━━━<br/>bee-keeper • chronicler<br/>━━━━━━━━━━━━━━━━<br/>ACTIVE SUBJECTS"]
-        Adapters["adapters/<br/>━━━━━━━━━━━━━━━━<br/>api-gateway • telegram-bot<br/>━━━━━━━━━━━━━━━━<br/>PASSIVE SERVANTS"]
+        Adapters["synapses/<br/>━━━━━━━━━━━━━━━━<br/>api-gateway • telegram-bot<br/>━━━━━━━━━━━━━━━━<br/>PASSIVE SERVANTS"]
     end
 
     Level1 -.->|"Types define contracts"| Level2
@@ -174,7 +174,7 @@ grep -r "from aura_core.dna import.*Skill" components/proteins/  # Should succee
 
 ---
 
-### 👥 Level 4: The Citizens (`/agents` & `/adapters`)
+### 👥 Level 4: The Citizens (`/agents` & `/synapses`)
 
 **Status:** Active Subjects & Passive Servants
 
@@ -182,7 +182,7 @@ grep -r "from aura_core.dna import.*Skill" components/proteins/  # Should succee
 - **Agents** (`/agents/`): Composed entities (Brain + Proteins) with **goals**
   - `bee-keeper/` — Architectural auditor
   - `chronicler/` — Documentation maintainer
-- **Adapters** (`/adapters/`): Translation layers with **no goals**
+- **Synapses** (`/synapses/`): Translation layers with **no goals**
   - `api-gateway/` — HTTP ↔ gRPC protocol translator
   - `telegram-bot/` — Telegram ↔ NATS event bridge
 
@@ -195,7 +195,7 @@ grep -r "from aura_core.dna import.*Skill" components/proteins/  # Should succee
 | Citizen Type | Has Goals? | Examples | Behavior |
 |--------------|-----------|----------|----------|
 | **Agent** | ✅ Yes | bee-keeper, chronicler | Proactively watches for violations, initiates audits |
-| **Adapter** | ❌ No | api-gateway, telegram-bot | Reactively translates requests, has no internal objectives |
+| **Synapse** | ❌ No | api-gateway, telegram-bot | Reactively translates requests, has no internal objectives |
 
 **Directory Structure (Agents):**
 ```
@@ -212,14 +212,12 @@ agents/bee-keeper/
     └── bee_keeper.md      # Agent's behavioral DNA
 ```
 
-**Directory Structure (Adapters):**
+**Directory Structure (Synapses):**
 ```
-adapters/api-gateway/
-├── src/
-│   ├── main.py            # FastAPI ↔ gRPC translation
-│   ├── config.py
-│   └── proto/             # Generated gRPC stubs
-└── tests/
+synapses/telegram-bot/
+├── main.py            # Bot ↔ NATS translation
+├── config.py
+└── proto/             # Generated gRPC stubs
 ```
 
 **Verification:**
@@ -227,8 +225,8 @@ adapters/api-gateway/
 # Agents MUST have hive/ directory (ATCG-M structure)
 ls agents/*/src/hive/  # Should list aggregator.py, transformer.py, etc.
 
-# Adapters MUST NOT have hive/ directory (no internal reasoning)
-ls adapters/*/src/hive/  # Should return "No such file or directory"
+# Synapses MUST NOT have hive/ directory (no internal reasoning)
+ls synapses/*/src/hive/  # Should return "No such file or directory"
 ```
 
 ---
@@ -276,7 +274,7 @@ flowchart TB
     Genome["🧬 GENOME<br/>(aura-core)"]
     Nucleus["🧠 NUCLEUS<br/>(core)"]
     Organs["🔬 ORGANS<br/>(proteins)"]
-    Citizens["👥 CITIZENS<br/>(agents + adapters)"]
+    Citizens["👥 CITIZENS<br/>(agents + synapses)"]
 
     Genome -.->|"defines protocols for"| Nucleus
     Genome -.->|"defines protocols for"| Organs
@@ -308,7 +306,7 @@ flowchart TD
     Q3 -->|Yes| Organs["🔬 ORGANS<br/>components/proteins/"]
     Q3 -->|No| Q4{Does it have<br/>goals/agency?}
     Q4 -->|Yes| Agents["👥 AGENTS<br/>agents/"]
-    Q4 -->|No| Adapters["👥 ADAPTERS<br/>adapters/"]
+    Q4 -->|No| Adapters["👥 SYNAPSES<br/>synapses/"]
 
     style Genome fill:#1565c0,color:#fff
     style Nucleus fill:#e65100,color:#fff
@@ -327,7 +325,7 @@ This diagram implements the ontological hierarchy defined in:
 - `packages/aura-core/src/aura_core/dna.py` (Genome implementation)
 - `core/src/hive/` (Nucleus implementation)
 - `components/proteins/` (Organs implementation)
-- `agents/`, `adapters/` (Citizens implementation)
+- `agents/`, `synapses/` (Citizens implementation)
 
 ---
 

@@ -6,7 +6,7 @@ from typing import TYPE_CHECKING, Any, cast
 import grpc
 import grpc.aio
 from grpc_health.v1 import health_pb2, health_pb2_grpc
-from hive.cortex import HiveCortex
+from hive.cortex import HiveCell
 from hive.metabolism.logging_config import (
     bind_request_id,
     clear_request_context,
@@ -290,7 +290,7 @@ async def serve() -> None:
         logger.error("metrics_server_failed", error=str(e))
 
     # 6. Initialize the "Cell" (The Cortex)
-    cell = HiveCortex(settings)
+    cell = HiveCell(settings)
     metabolism = await cell.build_organism()
 
     # 7. Wire fully initialized components

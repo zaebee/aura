@@ -39,18 +39,18 @@ Add this to your Claude Desktop configuration file:
         "--with", "httpx", 
         "--with", "pynacl",
         "--with", "python-dotenv",
-        "https://github.com/zaebee/aura/blob/main/adapters/mcp-server/src/aura_mcp/main.py" 
+        "https://github.com/zaebee/aura/blob/main/synapses/mcp-server/main.py"
         # Note: In a real release, you would point to a PyPI package name
       ],
       "env": {
-        "AURA_GATEWAY_URL": "http://localhost:8000"
+        "AURA_MCP__GATEWAY_URL": "http://localhost:8000"
       }
     }
   }
 }
 ```
 
-*(Note: If you are developing locally, replace the URL with the local path to the `adapters/mcp-server` directory).*
+*(Note: If you are developing locally, replace the URL with the local path to the `synapses/mcp-server` directory).*
 
 ---
 
@@ -66,23 +66,23 @@ If you are contributing to Aura or running the platform locally.
 
 ### 2. Installation
 
-Navigate to the adapter directory:
+Navigate to the synapse directory:
 
 ```bash
-cd adapters/mcp-server
+cd synapses/mcp-server
 uv sync
 ```
 
 ### 3. Running
 
-You can run the server in development mode (with hot reload capabilities provided by `fastmcp` if configured, or just standard run):
+You can run the server in development mode:
 
 ```bash
 # Run as a module (Recommended)
 uv run aura-mcp
 
 # Or via direct file execution (if needed for debug)
-uv run src/aura_mcp/main.py
+uv run main.py
 ```
 
 ---
@@ -120,8 +120,8 @@ The server is configured via Environment Variables.
 
 | Variable | Default | Description |
 | :--- | :--- | :--- |
-| `AURA_GATEWAY_URL` | `http://localhost:8000` | URL of the Aura API Gateway |
-| `LOG_LEVEL` | `INFO` | Logging verbosity (DEBUG, INFO, ERROR) |
+| `AURA_MCP__GATEWAY_URL` | `http://localhost:8000` | URL of the Aura API Gateway |
+| `AURA_MCP__LOG_LEVEL` | `INFO` | Logging verbosity (DEBUG, INFO, ERROR) |
 
 ---
 

@@ -10,6 +10,7 @@ from .llm import LLMSettings
 from .logic import LogicSettings
 from .policy import SafetySettings
 from .server import ServerSettings
+from .synapse import SynapseSettings
 
 
 class Settings(BaseSettings):
@@ -28,6 +29,7 @@ class Settings(BaseSettings):
     safety: SafetySettings = Field(default_factory=lambda: SafetySettings())  # type: ignore
     server: ServerSettings = Field(default_factory=lambda: ServerSettings())  # type: ignore
     heartbeat: HeartbeatSettings = Field(default_factory=lambda: HeartbeatSettings())  # type: ignore
+    synapses: SynapseSettings = Field(default_factory=lambda: SynapseSettings())  # type: ignore
 
 
 @lru_cache

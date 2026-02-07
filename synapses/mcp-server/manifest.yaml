@@ -1,0 +1,9 @@
+name: mcp-server
+role: Synapse
+description: MCP interface for the Aura Platform.
+capabilities:
+  - search_hotels: Find hotels via MCP.
+  - negotiate_price: Negotiate hotel prices via MCP.
+nats_subjects:
+  - aura.hive.events.>
+manifest_version: 1.0

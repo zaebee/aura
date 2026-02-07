@@ -49,7 +49,7 @@ flowchart TB
 
     subgraph Citizens["👥 CITIZENS LAYER"]
         WorkerCells["agents/<br/>━━━━━━━━━━━━━━━━<br/>WorkerCells<br/>━━━━━━━━━━━━━━━━<br/>Autonomous agents"]
-        HiveExtensions["adapters/<br/>━━━━━━━━━━━━━━━━<br/>HiveExtensions<br/>━━━━━━━━━━━━━━━━<br/>Protocol translators"]
+        HiveExtensions["synapses/<br/>━━━━━━━━━━━━━━━━<br/>HiveExtensions<br/>━━━━━━━━━━━━━━━━<br/>Protocol translators"]
         HiveGate["api-gateway/<br/>━━━━━━━━━━━━━━━━<br/>HiveGate<br/>━━━━━━━━━━━━━━━━<br/>HTTP entry point"]
         HiveWindow["frontend/<br/>━━━━━━━━━━━━━━━━<br/>HiveWindow<br/>━━━━━━━━━━━━━━━━<br/>Web interface"]
     end
@@ -112,7 +112,7 @@ flowchart TB
 | Path | Sacred Name | Purpose | Enforced By |
 |------|------------|---------|-------------|
 | `agents/` | **WorkerCells** | Autonomous agents (bee-keeper, chronicler) with goals | bee-keeper |
-| `adapters/` | **HiveExtensions** | Protocol translators (no agency) | bee-keeper |
+| `synapses/` | **HiveExtensions** | Protocol translators (no agency) | bee-keeper |
 | `api-gateway/` | **HiveGate** | HTTP/JSON ↔ gRPC/Protobuf translator | bee-keeper |
 | `frontend/` | **HiveWindow** | Web UI for human operators | bee-keeper |
 
@@ -161,8 +161,8 @@ Each sacred name is chosen to reinforce the bio-organic metaphor:
 - **Metaphor:** Agents are autonomous cells with specialized functions (like immune cells)
 - **Rationale:** "Worker" emphasizes agency and purposeful activity
 
-### HiveExtensions (`adapters/`)
-- **Metaphor:** Adapters extend the Hive's reach into external protocols
+### HiveExtensions (`synapses/`)
+- **Metaphor:** Synapses extend the Hive's reach into external protocols
 - **Rationale:** Like sensory organs extending beyond the body
 
 ---
@@ -223,7 +223,7 @@ aura-hive/
 │       └── src/hive/
 │           ├── proteins/     [EnzymaticHelpers]
 │           └── metabolism/   [MetabolicCore]
-├── 👥 adapters/             [HiveExtensions]
+├── 👥 synapses/             [HiveExtensions]
 ├── 👥 api-gateway/          [HiveGate]
 └── 👥 frontend/             [HiveWindow]
 ```
