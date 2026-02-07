@@ -2,7 +2,7 @@ name: transaction
 role: TreasuryVault
 description: >
   Manages blockchain interactions, currency conversion, and sensitive data encryption.
-  Provides payment verification on Solana and secure storage for deal secrets via Solana enzymes.
+  Provides payment verification on Solana and secure storage for deal secrets via Solana skills.
 capabilities:
   - verify_payment: Confirm receipt of SOL or USDC with matching memo.
   - encrypt_secret: Secure a deal secret before database storage.

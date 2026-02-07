@@ -1,6 +1,6 @@
 from unittest.mock import patch
 
-from src.hive.proteins.reasoning.enzymes.reasoning_engine import (
+from src.hive.proteins.reasoning.engine import (
     AI_Decision,
     LiteLLMStrategy,
 )
@@ -12,7 +12,7 @@ class TestLiteLLMStrategy:
         response = strategy.evaluate(item=None, bid=100.0, reputation=0.8)
         assert response.rejected.reason_code == "ITEM_NOT_FOUND"
 
-    @patch("src.hive.proteins.reasoning.enzymes.reasoning_engine.LLMEngine")
+    @patch("src.hive.proteins.reasoning.engine.LLMEngine")
     def test_evaluate_accept(self, mock_engine_class, mock_item):
         mock_engine = mock_engine_class.return_value
         mock_engine.complete.return_value = AI_Decision(
@@ -23,9 +23,9 @@ class TestLiteLLMStrategy:
         )
 
         with (
-            patch("src.hive.proteins.reasoning.enzymes.reasoning_engine.Template"),
+            patch("src.hive.proteins.reasoning.engine.Template"),
             patch(
-                "src.hive.proteins.reasoning.enzymes.reasoning_engine.open", create=True
+                "src.hive.proteins.reasoning.engine.open", create=True
             ),
         ):
             strategy = LiteLLMStrategy(model="gpt-3.5-turbo")
@@ -34,7 +34,7 @@ class TestLiteLLMStrategy:
             assert response.accepted.final_price == 150.0
             assert "LLM-" in response.accepted.reservation_code
 
-    @patch("src.hive.proteins.reasoning.enzymes.reasoning_engine.LLMEngine")
+    @patch("src.hive.proteins.reasoning.engine.LLMEngine")
     def test_evaluate_counter(self, mock_engine_class, mock_item):
         mock_engine = mock_engine_class.return_value
         mock_engine.complete.return_value = AI_Decision(
@@ -45,9 +45,9 @@ class TestLiteLLMStrategy:
         )
 
         with (
-            patch("src.hive.proteins.reasoning.enzymes.reasoning_engine.Template"),
+            patch("src.hive.proteins.reasoning.engine.Template"),
             patch(
-                "src.hive.proteins.reasoning.enzymes.reasoning_engine.open", create=True
+                "src.hive.proteins.reasoning.engine.open", create=True
             ),
         ):
             strategy = LiteLLMStrategy(model="gpt-3.5-turbo")
@@ -56,7 +56,7 @@ class TestLiteLLMStrategy:
             assert response.countered.proposed_price == 180.0
             assert response.countered.human_message == "Can you do 180?"
 
-    @patch("src.hive.proteins.reasoning.enzymes.reasoning_engine.LLMEngine")
+    @patch("src.hive.proteins.reasoning.engine.LLMEngine")
     def test_evaluate_reject(self, mock_engine_class, mock_item):
         mock_engine = mock_engine_class.return_value
         mock_engine.complete.return_value = AI_Decision(
@@ -64,9 +64,9 @@ class TestLiteLLMStrategy:
         )
 
         with (
-            patch("src.hive.proteins.reasoning.enzymes.reasoning_engine.Template"),
+            patch("src.hive.proteins.reasoning.engine.Template"),
             patch(
-                "src.hive.proteins.reasoning.enzymes.reasoning_engine.open", create=True
+                "src.hive.proteins.reasoning.engine.open", create=True
             ),
         ):
             strategy = LiteLLMStrategy(model="gpt-3.5-turbo")
@@ -74,15 +74,15 @@ class TestLiteLLMStrategy:
 
             assert response.rejected.reason_code == "OFFER_TOO_LOW"
 
-    @patch("src.hive.proteins.reasoning.enzymes.reasoning_engine.LLMEngine")
+    @patch("src.hive.proteins.reasoning.engine.LLMEngine")
     def test_evaluate_ai_error(self, mock_engine_class, mock_item):
         mock_engine = mock_engine_class.return_value
         mock_engine.complete.side_effect = Exception("API error")
 
         with (
-            patch("src.hive.proteins.reasoning.enzymes.reasoning_engine.Template"),
+            patch("src.hive.proteins.reasoning.engine.Template"),
             patch(
-                "src.hive.proteins.reasoning.enzymes.reasoning_engine.open", create=True
+                "src.hive.proteins.reasoning.engine.open", create=True
             ),
         ):
             strategy = LiteLLMStrategy(model="gpt-3.5-turbo")

@@ -14,7 +14,7 @@ from typing import Any
 import dspy
 import structlog
 from dspy.teleprompt import BootstrapFewShot
-from src.hive.proteins.reasoning.enzymes.reasoning_engine import (
+from hive.proteins.reasoning.engine import (
     AuraNegotiator,
     clean_and_parse_json,
 )
@@ -184,7 +184,7 @@ def train_negotiator() -> Any:
     except Exception as e:
         logger.warning("compilation_failed", error=str(e))
         logger.info("falling_back_to_manual_demos")
-        negotiator.negotiate_chain.predict.demos = dspy_examples
+        negotiator.negotiate.demos = dspy_examples
         compiled_negotiator = negotiator
 
     # Save compiled program

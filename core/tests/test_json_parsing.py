@@ -1,5 +1,5 @@
 import pytest
-from src.hive.proteins.reasoning.enzymes.reasoning_engine import clean_and_parse_json
+from src.hive.proteins.reasoning.engine import clean_and_parse_json
 
 
 def test_clean_and_parse_json_pure():

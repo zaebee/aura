@@ -1,6 +1,6 @@
 import pytest
-from hive.proteins.guard.enzymes.guard_logic import OutputGuard
-from hive.proteins.guard.main import GuardSkill
+from hive.proteins.guard.logic import OutputGuard
+from hive.proteins.guard.skill import GuardSkill
 
 from config.policy import SafetySettings
 

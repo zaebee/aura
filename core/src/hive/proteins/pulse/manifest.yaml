@@ -1,7 +1,7 @@
 name: pulse
 role: PulseOrgan
 description: >
-  The Hive's internal communication system using Pulse enzymes.
+  The Hive's internal communication system using Pulse skills.
   Emits events to NATS topics to synchronize other services and adapters.
   Ensures economic heartbeat signals are broadcasted throughout the hive.
 capabilities:

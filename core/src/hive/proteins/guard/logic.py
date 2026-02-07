@@ -14,6 +14,7 @@ class OutputGuard:
     """
     Deterministic safety layer for Aura Core.
     Protects against economic hallucinations and floor price breaches.
+    (The "Greedy Merchant" fix)
     """
 
     def __init__(self, safety_settings: Any = None):
@@ -46,7 +47,10 @@ class OutputGuard:
             raise SafetyViolation("Floor price violation")
 
         # 3. Margin violation
-        margin = (offered_price - internal_cost) / offered_price
+        if offered_price > 0:
+            margin = (offered_price - internal_cost) / offered_price
+        else:
+            margin = 0
 
         # DNA Rule: Safety Guard must "Fail-Closed" if misconfigured.
         if not self.settings:
@@ -69,3 +73,16 @@ class OutputGuard:
             raise SafetyViolation("Minimum profit margin violation")
 
         return True
+
+    def calculate_safe_price(self, context: dict, reason: str) -> float:
+        """Deterministic safe price calculation for override."""
+        floor = float(context.get("floor_price", 0.0))
+        if "margin" in reason.lower():
+            min_m = 0.1
+            if self.settings:
+                min_m = float(self.settings.min_profit_margin)
+
+            if min_m >= 1.0:
+                min_m = 0.1
+            return float(round(floor / (1 - min_m), 2))
+        return float(round(floor * 1.05, 2))

@@ -9,7 +9,7 @@ from sqlalchemy.orm import Session, sessionmaker
 
 from config.database import DatabaseSettings
 
-from .enzymes.postgres import (
+from .db import (
     Base,
     DealStatus,
     InventoryItem,
@@ -85,6 +85,10 @@ class PersistenceSkill(
         except Exception as e:
             logger.error(f"persistence_initialization_failed: {e}")
             return False
+
+    async def post_initialize(self) -> None:
+        """Handle database schema creation after successful connection."""
+        await self._init_db()
 
     async def execute(self, intent: str, params: dict[str, Any]) -> Observation:
         if not self.provider:
