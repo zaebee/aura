@@ -1,3 +1,3 @@
-from .main import PersistenceSkill
+from .skill import PersistenceSkill
 
 __all__ = ["PersistenceSkill"]

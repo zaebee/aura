@@ -1,5 +1,5 @@
 import pytest
-from hive.proteins.telemetry.main import TelemetrySkill
+from hive.proteins.telemetry.skill import TelemetrySkill
 
 from config.server import ServerSettings
 

@@ -1,7 +1,7 @@
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
-from hive.proteins.pulse.main import PulseSkill
+from hive.proteins.pulse.skill import PulseSkill
 
 from config.server import ServerSettings
 
