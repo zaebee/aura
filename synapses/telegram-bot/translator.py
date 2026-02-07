@@ -1,7 +1,9 @@
 from typing import Any
-from aiogram.types import Message, CallbackQuery
+
+from aiogram.types import CallbackQuery, Message
 from aura_core import HiveContext, NegotiationOffer, TelegramContext
 from aura_core.gen.aura.dna.v1 import Event as ProtoEvent
+
 
 class TelegramTranslator:
     @staticmethod
@@ -24,7 +26,7 @@ class TelegramTranslator:
         )
 
     @staticmethod
-    def to_telegram_context(signal: Any, state_data: dict = None) -> TelegramContext:
+    def to_telegram_context(signal: Any, state_data: dict | None = None) -> TelegramContext:
         state_data = state_data or {}
         user_id = 0
         chat_id = 0

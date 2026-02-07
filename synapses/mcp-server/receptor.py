@@ -1,6 +1,7 @@
-import structlog
-import uuid
 from typing import Any
+
+import structlog
+
 from translator import MCPTranslator
 
 logger = structlog.get_logger(__name__)
@@ -43,10 +44,14 @@ class MCPReceptor:
 
             # Determine status
             status = "unknown"
-            if "accepted" in res and res["accepted"]: status = "accepted"
-            elif "countered" in res and res["countered"]: status = "countered"
-            elif "ui_required" in res and res["ui_required"]: status = "ui_required"
-            elif "rejected" in res and res["rejected"]: status = "rejected"
+            if "accepted" in res and res["accepted"]:
+                status = "accepted"
+            elif "countered" in res and res["countered"]:
+                status = "countered"
+            elif "ui_required" in res and res["ui_required"]:
+                status = "ui_required"
+            elif "rejected" in res and res["rejected"]:
+                status = "rejected"
 
             # Use translator to format for LLM
             return MCPTranslator.format_negotiation_response(status, res.get(status, {}) if status != "unknown" else {})

@@ -25,7 +25,9 @@ class AgentWallet:
     - Signature verification
     """
 
-    def __init__(self, private_key_hex: str = None, public_key_hex: str = None):
+    def __init__(
+        self, private_key_hex: str | None = None, public_key_hex: str | None = None
+    ) -> None:
         """
         Initialize agent wallet with existing keys or generate new ones.
 
@@ -35,6 +37,7 @@ class AgentWallet:
 
         If no keys are provided, a new key pair is generated.
         """
+        self.signing_key: nacl.signing.SigningKey | None = None
         if private_key_hex:
             # Load existing private key
             private_key_bytes = bytes.fromhex(private_key_hex)

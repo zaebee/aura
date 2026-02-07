@@ -1,3 +1,5 @@
+from typing import Any
+
 from aiogram import F, Router
 from aiogram.filters import Command, CommandObject
 from aiogram.fsm.context import FSMContext
@@ -6,7 +8,6 @@ from aiogram.types import (
     CallbackQuery,
     Message,
 )
-from typing import Any
 from translator import TelegramTranslator
 
 router = Router()

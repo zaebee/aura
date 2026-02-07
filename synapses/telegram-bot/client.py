@@ -4,7 +4,7 @@ from typing import Any
 import grpc
 import structlog
 from aura.negotiation.v1 import negotiation_pb2, negotiation_pb2_grpc
-from aura_core import Observation, SearchResult, NegotiationResult
+from aura_core import NegotiationResult, Observation, SearchResult
 from google.protobuf.json_format import MessageToDict
 
 logger = structlog.get_logger()

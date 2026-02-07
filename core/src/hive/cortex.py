@@ -117,7 +117,7 @@ class HiveCell:
 
             # Start as a background task
             # In a real system, we'd use a more robust orchestration
-            async def run_synapse(name, path):
+            async def run_synapse(name: str, path: Path) -> None:
                 try:
                     spec = importlib.util.spec_from_file_location(f"synapse.{name}", path)
                     if spec and spec.loader:

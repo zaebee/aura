@@ -1,6 +1,5 @@
 import structlog
 from aiogram import Bot
-from aura_core.gen.aura.dna.v1 import Event as ProtoEvent
 from translator import TelegramTranslator
 
 logger = structlog.get_logger(__name__)
@@ -9,7 +8,7 @@ class TelegramEffector:
     def __init__(self, bot: Bot):
         self.bot = bot
 
-    async def emit(self, event_binary: bytes):
+    async def emit(self, event_binary: bytes) -> None:
         """Processes a binary event from the NATS bloodstream and sends it to the user."""
         try:
             event = TelegramTranslator.from_proto_event(event_binary)

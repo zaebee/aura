@@ -1,13 +1,13 @@
 import asyncio
 import logging
+
 import nats
 import structlog
-import grpc
 from aiogram import Bot, Dispatcher
-from aura_core import SkillRegistry
-from receptor import router
-from effector import TelegramEffector
 from client import GRPCNegotiationClient
+from effector import TelegramEffector
+from receptor import router
+
 from config import settings
 
 # Setup logging

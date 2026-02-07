@@ -7,6 +7,7 @@ PLATFORM ?= linux/amd64
 CORE_PATH ?= core:core/src
 GATEWAY_PATH ?= api-gateway/src
 TG_PATH ?= synapses/telegram-bot:synapses/telegram-bot/proto
+MCP_PATH ?= synapses/mcp-server:synapses/mcp-server/proto
 KEEPER_PATH ?= agents/bee-keeper/src
 
 # --- 1. CODE QUALITY ---
@@ -19,6 +20,7 @@ lint:
 	MYPYPATH=$(CORE_PATH) uv run mypy core/src
 	MYPYPATH=$(GATEWAY_PATH):packages/aura-core/src uv run mypy api-gateway/src
 	MYPYPATH=$(TG_PATH):packages/aura-core/src uv run mypy synapses/telegram-bot
+	MYPYPATH=$(MCP_PATH):packages/aura-core/src uv run mypy synapses/mcp-server
 	MYPYPATH=$(KEEPER_PATH):packages/aura-core/src uv run mypy agents/bee-keeper/main.py agents/bee-keeper/src
 	MYPYPATH=packages/aura-core/src uv run mypy packages/aura-core/src
 	# Security Audit (Bandit)

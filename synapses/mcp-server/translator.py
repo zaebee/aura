@@ -1,6 +1,5 @@
-from typing import Any
-from aura_core import HiveContext, NegotiationOffer
 from aura_core.gen.aura.dna.v1 import Event as ProtoEvent
+
 
 class MCPTranslator:
     @staticmethod

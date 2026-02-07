@@ -1,11 +1,13 @@
 import asyncio
+
 import nats
 import structlog
-from fastmcp import FastMCP
-from config import settings
-from receptor import MCPReceptor
-from effector import MCPEffector
+from fastmcp import FastMCP  # type: ignore[import-not-found]
+
 from client import GRPCMetabolismClient
+from config import settings
+from effector import MCPEffector
+from receptor import MCPReceptor
 from wallet import AgentWallet
 
 # Configure logging
@@ -48,7 +50,7 @@ def demonstrate_wallet() -> str:
     """Demonstrate the generated wallet's DID."""
     return f"🔑 Agent Wallet DID: {wallet.did}"
 
-async def start():
+async def start() -> None:
     logger.info("🔑 Generated temporary agent wallet", did=wallet.did)
 
     # Initialize NATS
@@ -56,7 +58,7 @@ async def start():
         nc = await nats.connect(settings.nats_url)
         logger.info("Connected to NATS", url=settings.nats_url)
 
-        async def nats_listener():
+        async def nats_listener() -> None:
             sub = await nc.subscribe("aura.hive.events.>")
             async for msg in sub.messages:
                 await effector.emit(msg.data)
@@ -69,7 +71,7 @@ async def start():
     logger.info("MCP Synapse ready")
     mcp.run()
 
-def main():
+def main() -> None:
     asyncio.run(start())
 
 if __name__ == "__main__":
