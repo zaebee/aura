@@ -184,7 +184,9 @@ def train_negotiator() -> Any:
     except Exception as e:
         logger.warning("compilation_failed", error=str(e))
         logger.info("falling_back_to_manual_demos")
-        negotiator.negotiate_chain.predict.demos = dspy_examples
+        # Fix: negotiator has 'negotiate' attribute, not 'negotiate_chain'
+        if hasattr(negotiator, "negotiate"):
+            negotiator.negotiate.demos = dspy_examples
         compiled_negotiator = negotiator
 
     # Save compiled program

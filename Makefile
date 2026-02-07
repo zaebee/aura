@@ -102,6 +102,8 @@ core-train:
 	# Train the DSPy negotiation engine
 	PYTHONPATH=$(CORE_PATH) uv run python core/scripts/training/train_dspy.py
 
+train: core-train
+
 # Test health endpoints
 tools-health:
 	# Test health check endpoints (requires running services)
