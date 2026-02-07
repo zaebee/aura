@@ -60,7 +60,7 @@ async def test_aggregator_perceive(mocker):
 
 @pytest.mark.asyncio
 async def test_membrane_outbound_override(mocker):
-    from hive.proteins.guard.logic import OutputGuard
+    from hive.proteins.guard.engine import OutputGuard
 
     from config.policy import SafetySettings
 
@@ -123,7 +123,7 @@ async def test_membrane_inbound_invalid_bid():
 
 @pytest.mark.asyncio
 async def test_membrane_invalid_min_margin(mocker):
-    from hive.proteins.guard.logic import OutputGuard
+    from hive.proteins.guard.engine import OutputGuard
 
     from config.policy import SafetySettings
 

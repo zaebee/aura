@@ -51,7 +51,9 @@ class JetStreamProvider:
         ts.FromDatetime(datetime.now(UTC))
         return ts
 
-    def _create_trace_context(self, trace_id: str | None = None, span_id: str | None = None) -> dna_pb2.TraceContext:
+    def _create_trace_context(
+        self, trace_id: str | None = None, span_id: str | None = None
+    ) -> dna_pb2.TraceContext:
         """Create trace context for OTel propagation."""
         trace = dna_pb2.TraceContext()
         trace.trace_id = trace_id or uuid.uuid4().hex
@@ -92,7 +94,9 @@ class JetStreamProvider:
             binary_data = event.SerializeToString()
             ack = await self.js.publish(event.topic, binary_data)
 
-            logger.debug(f"Published negotiation event: stream={ack.stream}, seq={ack.seq}, bytes={len(binary_data)}")
+            logger.debug(
+                f"Published negotiation event: stream={ack.stream}, seq={ack.seq}, bytes={len(binary_data)}"
+            )
             return True
 
         except Exception as e:
@@ -128,7 +132,9 @@ class JetStreamProvider:
             binary_data = event.SerializeToString()
             ack = await self.js.publish(event.topic, binary_data)
 
-            logger.debug(f"Published heartbeat: stream={ack.stream}, seq={ack.seq}, bytes={len(binary_data)}")
+            logger.debug(
+                f"Published heartbeat: stream={ack.stream}, seq={ack.seq}, bytes={len(binary_data)}"
+            )
             return True
 
         except Exception as e:
@@ -252,6 +258,7 @@ class JetStreamProvider:
 
         try:
             import json
+
             data = json.dumps(payload).encode()
             ack = await self.js.publish(topic, data)
             logger.warning(f"Published raw JSON (deprecated): {topic}, seq={ack.seq}")

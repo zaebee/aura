@@ -47,10 +47,10 @@ class TelegramAggregator(Aggregator[Any, TelegramContext]):
                         # Note: We might need a way to map session_token to chat_id
                         # For now, we'll extract what we can
                         context = TelegramContext(
-                            user_id=0, # Unknown from binary event
-                            chat_id=0, # Unknown from binary event
+                            user_id=0,  # Unknown from binary event
+                            chat_id=0,  # Unknown from binary event
                             message_text=f"NATS Event: {event.topic}",
-                            metadata={"event": event}
+                            metadata={"event": event},
                         )
                         return context
                 except Exception as e:
