@@ -2,6 +2,7 @@ import logging
 from typing import Any
 
 from aura_core import Observation, SkillProtocol
+from aura_core.gen.aura.dna.v1 import MetricParams
 
 from config.server import ServerSettings
 
@@ -11,7 +12,6 @@ from .enzymes.prometheus import (
     negotiation_accepted_total,
     negotiation_total,
 )
-from .schema import MetricIncrementParams
 
 logger = logging.getLogger(__name__)
 
@@ -44,13 +44,14 @@ class TelemetrySkill(SkillProtocol[ServerSettings, Any, dict[str, Any], Observat
         try:
             if intent in ["fetch_metrics", "get_vitals"]:
                 vitals = await fetch_vitals(self._metrics_cache, self.settings)
-                return Observation(success=True, data=vitals.model_dump())
+                return Observation(success=True, system_vitals=vitals)
 
             elif intent == "health_check":
-                return Observation(success=True, data={"status": "healthy"})
+                from aura_core.gen.aura.dna.v1 import SystemVitals, VitalsStatus
+                return Observation(success=True, system_vitals=SystemVitals(status=VitalsStatus.VITALS_STATUS_OK))
 
             elif intent == "increment_counter":
-                p = MetricIncrementParams(**params)
+                p = MetricParams().from_dict(params)
                 if p.name == "negotiation_total":
                     negotiation_total.labels(**p.labels).inc()
                 elif p.name == "negotiation_accepted_total":

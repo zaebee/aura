@@ -12,10 +12,12 @@ from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 import structlog
-from src.hive.proteins.reasoning.enzymes.reasoning_engine import (
+from src.hive.proteins.reasoning.enzymes.engine import (
     AuraNegotiator,
-    DSPyStrategy,
     Negotiate,
+)
+from src.hive.proteins.reasoning.enzymes.dspy_strategy import (
+    DSPyStrategy,
 )
 
 # Configure logging
@@ -71,7 +73,7 @@ def test_dspy_strategy_initialization():
     try:
         # Mock the loading to avoid file issues
         with patch(
-            "src.hive.proteins.reasoning.enzymes.reasoning_engine.dspy.load"
+            "src.hive.proteins.reasoning.enzymes.engine.dspy.load"
         ) as mock_load:
             mock_load.return_value = AuraNegotiator()
 

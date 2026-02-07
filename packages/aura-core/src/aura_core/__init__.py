@@ -17,28 +17,28 @@ from .manifest import (
     resolve_brain_path,
 )
 from .metabolism import (
-    BaseConnector,
-    MetabolicLoop,
-    SkillRegistry,
-)
-from .types import (
     AuditObservation,
+    BaseConnector,
     BeeContext,
     BeeObservation,
     Event,
     FailureIntent,
     HiveContext,
     IntentAction,
-    NegotiationOffer,
+    MetabolicLoop,
     NegotiationResult,
     Observation,
     SearchResult,
     Signal,
+    SkillRegistry,
     SystemVitals,
     TelegramContext,
     UIAction,
     get_raw_key,
     map_action,
+)
+from .gen.aura.dna.v1 import (
+    NegotiationOffer,
 )
 
 __all__ = [

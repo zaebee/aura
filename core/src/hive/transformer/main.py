@@ -2,6 +2,8 @@ import time
 from typing import Any, cast
 
 import structlog
+from pathlib import Path
+
 from aura_core import (
     FailureIntent,
     HiveContext,
@@ -31,12 +33,12 @@ class RuleBasedStrategy:
 
     def evaluate(
         self,
-        item_data: dict[str, Any],
+        item: Any,
         bid: float,
         reputation: float,
         request_id: str | None = None,
     ) -> IntentAction:
-        if not item_data:
+        if not item or not item.id:
             return IntentAction(
                 action=cast(ActionType, ActionType.ACTION_TYPE_REJECT),
                 price=0.0,
@@ -55,7 +57,7 @@ class RuleBasedStrategy:
                 thought="<think>Bid exceeds security threshold. UI confirmation required.</think>",
             )
 
-        floor_price = item_data.get("floor_price", 0.0)
+        floor_price = item.floor_price
         # Rule: Bid below floor price - counter with floor price
         if bid < floor_price:
             return IntentAction(
@@ -83,8 +85,20 @@ class AuraTransformer(Transformer[HiveContext, IntentAction]):
         self.settings = settings
         self.registry = registry
         compiled_path = None
-        if settings and hasattr(settings, "llm") and hasattr(settings.llm, "compiled_program_path"):
+        if (
+            settings
+            and hasattr(settings, "llm")
+            and hasattr(settings.llm, "compiled_program_path")
+        ):
             compiled_path = settings.llm.compiled_program_path
+
+        # DNA Rule: Relative path resolution for brain
+        if not compiled_path:
+            # Look in core/data relative to this file
+            possible_path = Path(__file__).parents[3] / "data" / "aura_brain.json"
+            if possible_path.exists():
+                compiled_path = str(possible_path)
+
         self.brain_path = resolve_brain_path(compiled_path)
 
     def _get_cpu_load(self, system_health: SystemVitals | dict[str, Any]) -> float:
@@ -99,11 +113,11 @@ class AuraTransformer(Transformer[HiveContext, IntentAction]):
             constraints.append("SYSTEM_LOAD_HIGH: Be extremely concise.")
 
         return {
-            "base_price": context.item_data.get("base_price", 0.0),
-            "floor_price": context.item_data.get("floor_price", 0.0),
+            "base_price": context.item.base_price,
+            "floor_price": context.item.floor_price,
             "reputation": context.offer.reputation,
             "system_constraints": constraints,
-            "meta": context.item_data.get("meta", {}),
+            "meta": context.item.meta,
         }
 
     async def think(self, context: HiveContext, **kwargs: Any) -> IntentAction:
@@ -115,7 +129,7 @@ class AuraTransformer(Transformer[HiveContext, IntentAction]):
                 trigger_price=self.settings.safety.ui_trigger_price
             )
             return strategy.evaluate(
-                context.item_data,
+                context.item,
                 context.offer.bid_amount,
                 context.offer.reputation,
                 context.request_id,
@@ -133,23 +147,23 @@ class AuraTransformer(Transformer[HiveContext, IntentAction]):
                 },
             )
 
-            if not obs.success:
+            if not obs.success or not obs.negotiation_result:
                 logger.error("reasoning_protein_failed", error=obs.error)
                 return FailureIntent(error=obs.error or "unknown_error")
 
-            result = obs.data
+            result = obs.negotiation_result
 
             # Implement <think> tag logic for transparency
-            raw_thought = result.get("thought", "")
+            raw_thought = result.thought
             wrapped_thought = f"<think>\n{raw_thought}\n</think>" if raw_thought else ""
 
             return IntentAction(
-                action=cast(ActionType, map_action(result["action"])),
-                price=result["price"],
-                message=result["message"],
+                action=cast(ActionType, map_action(result.action)),
+                price=result.price,
+                message=result.message,
                 thought=wrapped_thought,
                 metadata={
-                    **result.get("metadata", {}),
+                    **result.metadata,
                     "brain_path": self.brain_path,
                 },
             )

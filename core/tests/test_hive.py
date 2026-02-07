@@ -9,6 +9,7 @@ from aura_core import (
     SkillRegistry,
     SystemVitals,
 )
+from aura_core.gen.aura.dna.v1 import ItemData
 from hive.aggregator import HiveAggregator
 from hive.membrane import HiveMembrane
 from hive.proteins.guard import GuardSkill
@@ -22,13 +23,13 @@ async def test_aggregator_perceive(mocker):
     mock_persistence.execute = AsyncMock(
         return_value=Observation(
             success=True,
-            data={
-                "id": "item1",
-                "name": "Test Item",
-                "base_price": 150.0,
-                "floor_price": 100.0,
-                "meta": {},
-            },
+            item=ItemData(
+                id="item1",
+                name="Test Item",
+                base_price=150.0,
+                floor_price=100.0,
+                meta={},
+            ),
         )
     )
     registry.register("persistence", mock_persistence)
@@ -55,7 +56,7 @@ async def test_aggregator_perceive(mocker):
     assert context.item_id == "item1"
     assert context.offer.bid_amount == 100.0
     assert context.system_health.cpu_usage_percent == 10.0
-    assert context.item_data["floor_price"] == 100.0
+    assert context.item.floor_price == 100.0
 
 
 @pytest.mark.asyncio
@@ -75,7 +76,7 @@ async def test_membrane_outbound_override(mocker):
     context = HiveContext(
         item_id="item1",
         offer=NegotiationOffer(bid_amount=50.0, agent_did="did1", reputation=0.9),
-        item_data={"floor_price": 100.0},
+        item=ItemData(id="item1", floor_price=100.0),
     )
 
     # LLM tries to accept below floor - should trigger FLOOR_PRICE_VIOLATION
@@ -138,7 +139,7 @@ async def test_membrane_invalid_min_margin(mocker):
     context = HiveContext(
         item_id="item1",
         offer=NegotiationOffer(bid_amount=50.0, agent_did="did1", reputation=0.9),
-        item_data={"floor_price": 100.0},
+        item=ItemData(id="item1", floor_price=100.0),
     )
 
     decision = IntentAction(action="accept", price=200.0, message="OK")

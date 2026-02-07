@@ -2,10 +2,8 @@ import tempfile
 from pathlib import Path
 from unittest.mock import patch
 
-from src.hive.proteins.reasoning.enzymes.reasoning_engine import (
-    AuraNegotiator,
-    DSPyStrategy,
-)
+from src.hive.proteins.reasoning.enzymes.engine import AuraNegotiator
+from src.hive.proteins.reasoning.enzymes.dspy_strategy import DSPyStrategy
 
 
 def test_dspy_strategy_init_minimal():
@@ -17,7 +15,7 @@ def test_dspy_strategy_init_minimal():
     try:
         # Mock the loading to avoid file issues
         with patch(
-            "src.hive.proteins.reasoning.enzymes.reasoning_engine.dspy.load"
+            "src.hive.proteins.reasoning.enzymes.engine.dspy.load"
         ) as mock_load:
             mock_load.return_value = AuraNegotiator()
 

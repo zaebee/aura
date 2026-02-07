@@ -1,15 +1,15 @@
+from pathlib import Path
 from typing import Any
 
 import structlog
 from aura_core import (
     Aggregator,
     HiveContext,
-    NegotiationOffer,
     SkillRegistry,
     SystemVitals,
     resolve_brain_path,
 )
-from aura_core.gen.aura.dna.v1 import Signal
+from aura_core.gen.aura.dna.v1 import ItemData, NegotiationOffer, Signal
 
 logger = structlog.get_logger(__name__)
 
@@ -21,8 +21,20 @@ class HiveAggregator(Aggregator[Any, HiveContext]):
         self.settings = settings
         self.registry = registry
         compiled_path = None
-        if settings and hasattr(settings, "llm") and hasattr(settings.llm, "compiled_program_path"):
+        if (
+            settings
+            and hasattr(settings, "llm")
+            and hasattr(settings.llm, "compiled_program_path")
+        ):
             compiled_path = settings.llm.compiled_program_path
+
+        # DNA Rule: Relative path resolution for brain
+        if not compiled_path:
+            # Look in core/data relative to this file
+            possible_path = Path(__file__).parents[3] / "data" / "aura_brain.json"
+            if possible_path.exists():
+                compiled_path = str(possible_path)
+
         self.brain_path = resolve_brain_path(compiled_path)
 
     async def get_vitals(self) -> SystemVitals:
@@ -30,17 +42,20 @@ class HiveAggregator(Aggregator[Any, HiveContext]):
         try:
             # Call Telemetry Protein via SkillRegistry
             obs = await self.registry.execute("telemetry", "fetch_metrics", {})
-            if obs.success:
-                return SystemVitals(**obs.data)
-            return SystemVitals(status="unstable", timestamp="", error=obs.error)
+            if obs.success and obs.system_vitals:
+                return obs.system_vitals
+            from aura_core.gen.aura.dna.v1 import VitalsStatus
+            return SystemVitals(status=VitalsStatus.VITALS_STATUS_DEGRADED, error=obs.error or "unknown_error")
         except Exception as e:
             logger.error("aggregator_vitals_unexpected_error", error=str(e))
             return SystemVitals(status="error", timestamp="", error=str(e))
 
     async def get_system_metrics(self) -> dict[str, Any]:
         """Backward compatibility for legacy status calls."""
+        import betterproto
         vitals = await self.get_vitals()
-        return dict(vitals.model_dump())
+        # Betterproto to_dict() works well for compatibility
+        return vitals.to_dict(casing=betterproto.Casing.SNAKE, include_default_values=True)
 
     async def perceive(self, signal: Any, **kwargs: Any) -> HiveContext:
         """
@@ -74,28 +89,21 @@ class HiveAggregator(Aggregator[Any, HiveContext]):
                 agent_did=signal.agent.did,
             )
 
-        item_data = {}
+        item_data = ItemData()
         try:
             # Call Persistence Protein via SkillRegistry
             obs = await self.registry.execute(
                 "persistence", "read_item", {"item_id": item_id}
             )
-            if obs.success and obs.data:
-                item = obs.data
-                item_data = {
-                    "id": item["id"],
-                    "name": item["name"],
-                    "base_price": item["base_price"],
-                    "floor_price": item["floor_price"],
-                    "meta": item["meta"] or {},
-                }
+            if obs.success and obs.item:
+                item_data = obs.item
         except Exception as e:
             logger.error("aggregator_persistence_error", error=str(e))
 
         return HiveContext(
             item_id=item_id,
             offer=offer,
-            item_data=item_data,
+            item=item_data,
             # system_health will be automatically injected by MetabolicLoop
             request_id=request_id,
             metadata={"brain_path": self.brain_path},

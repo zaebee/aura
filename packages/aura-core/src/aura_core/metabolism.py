@@ -5,9 +5,11 @@ This module contains the executable machinery that powers the Hive's metabolism.
 The Protocols (the "Law") live in dna.py; this module provides the "Engine".
 """
 
-from typing import Any, cast
+from dataclasses import dataclass, field
+from typing import Any, Protocol, TypedDict, cast, runtime_checkable
 
 import opentelemetry.trace as trace
+from pydantic import SecretStr
 
 from .dna import (
     Aggregator,
@@ -17,9 +19,125 @@ from .dna import (
     SkillProtocol,
     Transformer,
 )
-from .types import Observation
+from .gen.aura.dna.v1 import (
+    ActionType,
+    AuditObservation as ProtoAuditObservation,
+    BeeContextData as BeeContext,
+    Event as ProtoEvent,
+    HiveContextData as HiveContext,
+    Observation as ProtoObservation,
+    SystemVitals as ProtoSystemVitals,
+    TelegramContextData as TelegramContext,
+)
+
+# Alias for Protocol Sovereignty
+SystemVitals = ProtoSystemVitals
+Observation = ProtoObservation
+Event = ProtoEvent
+AuditObservation = ProtoAuditObservation
+
+@runtime_checkable
+class Signal(Protocol):
+    """Protocol for inbound signals."""
+
+    pass
+
+@dataclass
+class IntentAction:
+    """Strictly typed intent returned by the Transformer."""
+
+    action: str | ActionType  # String for legacy, ActionType for crystalline
+    price: float
+    message: str
+    thought: str = ""
+    steps: list[dict[str, Any]] = field(default_factory=list)
+    metadata: dict[str, Any] = field(default_factory=dict)
+
+
+@dataclass
+class FailureIntent(IntentAction):
+    """Specialized intent for when the LLM or processing fails."""
+
+    error: str = ""
+    action: str | ActionType = cast(ActionType, ActionType.ACTION_TYPE_ERROR)
+    price: float = 0.0
+    message: str = "Internal processing error. Defaulting to safe state."
+
+
+class SearchResult(TypedDict):
+    item_id: str
+    name: str
+    base_price: float
+    description_snippet: str | None
+
+
+class NegotiationResult(TypedDict, total=False):
+    accepted: dict[str, Any] | None
+    countered: dict[str, Any] | None
+    rejected: dict[str, Any] | None
+    ui_required: dict[str, Any] | None
+    error: str | None
+
+
+@dataclass
+class BeeObservation:
+    """Observation resulting from BeeKeeper's actions."""
+
+    success: bool
+    github_comment_url: str = ""
+    nats_event_sent: bool = False
+    injuries: list[str] = field(default_factory=list)
+    report: "AuditObservation | None" = None
+    context: "BeeContext | None" = None
+    metadata: dict[str, Any] = field(default_factory=dict)
+
+
+@dataclass
+class UIAction:
+    """Structured action for the Telegram UI."""
+
+    text: str
+    reply_markup: Any | None = None
+    parse_mode: str | None = "Markdown"
+    action_type: str = (
+        "send_message"  # e.g., "send_message", "answer_callback", "edit_message"
+    )
+    show_thinking: bool = False
+    metadata: dict[str, Any] = field(default_factory=dict)
 
 tracer = trace.get_tracer(__name__)
+
+
+def map_action(action_str: str | None) -> ActionType:
+    """
+    Standardized mapper for negotiation actions.
+    Converts LLM strings to strict ActionType enum.
+    """
+    from typing import cast
+
+    if not action_str:
+        return cast(ActionType, ActionType.ACTION_TYPE_UNSPECIFIED)
+
+    mapping = {
+        "accept": ActionType.ACTION_TYPE_ACCEPT,
+        "counter": ActionType.ACTION_TYPE_COUNTER,
+        "counteroffer": ActionType.ACTION_TYPE_COUNTER,
+        "reject": ActionType.ACTION_TYPE_REJECT,
+        "ui_required": ActionType.ACTION_TYPE_UI_REQUIRED,
+        "error": ActionType.ACTION_TYPE_ERROR,
+    }
+    val = mapping.get(action_str.lower(), ActionType.ACTION_TYPE_UNSPECIFIED)
+    return cast(ActionType, val)
+
+
+def get_raw_key(key_field: SecretStr | str) -> str:
+    """
+    Safely retrieve the raw string value from a SecretStr or a plain string.
+    Fixes AttributeError: 'str' object has no attribute 'get_secret_value'.
+    """
+    if isinstance(key_field, SecretStr):
+        return key_field.get_secret_value()
+    return key_field  # It's already a string
 
 
 class SkillRegistry:

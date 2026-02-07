@@ -17,10 +17,7 @@ class TestRuleBasedStrategy:
 
         # Bid below floor price (floor_price=150)
         response = strategy.evaluate(
-            item_data={
-                "floor_price": mock_item.floor_price,
-                "base_price": mock_item.base_price,
-            },
+            item=mock_item,
             bid=100.0,
             reputation=0.8,
             request_id="test-request-1",
@@ -42,10 +39,7 @@ class TestRuleBasedStrategy:
 
         # Bid above trigger price
         response = strategy.evaluate(
-            item_data={
-                "floor_price": mock_item.floor_price,
-                "base_price": mock_item.base_price,
-            },
+            item=mock_item,
             bid=1500.0,
             reputation=0.9,
             request_id="test-request-2",
@@ -61,10 +55,7 @@ class TestRuleBasedStrategy:
         strategy = RuleBasedStrategy()
 
         response = strategy.evaluate(
-            item_data={
-                "floor_price": mock_item.floor_price,
-                "base_price": mock_item.base_price,
-            },
+            item=mock_item,
             bid=150.0,  # Exactly at floor price
             reputation=0.8,
             request_id="test-request-3",
@@ -79,10 +70,7 @@ class TestRuleBasedStrategy:
         strategy = RuleBasedStrategy()
 
         response = strategy.evaluate(
-            item_data={
-                "floor_price": mock_item.floor_price,
-                "base_price": mock_item.base_price,
-            },
+            item=mock_item,
             bid=175.0,  # Between floor (150) and base (200)
             reputation=0.8,
             request_id="test-request-4",
@@ -96,10 +84,7 @@ class TestRuleBasedStrategy:
         strategy = RuleBasedStrategy()
 
         response = strategy.evaluate(
-            item_data={
-                "floor_price": mock_item.floor_price,
-                "base_price": mock_item.base_price,
-            },
+            item=mock_item,
             bid=250.0,  # Above base price (200)
             reputation=0.8,
             request_id="test-request-5",
@@ -113,7 +98,7 @@ class TestRuleBasedStrategy:
         strategy = RuleBasedStrategy()
 
         response = strategy.evaluate(
-            item_data={},
+            item=None,
             bid=100.0,
             reputation=0.8,
             request_id="test-request-6",
@@ -128,10 +113,7 @@ class TestRuleBasedStrategy:
         strategy = RuleBasedStrategy(trigger_price=500.0)
 
         response = strategy.evaluate(
-            item_data={
-                "floor_price": mock_item.floor_price,
-                "base_price": mock_item.base_price,
-            },
+            item=mock_item,
             bid=600.0,  # Above custom trigger (500)
             reputation=0.8,
             request_id="test-request-7",
@@ -144,10 +126,7 @@ class TestRuleBasedStrategy:
         strategy = RuleBasedStrategy(trigger_price=1000.0)
 
         response = strategy.evaluate(
-            item_data={
-                "floor_price": mock_item.floor_price,
-                "base_price": mock_item.base_price,
-            },
+            item=mock_item,
             bid=999.0,  # Just below trigger
             reputation=0.8,
             request_id="test-request-8",
@@ -161,10 +140,7 @@ class TestRuleBasedStrategy:
         strategy = RuleBasedStrategy(trigger_price=1000.0)
 
         response = strategy.evaluate(
-            item_data={
-                "floor_price": mock_item.floor_price,
-                "base_price": mock_item.base_price,
-            },
+            item=mock_item,
             bid=1000.0,  # Exactly at trigger
             reputation=0.8,
             request_id="test-request-9",

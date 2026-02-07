@@ -66,6 +66,7 @@ class TelegramAggregator(Aggregator[Any, TelegramContext]):
                 chat_id = signal.message.chat.id if signal.message else 0
                 callback_data = signal.data
                 span.set_attribute("signal_type", "callback_query")
+                span.set_attribute("callback_data", callback_data)
 
             item_id = str(state_data.get("item_id", ""))
             bid_amount = 0.0
@@ -75,20 +76,21 @@ class TelegramAggregator(Aggregator[Any, TelegramContext]):
             # Negotiation history could be added to metadata if we had it in state_data
             history = state_data.get("history", [])
 
+            import json
             hive_context = HiveContext(
                 item_id=item_id,
                 offer=NegotiationOffer(bid_amount=bid_amount),
                 # system_health will be automatically injected by MetabolicLoop
-                metadata={"history": history},
+                metadata={"history_json": json.dumps(history)},
             )
 
             context = TelegramContext(
                 user_id=user_id,
                 chat_id=chat_id,
+                message_text=text or "",
+                fsm_state=str(state_data.get("state", "unknown")),
                 hive_context=hive_context,
-                message_text=text,
-                callback_data=callback_data,
-                fsm_data=state_data,
+                metadata={str(k): str(v) for k, v in state_data.items() if k != "state"},
             )
 
             span.set_attribute("user_id", user_id)

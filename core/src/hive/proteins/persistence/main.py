@@ -4,6 +4,7 @@ from datetime import UTC, datetime
 from typing import Any, cast
 
 from aura_core import Observation, SkillProtocol
+from aura_core.gen.aura.dna.v1 import DealData, ItemData
 from sqlalchemy import Engine, text
 from sqlalchemy.orm import Session, sessionmaker
 
@@ -15,7 +16,6 @@ from .enzymes.postgres import (
     InventoryItem,
     LockedDeal,
 )
-from .schema import DealSchema, ItemSchema
 
 logger = logging.getLogger(__name__)
 
@@ -128,29 +128,44 @@ class PersistenceSkill(
         if not item_id:
             return Observation(success=False, error="item_id_required")
 
-        def fetch() -> dict[str, Any] | None:
+        def fetch() -> ItemData | None:
             with self._get_session() as session:
                 item = session.query(InventoryItem).filter_by(id=item_id).first()
                 if item:
-                    return ItemSchema.model_validate(item).model_dump()
+                    # DNA Rule: Import data structures EXCLUSIVELY from aura_core.gen
+                    return ItemData(
+                        id=item.id,
+                        name=item.name,
+                        base_price=item.base_price,
+                        floor_price=item.floor_price,
+                        meta={str(k): str(v) for k, v in item.meta.items()},
+                        is_active=item.is_active,
+                    )
                 return None
 
         result = await asyncio.to_thread(fetch)
         if result:
-            return Observation(success=True, data=result)
+            return Observation(success=True, item=result)
         return Observation(success=False, error="item_not_found")
 
     async def _get_first_item(self) -> Observation:
-        def fetch() -> dict[str, Any] | None:
+        def fetch() -> ItemData | None:
             with self._get_session() as session:
                 item = session.query(InventoryItem).first()
                 if item:
-                    return ItemSchema.model_validate(item).model_dump()
+                    return ItemData(
+                        id=item.id,
+                        name=item.name,
+                        base_price=item.base_price,
+                        floor_price=item.floor_price,
+                        meta={str(k): str(v) for k, v in item.meta.items()},
+                        is_active=item.is_active,
+                    )
                 return None
 
         result = await asyncio.to_thread(fetch)
         if result:
-            return Observation(success=True, data=result)
+            return Observation(success=True, item=result)
         return Observation(success=False, error="no_items_found")
 
     async def _create_deal(self, params: dict[str, Any]) -> Observation:
@@ -183,32 +198,56 @@ class PersistenceSkill(
         if not deal_id:
             return Observation(success=False, error="deal_id_required")
 
-        def fetch() -> dict[str, Any] | None:
+        def fetch() -> DealData | None:
             with self._get_session() as session:
                 deal = session.query(LockedDeal).filter_by(id=deal_id).first()
                 if deal:
-                    return DealSchema.model_validate(deal).model_dump()
+                    return DealData(
+                        id=str(deal.id),
+                        item_id=deal.item_id,
+                        item_name=deal.item_name,
+                        final_price=deal.final_price,
+                        currency=deal.currency,
+                        payment_memo=deal.payment_memo,
+                        status=deal.status.value if hasattr(deal.status, "value") else str(deal.status),
+                        buyer_did=deal.buyer_did,
+                        expires_at=deal.expires_at,
+                        transaction_hash=deal.transaction_hash,
+                        paid_at=deal.paid_at,
+                    )
                 return None
 
         result = await asyncio.to_thread(fetch)
         if result:
-            return Observation(success=True, data=result)
+            return Observation(success=True, deal=result)
         return Observation(success=False, error="deal_not_found")
 
     async def _get_deal_by_memo(self, memo: str | None) -> Observation:
         if not memo:
             return Observation(success=False, error="memo_required")
 
-        def fetch() -> dict[str, Any] | None:
+        def fetch() -> DealData | None:
             with self._get_session() as session:
                 deal = session.query(LockedDeal).filter_by(payment_memo=memo).first()
                 if deal:
-                    return DealSchema.model_validate(deal).model_dump()
+                    return DealData(
+                        id=str(deal.id),
+                        item_id=deal.item_id,
+                        item_name=deal.item_name,
+                        final_price=deal.final_price,
+                        currency=deal.currency,
+                        payment_memo=deal.payment_memo,
+                        status=deal.status.value if hasattr(deal.status, "value") else str(deal.status),
+                        buyer_did=deal.buyer_did,
+                        expires_at=deal.expires_at,
+                        transaction_hash=deal.transaction_hash,
+                        paid_at=deal.paid_at,
+                    )
                 return None
 
         result = await asyncio.to_thread(fetch)
         if result:
-            return Observation(success=True, data=result)
+            return Observation(success=True, deal=result)
         return Observation(success=False, error="deal_not_found")
 
     async def _update_deal_status(self, params: dict[str, Any]) -> Observation:
@@ -271,11 +310,12 @@ class PersistenceSkill(
             return Observation(success=False, error=str(e))
 
     async def _vector_search(self, params: dict[str, Any]) -> Observation:
+        from aura_core.gen.aura.dna.v1 import ItemList
         query_vector = params.get("query_vector")
         limit = params.get("limit", 5)
         min_similarity = params.get("min_similarity")
 
-        def search() -> list[dict[str, Any]]:
+        def search() -> list[ItemData]:
             with self._get_session() as session:
                 results = (
                     session.query(
@@ -295,11 +335,18 @@ class PersistenceSkill(
                     if min_similarity and similarity < min_similarity:
                         continue
 
-                    response_items.append(
-                        ItemSchema.model_validate(item).model_dump()
-                        | {"similarity_score": similarity}
+                    data = ItemData(
+                        id=item.id,
+                        name=item.name,
+                        base_price=item.base_price,
+                        floor_price=item.floor_price,
+                        meta={str(k): str(v) for k, v in item.meta.items()},
+                        is_active=item.is_active,
                     )
+                    # Note: Betterproto doesn't support adding extra fields to messages.
+                    # We might need to use metadata for similarity score.
+                    response_items.append(data)
                 return response_items
 
         results = await asyncio.to_thread(search)
-        return Observation(success=True, data=results)
+        return Observation(success=True, item_list=ItemList(items=results))
