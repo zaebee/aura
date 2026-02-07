@@ -33,7 +33,7 @@
     * [Aura Brand Implementation Guide](frontend/docs/BRAND_IMPLEMENTATION.md)
 * [synapses](synapses/README.md)
   * [Aura MCP Server](synapses/mcp-server/README.md)
-  * [Aura Telegram Bot Adapter](synapses/telegram-bot/README.md)
+  * [Aura Telegram Bot](synapses/telegram-bot/README.md)
 * [agents](agents/README.md)
   * [bee.Keeper Agent](agents/bee-keeper/README.md)
     * [prompts](agents/bee-keeper/prompts/README.md)

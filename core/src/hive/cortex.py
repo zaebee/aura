@@ -3,9 +3,6 @@ from typing import TYPE_CHECKING, Any, cast
 import dspy
 import structlog
 from aura_core import SkillProtocol, SkillRegistry, get_raw_key
-from opentelemetry.instrumentation.grpc import GrpcInstrumentorServer
-from opentelemetry.instrumentation.langchain import LangchainInstrumentor
-from prometheus_client import start_http_server
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
@@ -15,16 +12,17 @@ from hive.generator import HiveGenerator
 from hive.membrane import HiveMembrane
 from hive.metabolism import MetabolicLoop
 from hive.proteins.guard import GuardSkill
-from hive.proteins.guard.engine import OutputGuard
+from hive.proteins.guard.logic import OutputGuard
 from hive.proteins.persistence import PersistenceSkill
 from hive.proteins.pulse import PulseSkill
-from hive.proteins.pulse.engine import NatsProvider
+
+# --- Implementation Details (Flattened) ---
+from hive.proteins.pulse.broker import NatsProvider
 from hive.proteins.reasoning import ReasoningSkill
 from hive.proteins.reasoning.engine import get_embedding_model
 from hive.proteins.telemetry import TelemetrySkill
-from hive.proteins.telemetry.engine import init_telemetry
 from hive.proteins.transaction import TransactionSkill
-from hive.proteins.transaction.engine import (
+from hive.proteins.transaction.solana import (
     PriceConverter,
     SecretEncryption,
     SolanaProvider,
@@ -35,7 +33,6 @@ if TYPE_CHECKING:
     from hive.metabolism import MetabolicLoop
 
 logger = structlog.get_logger("hive.cortex")
-
 
 class HiveCell:
     """
@@ -49,15 +46,12 @@ class HiveCell:
         self.metabolism: MetabolicLoop | None = None
         self.market_service: Any = None
 
-    async def build_organism(self) -> "MetabolicLoop":
+    async def build_organism(self) -> MetabolicLoop:
         """
         Instantiate, bind, and wire all Proteins and Nucleotides.
         Returns a fully functional MetabolicLoop.
         """
         logger.info("assembling_hive_cell")
-
-        # 0. Initialize Infrastructure (Telemetry, Tracing, Instrumentation)
-        self._init_infrastructure()
 
         # 1. Initialize Proteins (Skills)
         await self._init_proteins()
@@ -70,11 +64,11 @@ class HiveCell:
         market_service = None
         if self.settings.crypto.enabled:
             from hive.services.market import MarketService
-
             persistence = cast(SkillProtocol, self.registry.get("persistence"))
             transaction = cast(SkillProtocol, self.registry.get("transaction"))
             market_service = MarketService(
-                persistence=persistence, transaction=transaction
+                persistence=persistence,
+                transaction=transaction
             )
             self.market_service = market_service
             logger.info("market_service_wired")
@@ -82,9 +76,9 @@ class HiveCell:
         connector = HiveConnector(
             registry=self.registry,
             market_service=market_service,
-            settings=self.settings,
+            settings=self.settings
         )
-        generator = HiveGenerator(registry=self.registry, settings=self.settings)
+        generator = HiveGenerator(registry=self.registry)
         membrane = HiveMembrane(registry=self.registry)
 
         # 3. Form the Metabolic Loop
@@ -103,32 +97,55 @@ class HiveCell:
         logger.info("organism_assembly_complete")
         return self.metabolism
 
-    def _init_infrastructure(self) -> None:
-        """Initialize telemetry, tracing, and gRPC instrumentation."""
-        # 1. Start Prometheus metrics server
-        try:
-            metrics_port = self.settings.server.metrics_port
-            start_http_server(metrics_port)
-            logger.info("metrics_server_started", port=metrics_port)
-        except Exception as e:
-            logger.error("metrics_server_failed", error=str(e), exc_info=True)
+    async def _init_synapses(self) -> None:
+        """Initialize and start all configured synapses as background tasks."""
+        if not self.settings.synapses.enabled:
+            return
 
-        # 2. Initialize OpenTelemetry tracing
-        service_name = self.settings.server.otel_service_name
-        otel_endpoint = str(self.settings.server.otel_exporter_otlp_endpoint)
+        import asyncio
+        import importlib.util
+        from pathlib import Path
 
-        init_telemetry(service_name, otel_endpoint)
-        logger.info(
-            "telemetry_initialized",
-            service_name=service_name,
-            endpoint=otel_endpoint,
-        )
+        # Robust project root discovery via marker file
+        project_root = Path(__file__).resolve().parent
+        while project_root != project_root.parent:
+            if (project_root / "pyproject.toml").exists():
+                break
+            project_root = project_root.parent
 
-        # 3. Instrument gRPC server for distributed tracing
-        GrpcInstrumentorServer().instrument()
+        for synapse_name in self.settings.synapses.active_synapses:
+            logger.info("starting_synapse", synapse=synapse_name)
 
-        # 4. Instrument LangChain for LLM call tracing
-        LangchainInstrumentor().instrument()
+            # Convention: synapses/<name>/main.py
+            synapse_path = project_root / "synapses" / synapse_name / "main.py"
+            if not synapse_path.exists():
+                logger.error(
+                    "synapse_main_not_found",
+                    synapse=synapse_name,
+                    path=str(synapse_path),
+                )
+                continue
+
+            # Start as a background task
+            # In a real system, we'd use a more robust orchestration
+            async def run_synapse(name: str, path: Path) -> None:
+                try:
+                    spec = importlib.util.spec_from_file_location(
+                        f"synapse.{name}", path
+                    )
+                    if spec and spec.loader:
+                        module = importlib.util.module_from_spec(spec)
+                        spec.loader.exec_module(module)
+                        if hasattr(module, "main"):
+                            await module.main()
+                        elif hasattr(module, "run"):
+                            await module.run()
+                except Exception as e:
+                    logger.error(
+                        "synapse_crashed", synapse=name, error=str(e), exc_info=True
+                    )
+
+            asyncio.create_task(run_synapse(synapse_name, synapse_path))
 
     async def _init_proteins(self) -> None:
         """Instantiate and bind all Proteins according to the Trinity Pattern."""
@@ -158,18 +175,14 @@ class HiveCell:
 
         # 5. Guard
         guard = GuardSkill()
-        guard.bind(
-            self.settings.safety, OutputGuard(safety_settings=self.settings.safety)
-        )
+        guard.bind(self.settings.safety, OutputGuard(safety_settings=self.settings.safety))
 
         # 6. Transaction (Optional)
         transaction = None
         if self.settings.crypto.enabled:
             bundle = {
                 "provider": SolanaProvider(
-                    private_key_base58=get_raw_key(
-                        self.settings.crypto.solana_private_key
-                    ),
+                    private_key_base58=get_raw_key(self.settings.crypto.solana_private_key),
                     rpc_url=str(self.settings.crypto.solana_rpc_url),
                     usdc_mint=self.settings.crypto.solana_usdc_mint,
                 ),
@@ -199,11 +212,5 @@ class HiveCell:
                     logger.error("protein_initialization_failed", protein=name)
                 else:
                     # Optional post-initialization hook for protein-specific setup (e.g. DB init)
-                    if hasattr(skill, "post_initialize") and callable(
-                        skill.post_initialize
-                    ):
+                    if hasattr(skill, "post_initialize") and callable(skill.post_initialize):
                         await skill.post_initialize()
-
-
-# Alias for backward compatibility during transition
-HiveCortex = HiveCell

@@ -24,11 +24,11 @@ RUN uv sync --frozen --no-install-project --group dev --package telegram-bot
 COPY proto/ /app/proto/
 
 # Generate gRPC stubs
-RUN mkdir -p /app/synapses/telegram-bot/src/proto && \
+RUN mkdir -p /app/synapses/telegram-bot/proto && \
     uv run python -m grpc_tools.protoc -I /app/proto \
-    --python_out=/app/synapses/telegram-bot/src/proto \
-    --grpc_python_out=/app/synapses/telegram-bot/src/proto \
-    --pyi_out=/app/synapses/telegram-bot/src/proto \
+    --python_out=/app/synapses/telegram-bot/proto \
+    --grpc_python_out=/app/synapses/telegram-bot/proto \
+    --pyi_out=/app/synapses/telegram-bot/proto \
     /app/proto/aura/negotiation/v1/negotiation.proto
 
 # Final sync for production (no-dev, no-editable, scoped to package)
@@ -43,14 +43,14 @@ WORKDIR /app
 COPY --from=builder /app/.venv /app/.venv
 
 # Copy source code and generated stubs to the same relative path as builder
-COPY synapses/telegram-bot/src /app/synapses/telegram-bot/src
-COPY --from=builder /app/synapses/telegram-bot/src/proto /app/synapses/telegram-bot/src/proto
+COPY synapses/telegram-bot /app/synapses/telegram-bot
+COPY --from=builder /app/synapses/telegram-bot/proto /app/synapses/telegram-bot/proto
 
 WORKDIR /app/synapses/telegram-bot
 
 # Set PATH to use the virtual environment
 ENV PATH="/app/.venv/bin:$PATH"
-ENV PYTHONPATH=/app/synapses/telegram-bot/src:/app/synapses/telegram-bot/src/proto
+ENV PYTHONPATH=/app/synapses/telegram-bot:/app/synapses/telegram-bot/proto
 
 # Command to run the bot
-CMD ["python", "src/main.py"]
+CMD ["python", "main.py"]

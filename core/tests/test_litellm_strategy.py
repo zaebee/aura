@@ -24,7 +24,9 @@ class TestLiteLLMStrategy:
 
         with (
             patch("src.hive.proteins.reasoning.engine.Template"),
-            patch("src.hive.proteins.reasoning.engine.open", create=True),
+            patch(
+                "src.hive.proteins.reasoning.engine.open", create=True
+            ),
         ):
             strategy = LiteLLMStrategy(model="gpt-3.5-turbo")
             response = strategy.evaluate(item=mock_item, bid=150.0, reputation=0.8)
@@ -44,7 +46,9 @@ class TestLiteLLMStrategy:
 
         with (
             patch("src.hive.proteins.reasoning.engine.Template"),
-            patch("src.hive.proteins.reasoning.engine.open", create=True),
+            patch(
+                "src.hive.proteins.reasoning.engine.open", create=True
+            ),
         ):
             strategy = LiteLLMStrategy(model="gpt-3.5-turbo")
             response = strategy.evaluate(item=mock_item, bid=150.0, reputation=0.8)
@@ -61,7 +65,9 @@ class TestLiteLLMStrategy:
 
         with (
             patch("src.hive.proteins.reasoning.engine.Template"),
-            patch("src.hive.proteins.reasoning.engine.open", create=True),
+            patch(
+                "src.hive.proteins.reasoning.engine.open", create=True
+            ),
         ):
             strategy = LiteLLMStrategy(model="gpt-3.5-turbo")
             response = strategy.evaluate(item=mock_item, bid=50.0, reputation=0.8)
@@ -75,7 +81,9 @@ class TestLiteLLMStrategy:
 
         with (
             patch("src.hive.proteins.reasoning.engine.Template"),
-            patch("src.hive.proteins.reasoning.engine.open", create=True),
+            patch(
+                "src.hive.proteins.reasoning.engine.open", create=True
+            ),
         ):
             strategy = LiteLLMStrategy(model="gpt-3.5-turbo")
             response = strategy.evaluate(item=mock_item, bid=150.0, reputation=0.8)

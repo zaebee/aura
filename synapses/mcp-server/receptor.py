@@ -40,7 +40,7 @@ class MCPReceptor:
                 return f"❌ Negotiation failed: {observation.error}"
 
             # Observation.data should contain the negotiation result (dict)
-            res = observation.data
+            res = observation.data or {}
 
             # Determine status
             status = "unknown"

@@ -214,12 +214,10 @@ agents/bee-keeper/
 
 **Directory Structure (Synapses):**
 ```
-synapses/api-gateway/
-├── src/
-│   ├── main.py            # FastAPI ↔ gRPC translation
-│   ├── config.py
-│   └── proto/             # Generated gRPC stubs
-└── tests/
+synapses/telegram-bot/
+├── main.py            # Bot ↔ NATS translation
+├── config.py
+└── proto/             # Generated gRPC stubs
 ```
 
 **Verification:**
