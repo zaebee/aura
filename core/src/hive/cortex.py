@@ -1,7 +1,10 @@
-from typing import Any, cast
+from typing import TYPE_CHECKING, Any, cast
 
+import dspy
 import structlog
-from aura_core import SkillProtocol, SkillRegistry
+from aura_core import SkillProtocol, SkillRegistry, get_raw_key
+from sqlalchemy import create_engine
+from sqlalchemy.orm import sessionmaker
 
 from hive.aggregator import HiveAggregator
 from hive.connector import HiveConnector
@@ -9,12 +12,25 @@ from hive.generator import HiveGenerator
 from hive.membrane import HiveMembrane
 from hive.metabolism import MetabolicLoop
 from hive.proteins.guard import GuardSkill
+from hive.proteins.guard.logic import OutputGuard
 from hive.proteins.persistence import PersistenceSkill
 from hive.proteins.pulse import PulseSkill
+
+# --- Implementation Details (Flattened) ---
+from hive.proteins.pulse.broker import NatsProvider
 from hive.proteins.reasoning import ReasoningSkill
+from hive.proteins.reasoning.engine import get_embedding_model
 from hive.proteins.telemetry import TelemetrySkill
 from hive.proteins.transaction import TransactionSkill
+from hive.proteins.transaction.solana import (
+    PriceConverter,
+    SecretEncryption,
+    SolanaProvider,
+)
 from hive.transformer import AuraTransformer
+
+if TYPE_CHECKING:
+    from hive.metabolism import MetabolicLoop
 
 logger = structlog.get_logger("hive.cortex")
 
@@ -80,21 +96,6 @@ class HiveCortex:
 
     async def _init_proteins(self) -> None:
         """Instantiate and bind all Proteins according to the Trinity Pattern."""
-        import dspy
-        from aura_core import get_raw_key
-        from sqlalchemy import create_engine
-        from sqlalchemy.orm import sessionmaker
-
-        from hive.proteins.guard.logic import OutputGuard
-
-        # --- Implementation Details (Flattened) ---
-        from hive.proteins.pulse.broker import NatsProvider
-        from hive.proteins.reasoning.engine import get_embedding_model
-        from hive.proteins.transaction.solana import (
-            PriceConverter,
-            SecretEncryption,
-            SolanaProvider,
-        )
 
         # 1. Persistence
         engine = create_engine(str(self.settings.database.url))
@@ -156,7 +157,7 @@ class HiveCortex:
                 success = await skill.initialize()
                 if not success:
                     logger.error("protein_initialization_failed", protein=name)
-
-                # Special case: DB init
-                if name == "persistence" and success:
-                    await skill.execute("init_db", {})
+                else:
+                    # Optional post-initialization hook for protein-specific setup (e.g. DB init)
+                    if hasattr(skill, "post_initialize") and callable(skill.post_initialize):
+                        await skill.post_initialize()

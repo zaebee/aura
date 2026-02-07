@@ -1,7 +1,7 @@
 import asyncio
 import uuid
 from concurrent import futures
-from typing import Any, cast
+from typing import TYPE_CHECKING, Any, cast
 
 import grpc
 import grpc.aio
@@ -21,6 +21,9 @@ from opentelemetry.instrumentation.langchain import LangchainInstrumentor
 from prometheus_client import start_http_server
 
 from config import settings
+
+if TYPE_CHECKING:
+    from hive.metabolism import MetabolicLoop
 
 # Configure structured logging on startup
 configure_logging(log_level=settings.server.log_level)
@@ -59,7 +62,7 @@ class NegotiationService(negotiation_pb2_grpc.NegotiationServiceServicer):
 
     def __init__(
         self,
-        metabolism: Any = None,
+        metabolism: 'MetabolicLoop' | None = None,
         market_service: Any = None,
     ) -> None:
         self.metabolism = metabolism
@@ -135,7 +138,13 @@ class NegotiationService(negotiation_pb2_grpc.NegotiationServiceServicer):
                 "generate_embedding", {"text": request.query}
             )
             if not embed_obs.success:
+                logger.error(
+                    "embedding_generation_failed",
+                    query=request.query,
+                    error=embed_obs.error,
+                )
                 context.set_code(grpc.StatusCode.INTERNAL)
+                context.set_details(f"Failed to generate embedding: {embed_obs.error}")
                 return negotiation_pb2.SearchResponse()
 
             obs = await persistence.execute(
@@ -148,7 +157,9 @@ class NegotiationService(negotiation_pb2_grpc.NegotiationServiceServicer):
             )
 
             if not obs.success:
+                logger.error("vector_search_failed", error=obs.error)
                 context.set_code(grpc.StatusCode.INTERNAL)
+                context.set_details(f"Search failed: {obs.error}")
                 return negotiation_pb2.SearchResponse()
 
             response_items = [
@@ -162,11 +173,13 @@ class NegotiationService(negotiation_pb2_grpc.NegotiationServiceServicer):
                 for item in obs.data
             ]
 
+            logger.info("search_completed", result_count=len(response_items))
             return negotiation_pb2.SearchResponse(results=response_items)
 
         except Exception as e:
             logger.error("search_error", error=str(e))
             context.set_code(grpc.StatusCode.INTERNAL)
+            context.set_details(str(e))
             return negotiation_pb2.SearchResponse()
         finally:
             if request_id:
@@ -189,26 +202,62 @@ class NegotiationService(negotiation_pb2_grpc.NegotiationServiceServicer):
                 cached=vitals.cached,
             )
         except Exception as e:
-            logger.error("system_status_error", error=str(e))
+            logger.error("system_status_error", error=str(e), exc_info=True)
             return negotiation_pb2.GetSystemStatusResponse(status="error")
 
     async def CheckDealStatus(
         self, request: negotiation_pb2.CheckDealStatusRequest, context: Any
     ) -> negotiation_pb2.CheckDealStatusResponse:
         """Check crypto payment status."""
-        if not settings.crypto.enabled or not self.market_service:
-            context.set_code(grpc.StatusCode.UNIMPLEMENTED)
-            return negotiation_pb2.CheckDealStatusResponse(status="NOT_FOUND")
+        request_id = extract_request_id(context)
+        if request_id:
+            bind_request_id(request_id)
 
         try:
-            uuid.UUID(request.deal_id)
-            return cast(
+            # Feature toggle check
+            if not settings.crypto.enabled or not self.market_service:
+                logger.warning("crypto_disabled", deal_id=request.deal_id)
+                context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+                context.set_details("Crypto payments not enabled")
+                return negotiation_pb2.CheckDealStatusResponse(status="NOT_FOUND")
+
+            # Validate UUID format
+            try:
+                uuid.UUID(request.deal_id)
+            except ValueError:
+                logger.warning("invalid_deal_id", deal_id=request.deal_id)
+                context.set_code(grpc.StatusCode.INVALID_ARGUMENT)
+                context.set_details("Invalid deal_id format")
+                return negotiation_pb2.CheckDealStatusResponse(status="NOT_FOUND")
+
+            logger.info("check_deal_status_started", deal_id=request.deal_id)
+
+            # Check payment status via MarketService
+            response = cast(
                 negotiation_pb2.CheckDealStatusResponse,
                 await self.market_service.check_status(deal_id=request.deal_id),
             )
+
+            logger.info(
+                "check_deal_status_completed",
+                deal_id=request.deal_id,
+                status=response.status,
+            )
+            return response
+
         except Exception as e:
-            logger.error("check_deal_status_error", error=str(e))
+            logger.error(
+                "check_deal_status_error",
+                deal_id=request.deal_id,
+                error=str(e),
+                exc_info=True,
+            )
+            context.set_code(grpc.StatusCode.INTERNAL)
+            context.set_details("Payment verification failed")
             return negotiation_pb2.CheckDealStatusResponse(status="NOT_FOUND")
+        finally:
+            if request_id:
+                clear_request_context()
 
 
 async def serve() -> None:
