@@ -1,3 +1,3 @@
-from .skill import PulseSkill
+from .main import PulseSkill
 
 __all__ = ["PulseSkill"]

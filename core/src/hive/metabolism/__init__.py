@@ -26,7 +26,6 @@ class MetabolicLoop(
 ):
     """
     Orchestrates the ATCG flow with core-specific monitoring via Telemetry Protein.
-    Purified: No manual vitals injection in the loop; Nucleotides are Pure Pipes.
     """
 
     def __init__(
@@ -44,7 +43,6 @@ class MetabolicLoop(
     async def execute(self, signal: Any, **kwargs: Any) -> Any:
         """
         Execute one full metabolic cycle.
-        Pure implementation: Signal -> A -> T -> C -> G (with Membrane guards).
         """
         if self.registry:
             await self.registry.execute(
@@ -55,26 +53,7 @@ class MetabolicLoop(
 
         logger.info("metabolism_cycle_started")
 
-        with tracer.start_as_current_span("metabolic_loop"):
-            # 1. Inbound Membrane
-            if self.membrane and hasattr(self.membrane, "inspect_inbound"):
-                signal = await self.membrane.inspect_inbound(signal)
-
-            # 2. Aggregator (A) - Perceives Signal + Internal State (Vitals)
-            context = await self.aggregator.perceive(signal, **kwargs)
-
-            # 3. Transformer (T) - Reasoning
-            decision = await self.transformer.think(context, **kwargs)
-
-            # 4. Outbound Membrane - Deterministic Guards
-            if self.membrane and hasattr(self.membrane, "inspect_outbound"):
-                decision = await self.membrane.inspect_outbound(decision, context)
-
-            # 5. Connector (C) - Physical Action
-            observation = await self.connector.act(decision, context)
-
-            # 6. Generator (G) - Event Emission
-            await self.generator.pulse(observation)
+        observation = await super().execute(signal, **kwargs)
 
         if observation.success and observation.event_type == "negotiation_accept":
             if self.registry:

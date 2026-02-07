@@ -12,7 +12,7 @@ from jinja2 import Template
 from langchain_mistralai import MistralAIEmbeddings
 from pydantic import BaseModel
 
-from hive.proto.aura.negotiation.v1 import negotiation_pb2
+import hive.proto.aura.negotiation.v1.negotiation_pb2 as negotiation_pb2
 
 logger = structlog.get_logger(__name__)
 

@@ -5,10 +5,12 @@ from aura_core import Observation, SkillProtocol
 
 from config.policy import SafetySettings
 
-from .logic import OutputGuard, SafetyViolation
+from .enzymes.guard_logic import OutputGuard, SafetyViolation
 from .schema import SafePriceParams, ValidationParams
 
 logger = logging.getLogger(__name__)
+
+DEFAULT_MIN_MARGIN = 0.1
 
 
 class GuardSkill(
@@ -16,7 +18,7 @@ class GuardSkill(
 ):
     """
     Guard Protein: Handles safety validation and safe price calculation.
-    Crystallized: Implementation logic moved to logic.py.
+    Standardized following the Crystalline Protein Standard and Enzyme pattern.
     """
 
     def __init__(self) -> None:
@@ -47,7 +49,7 @@ class GuardSkill(
 
             elif intent == "get_safe_price":
                 p_safe = SafePriceParams(**params)
-                price = self.provider.calculate_safe_price(p_safe.context, p_safe.reason)
+                price = self._calculate_safe_price(p_safe.context, p_safe.reason)
                 return Observation(success=True, data={"safe_price": price})
 
             return Observation(success=False, error=f"Unknown intent: {intent}")
@@ -59,7 +61,7 @@ class GuardSkill(
             elif "floor" in err_msg.lower():
                 code = "FLOOR_PRICE_VIOLATION"
 
-            safe_p = self.provider.calculate_safe_price(params.get("context", {}), code)
+            safe_p = self._calculate_safe_price(params.get("context", {}), code)
             return Observation(
                 success=False,
                 error=err_msg,
@@ -67,3 +69,15 @@ class GuardSkill(
             )
         except Exception as e:
             return Observation(success=False, error=str(e))
+
+    def _calculate_safe_price(self, context: dict, reason: str) -> float:
+        floor = float(context.get("floor_price", 0.0))
+        if "margin" in reason.lower():
+            min_m = DEFAULT_MIN_MARGIN
+            if self.settings:
+                min_m = float(self.settings.min_profit_margin)
+
+            if min_m >= 1.0:
+                min_m = DEFAULT_MIN_MARGIN
+            return float(round(floor / (1 - min_m), 2))
+        return float(round(floor * 1.05, 2))

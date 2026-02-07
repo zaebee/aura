@@ -1,4 +1,5 @@
 
+import betterproto
 from aiogram.types import Message
 from aura_core.gen.aura.negotiation.v1 import (
     AgentIdentity,
@@ -35,10 +36,10 @@ class TelegramTranslator:
 
     @staticmethod
     def from_negotiate_response(response: NegotiateResponse) -> str:
-        result_type = response.which_oneof("result")
+        result_type, _ = betterproto.which_one_of(response, "result")
 
         if result_type == "accepted":
-            reveal_method = response.accepted.which_oneof("reveal_method")
+            reveal_method, _ = betterproto.which_one_of(response.accepted, "reveal_method")
             if reveal_method == "crypto_payment":
                 p = response.accepted.crypto_payment
                 return (

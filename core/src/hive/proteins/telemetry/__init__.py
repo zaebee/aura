@@ -1,3 +1,3 @@
-from .skill import TelemetrySkill
+from .main import TelemetrySkill
 
 __all__ = ["TelemetrySkill"]

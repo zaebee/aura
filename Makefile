@@ -66,6 +66,9 @@ generate:
 		mkdir -p packages/aura-core/src/aura_core/gen/aura/dna/google; \
 		echo "from betterproto.lib.google import protobuf" > packages/aura-core/src/aura_core/gen/aura/dna/google/__init__.py; \
 	fi
+	find packages/aura-core/src/aura_core/gen -type d -exec touch {}/__init__.py \;
+	find core/src/hive/proto -type d -exec touch {}/__init__.py \;
+	find synapses/telegram-bot/src/proto -type d -exec touch {}/__init__.py \;
 
 # --- 4. PUBLISH (CI ONLY) ---
 push: push-tg

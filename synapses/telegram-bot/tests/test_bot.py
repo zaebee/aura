@@ -2,7 +2,6 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 from aiogram.filters import CommandObject
-from aura_core import Observation
 from bot import (
     NegotiationStates,
     cmd_search,
@@ -20,13 +19,13 @@ async def test_cmd_start(message):
 
 
 @pytest.mark.asyncio
-async def test_cmd_search_results(message, mock_metabolism):
+async def test_cmd_search_results(message, mock_receptor):
     command = MagicMock(spec=CommandObject)
     command.args = "Paris"
 
-    await cmd_search(message, command, mock_metabolism)
+    await cmd_search(message, command, mock_receptor)
 
-    mock_metabolism.execute.assert_called_with(message)
+    mock_receptor.search.assert_called_with("Paris")
 
 
 @pytest.mark.asyncio
@@ -43,18 +42,14 @@ async def test_process_select_hotel(callback_query):
 
 
 @pytest.mark.asyncio
-async def test_process_bid_accepted(message, mock_metabolism):
+async def test_process_bid_accepted(message, mock_receptor):
     state = AsyncMock()
     state.get_data.return_value = {"item_id": "hotel_1"}
     message.text = "90"
 
-    mock_metabolism.execute.return_value = Observation(
-        success=True, event_type="deal_accepted"
-    )
+    mock_receptor.negotiate.return_value = "✅ *Bid Accepted!*"
 
-    await process_bid(message, state, mock_metabolism)
+    await process_bid(message, state, mock_receptor)
 
-    mock_metabolism.execute.assert_called_with(
-        message, state_data={"item_id": "hotel_1"}
-    )
+    mock_receptor.negotiate.assert_called_with(message, "hotel_1", 90.0)
     state.clear.assert_called()

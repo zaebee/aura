@@ -23,13 +23,11 @@ def mock_client():
 
 
 @pytest.fixture
-def mock_metabolism(mock_client):
-    metabolism = AsyncMock()
-    metabolism.connector = MagicMock()
-    metabolism.connector.search_core = mock_client.search
-    metabolism.execute_negotiation = AsyncMock()
-    metabolism.execute_search = AsyncMock()
-    return metabolism
+def mock_receptor():
+    receptor = AsyncMock()
+    receptor.search = AsyncMock(return_value="🏨 *Search Results:*")
+    receptor.negotiate = AsyncMock(return_value="✅ *Bid Accepted!*")
+    return receptor
 
 
 @pytest.fixture

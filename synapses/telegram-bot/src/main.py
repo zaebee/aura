@@ -3,11 +3,11 @@ import logging
 
 import structlog
 from aiogram import Bot, Dispatcher
+from bot import router
+from effector import TelegramEffector
+from receptor import TelegramReceptor
 
-from .bot import router
-from .config import settings
-from .effector import TelegramEffector
-from .receptor import TelegramReceptor
+from config import settings
 
 # Setup logging
 level = getattr(logging, settings.log_level.upper(), logging.INFO)
