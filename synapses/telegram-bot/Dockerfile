@@ -15,6 +15,7 @@ ENV UV_LINK_MODE=copy
 # Copy workspace and dependency files
 COPY pyproject.toml uv.lock /app/
 COPY packages/aura-core /app/packages/aura-core
+COPY core /app/core
 COPY synapses/telegram-bot/pyproject.toml /app/synapses/telegram-bot/
 
 # Install dependencies including dev for stub generation, scoped to telegram-bot
