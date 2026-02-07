@@ -12,24 +12,17 @@ KEEPER_PATH ?= agents/bee-keeper/src
 
 # --- 1. CODE QUALITY ---
 lint:
-	# Protobuf Lint
 	cd proto && buf lint
-	# Python Lint (Ruff)
 	uv run ruff check .
-	# Python Type Check (Mypy)
 	MYPYPATH=$(CORE_PATH) uv run mypy core/src
 	MYPYPATH=$(GATEWAY_PATH):packages/aura-core/src uv run mypy api-gateway/src
 	MYPYPATH=$(TG_PATH):packages/aura-core/src uv run mypy synapses/telegram-bot
 	MYPYPATH=$(MCP_PATH):packages/aura-core/src uv run mypy synapses/mcp-server
 	MYPYPATH=$(KEEPER_PATH):packages/aura-core/src uv run mypy agents/bee-keeper/main.py agents/bee-keeper/src
 	MYPYPATH=packages/aura-core/src uv run mypy packages/aura-core/src
-	# Security Audit (Bandit)
 	uv run bandit -r . -c pyproject.toml
-	# Frontend Lint
-	# cd frontend && bun run lint
 
 setup-hooks:
-	# Install pre-commit hooks
 	uv run pre-commit install
 
 # Run tests
