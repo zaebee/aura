@@ -147,7 +147,7 @@ class NegotiationService(negotiation_pb2_grpc.NegotiationServiceServicer):
             return negotiation_pb2.SearchResponse(results=response_items)
 
         except Exception as e:
-            logger.error("search_error", error=str(e))
+            logger.error("search_error", error=str(e), exc_info=True)
             context.set_code(grpc.StatusCode.INTERNAL)
             context.set_details(str(e))
             return negotiation_pb2.SearchResponse()
@@ -205,7 +205,10 @@ class NegotiationService(negotiation_pb2_grpc.NegotiationServiceServicer):
 
         except Exception as e:
             logger.error(
-                "check_deal_status_error", deal_id=request.deal_id, error=str(e)
+                "check_deal_status_error",
+                deal_id=request.deal_id,
+                error=str(e),
+                exc_info=True,
             )
             context.set_code(grpc.StatusCode.INTERNAL)
             context.set_details("Payment verification failed")

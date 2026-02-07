@@ -104,10 +104,11 @@ class HiveCell:
         """Initialize telemetry, tracing, and gRPC instrumentation."""
         # 1. Start Prometheus metrics server
         try:
-            start_http_server(9091)
-            logger.info("metrics_server_started", port=9091)
+            metrics_port = self.settings.server.metrics_port
+            start_http_server(metrics_port)
+            logger.info("metrics_server_started", port=metrics_port)
         except Exception as e:
-            logger.error("metrics_server_failed", error=str(e))
+            logger.error("metrics_server_failed", error=str(e), exc_info=True)
 
         # 2. Initialize OpenTelemetry tracing
         service_name = self.settings.server.otel_service_name
