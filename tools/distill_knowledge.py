@@ -269,11 +269,12 @@ def extract_citizen_agents() -> list[ComponentDefinition]:
 def extract_citizen_adapters() -> list[ComponentDefinition]:
     """Discover adapters (NO goals, passive translation)."""
     adapters = []
+    path = "synapses"
 
     # Find adapters by directory convention (adapters/*)
     adapter_dirs = [
         d
-        for d in (repo_root / "adapters").iterdir()
+        for d in (repo_root / path).iterdir()
         if d.is_dir() and not d.name.startswith(".")
     ]
 
