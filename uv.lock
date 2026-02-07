@@ -391,7 +391,7 @@ dev = [
 [[package]]
 name = "aura-mcp"
 version = "0.1.0"
-source = { editable = "adapters/mcp-server" }
+source = { editable = "synapses/mcp-server" }
 dependencies = [
     { name = "fastmcp" },
     { name = "httpx" },
@@ -2751,7 +2751,7 @@ wheels = [
 [[package]]
 name = "telegram-bot"
 version = "0.1.0"
-source = { virtual = "adapters/telegram-bot" }
+source = { virtual = "synapses/telegram-bot" }
 dependencies = [
     { name = "aiogram" },
     { name = "aura-core" },

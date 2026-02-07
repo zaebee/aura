@@ -1,0 +1,11 @@
+synapse:
+  name: telegram-bot
+  type: messenger
+  capabilities:
+    - search
+    - negotiate
+    - notify
+  nats:
+    subscriptions:
+      - "aura.hive.events.>"
+    publications: []

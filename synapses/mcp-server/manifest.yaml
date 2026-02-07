@@ -1,0 +1,9 @@
+synapse:
+  name: mcp-server
+  type: protocol
+  capabilities:
+    - search
+    - negotiate
+  nats:
+    subscriptions: []
+    publications: []

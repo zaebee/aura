@@ -1,16 +1,13 @@
-"""Aura MCP tools."""
-
 from fastmcp import FastMCP
-from server import AuraMCPServer
+from .receptor import MCPReceptor
+from .config import settings
 
 mcp = FastMCP(
     name="Aura",
     version="1.0.0",
 )
 
-
-server = AuraMCPServer()
-
+receptor = MCPReceptor(core_url=settings.core_url)
 
 @mcp.tool
 async def search_hotels(query: str, limit: int = 3) -> str:
@@ -24,8 +21,7 @@ async def search_hotels(query: str, limit: int = 3) -> str:
     Returns:
         Formatted string with search results for LLM consumption
     """
-    return await server.search_hotels(query, limit)
-
+    return await receptor.search_hotels(query, limit)
 
 @mcp.tool
 async def negotiate_price(item_id: str, bid: float) -> str:
@@ -39,14 +35,20 @@ async def negotiate_price(item_id: str, bid: float) -> str:
     Returns:
         Formatted string with negotiation result for LLM consumption
     """
-    return await server.negotiate_price(item_id, bid)
-
+    return await receptor.negotiate_price(item_id, bid)
 
 @mcp.tool
 def demonstrate_wallet() -> str:
     """Demonstrate the generated wallet's DID."""
-    return f"🔑 Agent Wallet DID: {server.wallet.did}"
-
+    return f"🔑 Agent Wallet DID: {receptor.wallet.did}"
 
 if __name__ == "__main__":
-    mcp.run()
+    try:
+        mcp.run()
+    finally:
+        import asyncio
+        loop = asyncio.get_event_loop()
+        if loop.is_running():
+            loop.create_task(receptor.close())
+        else:
+            asyncio.run(receptor.close())

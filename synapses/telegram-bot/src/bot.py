@@ -6,7 +6,7 @@ from aiogram.types import (
     CallbackQuery,
     Message,
 )
-from aura_core import MetabolicLoop
+from .receptor import TelegramReceptor
 
 router = Router()
 
@@ -26,10 +26,11 @@ async def cmd_start(message: Message) -> None:
 
 @router.message(Command("search"))
 async def cmd_search(
-    message: Message, command: CommandObject, metabolism: MetabolicLoop
+    message: Message, command: CommandObject, receptor: TelegramReceptor
 ) -> None:
-    # Execute full ATCG search loop
-    await metabolism.execute(message)
+    query = command.args or "hotels"
+    response_text = await receptor.search(query)
+    await message.answer(response_text, parse_mode="Markdown")
 
 
 @router.callback_query(F.data.startswith("select:"))
@@ -48,18 +49,21 @@ async def process_select_hotel(callback: CallbackQuery, state: FSMContext) -> No
 
 @router.message(NegotiationStates.WaitingForBid, F.text.regexp(r"^\d+(\.\d+)?$"))
 async def process_bid(
-    message: Message, state: FSMContext, metabolism: MetabolicLoop
+    message: Message, state: FSMContext, receptor: TelegramReceptor
 ) -> None:
     data = await state.get_data()
+    item_id = data.get("item_id")
+    bid_amount = float(message.text) if message.text else 0.0
 
-    # Execute full ATCG negotiation loop
-    observation = await metabolism.execute(message, state_data=data)
-
-    if not observation.success:
-        await message.answer(f"Sorry, something went wrong: {observation.error}")
+    if not item_id:
+        await message.answer("Error: No item selected. Use /search first.")
         return
 
-    if observation.event_type == "deal_accepted":
+    response_text = await receptor.negotiate(message, item_id, bid_amount)
+    await message.answer(response_text, parse_mode="Markdown")
+
+    # Optional: Clear state if accepted or rejected
+    if "Accepted" in response_text or "Rejected" in response_text:
         await state.clear()
 
 
