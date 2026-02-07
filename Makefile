@@ -15,7 +15,7 @@ lint:
 	# Protobuf Lint
 	cd proto && buf lint
 	# Python Lint (Ruff)
-	PYTHONPYPATH=$(DNA_PATH) uv run ruff check .
+	PYTHONPYPATH=$(CORE_PATH) uv run ruff check .
 	# Python Type Check (Mypy)
 	MYPYPATH=$(CORE_PATH) uv run mypy core/src
 	MYPYPATH=$(GATEWAY_PATH):packages/aura-core/src uv run mypy api-gateway/src
@@ -115,7 +115,7 @@ tools-validate:
 
 tools-simulate:
 	# Run agent negotiation simulation
-	PYTHONPATH=.(CORE_PATH) uv run python tools/simulators/agent_sim.py
+	PYTHONPATH=$(CORE_PATH) uv run python tools/simulators/agent_sim.py
 
 tools-buyer:
 	# Run agent negotiation simulation
