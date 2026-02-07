@@ -7,6 +7,7 @@ PLATFORM ?= linux/amd64
 CORE_PATH ?= core:core/src
 GATEWAY_PATH ?= api-gateway/src
 TG_PATH ?= synapses/telegram-bot/src:synapses/telegram-bot/src/proto
+MCP_PATH ?= synapses/mcp-server/src
 KEEPER_PATH ?= agents/bee-keeper/src
 
 # --- 1. CODE QUALITY ---
@@ -18,7 +19,8 @@ lint:
 	# Python Type Check (Mypy)
 	MYPYPATH=$(CORE_PATH) uv run mypy core/src
 	MYPYPATH=$(GATEWAY_PATH):packages/aura-core/src uv run mypy api-gateway/src
-	MYPYPATH=$(TG_PATH):packages/aura-core/src uv run mypy synapses/telegram-bot/src
+	MYPYPATH=$(TG_PATH):core/src:packages/aura-core/src uv run mypy synapses/telegram-bot/src
+	MYPYPATH=$(MCP_PATH):core/src:packages/aura-core/src uv run mypy synapses/mcp-server/src
 	MYPYPATH=$(KEEPER_PATH):packages/aura-core/src uv run mypy agents/bee-keeper/main.py agents/bee-keeper/src
 	MYPYPATH=packages/aura-core/src uv run mypy packages/aura-core/src
 	# Security Audit (Bandit)
@@ -36,6 +38,8 @@ test:
 	PYTHONPATH=$(CORE_PATH) uv run pytest core/tests/ -v
 	# Run telegram-bot tests with isolated path to avoid 'src' collision
 	PYTHONPATH=$(TG_PATH) uv run pytest synapses/telegram-bot/tests/ -v
+	# Run mcp-server tests if they exist
+	if [ -d "synapses/mcp-server/tests" ]; then PYTHONPATH=$(MCP_PATH):$(CORE_PATH) uv run pytest synapses/mcp-server/tests/ -v; fi
 
 # Run tests with coverage report
 test-cov:
@@ -66,6 +70,8 @@ generate:
 		mkdir -p packages/aura-core/src/aura_core/gen/aura/dna/google; \
 		echo "from betterproto.lib.google import protobuf" > packages/aura-core/src/aura_core/gen/aura/dna/google/__init__.py; \
 	fi
+	# Link core proto for absolute imports
+	ln -sf hive/proto/aura core/src/aura
 
 # --- 4. PUBLISH (CI ONLY) ---
 push: push-tg

@@ -1,0 +1,7 @@
+name: mcp-server
+type: synapse
+version: 1.0.0
+description: "Aura MCP Synapse for LLM Tool Consumption"
+capabilities:
+  - "receptor:mcp_tools"
+  - "translator:gateway_proxy"

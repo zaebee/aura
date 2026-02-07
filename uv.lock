@@ -393,18 +393,26 @@ name = "aura-mcp"
 version = "0.1.0"
 source = { editable = "synapses/mcp-server" }
 dependencies = [
+    { name = "aura-core" },
+    { name = "core" },
     { name = "fastmcp" },
     { name = "httpx" },
+    { name = "nats-py" },
     { name = "pynacl" },
     { name = "python-dotenv" },
+    { name = "structlog" },
 ]
 
 [package.metadata]
 requires-dist = [
+    { name = "aura-core", editable = "packages/aura-core" },
+    { name = "core", editable = "core" },
     { name = "fastmcp", specifier = "==2.12.3" },
     { name = "httpx" },
+    { name = "nats-py", specifier = ">=2.9.0" },
     { name = "pynacl" },
     { name = "python-dotenv" },
+    { name = "structlog", specifier = ">=25.1.0" },
 ]
 
 [[package]]
@@ -619,7 +627,7 @@ wheels = [
 [[package]]
 name = "core"
 version = "0.1.0"
-source = { virtual = "core" }
+source = { editable = "core" }
 dependencies = [
     { name = "alembic" },
     { name = "aura-core" },
@@ -2756,6 +2764,7 @@ dependencies = [
     { name = "aiogram" },
     { name = "aura-core" },
     { name = "betterproto" },
+    { name = "core" },
     { name = "grpcio" },
     { name = "nats-py" },
     { name = "opentelemetry-api" },
@@ -2779,6 +2788,7 @@ requires-dist = [
     { name = "aiogram", specifier = ">=3.17.0" },
     { name = "aura-core", editable = "packages/aura-core" },
     { name = "betterproto", specifier = ">=2.0.0b7" },
+    { name = "core", editable = "core" },
     { name = "grpcio", specifier = ">=1.70.0" },
     { name = "nats-py", specifier = ">=2.9.0" },
     { name = "opentelemetry-api", specifier = ">=1.24.0" },

@@ -1,0 +1,12 @@
+name: telegram-bot
+type: synapse
+version: 0.1.0
+description: "Telegram Synapse for Aura Platform"
+nats:
+  subjects:
+    - "aura.hive.events.>"
+capabilities:
+  - "receptor:telegram_messages"
+  - "receptor:telegram_callbacks"
+  - "effector:user_notifications"
+  - "translator:protobuf_mapping"

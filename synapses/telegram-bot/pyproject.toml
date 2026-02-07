@@ -14,11 +14,13 @@ dependencies = [
     "opentelemetry-exporter-otlp>=1.24.0",
     "nats-py>=2.9.0",
     "aura-core",
+    "core",
     "betterproto>=2.0.0b7",
 ]
 
 [tool.uv.sources]
 aura-core = { workspace = true }
+core = { workspace = true }
 
 [dependency-groups]
 dev = [

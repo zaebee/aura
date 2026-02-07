@@ -1,28 +1,19 @@
 import asyncio
 import logging
 
-import grpc
 import nats
 import structlog
 from aiogram import Bot, Dispatcher
-from aura_core import MetabolicLoop, SkillRegistry
-from bot import router
-from hive.aggregator import TelegramAggregator
-from hive.connector import TelegramConnector
-from hive.connector.proteins.aura_client import GRPCNegotiationClient
-from hive.connector.proteins.telegram_api import TelegramProtein
-from hive.generator import TelegramGenerator
-from hive.transformer import TelegramTransformer
-from opentelemetry import trace
-from opentelemetry.exporter.otlp.proto.grpc.trace_exporter import OTLPSpanExporter
-from opentelemetry.sdk.resources import SERVICE_NAME, Resource
-from opentelemetry.sdk.trace import TracerProvider
-from opentelemetry.sdk.trace.export import BatchSpanProcessor
+from effector import TelegramEffector
+from hive.cortex import HiveCell
+from receptor import TelegramReceptor
+from synapse_settings import settings as tg_settings
+from translator import TelegramTranslator
 
-from config import settings
+from config import Settings as CoreSettings
 
 # Setup logging
-level = getattr(logging, settings.log_level.upper(), logging.INFO)
+level = getattr(logging, tg_settings.log_level.upper(), logging.INFO)
 structlog.configure(
     processors=[
         structlog.processors.TimeStamper(fmt="iso"),
@@ -31,112 +22,70 @@ structlog.configure(
     ],
     wrapper_class=structlog.make_filtering_bound_logger(level),
 )
-logger = structlog.get_logger()
-
-
-def setup_tracing() -> None:
-    resource = Resource(attributes={SERVICE_NAME: "telegram-bot"})
-    provider = TracerProvider(resource=resource)
-
-    # DNA Rule: FQDN for cross-namespace services
-    otlp_endpoint = settings.otel_exporter_otlp_endpoint
-    processor = BatchSpanProcessor(
-        OTLPSpanExporter(endpoint=otlp_endpoint, insecure=True)
-    )
-    provider.add_span_processor(processor)
-    trace.set_tracer_provider(provider)
+logger = structlog.get_logger("telegram-bot")
 
 
 async def main() -> None:
-    # Setup OpenTelemetry
-    setup_tracing()
+    logger.info(
+        "starting_telegram_synapse", prefix=tg_settings.model_config.get("env_prefix")
+    )
 
-    # Initialize NATS
+    # 1. Initialize NATS Bloodstream
     nc = None
     try:
         nc = await nats.connect(
-            settings.nats_url,
+            tg_settings.nats_url,
             connect_timeout=5,
-            reconnect_time_wait=2,
-            max_reconnect_attempts=3,
         )
-        logger.info("Connected to NATS", url=settings.nats_url)
-    except (nats.errors.NoServersError, nats.errors.TimeoutError) as e:
-        logger.error("Failed to connect to NATS (service might be down)", error=str(e))
+        logger.info("connected_to_nats", url=tg_settings.nats_url)
     except Exception as e:
-        logger.error("Unexpected error connecting to NATS", error=str(e))
+        logger.error("nats_connection_failed", error=str(e))
+        # We continue as the bot might still function for non-bloodstream tasks,
+        # but Effector will fail.
 
-    # Initialize Bot
-    bot = Bot(token=settings.token.get_secret_value())
+    # 2. Initialize the "Cell" (Core Metabolism)
+    # We load CoreSettings which will pick up AURA_ prefixed env vars
+    core_config = CoreSettings()
+    cell = HiveCell(core_config)
+    metabolism = await cell.build_organism()
+    logger.info("metabolism_initialized_in_process")
 
-    # --- Provider Factories (Trinity Pattern) ---
-    aura_channel = grpc.aio.insecure_channel(settings.core_url)
+    # 3. Initialize Bot and Translator
+    bot = Bot(token=tg_settings.token.get_secret_value())
+    translator = TelegramTranslator()
 
-    # --- Skill Instantiation & Binding ---
-    telegram_protein = TelegramProtein()
-    telegram_protein.bind({}, bot)
+    # 4. Initialize Receptor (Inbound)
+    receptor = TelegramReceptor(metabolism, translator)
 
-    aura_protein = GRPCNegotiationClient()
-    aura_protein.bind({"timeout": settings.negotiation_timeout}, aura_channel)
+    # 5. Initialize Effector (Outbound)
+    effector = None
+    if nc:
+        effector = TelegramEffector(nc, bot, translator)
 
-    # Initialize Skill Registry
-    registry = SkillRegistry()
-    registry.register("messenger", telegram_protein)
-    registry.register("core_link", aura_protein)
-
-    # Initialize Hive components
-    aggregator = TelegramAggregator()
-    transformer = TelegramTransformer()
-    connector = TelegramConnector(registry)
-    generator = TelegramGenerator(nats_client=nc)
-    metabolism = MetabolicLoop(aggregator, transformer, connector, generator)
-
-    # Initialize Dispatcher
+    # 6. Setup Aiogram Dispatcher
     dp = Dispatcher()
+    dp.include_router(receptor.router)
 
-    # Register router
-    dp.include_router(router)
+    logger.info("synapse_ready", core_url=tg_settings.core_url)
 
-    logger.info(
-        "Starting Aura Telegram Bot with ATCG Hive pattern",
-        core_url=settings.core_url,
-    )
+    tasks = []
 
-    # --- Unified Metabolism: NATS Bloodstream Listener ---
-    async def nats_bloodstream_listener() -> None:
-        if nc:
-            try:
-                # Listen for binary events from the core
-                sub = await nc.subscribe("aura.hive.events.>")
-                logger.info("nats_bloodstream_subscribed", subject="aura.hive.events.>")
-                bot_tracer = trace.get_tracer(__name__)
-                async for msg in sub.messages:
-                    with bot_tracer.start_as_current_span(
-                        "nats_event_received"
-                    ) as span:
-                        span.set_attribute("subject", msg.subject)
-                        logger.info("nats_event_received", subject=msg.subject)
-                        # Process via Unified Metabolism Aggregator
-                        await metabolism.execute(msg.data, is_nats=True)
-            except Exception as e:
-                logger.error("nats_bloodstream_error", error=str(e))
+    # Start Effector background task
+    if effector:
+        tasks.append(asyncio.create_task(effector.run()))
+        logger.info("effector_task_started")
 
-    # Start NATS listener in background
-    nats_task = asyncio.create_task(nats_bloodstream_listener())
-
+    # Start Bot Polling
     try:
-        # Pass metabolism as dependency to handlers
-        await dp.start_polling(bot, metabolism=metabolism)
-    except asyncio.CancelledError:
-        logger.info("Bot stopped by user")
+        await dp.start_polling(bot)
     except Exception as e:
-        logger.error("Bot crashed unexpectedly", error=str(e), exc_info=True)
+        logger.error("bot_polling_failed", error=str(e))
     finally:
-        nats_task.cancel()
-        await aura_protein.close()
-        await bot.session.close()
+        for task in tasks:
+            task.cancel()
         if nc:
             await nc.close()
+        await bot.session.close()
 
 
 if __name__ == "__main__":
