@@ -26,7 +26,7 @@ class MCPReceptor:
             return MCPTranslator.format_search_results(observation.data)
 
         except Exception as e:
-            logger.error(f"🔴 Search failed: {e}")
+            logger.error("Search failed", error=e, exc_info=True)
             return f"❌ Search failed: {str(e)}"
 
     async def negotiate_price(self, item_id: str, bid: float) -> str:
@@ -57,5 +57,5 @@ class MCPReceptor:
             return MCPTranslator.format_negotiation_response(status, res.get(status, {}) if status != "unknown" else {})
 
         except Exception as e:
-            logger.error(f"🔴 Negotiation failed: {e}")
+            logger.error("Negotiation failed", error=e, exc_info=True)
             return f"❌ Negotiation failed: {str(e)}"

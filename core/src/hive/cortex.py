@@ -106,20 +106,33 @@ class HiveCell:
         import importlib.util
         from pathlib import Path
 
+        # Robust project root discovery via marker file
+        project_root = Path(__file__).resolve().parent
+        while project_root != project_root.parent:
+            if (project_root / "pyproject.toml").exists():
+                break
+            project_root = project_root.parent
+
         for synapse_name in self.settings.synapses.active_synapses:
             logger.info("starting_synapse", synapse=synapse_name)
 
             # Convention: synapses/<name>/main.py
-            synapse_path = Path(__file__).resolve().parents[3] / "synapses" / synapse_name / "main.py"
+            synapse_path = project_root / "synapses" / synapse_name / "main.py"
             if not synapse_path.exists():
-                logger.error("synapse_main_not_found", synapse=synapse_name, path=str(synapse_path))
+                logger.error(
+                    "synapse_main_not_found",
+                    synapse=synapse_name,
+                    path=str(synapse_path),
+                )
                 continue
 
             # Start as a background task
             # In a real system, we'd use a more robust orchestration
             async def run_synapse(name: str, path: Path) -> None:
                 try:
-                    spec = importlib.util.spec_from_file_location(f"synapse.{name}", path)
+                    spec = importlib.util.spec_from_file_location(
+                        f"synapse.{name}", path
+                    )
                     if spec and spec.loader:
                         module = importlib.util.module_from_spec(spec)
                         spec.loader.exec_module(module)
@@ -128,7 +141,9 @@ class HiveCell:
                         elif hasattr(module, "run"):
                             await module.run()
                 except Exception as e:
-                    logger.error("synapse_crashed", synapse=name, error=str(e))
+                    logger.error(
+                        "synapse_crashed", synapse=name, error=str(e), exc_info=True
+                    )
 
             asyncio.create_task(run_synapse(synapse_name, synapse_path))
 

@@ -14,13 +14,6 @@ class TelegramEffector:
             event = TelegramTranslator.from_proto_event(event_binary)
             logger.info("effector_received_event", topic=event.topic)
 
-            # Map internal event to Telegram message
-            # This is a simplified version. In a real system, you'd have more complex mapping.
-            # We need the chat_id, which should be in the event metadata or session_token
-
-            chat_id = 0 # How do we get this?
-            # In a production system, session_token would map to a chat_id in a DB.
-
             if event.negotiation:
                 message = f"Update on your negotiation for {event.negotiation.item_id}:\n"
                 message += f"Action: {event.negotiation.action}\n"
@@ -30,9 +23,12 @@ class TelegramEffector:
                 chat_id = 0
                 if event.negotiation.agent_did.startswith("tg:"):
                     try:
-                        chat_id = int(event.negotiation.agent_did.replace("tg:", ""))
-                    except ValueError:
-                        pass
+                        chat_id = int(event.negotiation.agent_did.split(":")[1])
+                    except (ValueError, IndexError):
+                        logger.warning(
+                            "Could not parse chat_id from agent_did",
+                            agent_did=event.negotiation.agent_did,
+                        )
 
                 logger.info("effector_emitting_update", chat_id=chat_id, message=message)
 
