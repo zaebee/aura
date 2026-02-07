@@ -5,7 +5,7 @@ from aura_core import Observation, SkillProtocol
 
 from config.server import ServerSettings
 
-from .enzymes.prometheus import (
+from .prometheus import (
     MetricsCache,
     fetch_vitals,
     negotiation_accepted_total,

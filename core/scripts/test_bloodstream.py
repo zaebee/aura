@@ -17,13 +17,11 @@ import argparse
 import asyncio
 import sys
 import uuid
-
-import structlog
-
 from datetime import UTC, datetime
 from typing import Any
 
 import nats
+import structlog
 from google.protobuf.timestamp_pb2 import Timestamp
 
 logger = structlog.get_logger(__name__)
@@ -82,7 +80,7 @@ async def test_basic_nats(nats_url: str) -> bool:
     async def message_handler(msg: Any) -> Any:
         await msg_queue.put(msg)
 
-    sub = await nc.subscribe("aura.test.>", cb=message_handler)
+    await nc.subscribe("aura.test.>", cb=message_handler)
     logger.info("subscribed_to_topic", subject="aura.test.>")
 
     # Publish

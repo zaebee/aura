@@ -16,6 +16,10 @@ class HiveMembrane(Membrane[Any, IntentAction, HiveContext]):
         self.registry = registry
 
     async def inspect_inbound(self, signal: Any) -> Any:
+        """
+        Pure Pipe: Inbound inspection.
+        Validates bid positivity and detects prompt injection.
+        """
         if hasattr(signal, "bid_amount") and signal.bid_amount <= 0:
             logger.warning("membrane_inbound_invalid_bid", bid_amount=signal.bid_amount)
             raise ValueError("Bid amount must be positive")
@@ -50,28 +54,36 @@ class HiveMembrane(Membrane[Any, IntentAction, HiveContext]):
     async def inspect_outbound(
         self, decision: IntentAction, context: HiveContext
     ) -> IntentAction:
+        """
+        Pure Pipe: Outbound inspection.
+        Uses Guard Protein for deterministic economic safety.
+        """
+        if not self.registry:
+            return decision
+
         floor_price = context.item_data.get("floor_price", 0.0)
+        internal_cost = context.item_data.get("meta", {}).get(
+            "internal_cost", floor_price
+        )
+        guard_context = {"floor_price": floor_price, "internal_cost": internal_cost}
 
-        # 1. Handle explicit failures
+        # 1. Handle explicit failures/errors via Guard (Greedy Merchant fix)
         if isinstance(decision, FailureIntent) or decision.action == "error":
-            safe_price = floor_price * 1.05
-            if self.registry:
-                obs_safe = await self.registry.execute(
-                    "guard",
-                    "get_safe_price",
-                    {
-                        "context": {"floor_price": floor_price},
-                        "reason": "FAILURE_RECOVERY",
-                    },
-                )
-                if obs_safe.success:
-                    safe_price = obs_safe.data["safe_price"]
-
+            obs_safe = await self.registry.execute(
+                "guard",
+                "get_safe_price",
+                {
+                    "context": guard_context,
+                    "reason": "FAILURE_RECOVERY",
+                },
+            )
+            # DNA Rule: Default to safe price from Guard logic
+            safe_price = obs_safe.data.get("safe_price", floor_price * 1.05) if obs_safe.success else floor_price * 1.05
             return self._override_with_safe_offer(
                 decision, safe_price, "FAILURE_RECOVERY"
             )
 
-        # 2. DLP Check
+        # 2. DLP Check (Data Loss Prevention)
         if "floor_price" in decision.message.lower():
             decision.message = "I cannot disclose internal pricing details."
             decision.thought += " [MEMBRANE: DLP block]"
@@ -79,15 +91,7 @@ class HiveMembrane(Membrane[Any, IntentAction, HiveContext]):
         if decision.action not in ["accept", "counter"]:
             return decision
 
-        # 3. Call Guard Protein for validation
-        if not self.registry:
-            return decision
-
-        internal_cost = context.item_data.get("meta", {}).get(
-            "internal_cost", floor_price
-        )
-        guard_context = {"floor_price": floor_price, "internal_cost": internal_cost}
-
+        # 3. Call Guard Protein for validation (Economic Safety)
         obs = await self.registry.execute(
             "guard",
             "validate_decision",
@@ -101,7 +105,7 @@ class HiveMembrane(Membrane[Any, IntentAction, HiveContext]):
             # Determine reason for logging/override using structured error code
             reason = obs.data.get("error_code", "SAFETY_VIOLATION")
 
-            # Use safe price provided by the Guard Protein
+            # Use safe price provided by the Guard Protein logic (The fix)
             safe_price = obs.data.get("safe_price", floor_price * 1.05)
             return self._override_with_safe_offer(decision, safe_price, reason)
 

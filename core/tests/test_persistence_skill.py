@@ -1,7 +1,7 @@
 from unittest.mock import MagicMock
 
 import pytest
-from hive.proteins.persistence.main import PersistenceSkill
+from hive.proteins.persistence.skill import PersistenceSkill
 
 from config.database import DatabaseSettings
 

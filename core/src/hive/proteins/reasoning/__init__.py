@@ -1,3 +1,3 @@
-from .main import ReasoningSkill
+from .skill import ReasoningSkill
 
 __all__ = ["ReasoningSkill"]
