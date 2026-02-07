@@ -105,6 +105,14 @@ tools-health:
 	# Test health check endpoints (requires running services)
 	PYTHONPATH=.:$(CORE_PATH) uv run python tools/test_health_endpoints.py
 
+tools-distill: tools-validate
+	# Test health check endpoints (requires running services)
+	PYTHONPATH=.:$(CORE_PATH) uv run python tools/distill_knowledge.py
+
+tools-validate:
+	# Test health check endpoints (requires running services)
+	PYTHONPATH=.:$(CORE_PATH) uv run python tools/validate_knowledge.py
+
 tools-simulate:
 	# Run agent negotiation simulation
 	PYTHONPATH=:.$(CORE_PATH) uv run python tools/simulators/agent_sim.py
