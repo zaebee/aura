@@ -246,7 +246,6 @@ def extract_citizen_agents() -> list[ComponentDefinition]:
     for agent_dir in agent_dirs:
         # Look for hive structure or main.py
         hive_dir = agent_dir / "src" / "hive"
-        _main_file = agent_dir / "src" / "main.py"
 
         if hive_dir.exists():
             agents.append(

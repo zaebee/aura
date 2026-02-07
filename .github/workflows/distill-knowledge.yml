@@ -63,7 +63,7 @@ jobs:
         run: uv sync --all-extras
 
       - name: Extract Architecture Knowledge
-        run: make tools-distill
+        run: make generate tools-distill
 
       - name: Check Binary Size
         run: |
