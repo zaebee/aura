@@ -87,7 +87,7 @@ class NatsAdapter:
             )
 
         except Exception as e:
-            logger.error("adapter_error", error=str(e))
+            logger.error("adapter_error", error=e, exc_info=True)
             return ProtoObservation(
                 success=False,
                 error=f"Adapter communication error: {e}",

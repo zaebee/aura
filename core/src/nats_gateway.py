@@ -67,7 +67,7 @@ class NatsSignalGateway:
             )
             return True
         except Exception as e:
-            logger.error("nats_gateway_start_failed", error=str(e))
+            logger.error("nats_gateway_start_failed", error=e, exc_info=True)
             return False
 
     async def _on_signal(self, msg: Any) -> None:
@@ -103,8 +103,9 @@ class NatsSignalGateway:
         except Exception as e:
             logger.error(
                 "gateway_signal_processing_failed",
-                error=str(e),
+                error=e,
                 subject=msg.subject,
+                exc_info=True,
             )
             # Try to reply with error observation so the synapse doesn't hang
             if msg.reply:
