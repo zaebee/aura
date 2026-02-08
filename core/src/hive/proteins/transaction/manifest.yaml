@@ -1,11 +1,98 @@
-name: transaction
-role: TreasuryVault
-description: >
-  Manages blockchain interactions, currency conversion, and sensitive data encryption.
-  Provides payment verification on Solana and secure storage for deal secrets via Solana skills.
+# Internal Metadata (For Cortex)
+skill_name: "transaction"
+version: "1.1.0"
+description: "Payment processing and encryption protein"
 capabilities:
-  - verify_payment: Confirm receipt of SOL or USDC with matching memo.
-  - encrypt_secret: Secure a deal secret before database storage.
-  - decrypt_secret: Reveal secret after verified payment.
-  - get_address: Retrieve the Hive's public treasury address.
-manifest_version: 1.0
+  - "verify_payment"
+  - "encrypt_secret"
+  - "decrypt_secret"
+  - "get_address"
+  - "convert_price"
+  - "get_network_name"
+dependencies:
+  settings_class: "CryptoSettings"
+  external_services:
+    - "Solana RPC"
+    - "Fernet Encryption"
+
+# External Tool Definitions (MCP / Anthropic / OpenAI Tools)
+llm_tools:
+  - name: "transaction__get_floor_price"
+    description: "Retrieves the minimum acceptable price for an inventory item."
+
+    # Membrane Policy (CRISPR-like safety rules)
+    membrane_policy:
+      safety_level: "read_only"
+      redaction_rules: ["floor_price_redaction"]
+      validation_rules: []
+
+    # Metabolic Cost
+    activation_cost:
+      tokens_est: 150
+      latency_ms_est: 100
+
+    input_schema:
+      type: "object"
+      properties:
+        item_id:
+          type: "string"
+          description: "The unique identifier of the inventory item"
+      required: ["item_id"]
+
+  - name: "transaction__create_payment_link"
+    description: "Generates a cryptocurrency payment link for a specific amount."
+
+    # Membrane Policy
+    membrane_policy:
+      safety_level: "read_write"
+      redaction_rules: ["pii_masking"]
+      validation_rules: ["floor_price_check"]
+
+    # Metabolic Cost
+    activation_cost:
+      tokens_est: 400
+      latency_ms_est: 250
+
+    input_schema:
+      type: "object"
+      properties:
+        amount:
+          type: "number"
+          description: "The payment amount in USD"
+        currency:
+          type: "string"
+          description: "The cryptocurrency to use (SOL, USDC)"
+          default: "SOL"
+        memo:
+          type: "string"
+          description: "Payment memo/identifier"
+      required: ["amount", "memo"]
+
+  - name: "transaction__verify_payment"
+    description: "Verifies if a cryptocurrency payment has been received."
+
+    # Membrane Policy
+    membrane_policy:
+      safety_level: "read_only"
+      redaction_rules: ["pii_masking"]
+      validation_rules: []
+
+    # Metabolic Cost
+    activation_cost:
+      tokens_est: 350
+      latency_ms_est: 200
+
+    input_schema:
+      type: "object"
+      properties:
+        memo:
+          type: "string"
+          description: "The payment memo to verify"
+        expected_amount:
+          type: "number"
+          description: "The expected payment amount"
+        currency:
+          type: "string"
+          description: "The expected currency"
+          default: "SOL"
+      required: ["memo", "expected_amount"]

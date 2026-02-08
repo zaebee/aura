@@ -1,10 +1,111 @@
-name: pulse
-role: PulseOrgan
-description: >
-  The Hive's internal communication system using Pulse skills.
-  Emits events to NATS topics to synchronize other services and adapters.
-  Ensures economic heartbeat signals are broadcasted throughout the hive.
+# Internal Metadata (For Cortex)
+skill_name: "pulse"
+version: "1.1.0"
+description: "NATS JetStream event emission protein"
 capabilities:
-  - emit_event: Publish a structured payload to a specific NATS topic.
-  - emit_heartbeat: Broadcast the system's operational heartbeat.
-manifest_version: 1.0
+  - "emit_heartbeat"
+  - "emit_negotiation"
+  - "emit_vitals"
+  - "emit_alert"
+  - "emit_audit"
+  - "emit_event"
+dependencies:
+  settings_class: "ServerSettings"
+  external_services:
+    - "NATS JetStream"
+
+# External Tool Definitions (MCP / Anthropic / OpenAI Tools)
+llm_tools:
+  - name: "pulse__emit_heartbeat"
+    description: "Broadcasts the system's operational heartbeat to monitor system health."
+
+    # Membrane Policy (CRISPR-like safety rules)
+    membrane_policy:
+      safety_level: "read_only"
+      redaction_rules: ["pii_masking"]
+      validation_rules: []
+
+    # Metabolic Cost
+    activation_cost:
+      tokens_est: 50
+      latency_ms_est: 20
+
+    input_schema:
+      type: "object"
+      properties:
+        service:
+          type: "string"
+          description: "The service name emitting the heartbeat"
+          default: "core"
+        instance_id:
+          type: "string"
+          description: "Unique instance identifier"
+        status:
+          type: "string"
+          description: "Current status of the service"
+          default: "ok"
+      required: ["service"]
+
+  - name: "pulse__emit_negotiation_event"
+    description: "Emits a negotiation event to the event bus for tracking and auditing."
+
+    # Membrane Policy
+    membrane_policy:
+      safety_level: "read_write"
+      redaction_rules: ["floor_price_redaction", "pii_masking"]
+      validation_rules: []
+
+    # Metabolic Cost
+    activation_cost:
+      tokens_est: 150
+      latency_ms_est: 50
+
+    input_schema:
+      type: "object"
+      properties:
+        session_token:
+          type: "string"
+          description: "Unique session identifier"
+        action:
+          type: "string"
+          description: "The negotiation action (accept/counter/reject)"
+        price:
+          type: "number"
+          description: "The proposed or final price"
+        item_id:
+          type: "string"
+          description: "The item being negotiated"
+        agent_did:
+          type: "string"
+          description: "Agent decentralized identifier"
+      required: ["session_token", "action", "item_id"]
+
+  - name: "pulse__emit_alert"
+    description: "Emits an alert event for critical system conditions."
+
+    # Membrane Policy
+    membrane_policy:
+      safety_level: "read_write"
+      redaction_rules: ["pii_masking"]
+      validation_rules: []
+
+    # Metabolic Cost
+    activation_cost:
+      tokens_est: 100
+      latency_ms_est: 30
+
+    input_schema:
+      type: "object"
+      properties:
+        severity:
+          type: "string"
+          description: "Alert severity level (info/warning/error/critical)"
+          default: "info"
+        message:
+          type: "string"
+          description: "Alert message content"
+        source:
+          type: "string"
+          description: "Source component emitting the alert"
+          default: "unknown"
+      required: ["message"]

@@ -1,11 +1,86 @@
-name: telemetry
-role: SensoryOrgan
-description: >
-  Standardized proprioception for the Hive.
-  Fetches metrics from Prometheus and initializes OpenTelemetry tracing via Prometheus skills.
-  Tracks economic counters like negotiation successes and heartbeats.
+# Internal Metadata (For Cortex)
+skill_name: "telemetry"
+version: "1.1.0"
+description: "System metrics and health checks protein"
 capabilities:
-  - fetch_metrics: Retrieve system CPU, memory, and status vitals.
-  - health_check: Verify the protein's own operational state.
-  - increment_counter: Record event occurrences in Prometheus.
-manifest_version: 1.0
+  - "fetch_metrics"
+  - "get_vitals"
+  - "health_check"
+  - "increment_counter"
+dependencies:
+  settings_class: "ServerSettings"
+  external_services:
+    - "Prometheus"
+    - "OpenTelemetry"
+
+# External Tool Definitions (MCP / Anthropic / OpenAI Tools)
+llm_tools:
+  - name: "telemetry__fetch_metrics"
+    description: "Retrieves system CPU, memory, and status vitals for monitoring."
+
+    # Membrane Policy (CRISPR-like safety rules)
+    membrane_policy:
+      safety_level: "read_only"
+      redaction_rules: ["pii_masking"]
+      validation_rules: []
+
+    # Metabolic Cost
+    activation_cost:
+      tokens_est: 80
+      latency_ms_est: 40
+
+    input_schema:
+      type: "object"
+      properties:
+        service_filter:
+          type: "string"
+          description: "Optional service filter for metrics"
+      required: []
+
+  - name: "telemetry__health_check"
+    description: "Verifies the protein's own operational state and system health."
+
+    # Membrane Policy
+    membrane_policy:
+      safety_level: "read_only"
+      redaction_rules: []
+      validation_rules: []
+
+    # Metabolic Cost
+    activation_cost:
+      tokens_est: 30
+      latency_ms_est: 15
+
+    input_schema:
+      type: "object"
+      properties: {}
+      required: []
+
+  - name: "telemetry__increment_counter"
+    description: "Records event occurrences in Prometheus for tracking negotiation metrics."
+
+    # Membrane Policy
+    membrane_policy:
+      safety_level: "read_write"
+      redaction_rules: ["pii_masking"]
+      validation_rules: []
+
+    # Metabolic Cost
+    activation_cost:
+      tokens_est: 60
+      latency_ms_est: 25
+
+    input_schema:
+      type: "object"
+      properties:
+        counter_name:
+          type: "string"
+          description: "Name of the counter to increment"
+        labels:
+          type: "object"
+          description: "Additional labels for the counter"
+        value:
+          type: "number"
+          description: "Value to increment by"
+          default: 1
+      required: ["counter_name"]
