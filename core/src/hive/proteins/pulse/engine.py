@@ -282,7 +282,7 @@ class JetStreamProvider:
             "ui_required": dna_pb2.ACTION_TYPE_UI_REQUIRED,
             "error": dna_pb2.ACTION_TYPE_ERROR,
         }
-        return mapping.get(action.lower(), dna_pb2.ACTION_TYPE_UNSPECIFIED)
+        return int(mapping.get(action.lower(), dna_pb2.ACTION_TYPE_UNSPECIFIED))
 
     def _status_to_enum(self, status: str) -> int:
         """Convert status string to VitalsStatus enum."""
@@ -291,7 +291,7 @@ class JetStreamProvider:
             "degraded": dna_pb2.VITALS_STATUS_DEGRADED,
             "error": dna_pb2.VITALS_STATUS_ERROR,
         }
-        return mapping.get(status.lower(), dna_pb2.VITALS_STATUS_UNSPECIFIED)
+        return int(mapping.get(status.lower(), dna_pb2.VITALS_STATUS_UNSPECIFIED))
 
     def _severity_to_enum(self, severity: str) -> int:
         """Convert severity string to AlertSeverity enum."""
@@ -301,7 +301,7 @@ class JetStreamProvider:
             "error": dna_pb2.ALERT_SEVERITY_ERROR,
             "critical": dna_pb2.ALERT_SEVERITY_CRITICAL,
         }
-        return mapping.get(severity.lower(), dna_pb2.ALERT_SEVERITY_UNSPECIFIED)
+        return int(mapping.get(severity.lower(), dna_pb2.ALERT_SEVERITY_UNSPECIFIED))
 
 
 class JetStreamSubscriber:

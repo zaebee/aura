@@ -1,13 +1,14 @@
 import asyncio
 import uuid
 from concurrent import futures
-from typing import TYPE_CHECKING, Any, cast
+from typing import Any, cast
 
 import grpc
 import grpc.aio
 from aura.negotiation.v1 import negotiation_pb2, negotiation_pb2_grpc
 from grpc_health.v1 import health_pb2, health_pb2_grpc
 from hive.cortex import HiveCell
+from hive.metabolism import MetabolicLoop
 from hive.metabolism.logging_config import (
     bind_request_id,
     clear_request_context,
@@ -17,9 +18,6 @@ from hive.metabolism.logging_config import (
 from opentelemetry import trace
 
 from config import settings
-
-if TYPE_CHECKING:
-    from hive.metabolism import MetabolicLoop
 
 # 1. Configure structured logging
 configure_logging(log_level=settings.server.log_level)
@@ -43,7 +41,7 @@ class NegotiationService(negotiation_pb2_grpc.NegotiationServiceServicer):
 
     def __init__(
         self,
-        metabolism: "MetabolicLoop" | None = None,
+        metabolism: MetabolicLoop | None = None,
         market_service: Any = None,
     ) -> None:
         self.metabolism = metabolism

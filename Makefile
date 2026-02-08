@@ -16,10 +16,10 @@ lint:
 	# Protobuf Lint
 	cd proto && buf lint
 	# Python Lint (Ruff)
-	uv run ruff check .
+	PYTHONPATH=$(CORE_PATH):$(GATEWAY_PATH):$(TG_PATH):$(MCP_PATH):$(KEEPER_PATH):$(DNA_PATH) uv run ruff check .
 	# Python Type Check (Mypy)
 	# We use --explicit-package-bases to avoid double discovery when multiple paths overlap
-	MYPYPATH=$(CORE_PATH) uv run mypy --explicit-package-bases core/src
+	MYPYPATH=$(CORE_PATH):$(DNA_PATH) uv run mypy --explicit-package-bases core/src
 	MYPYPATH=$(GATEWAY_PATH):packages/aura-core/src uv run mypy --explicit-package-bases api-gateway/src
 	MYPYPATH=$(TG_PATH):core/src:core/gen-proto:packages/aura-core/src uv run mypy --explicit-package-bases synapses/telegram-bot/src
 	MYPYPATH=$(MCP_PATH):core/src:core/gen-proto:packages/aura-core/src uv run mypy --explicit-package-bases synapses/mcp-server/src

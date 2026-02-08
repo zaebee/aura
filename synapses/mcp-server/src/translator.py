@@ -57,20 +57,25 @@ class MCPTranslator:
     def from_observation(self, observation: Observation) -> str:
         """Convert Hive Observation to LLM-friendly string."""
         if not observation.success:
-            return f"❌ Operation failed: {observation.error}"
+            return f"❌ Operation failed: {observation.error or 'Unknown error'}"
 
-        data = observation.data
-        # If it's a gRPC response or internal dict
-        if hasattr(data, "status"):
-            status = data.status
-        elif isinstance(data, dict):
-            status = data.get("status")
-        else:
-            status = "unknown"
+        if not observation.data:
+            return "✅ Operation completed but returned no data."
+
+        response = observation.data
+        # The data is a negotiation_pb2.NegotiateResponse protobuf object
+        status = response.WhichOneof("result")
 
         if status == "accepted":
-            return "🎉 SUCCESS! Negotiation accepted."
+            final_price = response.accepted.final_price
+            return f"🎉 SUCCESS! Negotiation accepted at ${final_price:.2f}."
         elif status == "countered":
-            return "🔄 COUNTER-OFFER received."
+            proposed_price = response.countered.proposed_price
+            message = response.countered.human_message or "No reason provided."
+            return f"🔄 COUNTER-OFFER: ${proposed_price:.2f}. Message: {message}"
+        elif status == "rejected":
+            return f"🚫 REJECTED. Reason: {response.rejected.reason_code}"
+        elif status == "ui_required":
+            return f"🚨 HUMAN INTERVENTION REQUIRED. Template: {response.ui_required.template_id}"
 
-        return f"✅ Operation completed: {observation.message_id or 'ok'}"
+        return f"✅ Operation completed with unknown status: {status}"

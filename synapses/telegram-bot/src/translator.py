@@ -102,6 +102,13 @@ class TelegramTranslator:
         Returns (0, "") if the event is not relevant to this synapse.
         """
         chat_id = int(event.metadata.get("chat_id", "0"))
+        # TODO: Relying on session_token being a digit to fall back and find
+        # the chat_id is fragile. This creates a tight, implicit coupling
+        # between how sessions are created and how events are processed.
+        # A more robust solution would be to ensure that any event destined
+        # for a Telegram user explicitly includes the chat_id in its metadata.
+        # This makes the contract clear and avoids potential issues
+        # if the session token format changes.
         if not chat_id:
             # Try to extract from session_token if we used chat_id as session_token
             session_id = ""
