@@ -19,6 +19,9 @@ COPY proto /app/proto
 COPY packages/aura-core /app/packages/aura-core
 COPY core /app/core
 COPY synapses/telegram-bot/pyproject.toml /app/synapses/telegram-bot/
+COPY api-gateway/pyproject.toml /app/api-gateway/
+COPY synapses/mcp-server/pyproject.toml /app/synapses/mcp-server/
+COPY agents/bee-keeper/pyproject.toml /app/agents/bee-keeper/
 
 # Generate Protobuf code
 RUN buf generate && \

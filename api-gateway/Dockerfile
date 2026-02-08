@@ -18,6 +18,10 @@ COPY pyproject.toml uv.lock buf.yaml buf.gen.yaml /app/
 COPY proto /app/proto
 COPY packages/aura-core /app/packages/aura-core
 COPY api-gateway/pyproject.toml /app/api-gateway/
+COPY core/pyproject.toml /app/core/
+COPY synapses/telegram-bot/pyproject.toml /app/synapses/telegram-bot/
+COPY synapses/mcp-server/pyproject.toml /app/synapses/mcp-server/
+COPY agents/bee-keeper/pyproject.toml /app/agents/bee-keeper/
 
 # Generate Protobuf code
 RUN buf generate && \
