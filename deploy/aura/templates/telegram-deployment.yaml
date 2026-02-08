@@ -38,7 +38,7 @@ spec:
             - name: AURA_TELEGRAM__OTEL_EXPORTER_OTLP_ENDPOINT
               value: {{ .Values.monitoring.jaeger.collectorUrl | default (include "aura.jaeger.collectorUrl" .) | quote }}
             {{- if .Values.telegram.env.DEBUG }}
-            - name: AURA_TELEGRAM__DEBUG
+            - name: DEBUG
               value: {{ .Values.telegram.env.DEBUG | quote }}
             {{- end }}
             # --- Core metabolism settings (in-process HiveCell) ---
