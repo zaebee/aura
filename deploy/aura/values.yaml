@@ -166,3 +166,8 @@ monitoring:
         memory: 512Mi
   loki:
     url: "http://loki.monitoring.svc.cluster.local:3100"
+
+nats:
+  jetstream:
+    enabled: true
+    storageSize: 1Gi

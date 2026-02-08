@@ -1,0 +1,177 @@
+name: Knowledge Distillation
+
+on:
+  push:
+    branches: [main, feat/sematic-anchor]
+    paths:
+      - 'packages/aura-core/src/**'
+      - 'core/src/hive/**'
+      - 'proto/**'
+      - 'tools/distill_knowledge.py'
+      - 'tools/validate_knowledge.py'
+      - 'docs/ARCHITECTURAL_ANCHOR.md'
+  pull_request:
+    branches: [main]
+    paths:
+      - 'packages/aura-core/src/**'
+      - 'core/src/hive/**'
+      - 'proto/**'
+      - 'tools/distill_knowledge.py'
+      - 'tools/validate_knowledge.py'
+      - 'docs/ARCHITECTURAL_ANCHOR.md'
+
+jobs:
+  distill-and-validate:
+    name: Extract and Validate Architecture
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      - name: Install Buf
+        uses: bufbuild/buf-setup-action@v1
+        with:
+            github_token: ${{ github.token }}
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v3
+        with:
+          enable-cache: true
+
+      - name: Install dependencies
+        run: uv sync --all-extras
+
+      - name: Extract Architecture Knowledge
+        run: make generate tools-distill
+
+      - name: Check Binary Size
+        run: |
+          BINARY_SIZE=$(stat -f%z docs/knowledge/hive_architecture_v2.bin 2>/dev/null || stat -c%s docs/knowledge/hive_architecture_v2.bin)
+          echo "Binary knowledge size: ${BINARY_SIZE} bytes"
+
+          # Fail if binary is unreasonably small (< 1KB) or large (> 100KB)
+          if [ "$BINARY_SIZE" -lt 1024 ]; then
+            echo "❌ Error: Binary too small (${BINARY_SIZE} bytes), extraction may have failed"
+            exit 1
+          fi
+
+          if [ "$BINARY_SIZE" -gt 102400 ]; then
+            echo "⚠️  Warning: Binary is large (${BINARY_SIZE} bytes), consider optimization"
+          fi
+
+      - name: Upload Knowledge Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: knowledge-distillation-${{ github.sha }}
+          path: |
+            docs/knowledge/hive_architecture_v2.bin
+            docs/knowledge/hive_architecture_v2.json
+          retention-days: 30
+
+      - name: Comment on PR (on failure)
+        if: failure() && github.event_name == 'pull_request'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: '❌ **Knowledge Distillation Failed**\n\n' +
+                    'The architectural knowledge extraction or validation failed. ' +
+                    'This means the binary protobuf representation is inconsistent with the markdown anchor.\n\n' +
+                    'Please check:\n' +
+                    '- Protocol definitions in `proto/aura/knowledge/v1/`\n' +
+                    '- Extraction logic in `tools/distill_knowledge.py`\n' +
+                    '- Markdown anchor in `docs/ARCHITECTURAL_ANCHOR.md`\n\n' +
+                    'Run locally: `uv run tools/distill_knowledge.py && uv run tools/validate_knowledge.py`'
+            })
+
+      - name: Post Success Summary
+        if: success()
+        run: |
+          echo "### ✅ Knowledge Distillation Success" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Extracted Components:**" >> $GITHUB_STEP_SUMMARY
+
+          # Parse JSON output for summary
+          PROTOCOLS=$(jq '.genomeProtocols | length' docs/knowledge/hive_architecture_v2.json)
+          SERVICES=$(jq '.nucleusServices | length' docs/knowledge/hive_architecture_v2.json)
+          PROTEINS=$(jq '.organProteins | length' docs/knowledge/hive_architecture_v2.json)
+          INVARIANTS=$(jq '.invariants | length' docs/knowledge/hive_architecture_v2.json)
+
+          echo "- 📜 Genome Protocols: ${PROTOCOLS}" >> $GITHUB_STEP_SUMMARY
+          echo "- 🧬 Nucleus Services: ${SERVICES}" >> $GITHUB_STEP_SUMMARY
+          echo "- 🦠 Organ Proteins: ${PROTEINS}" >> $GITHUB_STEP_SUMMARY
+          echo "- ⚖️  Architectural Invariants: ${INVARIANTS}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+          BINARY_SIZE=$(stat -f%z docs/knowledge/hive_architecture_v2.bin 2>/dev/null || stat -c%s docs/knowledge/hive_architecture_v2.bin)
+          JSON_SIZE=$(stat -f%z docs/knowledge/hive_architecture_v2.json 2>/dev/null || stat -c%s docs/knowledge/hive_architecture_v2.json)
+
+          echo "**Artifact Sizes:**" >> $GITHUB_STEP_SUMMARY
+          echo "- Binary: ${BINARY_SIZE} bytes" >> $GITHUB_STEP_SUMMARY
+          echo "- JSON: ${JSON_SIZE} bytes" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "🐝 _For the glory of the Hive._" >> $GITHUB_STEP_SUMMARY
+
+  # Optional: Attach to GitHub Releases
+  attach-to-release:
+    name: Attach to Release
+    runs-on: ubuntu-latest
+    needs: distill-and-validate
+    if: startsWith(github.ref, 'refs/tags/')
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Python & uv
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install Buf
+        uses: bufbuild/buf-setup-action@v1
+        with:
+            github_token: ${{ github.token }}
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v3
+
+      - name: Install dependencies
+        run: uv sync --all-extras
+
+      - name: Generate artifacts
+        run: make generate tools-distill
+
+      - name: Create Release Assets
+        uses: softprops/action-gh-release@v1
+        with:
+          files: |
+            docs/knowledge/hive_architecture_v2.bin
+            docs/knowledge/hive_architecture_v2.json
+          body: |
+            ## 📦 Knowledge Distillation Artifacts
+
+            This release includes binary architectural knowledge distillation:
+
+            - **hive_architecture_v2.bin** - Binary protobuf format (~6KB)
+            - **hive_architecture_v2.json** - JSON debug format (~12KB)
+
+            ### Usage
+
+            ```python
+            from pathlib import Path
+            from aura_core.gen.aura.knowledge.v1 import ArchitecturalKnowledge
+
+            binary = Path("hive_architecture_v2.bin").read_bytes()
+            knowledge = ArchitecturalKnowledge().parse(binary)
+            ```
+
+            🐝 _For the glory of the Hive._

@@ -1,0 +1,12 @@
+{{- if .Values.nats.jetstream.enabled }}
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: {{ .Release.Name }}-nats-js-pvc
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: {{ .Values.nats.jetstream.storageSize }}
+{{- end }}

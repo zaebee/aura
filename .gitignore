@@ -15,6 +15,8 @@ wheels/
 **/gen/
 **/proto/
 !/proto/
+*_pb.ts
+*_pb.js
 
 # Virtual environments
 .venv
@@ -24,3 +26,7 @@ wheels/
 
 # FRP client configuration (contains secrets)
 ona-dance.toml
+
+# Knowledge distillation artifacts (generated in CI/CD)
+docs/knowledge/*.bin
+docs/knowledge/*.json
