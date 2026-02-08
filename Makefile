@@ -1,4 +1,5 @@
-.PHONY: lint test test-cov test-verbose build generate push install-dev format test-health
+.PHONY: lint test test-cov test-verbose build generate push install-dev format test-health \
+       run-core run-gateway run-frontend prepare-bun
 
 # Makefile for Aura Project
 TAG ?= latest
@@ -10,9 +11,14 @@ GATEWAY_PATH ?= api-gateway/src:api-gateway/gen-proto
 TG_PATH ?= synapses/telegram-bot/src:synapses/telegram-bot/gen-proto
 MCP_PATH ?= synapses/mcp-server/src:synapses/mcp-server/gen-proto
 KEEPER_PATH ?= agents/bee-keeper/src
+TOOL_PATH ?= $(CORE_PATH):$(DNA_PATH)
+
+# Proto source files (for incremental generation)
+PROTO_SOURCES := $(wildcard proto/aura/*/v1/*.proto)
+PROTO_SENTINEL := .gen-proto.stamp
 
 # --- 1. CODE QUALITY ---
-lint:
+lint: $(PROTO_SENTINEL)
 	# Protobuf Lint
 	cd proto && buf lint
 	# Python Lint (Ruff)
@@ -35,7 +41,7 @@ setup-hooks:
 	uv run pre-commit install
 
 # Run tests
-test:
+test: $(PROTO_SENTINEL)
 	# Run core tests
 	PYTHONPATH=$(CORE_PATH) uv run pytest core/tests/ -v
 	# Run telegram-bot tests with isolated path to avoid 'src' collision
@@ -62,7 +68,9 @@ build-tg:
 	docker build --platform $(PLATFORM) -t $(REGISTRY)/aura-telegram-bot:$(TAG) -f synapses/telegram-bot/Dockerfile .
 
 # --- 3. HELPER ---
-generate:
+
+# Incremental generation: only re-run buf if .proto files changed
+$(PROTO_SENTINEL): $(PROTO_SOURCES) buf.gen.yaml
 	# Generate Protobuf code directly into packages/aura-core/src/aura_core/gen/
 	# Uses buf.gen.yaml which leverages betterproto
 	mkdir -p packages/aura-core/src/aura_core/gen
@@ -72,6 +80,9 @@ generate:
 		mkdir -p packages/aura-core/src/aura_core/gen/aura/dna/google; \
 		echo "from betterproto.lib.google import protobuf" > packages/aura-core/src/aura_core/gen/aura/dna/google/__init__.py; \
 	fi
+	touch $(PROTO_SENTINEL)
+
+generate: $(PROTO_SENTINEL)
 
 # --- 4. PUBLISH (CI ONLY) ---
 push: push-tg
@@ -92,7 +103,24 @@ format:
 	# Format code
 	uv run ruff format .
 
-# --- 6. CORE TASKS ---
+# --- 6. RUN SERVICES (auto-generates protos if needed) ---
+run-core: $(PROTO_SENTINEL)
+	# Run Core gRPC service
+	PYTHONPATH=$(TOOL_PATH) uv run python -m core.src.main
+
+run-gateway: $(PROTO_SENTINEL)
+	# Run API Gateway
+	PYTHONPATH=$(GATEWAY_PATH):$(DNA_PATH) uv run uvicorn main:app --host 0.0.0.0 --port 8000 --app-dir api-gateway/src
+
+prepare-bun:
+	# Install frontend dependencies via bun
+	cd frontend && bun install
+
+run-frontend: prepare-bun
+	# Run Frontend dev server
+	cd frontend && bun run dev
+
+# --- 7. CORE TASKS ---
 core-seed:
 	# Seed the database with initial inventory
 	PYTHONPATH=$(CORE_PATH) uv run python core/scripts/seed.py
@@ -108,20 +136,20 @@ core-train:
 # Test health endpoints
 tools-health:
 	# Test health check endpoints (requires running services)
-	PYTHONPATH=$(CORE_PATH) uv run python tools/test_health_endpoints.py
+	PYTHONPATH=$(TOOL_PATH) uv run python tools/test_health_endpoints.py
 
 tools-distill:
 	# Distill architectural knowledge from the codebase into binary/JSON artifacts
-	PYTHONPATH=$(CORE_PATH) uv run python tools/distill_knowledge.py
+	PYTHONPATH=$(TOOL_PATH) uv run python tools/distill_knowledge.py
 
 tools-validate:
 	# Validate knowledge artifacts against the markdown architectural anchor
-	PYTHONPATH=$(CORE_PATH) uv run python tools/validate_knowledge.py
+	PYTHONPATH=$(TOOL_PATH) uv run python tools/validate_knowledge.py
 
 tools-simulate:
 	# Run agent negotiation simulation
-	PYTHONPATH=$(CORE_PATH) uv run python tools/simulators/agent_sim.py
+	PYTHONPATH=$(TOOL_PATH) uv run python tools/simulators/agent_sim.py
 
 tools-buyer:
 	# Run agent negotiation simulation
-	PYTHONPATH=$(CORE_PATH) uv run python tools/simulators/autonomous_buyer.py
+	PYTHONPATH=$(TOOL_PATH) uv run python tools/simulators/autonomous_buyer.py
