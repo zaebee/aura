@@ -13,6 +13,7 @@ from aiogram.types import (
     Message,
 )
 from nats_adapter import NatsAdapter
+from translator import TelegramTranslator
 
 router = Router()
 
@@ -34,8 +35,6 @@ async def cmd_start(message: Message) -> None:
 async def cmd_search(
     message: Message, command: CommandObject, adapter: NatsAdapter
 ) -> None:
-    from translator import TelegramTranslator
-
     translator = TelegramTranslator()
     signal = translator.to_signal(message, command=command)
     await adapter.execute(signal)
