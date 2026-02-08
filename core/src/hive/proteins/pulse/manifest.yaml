@@ -78,7 +78,7 @@ llm_tools:
         agent_did:
           type: "string"
           description: "Agent decentralized identifier"
-      required: ["session_token", "action", "item_id"]
+      required: ["session_token", "action", "price", "item_id"]
 
   - name: "pulse__emit_alert"
     description: "Emits an alert event for critical system conditions."

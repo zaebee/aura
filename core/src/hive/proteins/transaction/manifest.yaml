@@ -88,11 +88,11 @@ llm_tools:
         memo:
           type: "string"
           description: "The payment memo to verify"
-        expected_amount:
+        amount:
           type: "number"
           description: "The expected payment amount"
         currency:
           type: "string"
           description: "The expected currency"
           default: "SOL"
-      required: ["memo", "expected_amount"]
+      required: ["memo", "amount"]
