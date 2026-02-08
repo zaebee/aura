@@ -4,7 +4,6 @@
 TAG ?= latest
 REGISTRY ?= ghcr.io/zaebee
 PLATFORM ?= linux/amd64
-DNA_PATH ?= packages/aura-core/src
 CORE_PATH ?= core:core/src:core/gen-proto
 GATEWAY_PATH ?= api-gateway/src:api-gateway/gen-proto
 TG_PATH ?= synapses/telegram-bot/src:synapses/telegram-bot/gen-proto
@@ -16,7 +15,7 @@ lint:
 	# Protobuf Lint
 	cd proto && buf lint
 	# Python Lint (Ruff)
-	PYTHONPYPATH=$(CORE_PATH) uv run ruff check .
+	uv run ruff check .
 	# Python Type Check (Mypy)
 	# We use --explicit-package-bases to avoid double discovery when multiple paths overlap
 	MYPYPATH=$(CORE_PATH) uv run mypy --explicit-package-bases core/src
@@ -24,7 +23,7 @@ lint:
 	MYPYPATH=$(TG_PATH):core/src:core/gen-proto:packages/aura-core/src uv run mypy --explicit-package-bases synapses/telegram-bot/src
 	MYPYPATH=$(MCP_PATH):core/src:core/gen-proto:packages/aura-core/src uv run mypy --explicit-package-bases synapses/mcp-server/src
 	MYPYPATH=$(KEEPER_PATH):packages/aura-core/src uv run mypy agents/bee-keeper/main.py agents/bee-keeper/src
-	MYPYPATH=$(DNA_PATH) uv run mypy packages/aura-core/src
+	MYPYPATH=packages/aura-core/src uv run mypy packages/aura-core/src
 	# Security Audit (Bandit)
 	uv run bandit -r . -c pyproject.toml
 	# Frontend Lint
@@ -108,20 +107,12 @@ core-train:
 # Test health endpoints
 tools-health:
 	# Test health check endpoints (requires running services)
-	PYTHONPATH=$(CORE_PATH) uv run python tools/test_health_endpoints.py
-
-tools-distill:
-	# Distill architectural knowledge from the codebase into binary/JSON artifacts
-	PYTHONPATH=$(CORE_PATH) uv run python tools/distill_knowledge.py
-
-tools-validate:
-	# Validate knowledge artifacts against the markdown architectural anchor
-	PYTHONPATH=$(CORE_PATH) uv run python tools/validate_knowledge.py
+	PYTHONPATH=.:$(CORE_PATH) uv run python tools/test_health_endpoints.py
 
 tools-simulate:
 	# Run agent negotiation simulation
-	PYTHONPATH=$(CORE_PATH) uv run python tools/simulators/agent_sim.py
+	PYTHONPATH=:.$(CORE_PATH) uv run python tools/simulators/agent_sim.py
 
 tools-buyer:
 	# Run agent negotiation simulation
-	PYTHONPATH=$(CORE_PATH) uv run python tools/simulators/autonomous_buyer.py
+	PYTHONPATH=:.$(CORE_PATH) uv run python tools/simulators/autonomous_buyer.py
