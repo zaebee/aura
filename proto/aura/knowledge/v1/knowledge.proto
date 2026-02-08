@@ -1,0 +1,120 @@
+// Knowledge Protocol Buffers - Binary Distillation of Hive Architecture
+//
+// This schema enables programmatic consumption of architectural knowledge.
+// It distills the Hive's 4-level ontology, ATCG-M patterns, and invariants
+// into a machine-readable format for tools, linters, and cross-project sharing.
+//
+// Usage:
+// - Generate with: buf generate
+// - Serialize: binary_bytes = bytes(knowledge)
+// - Deserialize: knowledge = ArchitecturalKnowledge().parse(binary_bytes)
+// - Distribute via NATS: subject aura.knowledge.*
+
+syntax = "proto3";
+
+package aura.knowledge.v1;
+
+import "google/protobuf/timestamp.proto";
+
+// =============================================================================
+// ENUMS - Architectural Taxonomy
+// =============================================================================
+
+// 4-Level Ontology: The strict hierarchy of the Hive
+enum OntologyLevel {
+  ONTOLOGY_LEVEL_UNSPECIFIED = 0;
+  ONTOLOGY_LEVEL_GENOME = 1;     // Level 1: Immutable Protocols (packages/aura-core)
+  ONTOLOGY_LEVEL_NUCLEUS = 2;    // Level 2: Sovereign Brain (core/)
+  ONTOLOGY_LEVEL_ORGANS = 3;     // Level 3: Specialized Skills (core/src/hive/proteins/)
+  ONTOLOGY_LEVEL_CITIZENS = 4;   // Level 4: Composed Entities (agents/, adapters/)
+}
+
+// ATCG-M Phase: Universal metabolic pattern
+enum ATCGMPhase {
+  ATCGM_PHASE_UNSPECIFIED = 0;
+  ATCGM_PHASE_M_INBOUND = 1;   // Membrane (input validation)
+  ATCGM_PHASE_A = 2;           // Aggregator (perceive)
+  ATCGM_PHASE_T = 3;           // Transformer (think)
+  ATCGM_PHASE_M_OUTBOUND = 4;  // Membrane (output guards)
+  ATCGM_PHASE_C = 5;           // Connector (act)
+  ATCGM_PHASE_G = 6;           // Generator (pulse)
+}
+
+// =============================================================================
+// TOP-LEVEL CONTAINER - Distilled Architectural Knowledge
+// =============================================================================
+
+message ArchitecturalKnowledge {
+  // Identity and versioning
+  string knowledge_id = 1;                    // Unique identifier (e.g., "hive_arch_20260207")
+  string version = 2;                         // Schema version (e.g., "HIVE_GENOME_v2")
+  google.protobuf.Timestamp created_at = 3;   // Extraction timestamp
+  map<string, string> metadata = 4;           // Flexible metadata (source, codebase, etc.)
+
+  // 4-Level Ontology Components
+  repeated ComponentDefinition genome_protocols = 10;   // Level 1: Protocol definitions
+  repeated ComponentDefinition nucleus_services = 11;   // Level 2: Brain services
+  repeated ComponentDefinition organ_proteins = 12;     // Level 3: Skill implementations
+  repeated ComponentDefinition citizen_agents = 13;     // Level 4: Agents (WITH goals)
+  repeated ComponentDefinition citizen_adapters = 14;   // Level 4: Adapters (NO goals)
+
+  // ATCG-M Metabolic Patterns
+  repeated MetabolicPattern atcgm_patterns = 20;        // Service metabolism completeness
+
+  // Sacred Chambers (filesystem enforcement)
+  repeated ChamberDefinition sacred_chambers = 30;      // Enforced directory structure
+
+  // Architectural Invariants (immutable laws)
+  repeated InvariantRule invariants = 40;               // Constraints and rules
+}
+
+// =============================================================================
+// COMPONENT DEFINITION - Represents any architectural entity
+// =============================================================================
+
+message ComponentDefinition {
+  string name = 1;                          // Component name (e.g., "HiveCortex", "PulseSkill")
+  OntologyLevel level = 2;                  // Ontological level
+  string file_path = 3;                     // Relative path from repo root
+  string description = 4;                   // Human-readable purpose
+  repeated string dependencies = 5;         // Components this depends on
+  repeated string capabilities = 6;         // What this component can do
+  map<string, string> metadata = 7;         // Flexible metadata (language, framework, etc.)
+}
+
+// =============================================================================
+// METABOLIC PATTERN - ATCG-M Completeness Tracking
+// =============================================================================
+
+message MetabolicPattern {
+  string service_name = 1;                        // Service identifier (e.g., "core", "bee-keeper")
+  repeated ATCGMPhase implemented_phases = 2;     // Which nucleotides are present
+  map<string, string> phase_implementations = 3;  // Phase -> file_path mapping
+  bool is_complete = 4;                           // True if all 5+ phases present
+  map<string, string> metadata = 5;               // Notes (e.g., "flattened nucleotides")
+}
+
+// =============================================================================
+// CHAMBER DEFINITION - Sacred Directory Enforcement
+// =============================================================================
+
+message ChamberDefinition {
+  string filesystem_path = 1;       // Glob pattern or exact path (e.g., "migrations/")
+  string sacred_name = 2;           // Poetic name (e.g., "HiveEvolutionaryScrolls")
+  string purpose = 3;               // Why this chamber exists
+  OntologyLevel level = 4;          // Which ontological level owns this
+  repeated string allowed_contents = 5;  // File types or patterns allowed inside
+}
+
+// =============================================================================
+// INVARIANT RULE - Architectural Law
+// =============================================================================
+
+message InvariantRule {
+  string rule_id = 1;                 // Unique identifier (e.g., "ontological_purity")
+  string description = 2;             // Human-readable law statement
+  string enforcement_mechanism = 3;   // How it's enforced (e.g., "bee-keeper", "type system")
+  bool is_hard_constraint = 4;        // True = build fails, False = warning
+  repeated string examples = 5;       // Code examples (allowed/forbidden)
+  map<string, string> metadata = 6;   // Additional context
+}

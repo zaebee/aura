@@ -136,7 +136,8 @@ jobs:
                   AURA_DATABASE__URL: postgresql://test:test@localhost:5432/test_db
                   AURA_DATABASE__REDIS_URL: redis://localhost:6379/0
               run: |
-                make core-train
+                echo "skip"
+                # make core-train
 
             - name: Log in to the Container registry
               uses: docker/login-action@v3
