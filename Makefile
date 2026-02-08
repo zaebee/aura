@@ -1,4 +1,4 @@
-.PHONY: lint test test-cov test-verbose build generate push install-dev format test-health
+.PHONY: lint test test-cov test-verbose build generate generate-local push install-dev format test-health
 
 # Makefile for Aura Project
 TAG ?= latest
@@ -13,8 +13,8 @@ KEEPER_PATH ?= agents/bee-keeper/src
 
 # --- 1. CODE QUALITY ---
 lint:
-	# Protobuf Lint
-	cd proto && buf lint
+	# Protobuf Lint (skip if buf not installed)
+	@if command -v buf >/dev/null 2>&1; then cd proto && buf lint; else echo "  ⚠ buf not found, skipping proto lint"; fi
 	# Python Lint (Ruff)
 	PYTHONPATH=$(CORE_PATH):$(GATEWAY_PATH):$(TG_PATH):$(MCP_PATH):$(KEEPER_PATH):$(DNA_PATH) uv run ruff check .
 	# Python Type Check (Mypy)
@@ -62,15 +62,45 @@ build-tg:
 	docker build --platform $(PLATFORM) -t $(REGISTRY)/aura-telegram-bot:$(TAG) -f synapses/telegram-bot/Dockerfile .
 
 # --- 3. HELPER ---
+PROTO_DIR   ?= proto
+PROTO_SRC   := $(wildcard proto/aura/*/v1/*.proto)
+GRPC_TARGETS := core/gen-proto api-gateway/gen-proto synapses/telegram-bot/gen-proto
+BETTERPROTO_OUT := packages/aura-core/src/aura_core/gen
+
+# CI-friendly: uses remote buf plugins (requires auth)
 generate:
-	# Generate Protobuf code directly into packages/aura-core/src/aura_core/gen/
-	# Uses buf.gen.yaml which leverages betterproto
-	mkdir -p packages/aura-core/src/aura_core/gen
+	mkdir -p $(BETTERPROTO_OUT)
 	buf generate
 	# Fix betterproto google import shim if needed
-	if [ -d "packages/aura-core/src/aura_core/gen/aura/dna" ]; then \
-		mkdir -p packages/aura-core/src/aura_core/gen/aura/dna/google; \
-		echo "from betterproto.lib.google import protobuf" > packages/aura-core/src/aura_core/gen/aura/dna/google/__init__.py; \
+	@if [ -d "$(BETTERPROTO_OUT)/aura/dna" ]; then \
+		mkdir -p $(BETTERPROTO_OUT)/aura/dna/google; \
+		echo "from betterproto.lib.google import protobuf" > $(BETTERPROTO_OUT)/aura/dna/google/__init__.py; \
+	fi
+
+# Local-friendly: uses grpc_tools.protoc + betterproto (no buf auth needed)
+generate-local:
+	# --- gRPC Python stubs (protobuf + grpc + pyi) for every service ---
+	@for dir in $(GRPC_TARGETS); do \
+		mkdir -p $$dir; \
+		uv run python -m grpc_tools.protoc \
+			-I $(PROTO_DIR) \
+			--python_out=$$dir \
+			--grpc_python_out=$$dir \
+			--pyi_out=$$dir \
+			$(PROTO_SRC); \
+		echo "  ✓ $$dir"; \
+	done
+	# --- Betterproto Pydantic models (aura-core DNA) ---
+	mkdir -p $(BETTERPROTO_OUT)
+	uv run python -m grpc_tools.protoc \
+		-I $(PROTO_DIR) \
+		--python_betterproto_out=$(BETTERPROTO_OUT) \
+		$(PROTO_SRC)
+	@echo "  ✓ $(BETTERPROTO_OUT)"
+	# Fix betterproto google import shim if needed
+	@if [ -d "$(BETTERPROTO_OUT)/aura/dna" ]; then \
+		mkdir -p $(BETTERPROTO_OUT)/aura/dna/google; \
+		echo "from betterproto.lib.google import protobuf" > $(BETTERPROTO_OUT)/aura/dna/google/__init__.py; \
 	fi
 
 # --- 4. PUBLISH (CI ONLY) ---

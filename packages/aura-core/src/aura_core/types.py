@@ -15,17 +15,17 @@ def map_action(action_str: str | None) -> ActionType:
     from typing import cast
 
     if not action_str:
-        return cast(ActionType, ActionType.ACTION_TYPE_UNSPECIFIED)
+        return cast(ActionType, ActionType.UNSPECIFIED)
 
     mapping = {
-        "accept": ActionType.ACTION_TYPE_ACCEPT,
-        "counter": ActionType.ACTION_TYPE_COUNTER,
-        "counteroffer": ActionType.ACTION_TYPE_COUNTER,
-        "reject": ActionType.ACTION_TYPE_REJECT,
-        "ui_required": ActionType.ACTION_TYPE_UI_REQUIRED,
-        "error": ActionType.ACTION_TYPE_ERROR,
+        "accept": ActionType.ACCEPT,
+        "counter": ActionType.COUNTER,
+        "counteroffer": ActionType.COUNTER,
+        "reject": ActionType.REJECT,
+        "ui_required": ActionType.UI_REQUIRED,
+        "error": ActionType.ERROR,
     }
-    val = mapping.get(action_str.lower(), ActionType.ACTION_TYPE_UNSPECIFIED)
+    val = mapping.get(action_str.lower(), ActionType.UNSPECIFIED)
     return cast(ActionType, val)
 
 
@@ -96,7 +96,7 @@ class FailureIntent(IntentAction):
     """Specialized intent for when the LLM or processing fails."""
 
     error: str = ""
-    action: str | ActionType = cast(ActionType, ActionType.ACTION_TYPE_ERROR)
+    action: str | ActionType = cast(ActionType, ActionType.ERROR)
     price: float = 0.0
     message: str = "Internal processing error. Defaulting to safe state."
 

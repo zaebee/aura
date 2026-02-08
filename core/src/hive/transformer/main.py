@@ -38,7 +38,7 @@ class RuleBasedStrategy:
     ) -> IntentAction:
         if not item_data:
             return IntentAction(
-                action=cast(ActionType, ActionType.ACTION_TYPE_REJECT),
+                action=cast(ActionType, ActionType.REJECT),
                 price=0.0,
                 message="Item not found",
                 metadata={"reason_code": "ITEM_NOT_FOUND"},
@@ -48,7 +48,7 @@ class RuleBasedStrategy:
         # Rule: High-value bids require UI confirmation
         if bid > self.trigger_price:
             return IntentAction(
-                action=cast(ActionType, ActionType.ACTION_TYPE_UI_REQUIRED),
+                action=cast(ActionType, ActionType.UI_REQUIRED),
                 price=bid,
                 message=f"Bid of ${bid} exceeds security threshold",
                 metadata={"template_id": "high_value_confirm"},
@@ -59,7 +59,7 @@ class RuleBasedStrategy:
         # Rule: Bid below floor price - counter with floor price
         if bid < floor_price:
             return IntentAction(
-                action=cast(ActionType, ActionType.ACTION_TYPE_COUNTER),
+                action=cast(ActionType, ActionType.COUNTER),
                 price=floor_price,
                 message=f"We cannot accept less than ${floor_price}.",
                 metadata={"reason_code": "BELOW_FLOOR"},
@@ -68,7 +68,7 @@ class RuleBasedStrategy:
 
         # Rule: Bid at or above floor price - accept
         return IntentAction(
-            action=cast(ActionType, ActionType.ACTION_TYPE_ACCEPT),
+            action=cast(ActionType, ActionType.ACCEPT),
             price=bid,
             message="Offer accepted.",
             metadata={"reservation_code": f"RULE-{int(time.time())}"},
