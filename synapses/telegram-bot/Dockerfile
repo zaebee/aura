@@ -24,13 +24,14 @@ RUN uv sync --frozen --no-install-project --group dev --package telegram-bot
 # Copy proto definitions (needed for stub generation)
 COPY proto/ /app/proto/
 
-# Generate gRPC stubs
+# Generate gRPC stubs (negotiation + dna protos required by core's hive package)
 RUN mkdir -p /app/synapses/telegram-bot/src/proto && \
     uv run python -m grpc_tools.protoc -I /app/proto \
     --python_out=/app/synapses/telegram-bot/src/proto \
     --grpc_python_out=/app/synapses/telegram-bot/src/proto \
     --pyi_out=/app/synapses/telegram-bot/src/proto \
-    /app/proto/aura/negotiation/v1/negotiation.proto
+    /app/proto/aura/negotiation/v1/negotiation.proto \
+    /app/proto/aura/dna/v1/dna.proto
 
 # Final sync for production (no-dev, no-editable, scoped to package)
 RUN uv sync --frozen --no-dev --no-install-project --no-editable --package telegram-bot
