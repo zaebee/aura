@@ -4,10 +4,10 @@
 TAG ?= latest
 REGISTRY ?= ghcr.io/zaebee
 PLATFORM ?= linux/amd64
-CORE_PATH ?= core:core/src
-GATEWAY_PATH ?= api-gateway/src
-TG_PATH ?= synapses/telegram-bot/src:synapses/telegram-bot/src/proto
-MCP_PATH ?= synapses/mcp-server/src
+CORE_PATH ?= core:core/src:core/gen-proto
+GATEWAY_PATH ?= api-gateway/src:api-gateway/gen-proto
+TG_PATH ?= synapses/telegram-bot/src:synapses/telegram-bot/gen-proto
+MCP_PATH ?= synapses/mcp-server/src:synapses/mcp-server/gen-proto
 KEEPER_PATH ?= agents/bee-keeper/src
 
 # --- 1. CODE QUALITY ---
@@ -20,8 +20,8 @@ lint:
 	# We use --explicit-package-bases to avoid double discovery when multiple paths overlap
 	MYPYPATH=$(CORE_PATH) uv run mypy --explicit-package-bases core/src
 	MYPYPATH=$(GATEWAY_PATH):packages/aura-core/src uv run mypy --explicit-package-bases api-gateway/src
-	MYPYPATH=$(TG_PATH):core/src:packages/aura-core/src uv run mypy --explicit-package-bases synapses/telegram-bot/src
-	MYPYPATH=$(MCP_PATH):core/src:packages/aura-core/src uv run mypy --explicit-package-bases synapses/mcp-server/src
+	MYPYPATH=$(TG_PATH):core/src:core/gen-proto:packages/aura-core/src uv run mypy --explicit-package-bases synapses/telegram-bot/src
+	MYPYPATH=$(MCP_PATH):core/src:core/gen-proto:packages/aura-core/src uv run mypy --explicit-package-bases synapses/mcp-server/src
 	MYPYPATH=$(KEEPER_PATH):packages/aura-core/src uv run mypy agents/bee-keeper/main.py agents/bee-keeper/src
 	MYPYPATH=packages/aura-core/src uv run mypy packages/aura-core/src
 	# Security Audit (Bandit)
@@ -71,8 +71,6 @@ generate:
 		mkdir -p packages/aura-core/src/aura_core/gen/aura/dna/google; \
 		echo "from betterproto.lib.google import protobuf" > packages/aura-core/src/aura_core/gen/aura/dna/google/__init__.py; \
 	fi
-	# Link core proto for absolute imports
-	ln -sf hive/proto/aura core/src/aura
 
 # --- 4. PUBLISH (CI ONLY) ---
 push: push-tg

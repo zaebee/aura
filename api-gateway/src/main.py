@@ -4,6 +4,10 @@ from contextlib import asynccontextmanager
 from typing import Any
 
 import grpc
+from aura.negotiation.v1 import (
+    negotiation_pb2,  # type: ignore
+    negotiation_pb2_grpc,  # type: ignore
+)
 from fastapi import Depends, FastAPI, Header, HTTPException, Request, Response
 from grpc_health.v1 import health_pb2_grpc
 from health import register_health_endpoints
@@ -22,10 +26,6 @@ from starlette.middleware.cors import CORSMiddleware
 from telemetry import init_telemetry
 
 from config import get_settings
-from proto.aura.negotiation.v1 import (
-    negotiation_pb2,  # type: ignore
-    negotiation_pb2_grpc,  # type: ignore
-)
 
 settings = get_settings()
 

@@ -3,6 +3,7 @@ import uuid
 from typing import Any
 
 import structlog
+from aura.negotiation.v1 import negotiation_pb2
 from aura_core import (
     BaseConnector,
     HiveContext,
@@ -11,8 +12,6 @@ from aura_core import (
     SkillRegistry,
 )
 from aura_core.gen.aura.dna.v1 import ActionType
-
-from hive.proto.aura.negotiation.v1 import negotiation_pb2
 
 logger = structlog.get_logger(__name__)
 

@@ -7,12 +7,11 @@ from typing import Any, cast
 import dspy
 import litellm
 import structlog
+from aura.negotiation.v1 import negotiation_pb2
 from aura_core import resolve_brain_path
 from jinja2 import Template
 from langchain_mistralai import MistralAIEmbeddings
 from pydantic import BaseModel
-
-from hive.proto.aura.negotiation.v1 import negotiation_pb2
 
 logger = structlog.get_logger(__name__)
 

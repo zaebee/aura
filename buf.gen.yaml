@@ -8,27 +8,27 @@ plugins:
 
   # Core service proto
   - remote: buf.build/protocolbuffers/pyi
-    out: core/src/hive/proto
+    out: core/gen-proto
   - remote: buf.build/grpc/python:v1.76.0
-    out: core/src/hive/proto
+    out: core/gen-proto
   - remote: buf.build/protocolbuffers/python
-    out: core/src/hive/proto
+    out: core/gen-proto
 
   # Gateway proto
   - remote: buf.build/protocolbuffers/pyi
-    out: api-gateway/src/proto
+    out: api-gateway/gen-proto
   - remote: buf.build/grpc/python:v1.76.0
-    out: api-gateway/src/proto
+    out: api-gateway/gen-proto
   - remote: buf.build/protocolbuffers/python
-    out: api-gateway/src/proto
+    out: api-gateway/gen-proto
 
   # Agents/Adaptors proto
   - remote: buf.build/protocolbuffers/pyi
-    out: synapses/telegram-bot/src/proto
+    out: synapses/telegram-bot/gen-proto
   - remote: buf.build/grpc/python:v1.76.0
-    out: synapses/telegram-bot/src/proto
+    out: synapses/telegram-bot/gen-proto
   - remote: buf.build/protocolbuffers/python
-    out: synapses/telegram-bot/src/proto
+    out: synapses/telegram-bot/gen-proto
 
   # Frontend ts proto
   - remote: buf.build/bufbuild/es

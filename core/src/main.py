@@ -5,6 +5,7 @@ from typing import TYPE_CHECKING, Any, cast
 
 import grpc
 import grpc.aio
+from aura.negotiation.v1 import negotiation_pb2, negotiation_pb2_grpc
 from grpc_health.v1 import health_pb2, health_pb2_grpc
 from hive.cortex import HiveCell
 from hive.metabolism.logging_config import (
@@ -13,7 +14,6 @@ from hive.metabolism.logging_config import (
     configure_logging,
     get_logger,
 )
-from hive.proto.aura.negotiation.v1 import negotiation_pb2, negotiation_pb2_grpc
 from opentelemetry import trace
 
 from config import settings

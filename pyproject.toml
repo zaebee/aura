@@ -75,6 +75,7 @@ line-length = 88
 exclude = [
     "**/proto/**",  # Auto-generated protobuf files
     "**/gen/**",  # Auto-generated dataclass files
+    "**/gen-proto/**",  # Auto-generated proto files
 ]
 
 [tool.ruff.lint]

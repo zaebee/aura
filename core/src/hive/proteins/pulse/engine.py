@@ -11,9 +11,8 @@ from typing import Any
 
 import nats
 import nats.errors
+from aura.dna.v1 import dna_pb2
 from google.protobuf.timestamp_pb2 import Timestamp
-
-from hive.proto.aura.dna.v1 import dna_pb2
 
 logger = logging.getLogger(__name__)
 
