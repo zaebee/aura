@@ -17,28 +17,6 @@ dependencies:
 
 # External Tool Definitions (MCP / Anthropic / OpenAI Tools)
 llm_tools:
-  - name: "transaction__get_floor_price"
-    description: "Retrieves the minimum acceptable price for an inventory item."
-
-    # Membrane Policy (CRISPR-like safety rules)
-    membrane_policy:
-      safety_level: "read_only"
-      redaction_rules: ["floor_price_redaction"]
-      validation_rules: []
-
-    # Metabolic Cost
-    activation_cost:
-      tokens_est: 150
-      latency_ms_est: 100
-
-    input_schema:
-      type: "object"
-      properties:
-        item_id:
-          type: "string"
-          description: "The unique identifier of the inventory item"
-      required: ["item_id"]
-
   - name: "transaction__create_payment_link"
     description: "Generates a cryptocurrency payment link for a specific amount."
 

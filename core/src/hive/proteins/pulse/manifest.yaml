@@ -44,7 +44,7 @@ llm_tools:
           type: "string"
           description: "Current status of the service"
           default: "ok"
-      required: ["service"]
+      required: []
 
   - name: "pulse__emit_negotiation_event"
     description: "Emits a negotiation event to the event bus for tracking and auditing."
