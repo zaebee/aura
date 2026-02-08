@@ -81,7 +81,7 @@ class NatsSignalGateway:
 
             # 1. Feed raw signal bytes into MetabolicLoop
             #    The aggregator detects bytes and parses them as a proto Signal.
-            observation = await self.metabolism.execute(msg.data)
+            observation = await self.metabolism.execute(msg.data, is_nats=True)
 
             # 2. Convert dataclass Observation to proto Observation
             proto_obs = self._to_proto_observation(observation)
