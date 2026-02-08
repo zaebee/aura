@@ -52,6 +52,7 @@ gateway:
   corsOrigins: "https://aura.zae.life"
   env:
     LOG_LEVEL: info
+    PYTHONPATH: /app/api-gateway/src:/app/api-gateway/gen-proto
 
 # Core Service Configuration
 core:
@@ -81,6 +82,7 @@ core:
       memory: 128Mi
   env:
     AURA_SERVER__LOG_LEVEL: info
+    PYTHONPATH: /app/core/src:/app/core/gen-proto
     AURA_LLM__MODEL: "mistral/mistral-large-latest"  # Can override: openai/gpt-4o, ollama/mistral, rule
     AURA_CRYPTO__ENABLED: "false"
 
@@ -142,6 +144,7 @@ telegram:
       memory: 64Mi
   env:
     LOG_LEVEL: info
+    PYTHONPATH: /app/synapses/telegram-bot/src:/app/synapses/telegram-bot/gen-proto
 
 # Secrets for the application.
 # For production, it is strongly recommended to use a secret management solution

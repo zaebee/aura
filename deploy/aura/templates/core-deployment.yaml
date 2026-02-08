@@ -39,6 +39,8 @@ spec:
           resources:
             {{- toYaml .Values.core.resources | nindent 12 }}
           env:
+            - name: PYTHONPATH
+              value: "{{ .Values.core.env.PYTHONPATH }}"
             - name: AURA_SERVER__LOG_LEVEL
               value: "{{ .Values.core.env.AURA_SERVER__LOG_LEVEL }}"
             - name: AURA_SERVER__PORT

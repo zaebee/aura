@@ -40,7 +40,7 @@ spec:
             timeoutSeconds: {{ .Values.frontend.readinessProbe.timeoutSeconds }}
             failureThreshold: {{ .Values.frontend.readinessProbe.failureThreshold }}
           env:
-            - name: NEXT_PUBLIC_API_GATEWAY_URL
+            - name: VITE_API_GATEWAY_URL
               value: "{{ .Values.frontend.apiGatewayUrl }}"
 ---
 apiVersion: v1
