@@ -14,7 +14,11 @@ from synapse_settings import settings as tg_settings
 from translator import TelegramTranslator
 
 # Setup logging
-level = logging.DEBUG if tg_settings.debug else getattr(logging, tg_settings.log_level.upper(), logging.INFO)
+level = (
+    logging.DEBUG
+    if tg_settings.debug
+    else getattr(logging, tg_settings.log_level.upper(), logging.INFO)
+)
 log_format = os.getenv("AURA_LOG_FORMAT", "json").lower()
 renderer = (
     structlog.dev.ConsoleRenderer()
@@ -64,7 +68,9 @@ async def main() -> None:
         logger.error("nats_connection_failed", error=str(e))
 
     if not nc:
-        logger.critical("nats_required", reason="Cannot operate without NATS connection")
+        logger.critical(
+            "nats_required", reason="Cannot operate without NATS connection"
+        )
         return
 
     # 2. Initialize NATS Adapter (replaces in-process core metabolism)
