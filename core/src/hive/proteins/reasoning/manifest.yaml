@@ -83,4 +83,5 @@ llm_tools:
                     type: "number"
                   message:
                     type: "string"
+          required: ["item_id", "current_bid"]
       required: ["context"]

@@ -40,6 +40,7 @@ llm_tools:
             price:
               type: "number"
               description: "The proposed price"
+          required: ["action", "price"]
         context:
           type: "object"
           description: "Contextual information for validation"
@@ -50,6 +51,7 @@ llm_tools:
             internal_cost:
               type: "number"
               description: "The internal cost of the item"
+          required: ["floor_price", "internal_cost"]
       required: ["decision", "context"]
 
   - name: "guard__get_safe_price"
@@ -76,6 +78,7 @@ llm_tools:
             floor_price:
               type: "number"
               description: "The floor price that was violated"
+          required: ["floor_price"]
         reason:
           type: "string"
           description: "The reason for needing a safe price (margin/floor violation)"
