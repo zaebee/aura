@@ -1,11 +1,14 @@
 import asyncio
+
 from nats.aio.client import Client as NATS
+
 
 class MetabolicLoop:
     """
     Worker Metabolic Loop: Manages NATS connectivity and control signals.
     Acts as the proprioceptive layer for the remote worker.
     """
+
     def __init__(self, worker_name: str, nats_url: str = "nats://localhost:4222"):
         self.worker_name = worker_name
         self.nats_url = nats_url
@@ -21,7 +24,7 @@ class MetabolicLoop:
                 self.nats_url,
                 connect_timeout=2,
                 reconnect_time_wait=1,
-                max_reconnect_attempts=60
+                max_reconnect_attempts=60,
             )
 
             # Subscribe to kill signals from the Gardener

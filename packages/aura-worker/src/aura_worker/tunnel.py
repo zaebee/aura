@@ -66,7 +66,8 @@ class Umbilical:
 
         print("Checksum verified. Extracting...")
         subprocess.run(
-            ["tar", "-xzf", str(tar_path), "-C", str(self.bin_dir)], check=True  # nosec B603 B607
+            ["tar", "-xzf", str(tar_path), "-C", str(self.bin_dir)],
+            check=True,  # nosec B603 B607
         )
 
         extracted_dir = self.bin_dir / f"frp_{self.FRPC_VERSION}_linux_amd64"

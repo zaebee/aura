@@ -1,18 +1,26 @@
-import logging
 import asyncio
+import logging
 import threading
 import uuid
 from collections import deque
-from datetime import datetime, timezone
-from nats.aio.client import Client as NATS
+from datetime import UTC, datetime
+
 from aura_core.gen.aura.dna.v1 import Event, LogEvent
+from nats.aio.client import Client as NATS
+
 
 class HiveLogHandler(logging.Handler):
     """
     Log Protein: Streams worker logs into the NATS bloodstream.
     Uses an internal asyncio.Queue to ensure logging never blocks LLM inference.
     """
-    def __init__(self, worker_name: str, nats_url: str = "nats://localhost:4222", max_logs: int = 1000):
+
+    def __init__(
+        self,
+        worker_name: str,
+        nats_url: str = "nats://localhost:4222",
+        max_logs: int = 1000,
+    ):
         super().__init__()
         self.worker_name = worker_name
         self.nats_url = nats_url
@@ -36,13 +44,13 @@ class HiveLogHandler(logging.Handler):
         event = Event(
             event_id=str(uuid.uuid4()),
             topic=f"aura.worker.{self.worker_name}.logs",
-            timestamp=datetime.fromtimestamp(record.created, tz=timezone.utc),
+            timestamp=datetime.fromtimestamp(record.created, tz=UTC),
             log=LogEvent(
                 level=record.levelname,
                 message=log_entry,
                 logger_name=record.name,
-                worker_name=self.worker_name
-            )
+                worker_name=self.worker_name,
+            ),
         )
 
         # Put in queue for NATS background task
@@ -50,7 +58,7 @@ class HiveLogHandler(logging.Handler):
             try:
                 self.loop.call_soon_threadsafe(self.queue.put_nowait, event)
             except (asyncio.QueueFull, RuntimeError):
-                pass # Drop logs if queue is full or loop closing to avoid blocking
+                pass  # Drop logs if queue is full or loop closing to avoid blocking
 
     def write(self, data: str):
         """Captures redirected stdout (e.g. from Ollama) and logs it as INFO."""
@@ -69,7 +77,7 @@ class HiveLogHandler(logging.Handler):
             lineno=0,
             msg=clean_data,
             args=(),
-            exc_info=None
+            exc_info=None,
         )
         self.emit(record)
 
@@ -89,7 +97,7 @@ class HiveLogHandler(logging.Handler):
                 self.nats_url,
                 connect_timeout=2,
                 reconnect_time_wait=1,
-                max_reconnect_attempts=60
+                max_reconnect_attempts=60,
             )
             asyncio.create_task(self._process_queue())
             return True
@@ -109,12 +117,9 @@ class HiveLogHandler(logging.Handler):
                 # wait_for to allow checking stop_event periodically
                 event = await asyncio.wait_for(self.queue.get(), timeout=1.0)
                 if self._nats_client.is_connected:
-                    await self._nats_client.publish(
-                        event.topic,
-                        bytes(event)
-                    )
+                    await self._nats_client.publish(event.topic, bytes(event))
                 self.queue.task_done()
-            except asyncio.TimeoutError:
+            except TimeoutError:
                 continue
             except Exception as e:
                 # Don't use logging here to avoid infinite recursion if it fails

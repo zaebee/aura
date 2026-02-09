@@ -1,6 +1,5 @@
-import os
-import asyncio
 import logging
+import os
 import secrets
 
 import gradio as gr
@@ -35,7 +34,9 @@ def launch_interactive_node():
         if state.log_handler:
             state.log_handler.write(message)
 
-    async def start_node(model, hive_host, frp_token, punk_key, frp_port, progress=None):
+    async def start_node(
+        model, hive_host, frp_token, punk_key, frp_port, progress=None
+    ):
         if progress is None:
             progress = gr.Progress()
         if state.node.is_running:
@@ -54,7 +55,7 @@ def launch_interactive_node():
                 frp_token=frp_token,
                 punk_key=punk_key,
                 frp_port=int(frp_port),
-                worker_id=state.worker_id
+                worker_id=state.worker_id,
             )
             state.umbilical.start(log_callback=log)
 
@@ -136,9 +137,7 @@ def launch_interactive_node():
                 status_label = gr.Label(
                     value=state.node.get_status(), label="Brain Status"
                 )
-                nats_label = gr.Label(
-                    value="🔴 Offline", label="NATS Pulse"
-                )
+                nats_label = gr.Label(value="🔴 Offline", label="NATS Pulse")
                 stats_box = gr.Number(
                     value=state.node.requests_processed, label="Requests Processed"
                 )
@@ -156,7 +155,9 @@ def launch_interactive_node():
                         value=ENV_PUNK_KEY, label="PUNK_KEY (Secret)", type="password"
                     )
                 with gr.Row():
-                    frp_port_input = gr.Number(value=7000, label="FRP Port", precision=0)
+                    frp_port_input = gr.Number(
+                        value=7000, label="FRP Port", precision=0
+                    )
 
         with gr.Row():
             start_btn = gr.Button("Start Node", variant="primary")
@@ -167,7 +168,9 @@ def launch_interactive_node():
         )
 
         timer = gr.Timer(2)
-        timer.tick(refresh_ui, outputs=[status_label, nats_label, stats_box, log_output])
+        timer.tick(
+            refresh_ui, outputs=[status_label, nats_label, stats_box, log_output]
+        )
 
         start_btn.click(
             start_node,
