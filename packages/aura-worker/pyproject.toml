@@ -1,0 +1,20 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "aura-worker"
+version = "0.1.0"
+description = "Aura Hive Worker Node for Jupyter/Colab environments"
+requires-python = ">=3.10"
+dependencies = [
+    "gradio>=4.0.0",
+    "requests>=2.31.0",
+    "python-dotenv>=1.0.0",
+    "toml>=0.10.2",
+    "torch>=2.0.0",
+    "aura-core",
+]
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/aura_worker"]
