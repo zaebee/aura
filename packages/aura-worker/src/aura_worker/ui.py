@@ -114,7 +114,7 @@ def launch_interactive_node():
                         value=ENV_PUNK_KEY, label="PUNK_KEY (Secret)", type="password"
                     )
                 with gr.Row():
-                    frp_port_input = gr.Textbox(value="7000", label="FRP Port")
+                    frp_port_input = gr.Number(value=7000, label="FRP Port", precision=0)
 
         with gr.Row():
             start_btn = gr.Button("Start Node", variant="primary")

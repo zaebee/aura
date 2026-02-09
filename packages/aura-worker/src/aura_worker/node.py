@@ -22,7 +22,8 @@ class AuraNode:
             if torch.cuda.is_available():
                 device_name = torch.cuda.get_device_name(0)
                 return True, f"GPU Active: {device_name}"
-        except Exception:  # nosec B110
+        except (ImportError, RuntimeError):  # nosec B110
+            # Catch specific errors related to torch or CUDA availability
             pass
 
         # Fallback to nvidia-smi
@@ -35,7 +36,8 @@ class AuraNode:
             )
             if result.returncode == 0:
                 return True, f"GPU Active: {result.stdout.strip()}"
-        except Exception:  # nosec B110
+        except (FileNotFoundError, subprocess.SubprocessError):  # nosec B110
+            # nvidia-smi not found or failed to run
             pass
 
         return False, "⚠️ DEGRADED (CPU MODE)"
