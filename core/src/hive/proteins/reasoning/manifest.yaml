@@ -1,10 +1,87 @@
-name: reasoning
-role: FrontalLobe
-description: >
-  The primary cognitive engine for negotiation.
-  Uses DSPy for self-optimizing strategic decisions and Mistral for semantic embeddings via Reasoning skills.
-  Provides structured negotiation outcomes with economic transparency (thought tags).
+# Internal Metadata (For Cortex)
+skill_name: "reasoning"
+version: "1.1.0"
+description: "LLM logic and DSPy negotiation protein"
 capabilities:
-  - negotiate: Make an optimized decision (accept/counter/reject) based on context.
-  - generate_embedding: Convert text to vector space for semantic search.
-manifest_version: 1.0
+  - "negotiate"
+  - "generate_embedding"
+dependencies:
+  settings_class: "LLMSettings"
+  external_services:
+    - "Mistral API"
+    - "OpenAI API"
+
+# External Tool Definitions (MCP / Anthropic / OpenAI Tools)
+llm_tools:
+  - name: "reasoning__analyze_sentiment"
+    description: "Analyzes the sentiment and intent of customer messages."
+
+    # Membrane Policy (CRISPR-like safety rules)
+    membrane_policy:
+      safety_level: "read_only"
+      redaction_rules: ["pii_masking"]
+      validation_rules: []
+
+    # Metabolic Cost
+    activation_cost:
+      tokens_est: 1000
+      latency_ms_est: 500
+
+    input_schema:
+      type: "object"
+      properties:
+        text:
+          type: "string"
+          description: "The text to analyze"
+        context:
+          type: "object"
+          description: "Additional context for analysis"
+          properties:
+            customer_history:
+              type: "array"
+              description: "Previous interactions with this customer"
+              items:
+                type: "string"
+      required: ["text"]
+
+  - name: "reasoning__generate_insight"
+    description: "Generates strategic insights based on negotiation context."
+
+    # Membrane Policy
+    membrane_policy:
+      safety_level: "read_only"
+      redaction_rules: ["floor_price_redaction", "cost_redaction"]
+      validation_rules: []
+
+    # Metabolic Cost
+    activation_cost:
+      tokens_est: 1500
+      latency_ms_est: 800
+
+    input_schema:
+      type: "object"
+      properties:
+        context:
+          type: "object"
+          description: "Current negotiation context"
+          properties:
+            item_id:
+              type: "string"
+              description: "The item being negotiated"
+            current_bid:
+              type: "number"
+              description: "The current bid amount"
+            negotiation_history:
+              type: "array"
+              description: "Previous negotiation steps"
+              items:
+                type: "object"
+                properties:
+                  action:
+                    type: "string"
+                  price:
+                    type: "number"
+                  message:
+                    type: "string"
+          required: ["item_id", "current_bid"]
+      required: ["context"]

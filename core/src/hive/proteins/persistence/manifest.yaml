@@ -1,12 +1,103 @@
-name: persistence
-role: SecurityCitadel
-description: >
-  Handles all persistent storage for the Hive, including inventory items and locked deals.
-  Isolates implementation details like SQLAlchemy and PostgreSQL in Postgres skills.
+# Internal Metadata (For Cortex)
+skill_name: "persistence"
+version: "1.1.0"
+description: "Database operations and vector search protein"
 capabilities:
-  - read_item: Retrieve an item from the inventory.
-  - create_deal: Persist a new negotiation agreement.
-  - update_deal_status: Track payment and fulfillment.
-  - vector_search: Semantic retrieval of items.
-  - init_db: Ensure schema consistency.
-manifest_version: 1.0
+  - "init_db"
+  - "read_item"
+  - "create_deal"
+  - "get_deal_by_memo"
+  - "get_deal_by_id"
+  - "update_deal_status"
+  - "vector_search"
+  - "list_items_semantic_search"
+  - "get_first_item"
+  - "upsert_item"
+dependencies:
+  settings_class: "DatabaseSettings"
+  external_services:
+    - "PostgreSQL"
+    - "Redis"
+
+# External Tool Definitions (MCP / Anthropic / OpenAI Tools)
+llm_tools:
+  - name: "persistence__fetch_history"
+    description: "Retrieves the chain of negotiation for a specific item to ensure context-awareness."
+
+    # Membrane Policy (CRISPR-like safety rules)
+    membrane_policy:
+      safety_level: "read_only"
+      redaction_rules: ["pii_masking", "floor_price_redaction"]
+      validation_rules: []
+
+    # Metabolic Cost
+    activation_cost:
+      tokens_est: 500
+      latency_ms_est: 200
+
+    input_schema:
+      type: "object"
+      properties:
+        identifier:
+          type: "string"
+          description: "The unique ID of the asset being negotiated."
+      required: ["identifier"]
+
+  - name: "persistence__store_fact"
+    description: "Stores a key-value fact in the knowledge base for future reference."
+
+    # Membrane Policy
+    membrane_policy:
+      safety_level: "read_write"
+      redaction_rules: ["pii_masking"]
+      validation_rules: []
+
+    # Metabolic Cost
+    activation_cost:
+      tokens_est: 300
+      latency_ms_est: 150
+
+    input_schema:
+      type: "object"
+      properties:
+        key:
+          type: "string"
+          description: "The unique key for this fact"
+        value:
+          type: "object"
+          description: "The fact data to store"
+        ttl_seconds:
+          type: "number"
+          description: "Time-to-live in seconds (optional)"
+      required: ["key", "value"]
+
+  - name: "persistence__semantic_search"
+    description: "Performs vector-based semantic search on inventory items."
+
+    # Membrane Policy
+    membrane_policy:
+      safety_level: "read_only"
+      redaction_rules: ["floor_price_redaction"]
+      validation_rules: []
+
+    # Metabolic Cost
+    activation_cost:
+      tokens_est: 800
+      latency_ms_est: 300
+
+    input_schema:
+      type: "object"
+      properties:
+        query_vector:
+          type: "array"
+          description: "Embedding vector representing the search query"
+          items:
+            type: "number"
+        limit:
+          type: "number"
+          description: "Maximum number of results to return"
+          default: 5
+        min_similarity:
+          type: "number"
+          description: "Minimum similarity score threshold"
+      required: ["query_vector"]

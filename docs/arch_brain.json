@@ -171,6 +171,12 @@
     "description": "Lessons learned in blood. Do NOT repeat these mistakes.",
     "wounds": [
       {
+        "name": "The Greedy Merchant",
+        "symptom": "LLM hallucinating prices below floor price during negotiations",
+        "cause": "Missing deterministic guardrails in early negotiation logic",
+        "solution": "Implemented OutputGuard with Price Homeostasis - deterministic safe price calculation at floor_price * 1.05 on violations"
+      },
+      {
         "name": "The Slash Trap",
         "symptom": "301 Redirects breaking Prometheus queries",
         "cause": "Pydantic HttpUrl forces trailing slashes",
