@@ -10,12 +10,15 @@ Channels:
 - Outbound: NATS reply inbox        (observation back to synapse)
 """
 
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 import nats
 import nats.errors
 import structlog
 from aura_core.gen.aura.dna.v1 import Observation as ProtoObservation
+
+if TYPE_CHECKING:
+    from nats.aio.msg import Msg
 
 logger = structlog.get_logger("nats_gateway")
 
@@ -70,7 +73,7 @@ class NatsSignalGateway:
             logger.error("nats_gateway_start_failed", error=e, exc_info=True)
             return False
 
-    async def _on_signal(self, msg: Any) -> None:
+    async def _on_signal(self, msg: "Msg") -> None:
         """Handle an incoming signal from a synapse."""
         try:
             logger.debug(

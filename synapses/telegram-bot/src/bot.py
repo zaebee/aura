@@ -35,8 +35,7 @@ async def cmd_start(message: Message) -> None:
 async def cmd_search(
     message: Message, command: CommandObject, adapter: NatsAdapter
 ) -> None:
-    translator = TelegramTranslator()
-    signal = translator.to_signal(message, command=command)
+    signal = TelegramTranslator().to_signal(message, command=command)
     await adapter.execute(signal)
 
 
@@ -58,11 +57,8 @@ async def process_select_hotel(callback: CallbackQuery, state: FSMContext) -> No
 async def process_bid(
     message: Message, state: FSMContext, adapter: NatsAdapter
 ) -> None:
-    from translator import TelegramTranslator
-
-    translator = TelegramTranslator()
     data = await state.get_data()
-    signal = translator.to_signal(message, state_data=data)
+    signal = TelegramTranslator().to_signal(message, state_data=data)
 
     observation = await adapter.execute(signal)
 
