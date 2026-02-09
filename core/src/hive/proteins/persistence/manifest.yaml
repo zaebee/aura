@@ -13,6 +13,8 @@ capabilities:
   - "list_items_semantic_search"
   - "get_first_item"
   - "upsert_item"
+  - "get_cache"
+  - "set_cache"
 dependencies:
   settings_class: "DatabaseSettings"
   external_services:

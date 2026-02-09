@@ -1,3 +1,4 @@
+import hashlib
 import time
 from typing import Any, cast
 
@@ -113,6 +114,43 @@ class AuraTransformer(Transformer[HiveContext, IntentAction]):
     async def think(self, context: HiveContext, **kwargs: Any) -> IntentAction:
         """Reason about the negotiation by calling the Reasoning Protein."""
 
+        # 1. Semantic Bypass (Cache Check)
+        item_id = context.item_id
+        bid = context.offer.bid_amount
+        base_price = context.item_data.get("base_price", 0.0)
+        floor_price = context.item_data.get("floor_price", 0.0)
+
+        # Create a stable context summary for hashing
+        context_summary = f"base:{base_price},floor:{floor_price}"
+        cache_raw = f"{item_id}:{bid}:{context_summary}"
+        cache_key = f"semantic_cache:{hashlib.sha256(cache_raw.encode()).hexdigest()}"
+
+        try:
+            cache_obs = await self.registry.execute(
+                "persistence", "get_cache", {"key": cache_key}
+            )
+            if cache_obs.success and cache_obs.data:
+                logger.info(
+                    "cache_hit",
+                    item_id=item_id,
+                    bid=bid,
+                    latency_ms=0,
+                    tokens_used=0,
+                )
+                cached_data = cache_obs.data
+                return IntentAction(
+                    action=cast(ActionType, map_action(cached_data["action"])),
+                    price=cached_data["price"],
+                    message=cached_data["message"],
+                    thought=cached_data.get("thought", ""),
+                    metadata={
+                        **cached_data.get("metadata", {}),
+                        "cached": True,
+                    },
+                )
+        except Exception as e:
+            logger.warning("cache_lookup_failed", error=str(e))
+
         # Rule-based fallback if requested
         if self.settings and self.settings.llm.model.lower() == "rule":
             strategy = RuleBasedStrategy(
@@ -138,6 +176,22 @@ class AuraTransformer(Transformer[HiveContext, IntentAction]):
             )
 
             if not obs.success:
+                # 2. Rate Limit Awareness - Fallback to Rule-based Strategy
+                if obs.error and "RateLimitError" in obs.error:
+                    logger.warning(
+                        "rate_limit_detected_falling_back_to_rule_strategy",
+                        error=obs.error,
+                    )
+                    strategy = RuleBasedStrategy(
+                        trigger_price=getattr(self.settings.safety, "ui_trigger_price", 1000.0) if self.settings else 1000.0
+                    )
+                    return strategy.evaluate(
+                        context.item_data,
+                        context.offer.bid_amount,
+                        context.offer.reputation,
+                        context.request_id,
+                    )
+
                 logger.error("reasoning_protein_failed", error=obs.error)
                 return FailureIntent(error=obs.error or "unknown_error")
 
@@ -147,7 +201,7 @@ class AuraTransformer(Transformer[HiveContext, IntentAction]):
             raw_thought = result.get("thought", "")
             wrapped_thought = f"<think>\n{raw_thought}\n</think>" if raw_thought else ""
 
-            return IntentAction(
+            intent = IntentAction(
                 action=cast(ActionType, map_action(result["action"])),
                 price=result["price"],
                 message=result["message"],
@@ -157,6 +211,26 @@ class AuraTransformer(Transformer[HiveContext, IntentAction]):
                     "brain_path": self.brain_path,
                 },
             )
+
+            # 3. Save to Redis (TTL: 1 hour)
+            try:
+                # Convert IntentAction to serializable dict
+                cache_value = {
+                    "action": str(intent.action),
+                    "price": intent.price,
+                    "message": intent.message,
+                    "thought": intent.thought,
+                    "metadata": intent.metadata,
+                }
+                await self.registry.execute(
+                    "persistence",
+                    "set_cache",
+                    {"key": cache_key, "value": cache_value, "ttl": 3600},
+                )
+            except Exception as e:
+                logger.warning("cache_save_failed", error=str(e))
+
+            return intent
 
         except Exception as e:
             logger.error("transformer_error", error=str(e), exc_info=True)

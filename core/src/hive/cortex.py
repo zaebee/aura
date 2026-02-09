@@ -134,7 +134,7 @@ class HiveCell:
         engine = create_engine(str(self.settings.database.url))
         SessionLocal = sessionmaker(bind=engine)
         persistence = PersistenceSkill()
-        persistence.bind(self.settings.database, (SessionLocal, engine))
+        persistence.bind(self.settings.database, (SessionLocal, engine, None))
 
         # 2. Pulse
         pulse = PulseSkill()

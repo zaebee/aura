@@ -14,15 +14,20 @@ from .engine import (
     DealStatus,
     InventoryItem,
     LockedDeal,
+    RedisCache,
 )
 from .schema import DealSchema, ItemSchema
+import redis.asyncio as redis
 
 logger = logging.getLogger(__name__)
 
 
 class PersistenceSkill(
     SkillProtocol[
-        DatabaseSettings, tuple[sessionmaker, Engine], dict[str, Any], Observation
+        DatabaseSettings,
+        tuple[sessionmaker, Engine, redis.Redis | None],
+        dict[str, Any],
+        Observation,
     ]
 ):
     """
@@ -34,6 +39,8 @@ class PersistenceSkill(
         self.settings: DatabaseSettings | None = None
         self.provider: sessionmaker | None = None
         self.engine: Engine | None = None
+        self.redis: redis.Redis | None = None
+        self.cache: RedisCache | None = None
         self._capabilities = {
             "init_db": self._init_db,
             "read_item": self._read_item_handler,
@@ -45,6 +52,8 @@ class PersistenceSkill(
             "list_items_semantic_search": self._vector_search,
             "get_first_item": self._get_first_item,
             "upsert_item": self._upsert_item,
+            "get_cache": self._get_cache_handler,
+            "set_cache": self._set_cache_handler,
         }
 
     def get_name(self) -> str:
@@ -54,10 +63,12 @@ class PersistenceSkill(
         return list(self._capabilities.keys())
 
     def bind(
-        self, settings: DatabaseSettings, provider: tuple[sessionmaker, Engine]
+        self,
+        settings: DatabaseSettings,
+        provider: tuple[sessionmaker, Engine, redis.Redis | None],
     ) -> None:
         self.settings = settings
-        self.provider, self.engine = provider
+        self.provider, self.engine, self.redis = provider
 
     def _get_session(self) -> Session:
         if not self.provider:
@@ -67,6 +78,12 @@ class PersistenceSkill(
     async def initialize(self) -> bool:
         if not self.settings or not self.provider:
             return False
+
+        if self.redis:
+            self.cache = RedisCache(self.redis)
+        elif self.settings.redis_url:
+            self.redis = redis.from_url(str(self.settings.redis_url))
+            self.cache = RedisCache(self.redis)
 
         from pgvector.sqlalchemy import Vector
 
@@ -264,6 +281,32 @@ class PersistenceSkill(
 
             await asyncio.to_thread(upsert)
             return Observation(success=True)
+        except Exception as e:
+            return Observation(success=False, error=str(e))
+
+    async def _get_cache_handler(self, params: dict[str, Any]) -> Observation:
+        if not self.cache:
+            return Observation(success=False, error="cache_not_initialized")
+        key = params.get("key")
+        if not key:
+            return Observation(success=False, error="key_required")
+        try:
+            val = await self.cache.get(key)
+            return Observation(success=True, data=val)
+        except Exception as e:
+            return Observation(success=False, error=str(e))
+
+    async def _set_cache_handler(self, params: dict[str, Any]) -> Observation:
+        if not self.cache:
+            return Observation(success=False, error="cache_not_initialized")
+        key = params.get("key")
+        value = params.get("value")
+        ttl = params.get("ttl", 3600)
+        if not key:
+            return Observation(success=False, error="key_required")
+        try:
+            success = await self.cache.set(key, value, ttl)
+            return Observation(success=success)
         except Exception as e:
             return Observation(success=False, error=str(e))
 

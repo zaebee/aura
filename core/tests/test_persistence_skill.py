@@ -16,7 +16,7 @@ async def test_persistence_skill_initialize() -> None:
     mock_sessionmaker = MagicMock()
     mock_engine = MagicMock()
 
-    skill.bind(settings, (mock_sessionmaker, mock_engine))
+    skill.bind(settings, (mock_sessionmaker, mock_engine, None))
     success = await skill.initialize()
     assert success is True
     assert skill.settings == settings
@@ -29,7 +29,7 @@ async def test_persistence_skill_execute_unknown_intent() -> None:
         url="postgresql://user:password@localhost:5432/aura_db",
         redis_url="redis://localhost:6379/0",
     )
-    skill.bind(settings, (MagicMock(), MagicMock()))
+    skill.bind(settings, (MagicMock(), MagicMock(), None))
     obs = await skill.execute("unknown", {})
     assert obs.success is False
     assert "Unknown intent" in obs.error

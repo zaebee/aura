@@ -21,6 +21,8 @@ from sqlalchemy.orm import (
     Mapped,
     mapped_column,
 )
+import redis.asyncio as redis
+import json
 
 # DNA Rule: Proteins must not import global settings.
 # Models will be initialized during Skill.initialize()
@@ -83,3 +85,22 @@ class LockedDeal(Base):
         default=lambda: datetime.now(UTC),
         onupdate=lambda: datetime.now(UTC),
     )
+
+
+class RedisCache:
+    """Redis technical implementation for caching."""
+
+    def __init__(self, redis_client: redis.Redis):
+        self.redis = redis_client
+
+    async def get(self, key: str) -> dict[str, Any] | None:
+        """Retrieve a JSON-serialized value from Redis."""
+        data = await self.redis.get(key)
+        if data:
+            return cast(dict[str, Any], json.loads(data))
+        return None
+
+    async def set(self, key: str, value: Any, ttl: int = 3600) -> bool:
+        """Store a value in Redis as JSON with TTL."""
+        data = json.dumps(value)
+        return await self.redis.set(key, data, ex=ttl)
