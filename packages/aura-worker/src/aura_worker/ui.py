@@ -1,9 +1,12 @@
 import os
+import asyncio
+import logging
+import secrets
 
 import gradio as gr
 from dotenv import load_dotenv
 
-from .metabolism import HiveLogHandler
+from .metabolism import HiveLogHandler, MetabolicLoop
 from .node import AuraNode
 from .tunnel import Umbilical
 
@@ -11,8 +14,10 @@ from .tunnel import Umbilical
 class WorkerState:
     def __init__(self):
         self.node = AuraNode()
-        self.log_handler = HiveLogHandler()
+        self.log_handler: HiveLogHandler | None = None
+        self.metabolism: MetabolicLoop | None = None
         self.umbilical: Umbilical | None = None
+        self.worker_id = secrets.token_hex(4)
 
 
 def launch_interactive_node():
@@ -27,9 +32,10 @@ def launch_interactive_node():
 
     def log(message):
         print(message)
-        state.log_handler.write(message)
+        if state.log_handler:
+            state.log_handler.write(message)
 
-    def start_node(model, hive_host, frp_token, punk_key, frp_port, progress=None):
+    async def start_node(model, hive_host, frp_token, punk_key, frp_port, progress=None):
         if progress is None:
             progress = gr.Progress()
         if state.node.is_running:
@@ -48,19 +54,44 @@ def launch_interactive_node():
                 frp_token=frp_token,
                 punk_key=punk_key,
                 frp_port=int(frp_port),
+                worker_id=state.worker_id
             )
             state.umbilical.start(log_callback=log)
+
+            # Initialize Log Protein and Metabolic Loop
+            progress(0.8, desc="Synchronizing with Hive Bloodstream...")
+            state.log_handler = HiveLogHandler(worker_name=state.worker_id)
+            state.metabolism = MetabolicLoop(worker_name=state.worker_id)
+
+            # Setup standard logging to capture all info/error calls
+            root_logger = logging.getLogger()
+            root_logger.addHandler(state.log_handler)
+            root_logger.setLevel(logging.INFO)
+
+            await state.log_handler.start()
+            await state.metabolism.start(kill_callback=stop_node)
 
             state.node.is_running = True
             state.node.status = "Connected"
             return "Node Started Successfully!"
         except Exception as e:
             log(f"Error starting node: {e}")
-            stop_node()
+            await stop_node()
             return f"Error: {e}"
 
-    def stop_node():
+    async def stop_node():
         log("--- Stopping Aura Node ---")
+
+        if state.metabolism:
+            await state.metabolism.stop()
+            state.metabolism = None
+
+        if state.log_handler:
+            # Remove from root logger
+            logging.getLogger().removeHandler(state.log_handler)
+            await state.log_handler.stop()
+            state.log_handler = None
+
         if state.umbilical:
             state.umbilical.stop()
             state.umbilical = None
@@ -72,6 +103,13 @@ def launch_interactive_node():
 
     def refresh_ui():
         status = state.node.get_status()
+        nats_status = "🔴 Offline"
+
+        if state.metabolism and state.metabolism.is_connected:
+            nats_status = "🟢 Connected (Pulse Active)"
+        elif state.node.is_running:
+            nats_status = "🟠 Pending (Connecting...)"
+
         if state.node.is_running:
             # Check if processes are still alive
             if (
@@ -84,7 +122,8 @@ def launch_interactive_node():
                 state.node.status = "Error: Umbilical process stopped"
                 state.node.is_running = False
 
-        return status, state.node.requests_processed, state.log_handler.get_logs()
+        logs = state.log_handler.get_logs() if state.log_handler else "Logs pending..."
+        return status, nats_status, state.node.requests_processed, logs
 
     with gr.Blocks(title="Aura Node", theme=gr.themes.Soft()) as demo:
         gr.Markdown("# 🐝 Aura Interactive Worker Node")
@@ -96,6 +135,9 @@ def launch_interactive_node():
             with gr.Column(scale=1):
                 status_label = gr.Label(
                     value=state.node.get_status(), label="Brain Status"
+                )
+                nats_label = gr.Label(
+                    value="🔴 Offline", label="NATS Pulse"
                 )
                 stats_box = gr.Number(
                     value=state.node.requests_processed, label="Requests Processed"
@@ -125,7 +167,7 @@ def launch_interactive_node():
         )
 
         timer = gr.Timer(2)
-        timer.tick(refresh_ui, outputs=[status_label, stats_box, log_output])
+        timer.tick(refresh_ui, outputs=[status_label, nats_label, stats_box, log_output])
 
         start_btn.click(
             start_node,

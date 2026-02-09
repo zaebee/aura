@@ -94,6 +94,16 @@ class Umbilical:
                     "localPort": 11434,
                 }
             ],
+            "visitors": [
+                {
+                    "name": f"nats-visitor-{self.worker_id}",
+                    "type": "stcp",
+                    "serverName": "hive-nats",
+                    "secretKey": self.punk_key,
+                    "bindAddr": "127.0.0.1",
+                    "bindPort": 4222,
+                }
+            ],
         }
         with open(self.config_path, "w") as f:
             toml.dump(config_data, f)
