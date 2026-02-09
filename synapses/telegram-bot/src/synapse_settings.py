@@ -14,14 +14,16 @@ class TelegramSettings(BaseSettings):
     )
 
     token: SecretStr = Field(...)  # type: ignore
-    core_url: str = Field(...)  # type: ignore
     nats_url: str = Field(...)  # type: ignore
+    signal_subject: str = "aura.synapse.telegram.signal"
     otel_exporter_otlp_endpoint: str = (
         "http://aura-jaeger.monitoring.svc.cluster.local:4317"
     )
     negotiation_timeout: float = 60.0
     webhook_domain: str | None = None
+    health_port: int = 8080
     log_level: str = "info"
+    debug: bool = False
 
 
 @lru_cache

@@ -2,39 +2,42 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 from aiogram.filters import CommandObject
-from aura_core import Observation
-from bot import (
-    NegotiationStates,
-    cmd_search,
-    cmd_start,
-    process_bid,
-    process_select_hotel,
-)
+from aura_core.gen.aura.dna.v1 import Observation as ProtoObservation
+from receptor import NegotiationStates, TelegramReceptor
+from translator import TelegramTranslator
+
+
+@pytest.fixture
+def receptor(mock_adapter):
+    return TelegramReceptor(mock_adapter, TelegramTranslator())
 
 
 @pytest.mark.asyncio
-async def test_cmd_start(message):
-    await cmd_start(message)
+async def test_cmd_start(message, receptor):
+    await receptor.cmd_start(message)
     message.answer.assert_called()
     assert "Welcome to Aura!" in message.answer.call_args[0][0]
 
 
 @pytest.mark.asyncio
-async def test_cmd_search_results(message, mock_metabolism):
+async def test_cmd_search(message, receptor, mock_adapter):
     command = MagicMock(spec=CommandObject)
+    command.command = "search"
     command.args = "Paris"
 
-    await cmd_search(message, command, mock_metabolism)
+    mock_adapter.execute.return_value = ProtoObservation(success=True)
 
-    mock_metabolism.execute.assert_called_with(message)
+    await receptor.cmd_search(message, command)
+
+    mock_adapter.execute.assert_called_once()
 
 
 @pytest.mark.asyncio
-async def test_process_select_hotel(callback_query):
+async def test_process_select_hotel(callback_query, receptor):
     callback_query.data = "select:hotel_1"
     state = AsyncMock()
 
-    await process_select_hotel(callback_query, state)
+    await receptor.process_select_hotel(callback_query, state)
 
     state.update_data.assert_called_with(item_id="hotel_1")
     state.set_state.assert_called_with(NegotiationStates.WaitingForBid)
@@ -43,18 +46,34 @@ async def test_process_select_hotel(callback_query):
 
 
 @pytest.mark.asyncio
-async def test_process_bid_accepted(message, mock_metabolism):
+async def test_process_bid_accepted(message, receptor, mock_adapter):
     state = AsyncMock()
     state.get_data.return_value = {"item_id": "hotel_1"}
     message.text = "90"
 
-    mock_metabolism.execute.return_value = Observation(
+    mock_adapter.execute.return_value = ProtoObservation(
         success=True, event_type="deal_accepted"
     )
 
-    await process_bid(message, state, mock_metabolism)
+    await receptor.process_bid(message, state)
 
-    mock_metabolism.execute.assert_called_with(
-        message, state_data={"item_id": "hotel_1"}
-    )
+    mock_adapter.execute.assert_called_once()
     state.clear.assert_called()
+
+
+@pytest.mark.asyncio
+async def test_process_bid_failed(message, receptor, mock_adapter):
+    state = AsyncMock()
+    state.get_data.return_value = {"item_id": "hotel_1"}
+    message.text = "10"
+
+    mock_adapter.execute.return_value = ProtoObservation(
+        success=False, error="Bid too low"
+    )
+
+    await receptor.process_bid(message, state)
+
+    mock_adapter.execute.assert_called_once()
+    message.answer.assert_called()
+    assert "Bid too low" in message.answer.call_args[0][0]
+    state.clear.assert_not_called()

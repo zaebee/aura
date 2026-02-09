@@ -130,21 +130,33 @@ frontend:
 
 # Telegram Bot Service Configuration
 telegram:
+  healthPort: 8080
+  livenessProbe:
+    initialDelaySeconds: 5
+    periodSeconds: 10
+    timeoutSeconds: 2
+    failureThreshold: 3
+  readinessProbe:
+    initialDelaySeconds: 10
+    periodSeconds: 10
+    timeoutSeconds: 2
+    failureThreshold: 3
   image:
     repository: ghcr.io/zaebee/aura-telegram-bot
     tag: latest
-    pullPolicy: IfNotPresent
+    pullPolicy: Always
   replicaCount: 1
   resources:
     limits:
-      cpu: 100m
-      memory: 128Mi
+      cpu: 200m
+      memory: 256Mi
     requests:
-      cpu: 50m
-      memory: 64Mi
+      cpu: 100m
+      memory: 256Mi
   env:
     LOG_LEVEL: info
-    PYTHONPATH: /app/synapses/telegram-bot/src:/app/synapses/telegram-bot/gen-proto
+    DEBUG: true
+    AURA_LLM__MODEL: "rule"  # Use rule-based reasoning by default (no API key needed)
 
 # Secrets for the application.
 # For production, it is strongly recommended to use a secret management solution
@@ -174,3 +186,8 @@ nats:
   jetstream:
     enabled: true
     storageSize: 1Gi
+
+# Hive Manifest ConfigMap (disabled by default, enable via values override)
+hiveManifest:
+  enabled: true
+  mountPath: /app/hive-manifest.yaml

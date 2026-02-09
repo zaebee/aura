@@ -60,8 +60,9 @@ jobs:
                   name: proto-stubs
                   path: |
                       packages/aura-core/src/aura_core/gen
-                      core/src/hive/proto
-                      api-gateway/src/proto
+                      core/gen-proto
+                      api-gateway/gen-proto
+                      synapses/telegram-bot/gen-proto
                       frontend/src/lib/aura
 
     quality:

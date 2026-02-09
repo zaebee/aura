@@ -1,0 +1,14 @@
+{{- if .Values.hiveManifest.enabled }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: "{{ .Release.Name }}-hive-manifest"
+  labels:
+    app.kubernetes.io/name: {{ .Chart.Name }}
+    app.kubernetes.io/instance: {{ .Release.Name }}
+    app.kubernetes.io/managed-by: {{ .Release.Service }}
+    helm.sh/chart: "{{ .Chart.Name }}-{{ .Chart.Version }}"
+data:
+  hive-manifest.yaml: |
+    {{- .Files.Get "hive-manifest.yaml" | nindent 4 }}
+{{- end }}

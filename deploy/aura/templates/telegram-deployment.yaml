@@ -21,20 +21,78 @@ spec:
           image: "{{ .Values.telegram.image.repository }}:{{ .Values.telegram.image.tag }}"
           imagePullPolicy: {{ .Values.telegram.image.pullPolicy }}
           env:
-            - name: AURA_TG__TOKEN
+            # --- Synapse-specific settings (AURA_TELEGRAM__) ---
+            - name: AURA_TELEGRAM__TOKEN
               valueFrom:
                 secretKeyRef:
                   name: "{{ .Release.Name }}-secrets"
                   key: "telegram-token"
-            - name: AURA_TG__CORE_URL
+            - name: AURA_TELEGRAM__CORE_URL
               value: "{{ .Release.Name }}-core.{{ .Release.Namespace }}.svc.cluster.local:50051"
-            - name: AURA_TG__NATS_URL
+            - name: AURA_TELEGRAM__NATS_URL
               value: "nats://{{ .Release.Name }}-nats.{{ .Release.Namespace }}.svc.cluster.local:4222"
-            - name: PYTHONPATH
-              value: "{{ .Values.telegram.env.PYTHONPATH }}"
-            - name: AURA_TG__LOG_LEVEL
+            - name: AURA_TELEGRAM__LOG_LEVEL
               value: "{{ .Values.telegram.env.LOG_LEVEL }}"
-            - name: AURA_TG__OTEL_EXPORTER_OTLP_ENDPOINT
+            - name: AURA_TELEGRAM__HEALTH_PORT
+              value: "{{ .Values.telegram.healthPort }}"
+            - name: AURA_TELEGRAM__OTEL_EXPORTER_OTLP_ENDPOINT
               value: {{ .Values.monitoring.jaeger.collectorUrl | default (include "aura.jaeger.collectorUrl" .) | quote }}
+            {{- if .Values.telegram.env.DEBUG }}
+            - name: DEBUG
+              value: {{ .Values.telegram.env.DEBUG | quote }}
+            {{- end }}
+            # --- Core metabolism settings (in-process HiveCell) ---
+            - name: AURA_DATABASE__URL
+              value: "postgresql://{{ .Values.postgres.auth.username }}:{{ .Values.postgres.auth.password }}@{{ .Release.Name }}-postgres.{{ .Release.Namespace }}.svc.cluster.local:5432/{{ .Values.postgres.auth.database }}"
+            - name: AURA_DATABASE__REDIS_URL
+              value: "redis://{{ .Release.Name }}-redis.{{ .Release.Namespace }}.svc.cluster.local:6379/0"
+            - name: AURA_SERVER__NATS_URL
+              value: "nats://{{ .Release.Name }}-nats.{{ .Release.Namespace }}.svc.cluster.local:4222"
+            - name: AURA_SERVER__OTEL_EXPORTER_OTLP_ENDPOINT
+              value: {{ .Values.monitoring.jaeger.collectorUrl | default (include "aura.jaeger.collectorUrl" .) | quote }}
+            - name: AURA_SERVER__METRICS_PORT
+              value: "9092"
+            - name: AURA_LLM__MODEL
+              value: "{{ .Values.telegram.env.AURA_LLM__MODEL | default "rule" }}"
+            - name: AURA_LLM__API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: "{{ .Release.Name }}-secrets"
+                  key: "api-key"
+                  optional: true
+            - name: AURA_CRYPTO__ENABLED
+              value: "false"
+          {{- if .Values.hiveManifest.enabled }}
+          volumeMounts:
+            - name: hive-manifest
+              mountPath: {{ .Values.hiveManifest.mountPath }}
+              subPath: hive-manifest.yaml
+              readOnly: true
+          {{- end }}
+          ports:
+            - containerPort: {{ .Values.telegram.healthPort }}
+              name: health
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: health
+            initialDelaySeconds: {{ .Values.telegram.livenessProbe.initialDelaySeconds }}
+            periodSeconds: {{ .Values.telegram.livenessProbe.periodSeconds }}
+            timeoutSeconds: {{ .Values.telegram.livenessProbe.timeoutSeconds }}
+            failureThreshold: {{ .Values.telegram.livenessProbe.failureThreshold }}
+          readinessProbe:
+            httpGet:
+              path: /readyz
+              port: health
+            initialDelaySeconds: {{ .Values.telegram.readinessProbe.initialDelaySeconds }}
+            periodSeconds: {{ .Values.telegram.readinessProbe.periodSeconds }}
+            timeoutSeconds: {{ .Values.telegram.readinessProbe.timeoutSeconds }}
+            failureThreshold: {{ .Values.telegram.readinessProbe.failureThreshold }}
           resources:
             {{- toYaml .Values.telegram.resources | nindent 12 }}
+      {{- if .Values.hiveManifest.enabled }}
+      volumes:
+        - name: hive-manifest
+          configMap:
+            name: "{{ .Release.Name }}-hive-manifest"
+      {{- end }}

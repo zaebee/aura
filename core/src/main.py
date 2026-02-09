@@ -15,6 +15,7 @@ from hive.metabolism.logging_config import (
     configure_logging,
     get_logger,
 )
+from nats_gateway import NatsSignalGateway
 from opentelemetry import trace
 
 from config import settings
@@ -247,10 +248,21 @@ async def serve() -> None:
     negotiation_service.metabolism = metabolism
     negotiation_service.market_service = cell.market_service
 
+    # 7. Start NATS Signal Gateway (receives signals from synapses via NATS)
+    gateway = NatsSignalGateway(
+        nats_url=settings.server.nats_url,
+        metabolism=metabolism,
+    )
+    gateway_started = await gateway.start()
+    if gateway_started:
+        logger.info("nats_signal_gateway_started")
+    else:
+        logger.warning("nats_signal_gateway_failed_to_start")
+
     # Set health to SERVING once DB/Metabolism is up
     health_servicer.set("", health_pb2.HealthCheckResponse.SERVING)
 
-    # 7. Start Heartbeat Deal (Honey Stimulus)
+    # 8. Start Heartbeat Deal (Honey Stimulus)
     async def heartbeat_deal_loop() -> None:
         await asyncio.sleep(60)
         while True:
@@ -284,6 +296,7 @@ async def serve() -> None:
     try:
         await server.wait_for_termination()
     finally:
+        await gateway.stop()
         await cell.registry.close()
 
 

@@ -31,3 +31,6 @@ ona-dance.toml
 # Knowledge distillation artifacts (generated in CI/CD)
 docs/knowledge/*.bin
 docs/knowledge/*.json
+
+# Makefile proto generation sentinel
+.gen-proto.stamp

@@ -1,0 +1,75 @@
+# Hive Manifest - Language-Agnostic Geography
+# This file defines the sacred structure of the Hive.
+# It can be read by any Bee, regardless of its programming language.
+
+version: "1.0"
+
+# The ATCG macro folders - top-level directories in the monorepo
+macro_atcg_folders:
+  - core
+  - api-gateway
+  - frontend
+  - adapters
+  - agents
+  - proto
+  - docs
+  - tools
+  - deploy
+  - packages
+
+# Files allowed at the repository root
+allowed_root_files:
+  - README.md
+  - llms.txt
+  - HIVE_STATE.md
+  - pyproject.toml
+  - uv.lock
+  - .gitignore
+  - Makefile
+  - buf.gen.yaml
+  - buf.yaml
+  - .python-version
+  - .dockerignore
+  - .env.example
+  - compose.yml
+  - .pre-commit-config.yaml
+  - CLAUDE.md
+  - CRYPTO_INTEGRATION_SUMMARY.md
+  - CRYPTO_QUICKSTART.md
+  - hive-manifest.yaml
+
+# Sacred Roles for Infrastructure - maps paths to their chamber names
+allowed_chambers:
+  core/migrations: HiveEvolutionaryScrolls
+  core/tests: ValidationPollen
+  core/scripts: WorkerDirectives
+  api-gateway: HiveGate
+  core/src/config: SacredCodex
+  core/src/hive/services: WorkerDirectives
+  core/src/hive/transformer: ReasoningNucleus
+  core/src/hive/connector/proteins: SecurityCitadel
+  core/src/hive/membrane: HiveMembrane
+  core/src/hive/aggregator: SensoryNexus
+  core/src/hive/generator: NeuralPulse
+  core/src/hive/metabolism: MetabolicEngine
+  deploy: HiveArmor
+  proto: SacredScrolls
+  docs: ChroniclersArchive
+  agents: WorkerCells
+  agents/bee-keeper: KeeperCell
+  agents/bee-keeper/src/hive/: KeeperNucleus
+  core/src/hive/aggregator/db.py: AuthorizedEnzyme
+  core/src/hive/aggregator/embeddings.py: AuthorizedEnzyme
+  core/src/hive/aggregator/main.py: AuthorizedEnzyme
+  core/src/hive/aggregator/vitals.py: AuthorizedEnzyme
+  core/src/hive/transformer/__init__.py: AuthorizedEnzyme
+  core/src/hive/connector/__init__.py: AuthorizedEnzyme
+  core/src/hive/generator/__init__.py: AuthorizedEnzyme
+  core/src/hive/services/market.py: AuthorizedEnzyme
+  synapses: HiveExtensions
+  frontend: HiveWindow
+  tools: ToolShed
+  tests: OuterValidationPollen
+  packages: SharedNucleotides
+  components: SpecializedProteins
+  agents/bee-keeper/src/hive/connector/proteins: KeeperSecurityCitadel

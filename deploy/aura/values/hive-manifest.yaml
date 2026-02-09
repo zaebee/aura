@@ -1,0 +1,11 @@
+# Hive Manifest values override
+# Usage: helm install aura ./deploy/aura -f deploy/aura/values/hive-manifest.yaml
+#
+# Enables the hive-manifest ConfigMap and mounts it into pods
+# so that aura-core can discover the hive root via find_hive_root().
+# The manifest content is loaded from deploy/aura/hive-manifest.yaml
+# via .Files.Get (no duplication with the root file).
+
+hiveManifest:
+  enabled: true
+  mountPath: /app/hive-manifest.yaml
