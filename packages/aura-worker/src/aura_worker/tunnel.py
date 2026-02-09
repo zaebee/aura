@@ -9,6 +9,8 @@ import toml
 
 
 class Umbilical:
+    """Manages the secure STCP tunnel connection to the Hive Hub using frpc."""
+
     FRPC_VERSION = "0.61.0"
     FRPC_SHA256 = "720a9fe2a3299346572544909a78c023344c88bde13c55b921e298e8c5ded21f"
 
@@ -81,6 +83,8 @@ class Umbilical:
             "serverAddr": self.hive_host,
             "serverPort": self.frp_port,
             "auth": {"method": "token", "token": self.frp_token},
+            "transport": {"tcpMux": True},
+            "loginFailExit": False,
             "proxies": [
                 {
                     "name": self.proxy_name,

@@ -83,6 +83,8 @@ class AuraNode:
         raise RuntimeError("Ollama failed to start within 30 seconds.")
 
     def pull_model(self, model: str, log_callback=print):
+        if not model or model.lstrip().startswith("-"):
+            raise ValueError(f"Invalid model name provided: '{model}'")
         log_callback(f"--- Pulling model: {model} ---")
         pull_proc = subprocess.Popen(
             ["ollama", "pull", model],  # nosec B603 B607
