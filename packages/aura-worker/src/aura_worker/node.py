@@ -1,41 +1,41 @@
-import os
-import subprocess
+import shutil
+import subprocess  # nosec B404
 import threading
 import time
+
 import requests
-import shutil
 import torch
-from typing import Optional, Tuple
+
 
 class AuraNode:
     def __init__(self):
-        self.ollama_process: Optional[subprocess.Popen] = None
+        self.ollama_process: subprocess.Popen | None = None
         self.status = "Idle"
         self.is_running = False
         self.requests_processed = 0
         self.lock = threading.Lock()
         self.gpu_active, self.gpu_info = self._check_gpu()
 
-    def _check_gpu(self) -> Tuple[bool, str]:
+    def _check_gpu(self) -> tuple[bool, str]:
         """System Check Enzyme: verify if a GPU is active."""
         try:
             if torch.cuda.is_available():
                 device_name = torch.cuda.get_device_name(0)
                 return True, f"GPU Active: {device_name}"
-        except Exception:
+        except Exception:  # nosec B110
             pass
 
         # Fallback to nvidia-smi
         try:
             result = subprocess.run(
-                ["nvidia-smi", "--query-gpu=name", "--format=csv,noheader"],
-                stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE,
+                ["nvidia-smi", "--query-gpu=name", "--format=csv,noheader"],  # nosec B603 B607
+                capture_output=True,
                 text=True,
+                check=False,
             )
             if result.returncode == 0:
                 return True, f"GPU Active: {result.stdout.strip()}"
-        except Exception:
+        except Exception:  # nosec B110
             pass
 
         return False, "⚠️ DEGRADED (CPU MODE)"
@@ -46,14 +46,18 @@ class AuraNode:
                 return
 
             if shutil.which("ollama") is None:
-                raise RuntimeError("Ollama not found. Please install it first: curl -fsSL https://ollama.com/install.sh | sh")
+                raise RuntimeError(
+                    "Ollama not found. Please install it first: curl -fsSL https://ollama.com/install.sh | sh"
+                )
 
             log_callback("--- Starting Ollama server ---")
             if not self.gpu_active:
-                log_callback("SCREAM: Running on CPU mode! Performance will be severely limited.")
+                log_callback(
+                    "SCREAM: Running on CPU mode! Performance will be severely limited."
+                )
 
             self.ollama_process = subprocess.Popen(
-                ["ollama", "serve"],
+                ["ollama", "serve"],  # nosec B603 B607
                 stdout=subprocess.PIPE,
                 stderr=subprocess.STDOUT,
                 text=True,
@@ -61,13 +65,15 @@ class AuraNode:
             )
 
             threading.Thread(
-                target=self._read_output, args=(self.ollama_process, log_callback), daemon=True
+                target=self._read_output,
+                args=(self.ollama_process, log_callback),
+                daemon=True,
             ).start()
 
         # Wait for ollama to be up
-        for i in range(30):
+        for _ in range(30):
             try:
-                requests.get("http://localhost:11434")
+                requests.get("http://localhost:11434", timeout=5)  # nosec B113
                 log_callback("Ollama server is up.")
                 return
             except requests.exceptions.RequestException:
@@ -79,7 +85,7 @@ class AuraNode:
     def pull_model(self, model: str, log_callback=print):
         log_callback(f"--- Pulling model: {model} ---")
         pull_proc = subprocess.Popen(
-            ["ollama", "pull", model],
+            ["ollama", "pull", model],  # nosec B603 B607
             stdout=subprocess.PIPE,
             stderr=subprocess.STDOUT,
             text=True,

@@ -1,10 +1,19 @@
 import os
-import secrets
+
 import gradio as gr
 from dotenv import load_dotenv
+
+from .metabolism import HiveLogHandler
 from .node import AuraNode
 from .tunnel import Umbilical
-from .metabolism import HiveLogHandler
+
+
+class WorkerState:
+    def __init__(self):
+        self.node = AuraNode()
+        self.log_handler = HiveLogHandler()
+        self.umbilical: Umbilical | None = None
+
 
 def launch_interactive_node():
     load_dotenv()
@@ -14,36 +23,36 @@ def launch_interactive_node():
     ENV_FRP_TOKEN = os.getenv("AURA_WORKER__FRP_TOKEN", "")
     ENV_PUNK_KEY = os.getenv("AURA_WORKER__PUNK_KEY", "")
 
-    node = AuraNode()
-    log_handler = HiveLogHandler()
-    umbilical = [None]  # Using list to hold reference in closures
+    state = WorkerState()
 
     def log(message):
         print(message)
-        log_handler.write(message)
+        state.log_handler.write(message)
 
-    def start_node(model, hive_host, frp_token, punk_key, frp_port, progress=gr.Progress()):
-        if node.is_running:
+    def start_node(model, hive_host, frp_token, punk_key, frp_port, progress=None):
+        if progress is None:
+            progress = gr.Progress()
+        if state.node.is_running:
             return "Node is already running."
 
         try:
             progress(0, desc="Starting Ollama...")
-            node.start_ollama(log_callback=log)
+            state.node.start_ollama(log_callback=log)
 
             progress(0.3, desc=f"Pulling model {model}...")
-            node.pull_model(model, log_callback=log)
+            state.node.pull_model(model, log_callback=log)
 
             progress(0.7, desc="Establishing Umbilical...")
-            umbilical[0] = Umbilical(
+            state.umbilical = Umbilical(
                 hive_host=hive_host,
                 frp_token=frp_token,
                 punk_key=punk_key,
-                frp_port=int(frp_port)
+                frp_port=int(frp_port),
             )
-            umbilical[0].start(log_callback=log)
+            state.umbilical.start(log_callback=log)
 
-            node.is_running = True
-            node.status = "Connected"
+            state.node.is_running = True
+            state.node.status = "Connected"
             return "Node Started Successfully!"
         except Exception as e:
             log(f"Error starting node: {e}")
@@ -52,27 +61,30 @@ def launch_interactive_node():
 
     def stop_node():
         log("--- Stopping Aura Node ---")
-        if umbilical[0]:
-            umbilical[0].stop()
-            umbilical[0] = None
+        if state.umbilical:
+            state.umbilical.stop()
+            state.umbilical = None
 
-        node.stop_ollama()
-        node.is_running = False
-        node.status = "Idle"
+        state.node.stop_ollama()
+        state.node.is_running = False
+        state.node.status = "Idle"
         return "Node Stopped"
 
     def refresh_ui():
-        status = node.get_status()
-        if node.is_running:
+        status = state.node.get_status()
+        if state.node.is_running:
             # Check if processes are still alive
-            if node.ollama_process and node.ollama_process.poll() is not None:
-                node.status = "Error: Ollama process stopped"
-                node.is_running = False
-            elif umbilical[0] and not umbilical[0].is_alive:
-                node.status = "Error: Umbilical process stopped"
-                node.is_running = False
+            if (
+                state.node.ollama_process
+                and state.node.ollama_process.poll() is not None
+            ):
+                state.node.status = "Error: Ollama process stopped"
+                state.node.is_running = False
+            elif state.umbilical and not state.umbilical.is_alive:
+                state.node.status = "Error: Umbilical process stopped"
+                state.node.is_running = False
 
-        return status, node.requests_processed, log_handler.get_logs()
+        return status, state.node.requests_processed, state.log_handler.get_logs()
 
     with gr.Blocks(title="Aura Node", theme=gr.themes.Soft()) as demo:
         gr.Markdown("# 🐝 Aura Interactive Worker Node")
@@ -82,9 +94,11 @@ def launch_interactive_node():
 
         with gr.Row():
             with gr.Column(scale=1):
-                status_label = gr.Label(value=node.get_status(), label="Brain Status")
+                status_label = gr.Label(
+                    value=state.node.get_status(), label="Brain Status"
+                )
                 stats_box = gr.Number(
-                    value=node.requests_processed, label="Requests Processed"
+                    value=state.node.requests_processed, label="Requests Processed"
                 )
             with gr.Column(scale=2):
                 with gr.Row():
@@ -106,7 +120,9 @@ def launch_interactive_node():
             start_btn = gr.Button("Start Node", variant="primary")
             stop_btn = gr.Button("Stop Node", variant="stop")
 
-        log_output = gr.Textbox(lines=15, label="Agent Thinking / Logs", interactive=False)
+        log_output = gr.Textbox(
+            lines=15, label="Agent Thinking / Logs", interactive=False
+        )
 
         timer = gr.Timer(2)
         timer.tick(refresh_ui, outputs=[status_label, stats_box, log_output])

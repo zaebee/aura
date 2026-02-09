@@ -1,6 +1,6 @@
 import collections
 import threading
-from typing import List
+
 
 class HiveLogHandler:
     def __init__(self, max_logs: int = 1000):

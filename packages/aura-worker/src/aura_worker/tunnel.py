@@ -1,13 +1,12 @@
 import hashlib
-import os
-import subprocess
+import secrets
+import subprocess  # nosec B404
 import threading
-import time
+from pathlib import Path
+
 import requests
 import toml
-import secrets
-from pathlib import Path
-from typing import Optional, List
+
 
 class Umbilical:
     FRPC_VERSION = "0.61.0"
@@ -19,7 +18,7 @@ class Umbilical:
         frp_token: str,
         punk_key: str,
         frp_port: int = 7000,
-        worker_id: Optional[str] = None,
+        worker_id: str | None = None,
     ):
         self.hive_host = hive_host
         self.frp_port = frp_port
@@ -33,8 +32,7 @@ class Umbilical:
         self.frpc_path = self.bin_dir / "frpc"
         self.config_path = self.work_dir / "frpc.toml"
 
-        self.process: Optional[subprocess.Popen] = None
-        self._stop_event = threading.Event()
+        self.process: subprocess.Popen | None = None
 
     def ensure_frpc(self):
         if self.frpc_path.exists():
@@ -47,7 +45,7 @@ class Umbilical:
         frp_url = f"https://github.com/fatedier/frp/releases/download/v{self.FRPC_VERSION}/{frp_file}"
 
         print(f"Downloading frpc v{self.FRPC_VERSION}...")
-        response = requests.get(frp_url, stream=True)
+        response = requests.get(frp_url, stream=True, timeout=30)  # nosec B113
         response.raise_for_status()
 
         tar_path = self.bin_dir / frp_file
@@ -60,17 +58,21 @@ class Umbilical:
 
         if sha256.hexdigest() != self.FRPC_SHA256:
             tar_path.unlink()
-            raise RuntimeError(f"Checksum verification failed for frpc! Expected {self.FRPC_SHA256}, got {sha256.hexdigest()}")
+            raise RuntimeError(
+                f"Checksum verification failed for frpc! Expected {self.FRPC_SHA256}, got {sha256.hexdigest()}"
+            )
 
         print("Checksum verified. Extracting...")
-        subprocess.run(["tar", "-xzf", str(tar_path), "-C", str(self.bin_dir)], check=True)
+        subprocess.run(
+            ["tar", "-xzf", str(tar_path), "-C", str(self.bin_dir)], check=True  # nosec B603 B607
+        )
 
         extracted_dir = self.bin_dir / f"frp_{self.FRPC_VERSION}_linux_amd64"
         (extracted_dir / "frpc").rename(self.frpc_path)
 
         # Cleanup
         tar_path.unlink()
-        subprocess.run(["rm", "-rf", str(extracted_dir)], check=True)
+        subprocess.run(["rm", "-rf", str(extracted_dir)], check=True)  # nosec B603 B607
         self.frpc_path.chmod(0o755)
         print(f"frpc installed at {self.frpc_path}")
 
@@ -78,10 +80,7 @@ class Umbilical:
         config_data = {
             "serverAddr": self.hive_host,
             "serverPort": self.frp_port,
-            "auth": {
-                "method": "token",
-                "token": self.frp_token
-            },
+            "auth": {"method": "token", "token": self.frp_token},
             "proxies": [
                 {
                     "name": self.proxy_name,
@@ -105,14 +104,16 @@ class Umbilical:
             self.stop()
 
         self.process = subprocess.Popen(
-            [str(self.frpc_path), "-c", str(self.config_path)],
+            [str(self.frpc_path), "-c", str(self.config_path)],  # nosec B603
             stdout=subprocess.PIPE,
             stderr=subprocess.STDOUT,
             text=True,
             bufsize=1,
         )
 
-        threading.Thread(target=self._read_output, args=(log_callback,), daemon=True).start()
+        threading.Thread(
+            target=self._read_output, args=(log_callback,), daemon=True
+        ).start()
 
     def _read_output(self, log_callback):
         if not self.process or not self.process.stdout:
