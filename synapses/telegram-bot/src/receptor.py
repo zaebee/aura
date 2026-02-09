@@ -4,7 +4,7 @@ from aiogram.filters import Command, CommandObject
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
 from aiogram.types import CallbackQuery, Message
-from aura_core import MetabolicLoop
+from nats_adapter import NatsAdapter
 from translator import TelegramTranslator
 
 logger = structlog.get_logger(__name__)
@@ -17,11 +17,11 @@ class NegotiationStates(StatesGroup):
 class TelegramReceptor:
     """
     Receptor: Handles the 'Synaptic Gap' between Telegram and the Hive.
-    Converts external events into Internal Signals and executes Metabolism.
+    Converts external events into Internal Signals and sends them to Core via NATS.
     """
 
-    def __init__(self, metabolism: MetabolicLoop, translator: TelegramTranslator):
-        self.metabolism = metabolism
+    def __init__(self, adapter: NatsAdapter, translator: TelegramTranslator):
+        self.adapter = adapter
         self.translator = translator
         self.router = Router()
         self._setup_routes()
@@ -52,10 +52,8 @@ class TelegramReceptor:
         # 1. Translate external event to Internal Signal
         signal = self.translator.to_signal(message, command=command)
 
-        # 2. Execute Metabolic Loop
-        await self.metabolism.execute(
-            signal.SerializeToString(), is_nats=True, original_message=message
-        )
+        # 2. Send Signal to Core via NATS and wait for Observation
+        await self.adapter.execute(signal)
 
     async def process_select_hotel(
         self, callback: CallbackQuery, state: FSMContext
@@ -85,14 +83,8 @@ class TelegramReceptor:
             item_id=data.get("item_id"),
         )
 
-        # 2. Execute Metabolic Loop (using binary proto for standardization)
-        observation = await self.metabolism.execute(
-            signal.SerializeToString(),
-            is_nats=True,
-            # Pass original message for any UI-specific tasks if needed,
-            # though the goal is to use the bloodstream.
-            original_message=message,
-        )
+        # 2. Send Signal to Core via NATS and wait for Observation
+        observation = await self.adapter.execute(signal)
 
         if not observation.success:
             await message.answer(f"Sorry, something went wrong: {observation.error}")

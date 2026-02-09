@@ -1,3 +1,9 @@
+"""Legacy bot module — kept for backward compatibility.
+
+The primary handler is now receptor.py which uses NatsAdapter
+to communicate with core via NATS instead of in-process MetabolicLoop.
+"""
+
 from aiogram import F, Router
 from aiogram.filters import Command, CommandObject
 from aiogram.fsm.context import FSMContext
@@ -6,7 +12,8 @@ from aiogram.types import (
     CallbackQuery,
     Message,
 )
-from aura_core import MetabolicLoop
+from nats_adapter import NatsAdapter
+from translator import TelegramTranslator
 
 router = Router()
 
@@ -26,10 +33,10 @@ async def cmd_start(message: Message) -> None:
 
 @router.message(Command("search"))
 async def cmd_search(
-    message: Message, command: CommandObject, metabolism: MetabolicLoop
+    message: Message, command: CommandObject, adapter: NatsAdapter
 ) -> None:
-    # Execute full ATCG search loop
-    await metabolism.execute(message)
+    signal = TelegramTranslator().to_signal(message, command=command)
+    await adapter.execute(signal)
 
 
 @router.callback_query(F.data.startswith("select:"))
@@ -48,12 +55,12 @@ async def process_select_hotel(callback: CallbackQuery, state: FSMContext) -> No
 
 @router.message(NegotiationStates.WaitingForBid, F.text.regexp(r"^\d+(\.\d+)?$"))
 async def process_bid(
-    message: Message, state: FSMContext, metabolism: MetabolicLoop
+    message: Message, state: FSMContext, adapter: NatsAdapter
 ) -> None:
     data = await state.get_data()
+    signal = TelegramTranslator().to_signal(message, state_data=data)
 
-    # Execute full ATCG negotiation loop
-    observation = await metabolism.execute(message, state_data=data)
+    observation = await adapter.execute(signal)
 
     if not observation.success:
         await message.answer(f"Sorry, something went wrong: {observation.error}")

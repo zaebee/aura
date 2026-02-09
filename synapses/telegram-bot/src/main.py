@@ -8,15 +8,17 @@ from aiogram import Bot, Dispatcher
 from effector import TelegramEffector
 from health import start_health_server
 from health import state as health_state
-from hive.cortex import HiveCell
+from nats_adapter import NatsAdapter
 from receptor import TelegramReceptor
 from synapse_settings import settings as tg_settings
 from translator import TelegramTranslator
 
-from config import Settings as CoreSettings
-
 # Setup logging
-level = logging.DEBUG if tg_settings.debug else getattr(logging, tg_settings.log_level.upper(), logging.INFO)
+level = (
+    logging.DEBUG
+    if tg_settings.debug
+    else getattr(logging, tg_settings.log_level.upper(), logging.INFO)
+)
 log_format = os.getenv("AURA_LOG_FORMAT", "json").lower()
 renderer = (
     structlog.dev.ConsoleRenderer()
@@ -41,8 +43,8 @@ async def main() -> None:
     )
     logger.debug(
         "synapse_settings",
-        core_url=tg_settings.core_url,
         nats_url=tg_settings.nats_url,
+        signal_subject=tg_settings.signal_subject,
         log_level=tg_settings.log_level,
         negotiation_timeout=tg_settings.negotiation_timeout,
         webhook_domain=tg_settings.webhook_domain,
@@ -51,7 +53,7 @@ async def main() -> None:
         debug=tg_settings.debug,
     )
 
-    # 1. Initialize NATS Bloodstream
+    # 1. Connect to NATS (required — bot communicates with core via NATS)
     nc = None
     try:
         logger.debug("connecting_to_nats", url=tg_settings.nats_url)
@@ -64,55 +66,54 @@ async def main() -> None:
         logger.info("connected_to_nats", url=tg_settings.nats_url)
     except Exception as e:
         logger.error("nats_connection_failed", error=str(e))
-        # We continue as the bot might still function for non-bloodstream tasks,
-        # but Effector will fail.
 
-    # 2. Initialize the "Cell" (Core Metabolism)
-    # We load CoreSettings which will pick up AURA_ prefixed env vars
-    core_config = CoreSettings()
-    logger.debug("core_settings_loaded", env_prefix=core_config.model_config.get("env_prefix"))
-    cell = HiveCell(core_config)
-    metabolism = await cell.build_organism()
-    logger.info("metabolism_initialized_in_process")
+    if not nc:
+        logger.critical(
+            "nats_required", reason="Cannot operate without NATS connection"
+        )
+        return
+
+    # 2. Initialize NATS Adapter (replaces in-process core metabolism)
+    adapter = NatsAdapter(
+        nc=nc,
+        signal_subject=tg_settings.signal_subject,
+        timeout=tg_settings.negotiation_timeout,
+    )
+    logger.info("nats_adapter_initialized", signal_subject=tg_settings.signal_subject)
 
     # 3. Initialize Bot and Translator
     bot = Bot(token=tg_settings.token.get_secret_value())
     translator = TelegramTranslator()
     logger.debug("bot_and_translator_initialized")
 
-    # 4. Initialize Receptor (Inbound)
-    receptor = TelegramReceptor(metabolism, translator)
+    # 4. Initialize Receptor (Inbound: Telegram -> NATS -> Core)
+    receptor = TelegramReceptor(adapter, translator)
     logger.debug("receptor_initialized")
 
-    # 5. Initialize Effector (Outbound)
-    effector = None
-    if nc:
-        effector = TelegramEffector(nc, bot, translator)
-        logger.debug("effector_initialized")
-    else:
-        logger.debug("effector_skipped", reason="no_nats_connection")
+    # 5. Initialize Effector (Outbound: Core -> NATS -> Telegram)
+    effector = TelegramEffector(nc, bot, translator)
+    logger.debug("effector_initialized")
 
     # 6. Setup Aiogram Dispatcher
     dp = Dispatcher()
     dp.include_router(receptor.router)
     logger.debug("dispatcher_configured", routers=1)
 
-    logger.info("synapse_ready", core_url=tg_settings.core_url)
+    logger.info("synapse_ready", nats_url=tg_settings.nats_url)
 
     # 7. Start Health probe server
     health_runner = await start_health_server(tg_settings.health_port)
     logger.info("health_server_started", port=tg_settings.health_port)
 
     # Mark probe state
-    health_state.nats_connected = nc is not None
+    health_state.nats_connected = True
     health_state.bot_polling = True
 
     tasks = []
 
     # Start Effector background task
-    if effector:
-        tasks.append(asyncio.create_task(effector.run()))
-        logger.info("effector_task_started")
+    tasks.append(asyncio.create_task(effector.run()))
+    logger.info("effector_task_started")
 
     # Start Bot Polling
     logger.debug("starting_bot_polling")
@@ -125,8 +126,7 @@ async def main() -> None:
         health_state.bot_polling = False
         for task in tasks:
             task.cancel()
-        if nc:
-            await nc.close()
+        await nc.close()
         await bot.session.close()
         logger.debug("shutdown_complete")
         await health_runner.cleanup()

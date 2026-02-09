@@ -1,54 +1,35 @@
+from typing import Any
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 from aiogram import types
-from interfaces import NegotiationProvider, NegotiationResult, SearchResult
-
-
-class MockNegotiationProvider(NegotiationProvider):
-    def __init__(self):
-        self.search_results = []
-        self.negotiation_result = {}
-
-    async def search(self, query: str, limit: int = 5) -> list[SearchResult]:
-        return self.search_results
-
-    async def negotiate(self, item_id: str, bid: float) -> NegotiationResult:
-        return self.negotiation_result
 
 
 @pytest.fixture
-def mock_client():
-    return MockNegotiationProvider()
+def mock_adapter() -> AsyncMock:
+    """Mock NatsAdapter for testing receptor without NATS."""
+    adapter = AsyncMock()
+    return adapter
 
 
 @pytest.fixture
-def mock_metabolism(mock_client):
-    metabolism = AsyncMock()
-    metabolism.connector = MagicMock()
-    metabolism.connector.search_core = mock_client.search
-    metabolism.execute_negotiation = AsyncMock()
-    metabolism.execute_search = AsyncMock()
-    return metabolism
-
-
-@pytest.fixture
-def bot():
+def bot() -> AsyncMock:
     return AsyncMock()
 
 
 @pytest.fixture
-def message(bot):
+def message(bot: AsyncMock) -> Any:
     msg = MagicMock(spec=types.Message)
     msg.bot = bot
     msg.answer = AsyncMock()
     msg.from_user = MagicMock(id=123, full_name="Test User")
     msg.chat = MagicMock(id=123)
+    msg.text = ""
     return msg
 
 
 @pytest.fixture
-def callback_query(bot):
+def callback_query(bot: AsyncMock) -> Any:
     cb = MagicMock(spec=types.CallbackQuery)
     cb.bot = bot
     cb.message = MagicMock(spec=types.Message)
