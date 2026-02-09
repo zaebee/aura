@@ -115,8 +115,11 @@ class NatsSignalGateway:
                 )
                 try:
                     await msg.respond(bytes(error_obs))
-                except Exception:
-                    pass
+                except Exception as reply_err:
+                    logger.warning(
+                        "failed_to_send_error_reply",
+                        error=str(reply_err),
+                    )
 
     def _to_proto_observation(self, observation: Any) -> ProtoObservation:
         """Convert aura_core.types.Observation dataclass to proto Observation."""
