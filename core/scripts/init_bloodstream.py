@@ -40,7 +40,7 @@ STREAMS = [
         description="All Hive events - negotiation, heartbeat, alerts",
         subjects=["aura.hive.events.>", "aura.hive.heartbeat"],
         retention=RetentionPolicy.LIMITS,
-        max_age=24 * 60 * 60 * 1_000_000_000,  # 24 hours in nanoseconds
+        # max_age=24 * 60 * 60 * 1_000_000_000,  # 24 hours in nanoseconds
         storage=StorageType.FILE,
         num_replicas=1,
         discard="old",
@@ -52,7 +52,7 @@ STREAMS = [
         description="System health metrics for proprioception",
         subjects=["aura.hive.vitals.>"],
         retention=RetentionPolicy.LIMITS,
-        max_age=1 * 60 * 60 * 1_000_000_000,  # 1 hour in nanoseconds
+        # max_age=1 * 60 * 60 * 1_000_000_000,  # 1 hour in nanoseconds
         storage=StorageType.MEMORY,  # Fast access, ephemeral
         num_replicas=1,
         discard="old",
@@ -64,7 +64,7 @@ STREAMS = [
         description="Architectural audit events for the Keeper",
         subjects=["aura.hive.audit.>"],
         retention=RetentionPolicy.LIMITS,
-        max_age=7 * 24 * 60 * 60 * 1_000_000_000,  # 7 days in nanoseconds
+        # max_age=7 * 24 * 60 * 60 * 1_000_000_000,  # 7 days in nanoseconds
         storage=StorageType.FILE,
         num_replicas=1,
         discard="old",
@@ -245,7 +245,7 @@ async def publish_test_event(nats_url: str) -> bool:
         return False
 
 
-def main():
+def main() -> None:
     parser = argparse.ArgumentParser(
         description="Initialize NATS JetStream for Aura Hive"
     )
