@@ -432,6 +432,7 @@ source = { editable = "packages/aura-worker" }
 dependencies = [
     { name = "aura-core" },
     { name = "gradio" },
+    { name = "nats-py" },
     { name = "python-dotenv" },
     { name = "requests" },
     { name = "toml" },
@@ -442,6 +443,7 @@ dependencies = [
 requires-dist = [
     { name = "aura-core", editable = "packages/aura-core" },
     { name = "gradio", specifier = ">=4.0.0" },
+    { name = "nats-py", specifier = ">=2.7.0" },
     { name = "python-dotenv", specifier = ">=1.0.0" },
     { name = "requests", specifier = ">=2.31.0" },
     { name = "toml", specifier = ">=0.10.2" },

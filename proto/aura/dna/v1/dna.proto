@@ -287,7 +287,15 @@ message Event {
     AlertEvent alert = 12;
     HeartbeatEvent heartbeat = 13;
     AuditEvent audit = 14;
+    LogEvent log = 15;
   }
+}
+
+message LogEvent {
+  string level = 1;
+  string message = 2;
+  string logger_name = 3;
+  string worker_name = 4;
 }
 
 message NegotiationEvent {

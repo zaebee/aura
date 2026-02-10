@@ -66,7 +66,8 @@ class Umbilical:
 
         print("Checksum verified. Extracting...")
         subprocess.run(
-            ["tar", "-xzf", str(tar_path), "-C", str(self.bin_dir)], check=True  # nosec B603 B607
+            ["tar", "-xzf", str(tar_path), "-C", str(self.bin_dir)],
+            check=True,  # nosec B603 B607
         )
 
         extracted_dir = self.bin_dir / f"frp_{self.FRPC_VERSION}_linux_amd64"
@@ -92,6 +93,16 @@ class Umbilical:
                     "secretKey": self.punk_key,
                     "localIP": "127.0.0.1",
                     "localPort": 11434,
+                }
+            ],
+            "visitors": [
+                {
+                    "name": f"nats-visitor-{self.worker_id}",
+                    "type": "stcp",
+                    "serverName": "hive-nats",
+                    "secretKey": self.punk_key,
+                    "bindAddr": "127.0.0.1",
+                    "bindPort": 4222,
                 }
             ],
         }
