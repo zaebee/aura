@@ -17,6 +17,7 @@ class WorkerState:
         self.metabolism: MetabolicLoop | None = None
         self.umbilical: Umbilical | None = None
         self.worker_id = secrets.token_hex(4)
+        self.original_log_level: int | None = None
 
 
 def launch_interactive_node():
@@ -66,6 +67,7 @@ def launch_interactive_node():
 
             # Setup standard logging to capture all info/error calls
             root_logger = logging.getLogger()
+            state.original_log_level = root_logger.level
             root_logger.addHandler(state.log_handler)
             root_logger.setLevel(logging.INFO)
 
@@ -89,7 +91,10 @@ def launch_interactive_node():
 
         if state.log_handler:
             # Remove from root logger
-            logging.getLogger().removeHandler(state.log_handler)
+            root_logger = logging.getLogger()
+            root_logger.removeHandler(state.log_handler)
+            if state.original_log_level is not None:
+                root_logger.setLevel(state.original_log_level)
             await state.log_handler.stop()
             state.log_handler = None
 

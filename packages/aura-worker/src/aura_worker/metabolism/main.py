@@ -1,6 +1,9 @@
 import asyncio
+import logging
 
 from nats.aio.client import Client as NATS
+
+logger = logging.getLogger(__name__)
 
 
 class MetabolicLoop:
@@ -31,10 +34,10 @@ class MetabolicLoop:
             # Subject: aura.worker.<worker_name>.commands
             subject = f"aura.worker.{self.worker_name}.commands"
             await self.nc.subscribe(subject, cb=self._handle_message)
-            print(f"MetabolicLoop subscribed to {subject}")
+            logger.info(f"MetabolicLoop subscribed to {subject}")
             return True
-        except Exception as e:
-            print(f"MetabolicLoop NATS connection pending: {e}")
+        except Exception:
+            logger.warning("MetabolicLoop NATS connection pending.")
             return False
 
     async def stop(self):
@@ -48,14 +51,16 @@ class MetabolicLoop:
         try:
             data = msg.data.decode().strip().lower()
             if data == "kill":
-                print(f"!!! RECEIVED KILL SIGNAL FROM NATS ({msg.subject}) !!!")
+                logger.warning(
+                    f"!!! RECEIVED KILL SIGNAL FROM NATS ({msg.subject}) !!!"
+                )
                 if self._kill_callback:
                     if asyncio.iscoroutinefunction(self._kill_callback):
                         await self._kill_callback()
                     else:
                         self._kill_callback()
         except Exception as e:
-            print(f"Error handling NATS message: {e}")
+            logger.error(f"Error handling NATS message: {e}")
 
     @property
     def is_connected(self) -> bool:

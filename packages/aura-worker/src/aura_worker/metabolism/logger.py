@@ -26,7 +26,7 @@ class HiveLogHandler(logging.Handler):
         self.nats_url = nats_url
         self.queue = asyncio.Queue(maxsize=10000)
         self.loop = None
-        self._stop_event = asyncio.Event()
+        self._processing_task = None
         self._nats_client = NATS()
 
         # Keep internal deque for local Gradio UI compatibility
@@ -99,31 +99,44 @@ class HiveLogHandler(logging.Handler):
                 reconnect_time_wait=1,
                 max_reconnect_attempts=60,
             )
-            asyncio.create_task(self._process_queue())
+            self._processing_task = asyncio.create_task(self._process_queue())
             return True
-        except Exception as e:
-            # Fallback print if NATS is not available yet
-            print(f"HiveLogHandler NATS connection pending: {e}")
+        except Exception:
+            # Fallback print if NATS is not available yet. Avoid logging the exception to prevent credential leaks.
+            print("HiveLogHandler NATS connection pending.")
             return False
 
     async def stop(self):
-        self._stop_event.set()
+        """Gracefully stop the log handler, ensuring the queue is flushed."""
+        if self.queue:
+            await self.queue.put(None)
+
+        if self._processing_task:
+            try:
+                await self._processing_task
+            except Exception:
+                pass
+            self._processing_task = None
+
         if self._nats_client.is_connected:
+            await self._nats_client.drain()
             await self._nats_client.close()
 
     async def _process_queue(self):
-        while not self._stop_event.is_set():
+        while True:
             try:
-                # wait_for to allow checking stop_event periodically
-                event = await asyncio.wait_for(self.queue.get(), timeout=1.0)
+                event = await self.queue.get()
+                if event is None:
+                    self.queue.task_done()
+                    break
+
                 if self._nats_client.is_connected:
                     await self._nats_client.publish(event.topic, bytes(event))
-                self.queue.task_done()
-            except TimeoutError:
-                continue
             except Exception as e:
                 # Don't use logging here to avoid infinite recursion if it fails
                 print(f"Error streaming log to NATS: {e}")
+            finally:
+                self.queue.task_done()
 
     @property
     def is_connected(self) -> bool:
