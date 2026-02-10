@@ -3,18 +3,25 @@ import os
 import shutil
 import signal
 import subprocess  # nosec B404
+from collections.abc import Callable
+from typing import Any
 
 import requests
+import structlog
 import torch
+
+logger = structlog.get_logger(__name__)
 
 
 class AuraNode:
-    def __init__(self):
+    def __init__(self) -> None:
         self.ollama_process: asyncio.subprocess.Process | None = None
-        self.status = "Idle"
-        self.is_running = False
-        self.requests_processed = 0
-        self.lock = asyncio.Lock()
+        self.status: str = "Idle"
+        self.is_running: bool = False
+        self.requests_processed: int = 0
+        self.lock: asyncio.Lock = asyncio.Lock()
+        self.gpu_active: bool
+        self.gpu_info: str
         self.gpu_active, self.gpu_info = self._check_gpu()
 
     def _check_gpu(self) -> tuple[bool, str]:
@@ -43,7 +50,7 @@ class AuraNode:
 
         return False, "⚠️ DEGRADED (CPU MODE)"
 
-    async def cleanup_zombies(self):
+    async def cleanup_zombies(self) -> None:
         """Kill any process listening on port 11434."""
         try:
             process = await asyncio.create_subprocess_exec(
@@ -52,17 +59,17 @@ class AuraNode:
                 stderr=asyncio.subprocess.PIPE,
             )
             stdout, _ = await process.communicate()
-            pids = stdout.decode().strip().split()
+            pids: list[str] = stdout.decode().strip().split()
             for pid in pids:
                 if pid:
                     try:
                         os.kill(int(pid), signal.SIGTERM)
                     except ProcessLookupError:
                         pass
-        except Exception:  # nosec B110
-            pass
+        except Exception:
+            logger.warning("Failed to clean up zombie processes on port 11434", exc_info=True)
 
-    async def start_ollama(self, log_callback=print):
+    async def start_ollama(self, log_callback: Callable[[Any], None] = print) -> None:
         async with self.lock:
             if self.ollama_process:
                 return
@@ -81,7 +88,7 @@ class AuraNode:
                 )
 
             # Enable debug logging for Ollama to ensure thought capture stability
-            env = os.environ.copy()
+            env: dict[str, str] = os.environ.copy()
             env["OLLAMA_DEBUG"] = "1"
 
             self.ollama_process = await asyncio.create_subprocess_exec(
@@ -96,7 +103,7 @@ class AuraNode:
         # Wait for ollama to be up
         for _ in range(30):
             try:
-                loop = asyncio.get_running_loop()
+                loop: asyncio.AbstractEventLoop = asyncio.get_running_loop()
                 await loop.run_in_executor(None, lambda: requests.get("http://localhost:11434", timeout=5))  # nosec B113
                 log_callback("Ollama server is up.")
                 return
@@ -106,41 +113,44 @@ class AuraNode:
         await self.stop_ollama()
         raise RuntimeError("Ollama failed to start within 30 seconds.")
 
-    async def pull_model(self, model: str, log_callback=print):
+    async def pull_model(self, model: str, log_callback: Callable[[Any], None] = print) -> None:
         if not model or model.lstrip().startswith("-"):
             raise ValueError(f"Invalid model name provided: '{model}'")
         log_callback(f"--- Pulling model: {model} ---")
 
-        pull_proc = await asyncio.create_subprocess_exec(
+        pull_proc: asyncio.subprocess.Process = await asyncio.create_subprocess_exec(
             "ollama", "pull", model,
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.STDOUT,
         )
 
-        while True:
-            line = await pull_proc.stdout.readline()
-            if not line:
-                break
-            log_callback(line.decode().strip())
+        if pull_proc.stdout:
+            while True:
+                line: bytes = await pull_proc.stdout.readline()
+                if not line:
+                    break
+                log_callback(line.decode().strip())
 
         await pull_proc.wait()
 
         if pull_proc.returncode != 0:
             raise RuntimeError(f"Failed to pull model {model}")
 
-    async def _read_output(self, process, log_callback):
+    async def _read_output(self, process: asyncio.subprocess.Process, log_callback: Callable[[Any], None]) -> None:
+        if process.stdout is None:
+            return
         while True:
-            line = await process.stdout.readline()
+            line: bytes = await process.stdout.readline()
             if not line:
                 break
-            text = line.decode().strip()
+            text: str = line.decode().strip()
             log_callback(text)
             # Increment stats on successful inference requests
             async with self.lock:
                 if "POST /api/generate" in text or "POST /api/chat" in text:
                     self.requests_processed += 1
 
-    async def stop_ollama(self):
+    async def stop_ollama(self) -> str:
         async with self.lock:
             if self.ollama_process:
                 self.ollama_process.terminate()
