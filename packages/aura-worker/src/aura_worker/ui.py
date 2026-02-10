@@ -1,26 +1,16 @@
-import logging
 import os
-import secrets
 
 import gradio as gr
 from dotenv import load_dotenv
 
-from .metabolism import HiveLogHandler, MetabolicLoop
-from .node import AuraNode
-from .tunnel import Umbilical
-
-
-class WorkerState:
-    def __init__(self):
-        self.node = AuraNode()
-        self.log_handler: HiveLogHandler | None = None
-        self.metabolism: MetabolicLoop | None = None
-        self.umbilical: Umbilical | None = None
-        self.worker_id = secrets.token_hex(4)
-        self.original_log_level: int | None = None
+from .controller import WorkerController
 
 
 def launch_interactive_node():
+    """
+    Launches the Aura Interactive Worker Node UI.
+    Utilizes Async Metabolism for non-blocking execution in Colab/Jupyter.
+    """
     load_dotenv()
 
     # Env Var Overrides
@@ -29,122 +19,12 @@ def launch_interactive_node():
     ENV_PUNK_KEY = os.getenv("AURA_WORKER__PUNK_KEY", "")
     ENV_NATS_URL = os.getenv("AURA_WORKER__NATS_URL", "nats://localhost:4222")
 
-    state = WorkerState()
+    controller = WorkerController()
 
-    def log(message):
-        print(message)
-        if state.log_handler:
-            state.log_handler.write(message)
-
-    async def start_node(
-        model, hive_host, nats_url, frp_token, punk_key, frp_port, progress=None
-    ):
-        if progress is None:
-            progress = gr.Progress()
-        if state.node.is_running:
-            return "Node is already running."
-
-        try:
-            progress(0, desc="Starting Ollama...")
-            state.node.start_ollama(log_callback=log)
-
-            progress(0.3, desc=f"Pulling model {model}...")
-            state.node.pull_model(model, log_callback=log)
-
-            progress(0.7, desc="Establishing Umbilical...")
-            state.umbilical = Umbilical(
-                hive_host=hive_host,
-                frp_token=frp_token,
-                punk_key=punk_key,
-                frp_port=int(frp_port),
-                worker_id=state.worker_id,
-            )
-            state.umbilical.start(log_callback=log)
-
-            # Initialize Log Protein and Metabolic Loop
-            progress(0.8, desc="Synchronizing with Hive Bloodstream...")
-            state.log_handler = HiveLogHandler(
-                worker_name=state.worker_id, nats_url=nats_url
-            )
-            state.metabolism = MetabolicLoop(
-                worker_name=state.worker_id, nats_url=nats_url
-            )
-
-            # Setup standard logging to capture all info/error calls
-            root_logger = logging.getLogger()
-            state.original_log_level = root_logger.level
-            root_logger.addHandler(state.log_handler)
-            root_logger.setLevel(logging.INFO)
-
-            await state.log_handler.start()
-            await state.metabolism.start(kill_callback=stop_node)
-
-            state.node.is_running = True
-            state.node.status = "Connected"
-            return "Node Started Successfully!"
-        except Exception as e:
-            log(f"Error starting node: {e}")
-            await stop_node()
-            return f"Error: {e}"
-
-    async def stop_node():
-        log("--- Stopping Aura Node ---")
-
-        if state.metabolism:
-            await state.metabolism.stop()
-            state.metabolism = None
-
-        if state.log_handler:
-            # Remove from root logger
-            root_logger = logging.getLogger()
-            root_logger.removeHandler(state.log_handler)
-            if state.original_log_level is not None:
-                root_logger.setLevel(state.original_log_level)
-            await state.log_handler.stop()
-            state.log_handler = None
-
-        if state.umbilical:
-            state.umbilical.stop()
-            state.umbilical = None
-
-        state.node.stop_ollama()
-        state.node.is_running = False
-        state.node.status = "Idle"
-        return "Node Stopped"
-
-    async def test_pulse():
-        if not state.log_handler or not state.log_handler.is_connected:
-            return "❌ NATS not connected. Start the node first."
-
-        success = await state.log_handler.send_test_event()
-        if success:
-            return "✅ Pulse Sent! Check NATS bloodstream."
-        else:
-            return "❌ Failed to send pulse (check tunnel)."
-
-    def refresh_ui():
-        status = state.node.get_status()
-        nats_status = "🔴 Offline"
-
-        if state.metabolism and state.metabolism.is_connected:
-            nats_status = "🟢 Connected (Pulse Active)"
-        elif state.node.is_running:
-            nats_status = "🟠 Pending (Connecting...)"
-
-        if state.node.is_running:
-            # Check if processes are still alive
-            if (
-                state.node.ollama_process
-                and state.node.ollama_process.poll() is not None
-            ):
-                state.node.status = "Error: Ollama process stopped"
-                state.node.is_running = False
-            elif state.umbilical and not state.umbilical.is_alive:
-                state.node.status = "Error: Umbilical process stopped"
-                state.node.is_running = False
-
-        logs = state.log_handler.get_logs() if state.log_handler else "Logs pending..."
-        return status, nats_status, state.node.requests_processed, logs
+    async def refresh_ui():
+        node_status, nats_status, requests_processed = await controller.get_status()
+        logs = await controller.get_ui_logs()
+        return node_status, nats_status, requests_processed, logs
 
     with gr.Blocks(title="Aura Node", theme=gr.themes.Soft()) as demo:
         gr.Markdown("# 🐝 Aura Interactive Worker Node")
@@ -154,13 +34,9 @@ def launch_interactive_node():
 
         with gr.Row():
             with gr.Column(scale=1):
-                status_label = gr.Label(
-                    value=state.node.get_status(), label="Brain Status"
-                )
+                status_label = gr.Label(value="Idle", label="Brain Status")
                 nats_label = gr.Label(value="🔴 Offline", label="NATS Pulse")
-                stats_box = gr.Number(
-                    value=state.node.requests_processed, label="Requests Processed"
-                )
+                stats_box = gr.Number(value=0, label="Requests Processed")
             with gr.Column(scale=2):
                 with gr.Row():
                     model_input = gr.Textbox(value="mistral", label="Ollama Model")
@@ -188,16 +64,17 @@ def launch_interactive_node():
             test_pulse_btn = gr.Button("Test Pulse", variant="secondary")
 
         log_output = gr.Textbox(
-            lines=15, label="Agent Thinking / Logs", interactive=False
+            lines=15,
+            label="Agent Thinking / Logs",
+            interactive=False,
+            placeholder="Logs will appear here once the node starts...",
         )
 
         timer = gr.Timer(2)
-        timer.tick(
-            refresh_ui, outputs=[status_label, nats_label, stats_box, log_output]
-        )
+        timer.tick(refresh_ui, outputs=[status_label, nats_label, stats_box, log_output])
 
         start_btn.click(
-            start_node,
+            controller.start,
             inputs=[
                 model_input,
                 hive_host_input,
@@ -208,7 +85,7 @@ def launch_interactive_node():
             ],
             outputs=[log_output],
         )
-        stop_btn.click(stop_node, outputs=[log_output])
-        test_pulse_btn.click(test_pulse, outputs=[log_output])
+        stop_btn.click(controller.stop, outputs=[log_output])
+        test_pulse_btn.click(controller.test_pulse, outputs=[log_output])
 
     demo.launch(share=True, inline=False)

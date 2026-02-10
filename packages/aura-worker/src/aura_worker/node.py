@@ -1,8 +1,8 @@
+import asyncio
 import os
 import shutil
+import signal
 import subprocess  # nosec B404
-import threading
-import time
 
 import requests
 import torch
@@ -10,11 +10,11 @@ import torch
 
 class AuraNode:
     def __init__(self):
-        self.ollama_process: subprocess.Popen | None = None
+        self.ollama_process: asyncio.subprocess.Process | None = None
         self.status = "Idle"
         self.is_running = False
         self.requests_processed = 0
-        self.lock = threading.Lock()
+        self.lock = asyncio.Lock()
         self.gpu_active, self.gpu_info = self._check_gpu()
 
     def _check_gpu(self) -> tuple[bool, str]:
@@ -43,10 +43,31 @@ class AuraNode:
 
         return False, "⚠️ DEGRADED (CPU MODE)"
 
-    def start_ollama(self, log_callback=print):
-        with self.lock:
+    async def cleanup_zombies(self):
+        """Kill any process listening on port 11434."""
+        try:
+            process = await asyncio.create_subprocess_exec(
+                "lsof", "-t", "-i:11434",
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.PIPE,
+            )
+            stdout, _ = await process.communicate()
+            pids = stdout.decode().strip().split()
+            for pid in pids:
+                if pid:
+                    try:
+                        os.kill(int(pid), signal.SIGTERM)
+                    except ProcessLookupError:
+                        pass
+        except Exception:  # nosec B110
+            pass
+
+    async def start_ollama(self, log_callback=print):
+        async with self.lock:
             if self.ollama_process:
                 return
+
+            await self.cleanup_zombies()
 
             if shutil.which("ollama") is None:
                 raise RuntimeError(
@@ -63,72 +84,75 @@ class AuraNode:
             env = os.environ.copy()
             env["OLLAMA_DEBUG"] = "1"
 
-            self.ollama_process = subprocess.Popen(
-                ["ollama", "serve"],  # nosec B603 B607
-                stdout=subprocess.PIPE,
-                stderr=subprocess.STDOUT,
-                text=True,
-                bufsize=1,
+            self.ollama_process = await asyncio.create_subprocess_exec(
+                "ollama", "serve",
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.STDOUT,
                 env=env,
             )
 
-            threading.Thread(
-                target=self._read_output,
-                args=(self.ollama_process, log_callback),
-                daemon=True,
-            ).start()
+            asyncio.create_task(self._read_output(self.ollama_process, log_callback))
 
         # Wait for ollama to be up
         for _ in range(30):
             try:
-                requests.get("http://localhost:11434", timeout=5)  # nosec B113
+                loop = asyncio.get_running_loop()
+                await loop.run_in_executor(None, lambda: requests.get("http://localhost:11434", timeout=5))  # nosec B113
                 log_callback("Ollama server is up.")
                 return
-            except requests.exceptions.RequestException:
-                time.sleep(1)
+            except Exception:  # nosec B110
+                await asyncio.sleep(1)
 
-        self.stop_ollama()
+        await self.stop_ollama()
         raise RuntimeError("Ollama failed to start within 30 seconds.")
 
-    def pull_model(self, model: str, log_callback=print):
+    async def pull_model(self, model: str, log_callback=print):
         if not model or model.lstrip().startswith("-"):
             raise ValueError(f"Invalid model name provided: '{model}'")
         log_callback(f"--- Pulling model: {model} ---")
-        pull_proc = subprocess.Popen(
-            ["ollama", "pull", model],  # nosec B603 B607
-            stdout=subprocess.PIPE,
-            stderr=subprocess.STDOUT,
-            text=True,
-            bufsize=1,
+
+        pull_proc = await asyncio.create_subprocess_exec(
+            "ollama", "pull", model,
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.STDOUT,
         )
-        for line in pull_proc.stdout:
-            log_callback(line.strip())
-        pull_proc.wait()
+
+        while True:
+            line = await pull_proc.stdout.readline()
+            if not line:
+                break
+            log_callback(line.decode().strip())
+
+        await pull_proc.wait()
 
         if pull_proc.returncode != 0:
             raise RuntimeError(f"Failed to pull model {model}")
 
-    def _read_output(self, process, log_callback):
-        for line in process.stdout:
-            log_callback(line.strip())
+    async def _read_output(self, process, log_callback):
+        while True:
+            line = await process.stdout.readline()
+            if not line:
+                break
+            text = line.decode().strip()
+            log_callback(text)
             # Increment stats on successful inference requests
-            with self.lock:
-                if "POST /api/generate" in line or "POST /api/chat" in line:
+            async with self.lock:
+                if "POST /api/generate" in text or "POST /api/chat" in text:
                     self.requests_processed += 1
 
-    def stop_ollama(self):
-        with self.lock:
+    async def stop_ollama(self):
+        async with self.lock:
             if self.ollama_process:
                 self.ollama_process.terminate()
                 try:
-                    self.ollama_process.wait(timeout=5)
-                except subprocess.TimeoutExpired:
+                    await asyncio.wait_for(self.ollama_process.wait(), timeout=5)
+                except TimeoutError:
                     self.ollama_process.kill()
                 self.ollama_process = None
         return "Ollama stopped"
 
-    def get_status(self) -> str:
-        with self.lock:
+    async def get_status(self) -> str:
+        async with self.lock:
             if not self.gpu_active:
                 return "⚠️ DEGRADED (CPU MODE)"
             return self.status

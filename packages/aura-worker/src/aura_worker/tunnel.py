@@ -1,7 +1,9 @@
+import asyncio
 import hashlib
+import os
 import secrets
+import signal
 import subprocess  # nosec B404
-import threading
 from pathlib import Path
 
 import requests
@@ -34,7 +36,7 @@ class Umbilical:
         self.frpc_path = self.bin_dir / "frpc"
         self.config_path = self.work_dir / "frpc.toml"
 
-        self.process: subprocess.Popen | None = None
+        self.process: asyncio.subprocess.Process | None = None
 
     def ensure_frpc(self):
         if self.frpc_path.exists():
@@ -109,42 +111,63 @@ class Umbilical:
         with open(self.config_path, "w") as f:
             toml.dump(config_data, f)
 
-    def start(self, log_callback=print):
-        self.ensure_frpc()
-        self._generate_config()
+    async def cleanup_zombies(self):
+        """Kill any process listening on port 7000."""
+        try:
+            process = await asyncio.create_subprocess_exec(
+                "lsof", "-t", "-i:7000",
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.PIPE,
+            )
+            stdout, _ = await process.communicate()
+            pids = stdout.decode().strip().split()
+            for pid in pids:
+                if pid:
+                    try:
+                        os.kill(int(pid), signal.SIGTERM)
+                    except ProcessLookupError:
+                        pass
+        except Exception:  # nosec B110
+            pass
+
+    async def start(self, log_callback=print):
+        await asyncio.to_thread(self.ensure_frpc)
+        await asyncio.to_thread(self._generate_config)
 
         log_callback(f"--- Starting Umbilical (STCP Tunnel: {self.proxy_name}) ---")
 
         if self.process:
-            self.stop()
+            await self.stop()
 
-        self.process = subprocess.Popen(
-            [str(self.frpc_path), "-c", str(self.config_path)],  # nosec B603
-            stdout=subprocess.PIPE,
-            stderr=subprocess.STDOUT,
-            text=True,
-            bufsize=1,
+        await self.cleanup_zombies()
+
+        self.process = await asyncio.create_subprocess_exec(
+            str(self.frpc_path), "-c", str(self.config_path),  # nosec B603
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.STDOUT,
         )
 
-        threading.Thread(
-            target=self._read_output, args=(log_callback,), daemon=True
-        ).start()
+        asyncio.create_task(self._read_output(log_callback))
 
-    def _read_output(self, log_callback):
+    async def _read_output(self, log_callback):
         if not self.process or not self.process.stdout:
             return
 
-        for line in self.process.stdout:
-            log_callback(line.strip())
-            if "login to server success" in line:
+        while True:
+            line = await self.process.stdout.readline()
+            if not line:
+                break
+            text = line.decode().strip()
+            log_callback(text)
+            if "login to server success" in text:
                 log_callback(f"--- Umbilical Connected to Hive at {self.hive_host} ---")
 
-    def stop(self):
+    async def stop(self):
         if self.process:
             self.process.terminate()
             try:
-                self.process.wait(timeout=5)
-            except subprocess.TimeoutExpired:
+                await asyncio.wait_for(self.process.wait(), timeout=5)
+            except TimeoutError:
                 self.process.kill()
             self.process = None
 
@@ -157,4 +180,4 @@ class Umbilical:
 
     @property
     def is_alive(self) -> bool:
-        return self.process is not None and self.process.poll() is None
+        return self.process is not None and self.process.returncode is None

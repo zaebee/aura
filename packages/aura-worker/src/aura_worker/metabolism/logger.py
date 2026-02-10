@@ -21,16 +21,18 @@ class HiveLogHandler(logging.Handler):
         worker_name: str,
         nats_url: str = "nats://localhost:4222",
         max_logs: int = 1000,
+        ui_queue: asyncio.Queue | None = None,
     ):
         super().__init__()
         self.worker_name = worker_name
         self.nats_url = nats_url
         self.queue = asyncio.Queue(maxsize=10000)
+        self.ui_queue = ui_queue
         self.loop = None
         self._processing_task = None
         self._nats_client = NATS()
 
-        # Keep internal deque for local Gradio UI compatibility
+        # Keep internal deque for local Gradio UI compatibility (Legacy/Fallback)
         self.local_logs = deque(maxlen=max_logs)
         self.lock = threading.Lock()
 
@@ -40,6 +42,13 @@ class HiveLogHandler(logging.Handler):
         # Add to local deque for UI
         with self.lock:
             self.local_logs.append(log_entry + "\n")
+
+        # Put in UI queue if present
+        if self.ui_queue and self.loop and self.loop.is_running():
+            try:
+                self.loop.call_soon_threadsafe(self.ui_queue.put_nowait, log_entry + "\n")
+            except (asyncio.QueueFull, RuntimeError):
+                pass
 
         # Extract thought metadata if present (Gemma 3 Thought Capture)
         metadata = {}
