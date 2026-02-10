@@ -1,7 +1,9 @@
-import pytest
 from unittest.mock import AsyncMock, patch
-from hive.proteins.perception.skill import PerceptionSkill
+
+import pytest
 from hive.proteins.perception.engine import PerceptionEngine
+from hive.proteins.perception.skill import PerceptionSkill
+
 from config.perception import PerceptionSettings
 
 
