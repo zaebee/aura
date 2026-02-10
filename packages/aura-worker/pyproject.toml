@@ -12,9 +12,15 @@ dependencies = [
     "requests>=2.31.0",
     "python-dotenv>=1.0.0",
     "toml>=0.10.2",
-    "torch>=2.0.0",
     "nats-py>=2.7.0",
     "aura-core",
+]
+
+[dependency-groups]
+ml = [
+    "torch>=2.0.0",
+    "transformers",
+    "accelerate",
 ]
 
 [tool.hatch.build.targets.wheel]
