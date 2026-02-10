@@ -63,8 +63,43 @@ class HiveAggregator(Aggregator[Any, HiveContext]):
                         reputation=proto_signal.negotiation.agent.reputation_score,
                         agent_did=proto_signal.negotiation.agent.did,
                     )
+                elif proto_signal.perception:
+                    # Logic for Perception Signal (Vision Integration)
+                    obs = await self.registry.execute(
+                        "perception",
+                        "perceive_image",
+                        {"image_bytes": proto_signal.perception.image_data},
+                    )
+                    if obs.success:
+                        item = obs.data["item"]
+                        item_id = item["id"]
+                        request_id = proto_signal.signal_id
+                        offer = NegotiationOffer(
+                            bid_amount=0.0,  # Initial perception has no bid
+                            reputation=proto_signal.perception.agent.reputation_score,
+                            agent_did=proto_signal.perception.agent.did,
+                        )
+                        # Inject perceived item into context directly to bypass DB if needed,
+                        # but HiveContext expects item_data.
+                        item_data = {
+                            "id": item["id"],
+                            "name": item["name"],
+                            "base_price": item["base_price"],
+                            "floor_price": item["floor_price"],
+                            "meta": item["meta"] or {},
+                        }
+                        return HiveContext(
+                            item_id=item_id,
+                            offer=offer,
+                            item_data=item_data,
+                            system_health=await self.get_vitals(),
+                            request_id=request_id,
+                            metadata={"brain_path": self.brain_path, "source": "perception"},
+                        )
+                    else:
+                        raise ValueError(f"Perception failed: {obs.error}")
                 else:
-                    raise ValueError("Signal does not contain negotiation payload")
+                    raise ValueError("Signal does not contain a recognized payload")
             except Exception as e:
                 logger.error("binary_signal_decode_failed", error=str(e))
                 raise ValueError(f"Failed to decode binary signal: {e}") from e

@@ -8,6 +8,7 @@ from .database import DatabaseSettings
 from .heartbeat import HeartbeatSettings
 from .llm import LLMSettings
 from .logic import LogicSettings
+from .perception import PerceptionSettings
 from .policy import SafetySettings
 from .server import ServerSettings
 
@@ -28,6 +29,7 @@ class Settings(BaseSettings):
     safety: SafetySettings = Field(default_factory=lambda: SafetySettings())  # type: ignore
     server: ServerSettings = Field(default_factory=lambda: ServerSettings())  # type: ignore
     heartbeat: HeartbeatSettings = Field(default_factory=lambda: HeartbeatSettings())  # type: ignore
+    perception: PerceptionSettings = Field(default_factory=lambda: PerceptionSettings())  # type: ignore
 
 
 @lru_cache

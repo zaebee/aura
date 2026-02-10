@@ -36,6 +36,7 @@ class TelegramReceptor:
             NegotiationStates.WaitingForBid, F.text.regexp(r"^\d+(\.\d+)?$")
         )(self.process_bid)
         self.router.callback_query(F.data == "pay_stub")(self.process_pay_stub)
+        self.router.message(F.photo)(self.process_photo)
 
     async def cmd_start(self, message: Message) -> None:
         await message.answer(
@@ -95,3 +96,41 @@ class TelegramReceptor:
 
     async def process_pay_stub(self, callback: CallbackQuery) -> None:
         await callback.answer("Payment functionality coming soon!", show_alert=True)
+
+    async def process_photo(self, message: Message, state: FSMContext) -> None:
+        """Handle incoming photos for Perception Chamber."""
+        if not message.photo:
+            return
+
+        # Get the largest photo
+        photo = message.photo[-1]
+        file = await message.bot.get_file(photo.file_id)
+        file_path = file.file_path
+        if not file_path:
+            await message.answer("Failed to download photo.")
+            return
+
+        # Download photo
+        from io import BytesIO
+
+        result: BytesIO = await message.bot.download_file(file_path)  # type: ignore
+        image_bytes = result.read()
+
+        await message.answer("Analyzing image... 👁️")
+
+        data = await state.get_data()
+        # 1. Translate photo to Perception Signal
+        signal = self.translator.to_signal(
+            message, image_bytes=image_bytes, state_data=data
+        )
+
+        # 2. Send Signal to Core and wait for Observation (Offer)
+        observation = await self.adapter.execute(signal)
+
+        if not observation.success:
+            await message.answer(f"Perception failed: {observation.error}")
+            return
+
+        # If it was successful, the effector will handle the outgoing event if it's sent via NATS,
+        # but since we are using await self.adapter.execute(signal), we get the observation back.
+        # NatsAdapter.execute usually returns the observation from the request-reply pattern.

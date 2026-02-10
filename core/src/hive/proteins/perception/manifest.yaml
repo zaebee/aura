@@ -1,0 +1,9 @@
+name: "perception"
+description: "Vision Protein: Turns images into Hive Assets using multimodal LLMs (Ollama/Gemma3)."
+version: "0.1.0"
+capabilities:
+  - "perceive_image"
+trinity:
+  skill: "PerceptionSkill"
+  engine: "PerceptionEngine"
+  settings: "PerceptionSettings"
