@@ -8,6 +8,7 @@ from aura_core.gen.aura.dna.v1 import (
     AgentIdentity,
     Event,
     NegotiationSignal,
+    PerceptionSignal,
     Signal,
     SignalType,
     TelegramSignal,
@@ -50,6 +51,27 @@ class TelegramTranslator:
             bid_amount = 0.0
             if text.replace(".", "", 1).isdigit():
                 bid_amount = float(text)
+
+            # Handle photo message (Perception)
+            if kwargs.get("image_bytes"):
+                return Signal(
+                    signal_id=signal_id,
+                    signal_type=cast(SignalType, SignalType.SIGNAL_TYPE_PERCEPTION),
+                    timestamp=datetime.now(UTC),
+                    perception=PerceptionSignal(
+                        image_data=kwargs["image_bytes"],
+                        mime_type="image/jpeg",
+                        agent=AgentIdentity(
+                            did=f"tg:{user_id}",
+                            reputation_score=1.0,
+                        ),
+                    ),
+                    metadata={
+                        "chat_id": str(chat_id),
+                        "user_id": str(user_id),
+                        "source": "telegram",
+                    },
+                )
 
             return Signal(
                 signal_id=signal_id,

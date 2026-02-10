@@ -40,6 +40,7 @@ message Signal {
     AuditSignal audit = 11;
     TelegramSignal telegram = 12;
     HeartbeatSignal heartbeat = 13;
+    PerceptionSignal perception = 14;
   }
 }
 
@@ -49,6 +50,7 @@ enum SignalType {
   SIGNAL_TYPE_AUDIT = 2;
   SIGNAL_TYPE_TELEGRAM = 3;
   SIGNAL_TYPE_HEARTBEAT = 4;
+  SIGNAL_TYPE_PERCEPTION = 5;
 }
 
 message NegotiationSignal {
@@ -80,6 +82,12 @@ message TelegramSignal {
 message HeartbeatSignal {
   string service_name = 1;
   string instance_id = 2;
+}
+
+message PerceptionSignal {
+  bytes image_data = 1;
+  string mime_type = 2;
+  AgentIdentity agent = 3;
 }
 
 // =============================================================================
@@ -215,6 +223,7 @@ message Observation {
     NegotiationObservation negotiation = 10;
     AuditObservation audit = 11;
     TelegramObservation telegram = 12;
+    PerceptionObservation perception = 13;
   }
 }
 
@@ -267,6 +276,10 @@ message AuditObservation {
 message TelegramObservation {
   int64 message_id = 1;
   bool delivered = 2;
+}
+
+message PerceptionObservation {
+  ItemData item = 1;
 }
 
 // =============================================================================

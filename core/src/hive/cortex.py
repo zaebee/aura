@@ -16,6 +16,8 @@ from hive.membrane import HiveMembrane
 from hive.metabolism import MetabolicLoop
 from hive.proteins.guard import GuardSkill
 from hive.proteins.guard.engine import OutputGuard
+from hive.proteins.perception import PerceptionSkill
+from hive.proteins.perception.engine import PerceptionEngine
 from hive.proteins.persistence import PersistenceSkill
 from hive.proteins.pulse import PulseSkill
 from hive.proteins.pulse.engine import NatsProvider
@@ -159,7 +161,17 @@ class HiveCell:
             self.settings.safety, OutputGuard(safety_settings=self.settings.safety)
         )
 
-        # 6. Transaction (Optional)
+        # 6. Perception
+        perception = PerceptionSkill()
+        perception.bind(
+            self.settings.perception,
+            PerceptionEngine(
+                ollama_url=self.settings.perception.ollama_url,
+                model=self.settings.perception.model,
+            ),
+        )
+
+        # 7. Transaction (Optional)
         transaction = None
         if self.settings.crypto.enabled:
             bundle = {
@@ -184,6 +196,7 @@ class HiveCell:
         self.registry.register("reasoning", reasoning)
         self.registry.register("telemetry", telemetry)
         self.registry.register("guard", guard)
+        self.registry.register("perception", perception)
         if transaction:
             self.registry.register("transaction", transaction)
 
