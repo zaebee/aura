@@ -88,4 +88,5 @@ def launch_interactive_node():
         stop_btn.click(controller.stop, outputs=[log_output])
         test_pulse_btn.click(controller.test_pulse, outputs=[log_output])
 
-    demo.launch(share=True, inline=False)
+    # Use prevent_thread_lock=True to allow the notebook to continue executing other cells
+    demo.launch(share=True, inline=False, prevent_thread_lock=True)
