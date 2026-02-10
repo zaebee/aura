@@ -4,7 +4,10 @@ import sys
 from pathlib import Path
 from typing import Any
 
+import structlog
 from hatchling.builders.hooks.plugin.interface import BuildHookInterface
+
+logger = structlog.get_logger(__name__)
 
 
 class CustomBuildHook(BuildHookInterface):
@@ -23,9 +26,7 @@ class CustomBuildHook(BuildHookInterface):
                 break
 
         if not proto_dir:
-            self.logger.warning(
-                "DNA Source (proto) not found in: %s", possible_proto_paths
-            )
+            logger.warning("DNA Source (proto) not found in: %s", possible_proto_paths)
             return
 
         out_dir = project_root / "src" / "aura_core" / "gen"
@@ -36,9 +37,7 @@ class CustomBuildHook(BuildHookInterface):
         try:
             import grpc_tools.protoc  # noqa
         except ImportError:
-            self.logger.error(
-                "Error: 'grpcio-tools' is missing in build-system.requires"
-            )
+            logger.error("Error: 'grpcio-tools' is missing in build-system.requires")
             return
 
         proto_file = proto_dir / "aura" / "dna" / "v1" / "dna.proto"
@@ -58,14 +57,14 @@ class CustomBuildHook(BuildHookInterface):
             )
 
             if result.returncode != 0:
-                self.logger.error("Protoc Error:\n%s", result.stderr)
+                logger.error("Protoc Error:\n%s", result.stderr)
                 raise RuntimeError(f"Protoc failed with status {result.returncode}")
 
             self._ensure_init_files(out_dir)
-            self.logger.info("DNA successfully expressed.")
+            logger.info("DNA successfully expressed.")
 
         except Exception as e:
-            self.logger.critical("Critical Transcription failure", exc_info=True)
+            logger.critical("Critical Transcription failure", exc_info=True)
             raise e
 
     def _ensure_init_files(self, base_path: Path) -> None:
