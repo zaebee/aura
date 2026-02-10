@@ -1,5 +1,6 @@
 import asyncio
 import logging
+import re
 import threading
 import uuid
 from collections import deque
@@ -40,6 +41,16 @@ class HiveLogHandler(logging.Handler):
         with self.lock:
             self.local_logs.append(log_entry + "\n")
 
+        # Extract thought metadata if present (Gemma 3 Thought Capture)
+        metadata = {}
+        if "<think>" in log_entry:
+            match = re.search(r"<think>(.*?)</think>", log_entry, re.DOTALL)
+            if match:
+                metadata["thought"] = match.group(1).strip()
+            elif "<think>" in log_entry and "</think>" not in log_entry:
+                # Handle partial/streamed thoughts if they appear line-by-line
+                metadata["thought_state"] = "started"
+
         # Create binary Event
         event = Event(
             event_id=str(uuid.uuid4()),
@@ -51,6 +62,7 @@ class HiveLogHandler(logging.Handler):
                 logger_name=record.name,
                 worker_name=self.worker_name,
             ),
+            metadata=metadata,
         )
 
         # Put in queue for NATS background task
@@ -88,6 +100,29 @@ class HiveLogHandler(logging.Handler):
     def clear(self):
         with self.lock:
             self.local_logs.clear()
+
+    async def send_test_event(self):
+        """Manually send a test event to NATS to verify the umbilical pulse."""
+        if not self.is_connected:
+            return False
+
+        event = Event(
+            event_id=str(uuid.uuid4()),
+            topic=f"aura.worker.{self.worker_name}.test",
+            timestamp=datetime.now(tz=UTC),
+            log=LogEvent(
+                level="INFO",
+                message="PULSE CHECK: NATS Telepathic Logger is active.",
+                logger_name="test_pulse",
+                worker_name=self.worker_name,
+            ),
+        )
+        try:
+            await self._nats_client.publish(event.topic, bytes(event))
+            return True
+        except Exception as e:
+            print(f"Failed to send test pulse: {e}")
+            return False
 
     async def start(self):
         """Initialize NATS connection and start background processing task."""
