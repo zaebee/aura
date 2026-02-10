@@ -1,9 +1,10 @@
-import pytest
-import asyncio
 from unittest.mock import AsyncMock, MagicMock
-from aura_core import HiveContext, NegotiationOffer, SystemVitals, IntentAction
-from hive.transformer.main import AuraTransformer
+
+import pytest
+from aura_core import HiveContext, NegotiationOffer, SystemVitals
 from aura_core.gen.aura.dna.v1 import ActionType
+from hive.transformer.main import AuraTransformer
+
 
 @pytest.mark.asyncio
 async def test_semantic_cache_hit():

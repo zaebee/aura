@@ -1,7 +1,7 @@
 import enum
 import uuid
 from datetime import UTC, datetime
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, cast
 
 from pgvector.sqlalchemy import Vector
 from sqlalchemy import (
@@ -15,14 +15,15 @@ from sqlalchemy import (
 
 if TYPE_CHECKING:
     pass
+import json
+
+import redis.asyncio as redis
 from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import (
     DeclarativeBase,
     Mapped,
     mapped_column,
 )
-import redis.asyncio as redis
-import json
 
 # DNA Rule: Proteins must not import global settings.
 # Models will be initialized during Skill.initialize()
@@ -103,4 +104,4 @@ class RedisCache:
     async def set(self, key: str, value: Any, ttl: int = 3600) -> bool:
         """Store a value in Redis as JSON with TTL."""
         data = json.dumps(value)
-        return await self.redis.set(key, data, ex=ttl)
+        return bool(await self.redis.set(key, data, ex=ttl))

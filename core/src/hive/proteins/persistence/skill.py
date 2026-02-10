@@ -3,6 +3,7 @@ import logging
 from datetime import UTC, datetime
 from typing import Any, cast
 
+import redis.asyncio as redis
 from aura_core import Observation, SkillProtocol
 from sqlalchemy import Engine, text
 from sqlalchemy.orm import Session, sessionmaker
@@ -17,7 +18,6 @@ from .engine import (
     RedisCache,
 )
 from .schema import DealSchema, ItemSchema
-import redis.asyncio as redis
 
 logger = logging.getLogger(__name__)
 
