@@ -121,7 +121,7 @@ class HiveLogHandler(logging.Handler):
             await self._nats_client.publish(event.topic, bytes(event))
             return True
         except Exception as e:
-            print(f"Failed to send test pulse: {e}")
+            logging.warning("Failed to send test pulse: %s", e)
             return False
 
     async def start(self):

@@ -1,3 +1,4 @@
+import os
 import shutil
 import subprocess  # nosec B404
 import threading
@@ -59,8 +60,6 @@ class AuraNode:
                 )
 
             # Enable debug logging for Ollama to ensure thought capture stability
-            import os
-
             env = os.environ.copy()
             env["OLLAMA_DEBUG"] = "1"
 
