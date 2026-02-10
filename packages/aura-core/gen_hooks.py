@@ -23,7 +23,9 @@ class CustomBuildHook(BuildHookInterface):
                 break
 
         if not proto_dir:
-            print(f"⚠️ DNA Source (proto) not found in: {possible_proto_paths}")
+            self.logger.warning(
+                "DNA Source (proto) not found in: %s", possible_proto_paths
+            )
             return
 
         out_dir = project_root / "src" / "aura_core" / "gen"
@@ -34,7 +36,9 @@ class CustomBuildHook(BuildHookInterface):
         try:
             import grpc_tools.protoc  # noqa
         except ImportError:
-            print("❌ Error: 'grpcio-tools' is missing in build-system.requires")
+            self.logger.error(
+                "Error: 'grpcio-tools' is missing in build-system.requires"
+            )
             return
 
         proto_file = proto_dir / "aura" / "dna" / "v1" / "dna.proto"
@@ -54,14 +58,14 @@ class CustomBuildHook(BuildHookInterface):
             )
 
             if result.returncode != 0:
-                print(f"❌ Protoc Error:\n{result.stderr}")
+                self.logger.error("Protoc Error:\n%s", result.stderr)
                 raise RuntimeError(f"Protoc failed with status {result.returncode}")
 
             self._ensure_init_files(out_dir)
-            print("✅ DNA successfully expressed.")
+            self.logger.info("DNA successfully expressed.")
 
         except Exception as e:
-            print(f"❌ Critical Transcription failure: {e}")
+            self.logger.critical("Critical Transcription failure", exc_info=True)
             raise e
 
     def _ensure_init_files(self, base_path: Path) -> None:
