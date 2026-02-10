@@ -114,7 +114,7 @@ class HiveLogHandler(logging.Handler):
         if self._processing_task:
             try:
                 await self._processing_task
-            except Exception:
+            except Exception:  # nosec B110
                 pass
             self._processing_task = None
 
