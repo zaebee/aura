@@ -21,28 +21,37 @@ class HiveLogHandler(logging.Handler):
         worker_name: str,
         nats_url: str = "nats://localhost:4222",
         max_logs: int = 1000,
-    ):
+        ui_queue: asyncio.Queue[str] | None = None,
+    ) -> None:
         super().__init__()
-        self.worker_name = worker_name
-        self.nats_url = nats_url
-        self.queue = asyncio.Queue(maxsize=10000)
-        self.loop = None
-        self._processing_task = None
-        self._nats_client = NATS()
+        self.worker_name: str = worker_name
+        self.nats_url: str = nats_url
+        self.queue: asyncio.Queue[Event | None] = asyncio.Queue(maxsize=10000)
+        self.ui_queue: asyncio.Queue[str] | None = ui_queue
+        self.loop: asyncio.AbstractEventLoop | None = None
+        self._processing_task: asyncio.Task[None] | None = None
+        self._nats_client: NATS = NATS()
 
-        # Keep internal deque for local Gradio UI compatibility
-        self.local_logs = deque(maxlen=max_logs)
-        self.lock = threading.Lock()
+        # Keep internal deque for local Gradio UI compatibility (Legacy/Fallback)
+        self.local_logs: deque[str] = deque(maxlen=max_logs)
+        self.lock: threading.Lock = threading.Lock()
 
-    def emit(self, record: logging.LogRecord):
-        log_entry = self.format(record)
+    def emit(self, record: logging.LogRecord) -> None:
+        log_entry: str = self.format(record)
 
         # Add to local deque for UI
         with self.lock:
             self.local_logs.append(log_entry + "\n")
 
+        # Put in UI queue if present
+        if self.ui_queue and self.loop and self.loop.is_running():
+            try:
+                self.loop.call_soon_threadsafe(self.ui_queue.put_nowait, log_entry + "\n")
+            except (asyncio.QueueFull, RuntimeError):
+                pass
+
         # Extract thought metadata if present (Gemma 3 Thought Capture)
-        metadata = {}
+        metadata: dict[str, str] = {}
         if "<think>" in log_entry:
             match = re.search(r"<think>(.*?)</think>", log_entry, re.DOTALL)
             if match:
@@ -52,7 +61,7 @@ class HiveLogHandler(logging.Handler):
                 metadata["thought_state"] = "started"
 
         # Create binary Event
-        event = Event(
+        event: Event = Event(
             event_id=str(uuid.uuid4()),
             topic=f"aura.worker.{self.worker_name}.logs",
             timestamp=datetime.fromtimestamp(record.created, tz=UTC),
@@ -72,17 +81,17 @@ class HiveLogHandler(logging.Handler):
             except (asyncio.QueueFull, RuntimeError):
                 pass  # Drop logs if queue is full or loop closing to avoid blocking
 
-    def write(self, data: str):
+    def write(self, data: str) -> None:
         """Captures redirected stdout (e.g. from Ollama) and logs it as INFO."""
         if not data:
             return
 
-        clean_data = data.strip()
+        clean_data: str = data.strip()
         if not clean_data:
             return
 
         # Create a dummy record for stdout
-        record = logging.LogRecord(
+        record: logging.LogRecord = logging.LogRecord(
             name="ollama",
             level=logging.INFO,
             pathname="node.py",
@@ -97,16 +106,16 @@ class HiveLogHandler(logging.Handler):
         with self.lock:
             return "".join(self.local_logs)
 
-    def clear(self):
+    def clear(self) -> None:
         with self.lock:
             self.local_logs.clear()
 
-    async def send_test_event(self):
+    async def send_test_event(self) -> bool:
         """Manually send a test event to NATS to verify the umbilical pulse."""
         if not self.is_connected:
             return False
 
-        event = Event(
+        event: Event = Event(
             event_id=str(uuid.uuid4()),
             topic=f"aura.worker.{self.worker_name}.test",
             timestamp=datetime.now(tz=UTC),
@@ -124,7 +133,7 @@ class HiveLogHandler(logging.Handler):
             logging.warning("Failed to send test pulse: %s", e)
             return False
 
-    async def start(self):
+    async def start(self) -> bool:
         """Initialize NATS connection and start background processing task."""
         self.loop = asyncio.get_running_loop()
         try:
@@ -141,7 +150,7 @@ class HiveLogHandler(logging.Handler):
             print("HiveLogHandler NATS connection pending.")
             return False
 
-    async def stop(self):
+    async def stop(self) -> None:
         """Gracefully stop the log handler, ensuring the queue is flushed."""
         if self.queue:
             await self.queue.put(None)
@@ -157,10 +166,10 @@ class HiveLogHandler(logging.Handler):
             await self._nats_client.drain()
             await self._nats_client.close()
 
-    async def _process_queue(self):
+    async def _process_queue(self) -> None:
         while True:
             try:
-                event = await self.queue.get()
+                event: Event | None = await self.queue.get()
                 if event is None:
                     self.queue.task_done()
                     break
