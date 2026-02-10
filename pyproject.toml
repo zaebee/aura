@@ -44,6 +44,7 @@ dependencies = [
     "pygithub>=2.8.1",
     "types-pyyaml>=6.0.12.20250915",
     "aura-core",
+    "aura-worker",
 ]
 
 [tool.uv.workspace]
@@ -51,6 +52,7 @@ members = ["packages/*", "core", "api-gateway", "synapses/*", "agents/*"]
 
 [tool.uv.sources]
 aura-core = { workspace = true }
+aura-worker = { workspace = true }
 aura-protein-solana = { path = "components/proteins/solana" }
 aura-protein-observability = { path = "components/proteins/observability" }
 

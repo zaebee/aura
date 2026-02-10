@@ -84,3 +84,5 @@ spec:
               value: "https://api.mainnet-beta.solana.com"
             - name: AURA_CRYPTO__SOLANA_USDC_MINT
               value: "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v"
+            - name: AURA_HEARTBEAT__INTERVAL_SECONDS
+              value: "1800"
