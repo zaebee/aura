@@ -22,6 +22,7 @@ services:
       dockerfile: core/Dockerfile
     restart: on-failure
     environment:
+      PYTHONPATH: /app/core/src:/app/core/gen-proto
       AURA_DATABASE__URL: postgresql://user:password@db:5432/aura_db
       AURA_DATABASE__REDIS_URL: redis://redis:6379/0
       AURA_LLM__API_KEY: ${MISTRAL_API_KEY}
@@ -61,6 +62,7 @@ services:
       dockerfile: api-gateway/Dockerfile
     restart: on-failure
     environment:
+      PYTHONPATH: /app/api-gateway/src:/app/api-gateway/gen-proto
       AURA_GATEWAY__CORE_SERVICE_HOST: core:50051
       AURA_GATEWAY__REDIS_URL: redis://redis:6379/0
       OTEL_SERVICE_NAME: "aura-gateway"
@@ -93,7 +95,7 @@ services:
       dockerfile: frontend/Dockerfile
     restart: on-failure
     environment:
-      NEXT_PUBLIC_API_GATEWAY_URL: http://api-gateway:8000/v1
+      VITE_API_GATEWAY_URL: http://api-gateway:8000/v1
     ports:
       - "3000:80"
     depends_on:
@@ -145,12 +147,10 @@ services:
       dockerfile: synapses/telegram-bot/Dockerfile
     restart: on-failure
     environment:
-      AURA_TELEGRAM__NATS_URL: ${NATS_URL}
+      PYTHONPATH: /app/synapses/telegram-bot/src:/app/synapses/telegram-bot/gen-proto
+      NATS_URL: ${NATS_URL}
       AURA_TELEGRAM__TOKEN: ${AURA_TG__TOKEN}
       AURA_TELEGRAM__CORE_URL: ${AURA_TG__CORE_URL}
-      AURA_DATABASE__REDIS_URL: redis://redis:6379/0
-      AURA_DATABASE__URL: postgresql://user:password@db:5432/aura_db
-      AURA_LLM__API_KEY: ${MISTRAL_API_KEY}
     depends_on:
       core:
         condition: service_healthy
