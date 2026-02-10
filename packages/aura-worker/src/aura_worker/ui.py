@@ -27,6 +27,7 @@ def launch_interactive_node():
     ENV_HIVE_HOST = os.getenv("AURA_WORKER__HIVE_HOST", "hub.zae.life")
     ENV_FRP_TOKEN = os.getenv("AURA_WORKER__FRP_TOKEN", "")
     ENV_PUNK_KEY = os.getenv("AURA_WORKER__PUNK_KEY", "")
+    ENV_NATS_URL = os.getenv("AURA_WORKER__NATS_URL", "nats://localhost:4222")
 
     state = WorkerState()
 
@@ -36,7 +37,7 @@ def launch_interactive_node():
             state.log_handler.write(message)
 
     async def start_node(
-        model, hive_host, frp_token, punk_key, frp_port, progress=None
+        model, hive_host, nats_url, frp_token, punk_key, frp_port, progress=None
     ):
         if progress is None:
             progress = gr.Progress()
@@ -62,8 +63,12 @@ def launch_interactive_node():
 
             # Initialize Log Protein and Metabolic Loop
             progress(0.8, desc="Synchronizing with Hive Bloodstream...")
-            state.log_handler = HiveLogHandler(worker_name=state.worker_id)
-            state.metabolism = MetabolicLoop(worker_name=state.worker_id)
+            state.log_handler = HiveLogHandler(
+                worker_name=state.worker_id, nats_url=nats_url
+            )
+            state.metabolism = MetabolicLoop(
+                worker_name=state.worker_id, nats_url=nats_url
+            )
 
             # Setup standard logging to capture all info/error calls
             root_logger = logging.getLogger()
@@ -106,6 +111,16 @@ def launch_interactive_node():
         state.node.is_running = False
         state.node.status = "Idle"
         return "Node Stopped"
+
+    async def test_pulse():
+        if not state.log_handler or not state.log_handler.is_connected:
+            return "❌ NATS not connected. Start the node first."
+
+        success = await state.log_handler.send_test_event()
+        if success:
+            return "✅ Pulse Sent! Check NATS bloodstream."
+        else:
+            return "❌ Failed to send pulse (check tunnel)."
 
     def refresh_ui():
         status = state.node.get_status()
@@ -152,6 +167,9 @@ def launch_interactive_node():
                     hive_host_input = gr.Textbox(
                         value=ENV_HIVE_HOST, label="HIVE_HOST (Anchor)"
                     )
+                    nats_url_input = gr.Textbox(
+                        value=ENV_NATS_URL, label="NATS_URL (Bloodstream)"
+                    )
                 with gr.Row():
                     frp_token_input = gr.Textbox(
                         value=ENV_FRP_TOKEN, label="FRP_TOKEN", type="password"
@@ -167,6 +185,7 @@ def launch_interactive_node():
         with gr.Row():
             start_btn = gr.Button("Start Node", variant="primary")
             stop_btn = gr.Button("Stop Node", variant="stop")
+            test_pulse_btn = gr.Button("Test Pulse", variant="secondary")
 
         log_output = gr.Textbox(
             lines=15, label="Agent Thinking / Logs", interactive=False
@@ -182,6 +201,7 @@ def launch_interactive_node():
             inputs=[
                 model_input,
                 hive_host_input,
+                nats_url_input,
                 frp_token_input,
                 punk_key_input,
                 frp_port_input,
@@ -189,5 +209,6 @@ def launch_interactive_node():
             outputs=[log_output],
         )
         stop_btn.click(stop_node, outputs=[log_output])
+        test_pulse_btn.click(test_pulse, outputs=[log_output])
 
     demo.launch(share=True, inline=False)

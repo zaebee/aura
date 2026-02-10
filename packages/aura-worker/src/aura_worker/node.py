@@ -1,3 +1,4 @@
+import os
 import shutil
 import subprocess  # nosec B404
 import threading
@@ -58,12 +59,17 @@ class AuraNode:
                     "SCREAM: Running on CPU mode! Performance will be severely limited."
                 )
 
+            # Enable debug logging for Ollama to ensure thought capture stability
+            env = os.environ.copy()
+            env["OLLAMA_DEBUG"] = "1"
+
             self.ollama_process = subprocess.Popen(
                 ["ollama", "serve"],  # nosec B603 B607
                 stdout=subprocess.PIPE,
                 stderr=subprocess.STDOUT,
                 text=True,
                 bufsize=1,
+                env=env,
             )
 
             threading.Thread(
