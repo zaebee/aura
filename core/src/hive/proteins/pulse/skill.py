@@ -1,11 +1,13 @@
+import uuid
 from typing import Any
 
-from aura_core import Observation, SkillProtocol
+from aura_core import SkillProtocol
+from aura_core.gen.aura.dna.v1 import Observation
 
 from config.server import ServerSettings
 
 from .engine import JetStreamProvider
-from .schema import EventParams, NegotiationEventParams
+from .schema import EventParams, NegotiationEventParams, VitalsEventParams
 
 
 class PulseSkill(
@@ -57,10 +59,12 @@ class PulseSkill(
 
     async def _emit_heartbeat(self, params: dict[str, Any]) -> Observation:
         assert self.provider is not None
+
+        p = VitalsEventParams.model_validate(params)
         success = await self.provider.publish_heartbeat(
-            service=params.get("service", "core"),
-            instance_id=params.get("instance_id"),
-            status=params.get("status", "ok"),
+            service=p.service,
+            instance_id=params.get("instance_id") or uuid.uuid4().hex[:8],
+            status=p.status,
             trace_id=params.get("trace_id"),
             span_id=params.get("span_id"),
         )
@@ -68,12 +72,12 @@ class PulseSkill(
 
     async def _emit_negotiation(self, params: dict[str, Any]) -> Observation:
         assert self.provider is not None
-        p = NegotiationEventParams(**params)
+        p = NegotiationEventParams.model_validate(params)
         success = await self.provider.publish_negotiation_event(
             session_token=p.session_token,
             action=p.action,
             price=p.price,
-            item_id=p.item_id,
+            identifier=p.identifier,
             agent_did=p.agent_did,
             trace_id=params.get("trace_id"),
             span_id=params.get("span_id"),
@@ -118,7 +122,7 @@ class PulseSkill(
     async def _emit_event(self, params: dict[str, Any]) -> Observation:
         assert self.provider is not None
         # Deprecated: fallback to raw JSON publish
-        event_params = EventParams(**params)
+        event_params = EventParams.model_validate(params)
         success = await self.provider.publish_raw(
             event_params.topic, event_params.payload
         )

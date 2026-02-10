@@ -10,7 +10,8 @@ from datetime import UTC, datetime
 import structlog
 
 from config import KeeperSettings
-from aura_core import Aggregator, BeeContext, find_hive_root, SystemVitals
+from aura_core import Aggregator, BeeContext, find_hive_root, SystemVitals, VitalsStatus
+from typing import cast
 
 logger = structlog.get_logger(__name__)
 
@@ -21,8 +22,8 @@ class BeeAggregator(Aggregator[Any, BeeContext]):
     async def get_vitals(self) -> SystemVitals:
         """Proprioception for the BeeKeeper."""
         return SystemVitals(
-            status="ok",
-            timestamp=datetime.now(UTC).isoformat(),
+            status=cast(VitalsStatus, VitalsStatus.VITALS_STATUS_OK),
+            timestamp=datetime.now(UTC),
         )
 
     def __init__(self, settings: KeeperSettings) -> None:

@@ -15,3 +15,16 @@ class PaymentProof(BaseModel):
     block_number: str
     from_address: str
     confirmed_at: datetime
+
+
+class EncryptSecretParams(BaseModel):
+    secret: str
+
+
+class DecryptSecretParams(BaseModel):
+    encrypted_secret: str
+
+
+class ConvertPriceParams(BaseModel):
+    usd_amount: float
+    currency: str | None = None

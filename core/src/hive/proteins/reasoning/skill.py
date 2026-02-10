@@ -1,6 +1,7 @@
 import asyncio
+import json
 import logging
-from typing import Any
+from typing import Any, cast
 
 import dspy
 from aura_core import Observation, SkillProtocol
@@ -8,7 +9,7 @@ from aura_core import Observation, SkillProtocol
 from config.llm import LLMSettings
 
 from .engine import generate_embedding, load_brain
-from .schema import EmbeddingParams, NegotiationParams, NegotiationResult
+from .schema import EmbeddingParams, NegotiationParams
 
 logger = logging.getLogger(__name__)
 
@@ -76,8 +77,6 @@ class ReasoningSkill(
         p_neg = NegotiationParams(**params)
 
         def call() -> dict[str, Any]:
-            from typing import cast
-
             neg = cast(Any, self.negotiator)
             return cast(
                 dict[str, Any],
@@ -96,7 +95,10 @@ class ReasoningSkill(
             "thought": result.get("thought", ""),
             "metadata": result.get("metadata", {}),
         }
-        return Observation(success=True, data=NegotiationResult(**data).model_dump())
+
+        return Observation(
+            success=True, metadata={"negotiation_result": json.dumps(data)}
+        )
 
     async def _generate_embedding(self, params: dict[str, Any]) -> Observation:
         if not self._embed_model:
@@ -104,4 +106,5 @@ class ReasoningSkill(
         p_emb = EmbeddingParams(**params)
 
         emb = await asyncio.to_thread(generate_embedding, p_emb.text, self._embed_model)
-        return Observation(success=True, data=emb)
+
+        return Observation(success=True, metadata={"embedding": json.dumps(emb)})

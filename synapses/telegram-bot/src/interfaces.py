@@ -1,6 +1,6 @@
 from typing import Protocol
 
-from aura_core import NegotiationResult, SearchResult
+from aura_core import Observation, SearchResult
 
 
 class NegotiationProvider(Protocol):
@@ -8,6 +8,6 @@ class NegotiationProvider(Protocol):
         """Search for items to negotiate."""
         ...
 
-    async def negotiate(self, item_id: str, bid: float) -> NegotiationResult:
+    async def negotiate(self, item_id: str, bid: float) -> Observation:
         """Submit a bid for an item."""
         ...

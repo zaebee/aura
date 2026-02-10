@@ -2,18 +2,19 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 from aiogram import types
-from interfaces import NegotiationProvider, NegotiationResult, SearchResult
+from aura_core import Observation
+from interfaces import NegotiationProvider, SearchResult
 
 
 class MockNegotiationProvider(NegotiationProvider):
     def __init__(self):
         self.search_results = []
-        self.negotiation_result = {}
+        self.negotiation_result = Observation()
 
     async def search(self, query: str, limit: int = 5) -> list[SearchResult]:
         return self.search_results
 
-    async def negotiate(self, item_id: str, bid: float) -> NegotiationResult:
+    async def negotiate(self, item_id: str, bid: float) -> Observation:
         return self.negotiation_result
 
 

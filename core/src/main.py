@@ -1,4 +1,5 @@
 import asyncio
+import json
 import uuid
 from concurrent import futures
 from typing import Any, cast
@@ -6,7 +7,8 @@ from typing import Any, cast
 import grpc
 import grpc.aio
 from aura.negotiation.v1 import negotiation_pb2, negotiation_pb2_grpc
-from grpc_health.v1 import health_pb2, health_pb2_grpc
+from aura_core.gen.aura.dna.v1 import Observation, VitalsStatus
+from grpc_health.v1 import health, health_pb2, health_pb2_grpc
 from hive.cortex import HiveCell
 from hive.metabolism import MetabolicLoop
 from hive.metabolism.logging_config import (
@@ -63,8 +65,41 @@ class NegotiationService(negotiation_pb2_grpc.NegotiationServiceServicer):
         bind_request_id(request_id)
 
         try:
-            observation = await self.metabolism.execute(request)
-            return observation.data  # type: ignore
+            observation = cast(Observation, await self.metabolism.execute(request))
+
+            # Map DNA Observation to gRPC NegotiateResponse
+            response = negotiation_pb2.NegotiateResponse()
+
+            if observation.negotiation:
+                neg = observation.negotiation
+                response.session_token = neg.session_token
+                response.valid_until_timestamp = neg.valid_until_timestamp
+
+                if neg.accepted:
+                    response.accepted.final_price = neg.accepted.final_price
+                    if neg.accepted.reservation_code:
+                        response.accepted.reservation_code = (
+                            neg.accepted.reservation_code
+                        )
+                    if neg.accepted.crypto_payment:
+                        cp = neg.accepted.crypto_payment
+                        response.accepted.crypto_payment.deal_id = cp.deal_id
+                        response.accepted.crypto_payment.wallet_address = (
+                            cp.wallet_address
+                        )
+                        response.accepted.crypto_payment.amount = cp.price
+                        response.accepted.crypto_payment.currency = cp.currency
+                        response.accepted.crypto_payment.memo = cp.memo
+                        response.accepted.crypto_payment.network = cp.network
+                        response.accepted.crypto_payment.expires_at = cp.expires_at
+                elif neg.countered:
+                    response.countered.proposed_price = neg.countered.proposed_price
+                    response.countered.reason_code = neg.countered.reason_code
+                    response.countered.human_message = neg.countered.human_message
+                elif neg.rejected:
+                    response.rejected.reason_code = neg.rejected.reason_code
+
+            return response
 
         except ValueError as e:
             logger.warning("invalid_argument", error=str(e))
@@ -117,10 +152,12 @@ class NegotiationService(negotiation_pb2_grpc.NegotiationServiceServicer):
                 context.set_details(f"Failed to generate embedding: {embed_obs.error}")
                 return negotiation_pb2.SearchResponse()
 
+            embedding = json.loads(embed_obs.metadata.get("embedding", "[]"))
+
             obs = await persistence.execute(
                 "vector_search",
                 {
-                    "query_vector": embed_obs.data,
+                    "query_vector": embedding,
                     "limit": request.limit or 5,
                     "min_similarity": request.min_similarity,
                 },
@@ -131,15 +168,18 @@ class NegotiationService(negotiation_pb2_grpc.NegotiationServiceServicer):
                 context.set_details(f"Search failed: {obs.error}")
                 return negotiation_pb2.SearchResponse()
 
+            results_json = obs.metadata.get("results_json", "[]")
+            items_data = json.loads(results_json)
+
             response_items = [
                 negotiation_pb2.SearchResultItem(
-                    item_id=item["id"],
+                    item_id=item["identifier"],
                     name=item["name"],
                     base_price=item["base_price"],
-                    similarity_score=item["similarity_score"],
+                    similarity_score=float(item["meta"].get("similarity_score", 0.0)),
                     description_snippet=str(item["meta"]),
                 )
-                for item in obs.data
+                for item in items_data
             ]
 
             return negotiation_pb2.SearchResponse(results=response_items)
@@ -162,11 +202,22 @@ class NegotiationService(negotiation_pb2_grpc.NegotiationServiceServicer):
 
         try:
             vitals = await self.metabolism.aggregator.get_vitals()
+            # Map VitalsStatus enum to string for gRPC response
+            status_str = "ok"
+            if vitals.status == VitalsStatus.VITALS_STATUS_OK:
+                status_str = "ok"
+            elif vitals.status == VitalsStatus.VITALS_STATUS_DEGRADED:
+                status_str = "degraded"
+            elif vitals.status == VitalsStatus.VITALS_STATUS_ERROR:
+                status_str = "error"
+
             return negotiation_pb2.GetSystemStatusResponse(
-                status=vitals.status,
+                status=status_str,
                 cpu_usage_percent=vitals.cpu_usage_percent,
                 memory_usage_mb=vitals.memory_usage_mb,
-                timestamp=vitals.timestamp,
+                timestamp=vitals.timestamp.isoformat()
+                if hasattr(vitals.timestamp, "isoformat")
+                else str(vitals.timestamp),
                 cached=vitals.cached,
             )
         except Exception as e:
@@ -217,8 +268,6 @@ class NegotiationService(negotiation_pb2_grpc.NegotiationServiceServicer):
 
 
 async def serve() -> None:
-    from grpc_health.v1 import health
-
     # 1. Initialize gRPC Server
     server = grpc.aio.server(
         futures.ThreadPoolExecutor(max_workers=settings.server.grpc_max_workers)
@@ -259,12 +308,11 @@ async def serve() -> None:
                 if not persistence:
                     continue
                 obs = await persistence.execute("get_first_item", {})
-                if obs.success and obs.data:
-                    item = obs.data
+                if obs.success and obs.item:
+                    item = obs.item
                     mock_signal = negotiation_pb2.NegotiateRequest(
-                        item_id=item["id"],
-                        bid_amount=item["base_price"]
-                        * settings.heartbeat.bid_multiplier,
+                        item_id=item.identifier,
+                        bid_amount=item.base_price * settings.heartbeat.bid_multiplier,
                         currency_code="USD",
                         agent=negotiation_pb2.AgentIdentity(
                             did=settings.heartbeat.agent_did,

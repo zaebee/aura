@@ -1,7 +1,8 @@
 import logging
 from typing import Any
 
-from aura_core import Observation, SkillProtocol
+from aura_core import SkillProtocol
+from aura_core.gen.aura.dna.v1 import Observation
 
 from config.server import ServerSettings
 
@@ -58,13 +59,13 @@ class TelemetrySkill(SkillProtocol[ServerSettings, Any, dict[str, Any], Observat
 
     async def _fetch_metrics(self, params: dict[str, Any]) -> Observation:
         vitals = await fetch_vitals(self._metrics_cache, self.settings)
-        return Observation(success=True, data=vitals.model_dump())
+        return Observation(success=True, vitals=vitals)
 
     async def _health_check(self, params: dict[str, Any]) -> Observation:
-        return Observation(success=True, data={"status": "healthy"})
+        return Observation(success=True, metadata={"status": "healthy"})
 
     async def _increment_counter(self, params: dict[str, Any]) -> Observation:
-        p = MetricIncrementParams(**params)
+        p = MetricIncrementParams.model_validate(params)
         if p.name == "negotiation_total":
             negotiation_total.labels(**p.labels).inc()
         elif p.name == "negotiation_accepted_total":

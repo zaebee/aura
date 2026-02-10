@@ -24,11 +24,11 @@ class MCPTranslator:
                 signal_type=cast(SignalType, SignalType.SIGNAL_TYPE_NEGOTIATION),
                 timestamp=datetime.now(UTC),
                 negotiation=NegotiationSignal(
-                    item_id=kwargs.get("item_id", ""),
-                    bid_amount=kwargs.get("bid", 0.0),
+                    identifier=kwargs.get("item_id", ""),
+                    price=kwargs.get("bid", 0.0),
                     agent=AgentIdentity(
                         did=kwargs.get("agent_did", "mcp-agent"),
-                        reputation_score=1.0,
+                        reputation=1.0,
                     ),
                 ),
             )
@@ -59,23 +59,19 @@ class MCPTranslator:
         if not observation.success:
             return f"❌ Operation failed: {observation.error or 'Unknown error'}"
 
-        if not observation.data:
+        if not observation.negotiation:
             return "✅ Operation completed but returned no data."
 
-        response = observation.data
-        # The data is a negotiation_pb2.NegotiateResponse protobuf object
-        status = response.WhichOneof("result")
+        response = observation.negotiation
 
-        if status == "accepted":
+        if response.accepted:
             final_price = response.accepted.final_price
             return f"🎉 SUCCESS! Negotiation accepted at ${final_price:.2f}."
-        elif status == "countered":
+        elif response.countered:
             proposed_price = response.countered.proposed_price
             message = response.countered.human_message or "No reason provided."
             return f"🔄 COUNTER-OFFER: ${proposed_price:.2f}. Message: {message}"
-        elif status == "rejected":
+        elif response.rejected:
             return f"🚫 REJECTED. Reason: {response.rejected.reason_code}"
-        elif status == "ui_required":
-            return f"🚨 HUMAN INTERVENTION REQUIRED. Template: {response.ui_required.template_id}"
 
-        return f"✅ Operation completed with unknown status: {status}"
+        return "✅ Operation completed with unknown status."

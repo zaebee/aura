@@ -28,9 +28,9 @@ class TestRuleBasedStrategy:
 
         # Should counter with floor price
         assert response.action == ActionType.ACTION_TYPE_COUNTER
-        assert response.price == mock_item.floor_price
+        assert response.negotiation.price == mock_item.floor_price
         assert response.metadata["reason_code"] == "BELOW_FLOOR"
-        assert "150" in response.message
+        assert "150" in response.negotiation.message
 
     def test_bid_above_trigger_price_should_ui_request(self, mock_item):
         """Test case: Bid > Trigger Price (Should UI Request).
@@ -54,7 +54,7 @@ class TestRuleBasedStrategy:
         # Should require UI confirmation
         assert response.action == ActionType.ACTION_TYPE_UI_REQUIRED
         assert response.metadata["template_id"] == "high_value_confirm"
-        assert "1500" in response.message
+        assert "1500" in response.negotiation.message
 
     def test_bid_at_floor_price_should_accept(self, mock_item):
         """Test that bid exactly at floor price is accepted."""
@@ -71,7 +71,7 @@ class TestRuleBasedStrategy:
         )
 
         assert response.action == ActionType.ACTION_TYPE_ACCEPT
-        assert response.price == 150.0
+        assert response.negotiation.price == 150.0
         assert response.metadata["reservation_code"].startswith("RULE-")
 
     def test_bid_between_floor_and_base_should_accept(self, mock_item):
@@ -89,7 +89,7 @@ class TestRuleBasedStrategy:
         )
 
         assert response.action == ActionType.ACTION_TYPE_ACCEPT
-        assert response.price == 175.0
+        assert response.negotiation.price == 175.0
 
     def test_bid_above_base_price_should_accept(self, mock_item):
         """Test that bid above base price is accepted."""
@@ -106,7 +106,7 @@ class TestRuleBasedStrategy:
         )
 
         assert response.action == ActionType.ACTION_TYPE_ACCEPT
-        assert response.price == 250.0
+        assert response.negotiation.price == 250.0
 
     def test_item_not_found_should_reject(self):
         """Test that non-existent item returns rejection."""
@@ -154,7 +154,7 @@ class TestRuleBasedStrategy:
         )
 
         assert response.action == ActionType.ACTION_TYPE_ACCEPT
-        assert response.price == 999.0
+        assert response.negotiation.price == 999.0
 
     def test_bid_exactly_at_trigger_should_accept(self, mock_item):
         """Test that bid exactly at trigger price is accepted (not > trigger)."""
@@ -172,4 +172,4 @@ class TestRuleBasedStrategy:
 
         # Should accept because condition is bid > trigger_price, not >=
         assert response.action == ActionType.ACTION_TYPE_ACCEPT
-        assert response.price == 1000.0
+        assert response.negotiation.price == 1000.0

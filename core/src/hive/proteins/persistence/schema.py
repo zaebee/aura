@@ -23,7 +23,7 @@ class DealSchema(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
     id: Any
-    item_id: str
+    identifier: str
     item_name: str
     final_price: float
     currency: str
@@ -33,3 +33,27 @@ class DealSchema(BaseModel):
     expires_at: datetime
     transaction_hash: str | None = None
     paid_at: datetime | None = None
+
+
+class ReadItemParams(BaseModel):
+    identifier: str | None = None
+    item_id: str | None = None
+
+
+class CreateDealParams(BaseModel):
+    id: Any
+    identifier: str | None = None
+    item_id: str | None = None
+    item_name: str
+    final_price: float
+    currency: str
+    payment_memo: str
+    secret_content: bytes
+    buyer_did: str | None = None
+    expires_at: datetime
+
+
+class VectorSearchParams(BaseModel):
+    query_vector: list[float]
+    limit: int = 5
+    min_similarity: float | None = None

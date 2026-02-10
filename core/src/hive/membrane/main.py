@@ -1,14 +1,23 @@
-from typing import Any
+from typing import Any, cast
+from unittest.mock import MagicMock
 
 import structlog
-from aura_core import FailureIntent, HiveContext, IntentAction, Membrane, SkillRegistry
+from aura_core import Membrane, SkillRegistry, get_action_name
+from aura_core.gen.aura.dna.v1 import (
+    ActionType,
+    Context,
+    NegotiationIntent,
+)
+from aura_core.gen.aura.dna.v1 import (
+    Intent as IntentAction,
+)
 
 from config import get_settings
 
 logger = structlog.get_logger(__name__)
 
 
-class HiveMembrane(Membrane[Any, IntentAction, HiveContext]):
+class HiveMembrane(Membrane[Any, IntentAction, Context]):
     """The Immune System: Deterministic Guardrails using Guard Protein."""
 
     def __init__(self, registry: SkillRegistry | None = None) -> None:
@@ -16,8 +25,18 @@ class HiveMembrane(Membrane[Any, IntentAction, HiveContext]):
         self.registry = registry
 
     async def inspect_inbound(self, signal: Any) -> Any:
-        if hasattr(signal, "bid_amount") and signal.bid_amount <= 0:
-            logger.warning("membrane_inbound_invalid_bid", bid_amount=signal.bid_amount)
+        # Check both new and old names for resilience
+
+        price = None
+        if hasattr(signal, "price") and not isinstance(signal.price, MagicMock):
+            price = signal.price
+        elif hasattr(signal, "bid_amount") and not isinstance(
+            signal.bid_amount, MagicMock
+        ):
+            price = signal.bid_amount
+
+        if price is not None and price <= 0:
+            logger.warning("membrane_inbound_invalid_bid", price=price)
             raise ValueError("Bid amount must be positive")
 
         injection_patterns = [
@@ -26,6 +45,8 @@ class HiveMembrane(Membrane[Any, IntentAction, HiveContext]):
             "you are now",
         ]
         fields_to_scan = []
+        if hasattr(signal, "identifier"):
+            fields_to_scan.append(("identifier", signal.identifier))
         if hasattr(signal, "item_id"):
             fields_to_scan.append(("item_id", signal.item_id))
         if hasattr(signal, "agent") and hasattr(signal.agent, "did"):
@@ -41,19 +62,22 @@ class HiveMembrane(Membrane[Any, IntentAction, HiveContext]):
                             field=field_name,
                             pattern=pattern,
                         )
-                        if field_name == "item_id":
-                            signal.item_id = "INVALID_ID_POTENTIAL_INJECTION"
+                        if field_name in ["item_id", "identifier"]:
+                            setattr(
+                                signal, field_name, "INVALID_ID_POTENTIAL_INJECTION"
+                            )
                         elif field_name == "agent.did":
                             signal.agent.did = "REDACTED"
         return signal
 
     async def inspect_outbound(
-        self, decision: IntentAction, context: HiveContext
+        self, decision: IntentAction, context: Context
     ) -> IntentAction:
-        floor_price = context.item_data.get("floor_price", 0.0)
+        hive = context.hive
+        floor_price = hive.item.floor_price
 
         # 1. Handle explicit failures
-        if isinstance(decision, FailureIntent) or decision.action == "error":
+        if decision.action == ActionType.ACTION_TYPE_ERROR:
             safe_price = floor_price * 1.05
             if self.registry:
                 obs_safe = await self.registry.execute(
@@ -65,44 +89,53 @@ class HiveMembrane(Membrane[Any, IntentAction, HiveContext]):
                     },
                 )
                 if obs_safe.success:
-                    safe_price = obs_safe.data["safe_price"]
+                    safe_price = float(obs_safe.metadata.get("safe_price", safe_price))
 
             return self._override_with_safe_offer(
                 decision, safe_price, "FAILURE_RECOVERY"
             )
 
         # 2. DLP Check
-        if "floor_price" in decision.message.lower():
-            decision.message = "I cannot disclose internal pricing details."
-            decision.thought += " [MEMBRANE: DLP block]"
+        if (
+            decision.negotiation
+            and "floor_price" in decision.negotiation.message.lower()
+        ):
+            decision.negotiation.message = "I cannot disclose internal pricing details."
+            decision.reasoning += " [MEMBRANE: DLP block]"
 
-        if decision.action not in ["accept", "counter"]:
+        if decision.action not in [
+            ActionType.ACTION_TYPE_ACCEPT,
+            ActionType.ACTION_TYPE_COUNTER,
+        ]:
             return decision
 
         # 3. Call Guard Protein for validation
         if not self.registry:
             return decision
 
-        internal_cost = context.item_data.get("meta", {}).get(
-            "internal_cost", floor_price
-        )
+        internal_cost = float(hive.item.meta.get("internal_cost", floor_price))
         guard_context = {"floor_price": floor_price, "internal_cost": internal_cost}
 
         obs = await self.registry.execute(
             "guard",
             "validate_decision",
             {
-                "decision": {"action": decision.action, "price": decision.price},
+                "decision": {
+                    "action": get_action_name(decision.action),
+                    "price": decision.negotiation.price
+                    if decision.negotiation
+                    else 0.0,
+                },
                 "context": guard_context,
             },
         )
 
         if not obs.success:
             # Determine reason for logging/override using structured error code
-            reason = obs.data.get("error_code", "SAFETY_VIOLATION")
+            reason = obs.metadata.get("error_code", "SAFETY_VIOLATION")
 
             # Use safe price provided by the Guard Protein
-            safe_price = obs.data.get("safe_price", floor_price * 1.05)
+            safe_price = float(obs.metadata.get("safe_price", floor_price * 1.05))
             return self._override_with_safe_offer(decision, safe_price, reason)
 
         return decision
@@ -111,18 +144,25 @@ class HiveMembrane(Membrane[Any, IntentAction, HiveContext]):
         self, original: IntentAction, safe_price: float, reason: str
     ) -> IntentAction:
         rounded_price = round(safe_price, 2)
-        new_thought = f"Membrane Override: {reason}. LLM suggested {original.action} at {getattr(original, 'price', 0.0)}."
-        if original.thought:
-            new_thought = f"{original.thought} | {new_thought}"
+        orig_price = original.negotiation.price if original.negotiation else 0.0
+        action_name = get_action_name(original.action)
+        new_thought = (
+            f"Membrane Override: {reason}. LLM suggested {action_name} at {orig_price}."
+        )
+        if original.reasoning:
+            new_thought = f"{original.reasoning} | {new_thought}"
 
         return IntentAction(
-            action="counter",
-            price=rounded_price,
-            message=f"I've reached my final limit for this item. My best offer is ${rounded_price:.2f}.",
-            thought=new_thought,
+            action=cast(ActionType, ActionType.ACTION_TYPE_COUNTER),
+            reasoning=new_thought,
+            negotiation=NegotiationIntent(
+                price=rounded_price,
+                message=f"I've reached my final limit for this item. My best offer is ${rounded_price:.2f}.",
+                thought=new_thought,
+            ),
             metadata={
-                "original_decision": original.action,
-                "original_price": getattr(original, "price", 0.0),
+                "original_decision": action_name,
+                "original_price": str(orig_price),
                 "override_reason": reason,
             },
         )

@@ -19,7 +19,7 @@ import type { Message } from "@bufbuild/protobuf";
  * Describes the file aura/dna/v1/dna.proto.
  */
 export const file_aura_dna_v1_dna: GenFile = /*@__PURE__*/
-  fileDesc("ChVhdXJhL2RuYS92MS9kbmEucHJvdG8SC2F1cmEuZG5hLnYxIlsKDFRyYWNlQ29udGV4dBIQCgh0cmFjZV9pZBgBIAEoCRIPCgdzcGFuX2lkGAIgASgJEhMKC3RyYWNlX2ZsYWdzGAMgASgJEhMKC3RyYWNlX3N0YXRlGAQgASgJItkDCgZTaWduYWwSEQoJc2lnbmFsX2lkGAEgASgJEiwKC3NpZ25hbF90eXBlGAIgASgOMhcuYXVyYS5kbmEudjEuU2lnbmFsVHlwZRItCgl0aW1lc3RhbXAYAyABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wEjMKCG1ldGFkYXRhGAQgAygLMiEuYXVyYS5kbmEudjEuU2lnbmFsLk1ldGFkYXRhRW50cnkSKAoFdHJhY2UYBSABKAsyGS5hdXJhLmRuYS52MS5UcmFjZUNvbnRleHQSNQoLbmVnb3RpYXRpb24YCiABKAsyHi5hdXJhLmRuYS52MS5OZWdvdGlhdGlvblNpZ25hbEgAEikKBWF1ZGl0GAsgASgLMhguYXVyYS5kbmEudjEuQXVkaXRTaWduYWxIABIvCgh0ZWxlZ3JhbRgMIAEoCzIbLmF1cmEuZG5hLnYxLlRlbGVncmFtU2lnbmFsSAASMQoJaGVhcnRiZWF0GA0gASgLMhwuYXVyYS5kbmEudjEuSGVhcnRiZWF0U2lnbmFsSAAaLwoNTWV0YWRhdGFFbnRyeRILCgNrZXkYASABKAkSDQoFdmFsdWUYAiABKAk6AjgBQgkKB3BheWxvYWQiegoRTmVnb3RpYXRpb25TaWduYWwSDwoHaXRlbV9pZBgBIAEoCRISCgpiaWRfYW1vdW50GAIgASgBEhUKDWN1cnJlbmN5X2NvZGUYAyABKAkSKQoFYWdlbnQYBCABKAsyGi5hdXJhLmRuYS52MS5BZ2VudElkZW50aXR5IjYKDUFnZW50SWRlbnRpdHkSCwoDZGlkGAEgASgJEhgKEHJlcHV0YXRpb25fc2NvcmUYAiABKAIiXgoLQXVkaXRTaWduYWwSEQoJcmVwb19uYW1lGAEgASgJEhAKCGdpdF9kaWZmGAIgASgJEhYKDmZpbGVzeXN0ZW1fbWFwGAMgAygJEhIKCmV2ZW50X25hbWUYBCABKAkiXwoOVGVsZWdyYW1TaWduYWwSDwoHdXNlcl9pZBgBIAEoAxIPCgdjaGF0X2lkGAIgASgDEhQKDG1lc3NhZ2VfdGV4dBgDIAEoCRIVCg1jYWxsYmFja19kYXRhGAQgASgJIjwKD0hlYXJ0YmVhdFNpZ25hbBIUCgxzZXJ2aWNlX25hbWUYASABKAkSEwoLaW5zdGFuY2VfaWQYAiABKAkiqAMKB0NvbnRleHQSEgoKY29udGV4dF9pZBgBIAEoCRIuCgxjb250ZXh0X3R5cGUYAiABKA4yGC5hdXJhLmRuYS52MS5Db250ZXh0VHlwZRIwCg1zeXN0ZW1faGVhbHRoGAMgASgLMhkuYXVyYS5kbmEudjEuU3lzdGVtVml0YWxzEjQKCG1ldGFkYXRhGAQgAygLMiIuYXVyYS5kbmEudjEuQ29udGV4dC5NZXRhZGF0YUVudHJ5EigKBXRyYWNlGAUgASgLMhkuYXVyYS5kbmEudjEuVHJhY2VDb250ZXh0EiwKBGhpdmUYCiABKAsyHC5hdXJhLmRuYS52MS5IaXZlQ29udGV4dERhdGFIABIqCgNiZWUYCyABKAsyGy5hdXJhLmRuYS52MS5CZWVDb250ZXh0RGF0YUgAEjQKCHRlbGVncmFtGAwgASgLMiAuYXVyYS5kbmEudjEuVGVsZWdyYW1Db250ZXh0RGF0YUgAGi8KDU1ldGFkYXRhRW50cnkSCwoDa2V5GAEgASgJEg0KBXZhbHVlGAIgASgJOgI4AUIGCgRkYXRhIokBCg9IaXZlQ29udGV4dERhdGESDwoHaXRlbV9pZBgBIAEoCRIsCgVvZmZlchgCIAEoCzIdLmF1cmEuZG5hLnYxLk5lZ290aWF0aW9uT2ZmZXISIwoEaXRlbRgDIAEoCzIVLmF1cmEuZG5hLnYxLkl0ZW1EYXRhEhIKCnJlcXVlc3RfaWQYBCABKAkiTQoQTmVnb3RpYXRpb25PZmZlchISCgpiaWRfYW1vdW50GAEgASgBEhIKCnJlcHV0YXRpb24YAiABKAISEQoJYWdlbnRfZGlkGAMgASgJIqkBCghJdGVtRGF0YRIKCgJpZBgBIAEoCRIMCgRuYW1lGAIgASgJEhIKCmJhc2VfcHJpY2UYAyABKAESEwoLZmxvb3JfcHJpY2UYBCABKAESLQoEbWV0YRgFIAMoCzIfLmF1cmEuZG5hLnYxLkl0ZW1EYXRhLk1ldGFFbnRyeRorCglNZXRhRW50cnkSCwoDa2V5GAEgASgJEg0KBXZhbHVlGAIgASgJOgI4ASLFAQoOQmVlQ29udGV4dERhdGESEQoJcmVwb19uYW1lGAEgASgJEhAKCGdpdF9kaWZmGAIgASgJEhYKDmZpbGVzeXN0ZW1fbWFwGAMgAygJEkIKDGhpdmVfbWV0cmljcxgEIAMoCzIsLmF1cmEuZG5hLnYxLkJlZUNvbnRleHREYXRhLkhpdmVNZXRyaWNzRW50cnkaMgoQSGl2ZU1ldHJpY3NFbnRyeRILCgNrZXkYASABKAkSDQoFdmFsdWUYAiABKAE6AjgBImAKE1RlbGVncmFtQ29udGV4dERhdGESDwoHdXNlcl9pZBgBIAEoAxIPCgdjaGF0X2lkGAIgASgDEhQKDG1lc3NhZ2VfdGV4dBgDIAEoCRIRCglmc21fc3RhdGUYBCABKAkioAMKBkludGVudBIRCglpbnRlbnRfaWQYASABKAkSJwoGYWN0aW9uGAIgASgOMhcuYXVyYS5kbmEudjEuQWN0aW9uVHlwZRIRCglyZWFzb25pbmcYAyABKAkSJgoFc3RlcHMYBCADKAsyFy5hdXJhLmRuYS52MS5JbnRlbnRTdGVwEjMKCG1ldGFkYXRhGAUgAygLMiEuYXVyYS5kbmEudjEuSW50ZW50Lk1ldGFkYXRhRW50cnkSKAoFdHJhY2UYBiABKAsyGS5hdXJhLmRuYS52MS5UcmFjZUNvbnRleHQSNQoLbmVnb3RpYXRpb24YCiABKAsyHi5hdXJhLmRuYS52MS5OZWdvdGlhdGlvbkludGVudEgAEikKBWF1ZGl0GAsgASgLMhguYXVyYS5kbmEudjEuQXVkaXRJbnRlbnRIABIjCgJ1aRgMIAEoCzIVLmF1cmEuZG5hLnYxLlVJSW50ZW50SAAaLwoNTWV0YWRhdGFFbnRyeRILCgNrZXkYASABKAkSDQoFdmFsdWUYAiABKAk6AjgBQggKBnBhcmFtcyJEChFOZWdvdGlhdGlvbkludGVudBINCgVwcmljZRgBIAEoARIPCgdtZXNzYWdlGAIgASgJEg8KB3Rob3VnaHQYAyABKAkiQwoLQXVkaXRJbnRlbnQSDwoHaXNfcHVyZRgBIAEoCBIQCghoZXJlc2llcxgCIAMoCRIRCgluYXJyYXRpdmUYAyABKAkiQQoIVUlJbnRlbnQSEwoLdGVtcGxhdGVfaWQYASABKAkSDAoEdGV4dBgCIAEoCRISCgpwYXJzZV9tb2RlGAMgASgJIlEKCkludGVudFN0ZXASDQoFc2tpbGwYASABKAkSDgoGaW50ZW50GAIgASgJEiQKBnBhcmFtcxgDIAEoCzIULmdvb2dsZS5wcm90b2J1Zi5BbnkilAMKC09ic2VydmF0aW9uEg8KB3N1Y2Nlc3MYASABKAgSEgoKbWVzc2FnZV9pZBgCIAEoAxINCgVlcnJvchgDIAEoCRISCgpldmVudF90eXBlGAQgASgJEjgKCG1ldGFkYXRhGAUgAygLMiYuYXVyYS5kbmEudjEuT2JzZXJ2YXRpb24uTWV0YWRhdGFFbnRyeRIoCgV0cmFjZRgGIAEoCzIZLmF1cmEuZG5hLnYxLlRyYWNlQ29udGV4dBI6CgtuZWdvdGlhdGlvbhgKIAEoCzIjLmF1cmEuZG5hLnYxLk5lZ290aWF0aW9uT2JzZXJ2YXRpb25IABIuCgVhdWRpdBgLIAEoCzIdLmF1cmEuZG5hLnYxLkF1ZGl0T2JzZXJ2YXRpb25IABI0Cgh0ZWxlZ3JhbRgMIAEoCzIgLmF1cmEuZG5hLnYxLlRlbGVncmFtT2JzZXJ2YXRpb25IABovCg1NZXRhZGF0YUVudHJ5EgsKA2tleRgBIAEoCRINCgV2YWx1ZRgCIAEoCToCOAFCBgoEZGF0YSLqAQoWTmVnb3RpYXRpb25PYnNlcnZhdGlvbhIVCg1zZXNzaW9uX3Rva2VuGAEgASgJEh0KFXZhbGlkX3VudGlsX3RpbWVzdGFtcBgCIAEoAxIuCghhY2NlcHRlZBgDIAEoCzIaLmF1cmEuZG5hLnYxLk9mZmVyQWNjZXB0ZWRIABIwCgljb3VudGVyZWQYBCABKAsyGy5hdXJhLmRuYS52MS5PZmZlckNvdW50ZXJlZEgAEi4KCHJlamVjdGVkGAUgASgLMhouYXVyYS5kbmEudjEuT2ZmZXJSZWplY3RlZEgAQggKBnJlc3VsdCJ+Cg1PZmZlckFjY2VwdGVkEhMKC2ZpbmFsX3ByaWNlGAEgASgBEhgKEHJlc2VydmF0aW9uX2NvZGUYAiABKAkSPgoOY3J5cHRvX3BheW1lbnQYAyABKAsyJi5hdXJhLmRuYS52MS5DcnlwdG9QYXltZW50SW5zdHJ1Y3Rpb25zIlQKDk9mZmVyQ291bnRlcmVkEhYKDnByb3Bvc2VkX3ByaWNlGAEgASgBEhMKC3JlYXNvbl9jb2RlGAIgASgJEhUKDWh1bWFuX21lc3NhZ2UYAyABKAkiJAoNT2ZmZXJSZWplY3RlZBITCgtyZWFzb25fY29kZRgBIAEoCSKZAQoZQ3J5cHRvUGF5bWVudEluc3RydWN0aW9ucxIPCgdkZWFsX2lkGAEgASgJEhYKDndhbGxldF9hZGRyZXNzGAIgASgJEg4KBmFtb3VudBgDIAEoARIQCghjdXJyZW5jeRgEIAEoCRIMCgRtZW1vGAUgASgJEg8KB25ldHdvcmsYBiABKAkSEgoKZXhwaXJlc19hdBgHIAEoAyKIAQoQQXVkaXRPYnNlcnZhdGlvbhIPCgdpc19wdXJlGAEgASgIEhAKCGhlcmVzaWVzGAIgAygJEhEKCW5hcnJhdGl2ZRgDIAEoCRIRCglyZWFzb25pbmcYBCABKAkSFgoOZXhlY3V0aW9uX3RpbWUYBSABKAESEwoLdG9rZW5fdXNhZ2UYBiABKAUiPAoTVGVsZWdyYW1PYnNlcnZhdGlvbhISCgptZXNzYWdlX2lkGAEgASgDEhEKCWRlbGl2ZXJlZBgCIAEoCCLZAwoFRXZlbnQSEAoIZXZlbnRfaWQYASABKAkSDQoFdG9waWMYAiABKAkSLQoJdGltZXN0YW1wGAMgASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcBIyCghtZXRhZGF0YRgEIAMoCzIgLmF1cmEuZG5hLnYxLkV2ZW50Lk1ldGFkYXRhRW50cnkSKAoFdHJhY2UYBSABKAsyGS5hdXJhLmRuYS52MS5UcmFjZUNvbnRleHQSNAoLbmVnb3RpYXRpb24YCiABKAsyHS5hdXJhLmRuYS52MS5OZWdvdGlhdGlvbkV2ZW50SAASKgoGdml0YWxzGAsgASgLMhguYXVyYS5kbmEudjEuVml0YWxzRXZlbnRIABIoCgVhbGVydBgMIAEoCzIXLmF1cmEuZG5hLnYxLkFsZXJ0RXZlbnRIABIwCgloZWFydGJlYXQYDSABKAsyGy5hdXJhLmRuYS52MS5IZWFydGJlYXRFdmVudEgAEigKBWF1ZGl0GA4gASgLMhcuYXVyYS5kbmEudjEuQXVkaXRFdmVudEgAGi8KDU1ldGFkYXRhRW50cnkSCwoDa2V5GAEgASgJEg0KBXZhbHVlGAIgASgJOgI4AUIJCgdwYXlsb2FkIoUBChBOZWdvdGlhdGlvbkV2ZW50EhUKDXNlc3Npb25fdG9rZW4YASABKAkSJwoGYWN0aW9uGAIgASgOMhcuYXVyYS5kbmEudjEuQWN0aW9uVHlwZRINCgVwcmljZRgDIAEoARIPCgdpdGVtX2lkGAQgASgJEhEKCWFnZW50X2RpZBgFIAEoCSJ9CgtWaXRhbHNFdmVudBIPCgdzZXJ2aWNlGAEgASgJEikKBnN0YXR1cxgCIAEoDjIZLmF1cmEuZG5hLnYxLlZpdGFsc1N0YXR1cxIZChFjcHVfdXNhZ2VfcGVyY2VudBgDIAEoARIXCg9tZW1vcnlfdXNhZ2VfbWIYBCABKAEiWwoKQWxlcnRFdmVudBIsCghzZXZlcml0eRgBIAEoDjIaLmF1cmEuZG5hLnYxLkFsZXJ0U2V2ZXJpdHkSDwoHbWVzc2FnZRgCIAEoCRIOCgZzb3VyY2UYAyABKAkiYQoOSGVhcnRiZWF0RXZlbnQSDwoHc2VydmljZRgBIAEoCRITCgtpbnN0YW5jZV9pZBgCIAEoCRIpCgZzdGF0dXMYAyABKA4yGS5hdXJhLmRuYS52MS5WaXRhbHNTdGF0dXMiZAoKQXVkaXRFdmVudBIRCglyZXBvX25hbWUYASABKAkSDwoHaXNfcHVyZRgCIAEoCBIQCghoZXJlc2llcxgDIAMoCRIgChhuZWdvdGlhdGlvbl9zdWNjZXNzX3JhdGUYBCABKAEizQEKDFN5c3RlbVZpdGFscxIpCgZzdGF0dXMYASABKA4yGS5hdXJhLmRuYS52MS5WaXRhbHNTdGF0dXMSGQoRY3B1X3VzYWdlX3BlcmNlbnQYAiABKAESFwoPbWVtb3J5X3VzYWdlX21iGAMgASgBEi0KCXRpbWVzdGFtcBgEIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXASDgoGY2FjaGVkGAUgASgIEhAKCHdhcm5pbmdzGAYgAygJEg0KBWVycm9yGAcgASgJKpIBCgpTaWduYWxUeXBlEhsKF1NJR05BTF9UWVBFX1VOU1BFQ0lGSUVEEAASGwoXU0lHTkFMX1RZUEVfTkVHT1RJQVRJT04QARIVChFTSUdOQUxfVFlQRV9BVURJVBACEhgKFFNJR05BTF9UWVBFX1RFTEVHUkFNEAMSGQoVU0lHTkFMX1RZUEVfSEVBUlRCRUFUEAQqcwoLQ29udGV4dFR5cGUSHAoYQ09OVEVYVF9UWVBFX1VOU1BFQ0lGSUVEEAASFQoRQ09OVEVYVF9UWVBFX0hJVkUQARIUChBDT05URVhUX1RZUEVfQkVFEAISGQoVQ09OVEVYVF9UWVBFX1RFTEVHUkFNEAMqvQEKCkFjdGlvblR5cGUSGwoXQUNUSU9OX1RZUEVfVU5TUEVDSUZJRUQQABIWChJBQ1RJT05fVFlQRV9BQ0NFUFQQARIXChNBQ1RJT05fVFlQRV9DT1VOVEVSEAISFgoSQUNUSU9OX1RZUEVfUkVKRUNUEAMSFQoRQUNUSU9OX1RZUEVfQVVESVQQBBIbChdBQ1RJT05fVFlQRV9VSV9SRVFVSVJFRBAFEhUKEUFDVElPTl9UWVBFX0VSUk9SEAYqmwEKDUFsZXJ0U2V2ZXJpdHkSHgoaQUxFUlRfU0VWRVJJVFlfVU5TUEVDSUZJRUQQABIXChNBTEVSVF9TRVZFUklUWV9JTkZPEAESGgoWQUxFUlRfU0VWRVJJVFlfV0FSTklORxACEhgKFEFMRVJUX1NFVkVSSVRZX0VSUk9SEAMSGwoXQUxFUlRfU0VWRVJJVFlfQ1JJVElDQUwQBCp4CgxWaXRhbHNTdGF0dXMSHQoZVklUQUxTX1NUQVRVU19VTlNQRUNJRklFRBAAEhQKEFZJVEFMU19TVEFUVVNfT0sQARIaChZWSVRBTFNfU1RBVFVTX0RFR1JBREVEEAISFwoTVklUQUxTX1NUQVRVU19FUlJPUhADYgZwcm90bzM", [file_google_protobuf_timestamp, file_google_protobuf_any]);
+  fileDesc("ChVhdXJhL2RuYS92MS9kbmEucHJvdG8SC2F1cmEuZG5hLnYxIlsKDFRyYWNlQ29udGV4dBIQCgh0cmFjZV9pZBgBIAEoCRIPCgdzcGFuX2lkGAIgASgJEhMKC3RyYWNlX2ZsYWdzGAMgASgJEhMKC3RyYWNlX3N0YXRlGAQgASgJItkDCgZTaWduYWwSEQoJc2lnbmFsX2lkGAEgASgJEiwKC3NpZ25hbF90eXBlGAIgASgOMhcuYXVyYS5kbmEudjEuU2lnbmFsVHlwZRItCgl0aW1lc3RhbXAYAyABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wEjMKCG1ldGFkYXRhGAQgAygLMiEuYXVyYS5kbmEudjEuU2lnbmFsLk1ldGFkYXRhRW50cnkSKAoFdHJhY2UYBSABKAsyGS5hdXJhLmRuYS52MS5UcmFjZUNvbnRleHQSNQoLbmVnb3RpYXRpb24YCiABKAsyHi5hdXJhLmRuYS52MS5OZWdvdGlhdGlvblNpZ25hbEgAEikKBWF1ZGl0GAsgASgLMhguYXVyYS5kbmEudjEuQXVkaXRTaWduYWxIABIvCgh0ZWxlZ3JhbRgMIAEoCzIbLmF1cmEuZG5hLnYxLlRlbGVncmFtU2lnbmFsSAASMQoJaGVhcnRiZWF0GA0gASgLMhwuYXVyYS5kbmEudjEuSGVhcnRiZWF0U2lnbmFsSAAaLwoNTWV0YWRhdGFFbnRyeRILCgNrZXkYASABKAkSDQoFdmFsdWUYAiABKAk6AjgBQgkKB3BheWxvYWQieAoRTmVnb3RpYXRpb25TaWduYWwSEgoKaWRlbnRpZmllchgBIAEoCRINCgVwcmljZRgCIAEoARIVCg1jdXJyZW5jeV9jb2RlGAMgASgJEikKBWFnZW50GAQgASgLMhouYXVyYS5kbmEudjEuQWdlbnRJZGVudGl0eSIwCg1BZ2VudElkZW50aXR5EgsKA2RpZBgBIAEoCRISCgpyZXB1dGF0aW9uGAIgASgCIl4KC0F1ZGl0U2lnbmFsEhEKCXJlcG9fbmFtZRgBIAEoCRIQCghnaXRfZGlmZhgCIAEoCRIWCg5maWxlc3lzdGVtX21hcBgDIAMoCRISCgpldmVudF9uYW1lGAQgASgJIl8KDlRlbGVncmFtU2lnbmFsEg8KB3VzZXJfaWQYASABKAMSDwoHY2hhdF9pZBgCIAEoAxIUCgxtZXNzYWdlX3RleHQYAyABKAkSFQoNY2FsbGJhY2tfZGF0YRgEIAEoCSI8Cg9IZWFydGJlYXRTaWduYWwSFAoMc2VydmljZV9uYW1lGAEgASgJEhMKC2luc3RhbmNlX2lkGAIgASgJIqgDCgdDb250ZXh0EhIKCmNvbnRleHRfaWQYASABKAkSLgoMY29udGV4dF90eXBlGAIgASgOMhguYXVyYS5kbmEudjEuQ29udGV4dFR5cGUSMAoNc3lzdGVtX2hlYWx0aBgDIAEoCzIZLmF1cmEuZG5hLnYxLlN5c3RlbVZpdGFscxI0CghtZXRhZGF0YRgEIAMoCzIiLmF1cmEuZG5hLnYxLkNvbnRleHQuTWV0YWRhdGFFbnRyeRIoCgV0cmFjZRgFIAEoCzIZLmF1cmEuZG5hLnYxLlRyYWNlQ29udGV4dBIsCgRoaXZlGAogASgLMhwuYXVyYS5kbmEudjEuSGl2ZUNvbnRleHREYXRhSAASKgoDYmVlGAsgASgLMhsuYXVyYS5kbmEudjEuQmVlQ29udGV4dERhdGFIABI0Cgh0ZWxlZ3JhbRgMIAEoCzIgLmF1cmEuZG5hLnYxLlRlbGVncmFtQ29udGV4dERhdGFIABovCg1NZXRhZGF0YUVudHJ5EgsKA2tleRgBIAEoCRINCgV2YWx1ZRgCIAEoCToCOAFCBgoEZGF0YSKMAQoPSGl2ZUNvbnRleHREYXRhEhIKCmlkZW50aWZpZXIYASABKAkSLAoFb2ZmZXIYAiABKAsyHS5hdXJhLmRuYS52MS5OZWdvdGlhdGlvbk9mZmVyEiMKBGl0ZW0YAyABKAsyFS5hdXJhLmRuYS52MS5JdGVtRGF0YRISCgpyZXF1ZXN0X2lkGAQgASgJIkgKEE5lZ290aWF0aW9uT2ZmZXISDQoFcHJpY2UYASABKAESEgoKcmVwdXRhdGlvbhgCIAEoAhIRCglhZ2VudF9kaWQYAyABKAkisQEKCEl0ZW1EYXRhEhIKCmlkZW50aWZpZXIYASABKAkSDAoEbmFtZRgCIAEoCRISCgpiYXNlX3ByaWNlGAMgASgBEhMKC2Zsb29yX3ByaWNlGAQgASgBEi0KBG1ldGEYBSADKAsyHy5hdXJhLmRuYS52MS5JdGVtRGF0YS5NZXRhRW50cnkaKwoJTWV0YUVudHJ5EgsKA2tleRgBIAEoCRINCgV2YWx1ZRgCIAEoCToCOAEiuQMKDkJlZUNvbnRleHREYXRhEhEKCXJlcG9fbmFtZRgBIAEoCRIQCghnaXRfZGlmZhgCIAEoCRIWCg5maWxlc3lzdGVtX21hcBgDIAMoCRJCCgxoaXZlX21ldHJpY3MYBCADKAsyLC5hdXJhLmRuYS52MS5CZWVDb250ZXh0RGF0YS5IaXZlTWV0cmljc0VudHJ5EhIKCmV2ZW50X25hbWUYBSABKAkSPgoKZXZlbnRfZGF0YRgGIAMoCzIqLmF1cmEuZG5hLnYxLkJlZUNvbnRleHREYXRhLkV2ZW50RGF0YUVudHJ5EjsKCG1ldGFkYXRhGAcgAygLMikuYXVyYS5kbmEudjEuQmVlQ29udGV4dERhdGEuTWV0YWRhdGFFbnRyeRoyChBIaXZlTWV0cmljc0VudHJ5EgsKA2tleRgBIAEoCRINCgV2YWx1ZRgCIAEoAToCOAEaMAoORXZlbnREYXRhRW50cnkSCwoDa2V5GAEgASgJEg0KBXZhbHVlGAIgASgJOgI4ARovCg1NZXRhZGF0YUVudHJ5EgsKA2tleRgBIAEoCRINCgV2YWx1ZRgCIAEoCToCOAEiYAoTVGVsZWdyYW1Db250ZXh0RGF0YRIPCgd1c2VyX2lkGAEgASgDEg8KB2NoYXRfaWQYAiABKAMSFAoMbWVzc2FnZV90ZXh0GAMgASgJEhEKCWZzbV9zdGF0ZRgEIAEoCSKgAwoGSW50ZW50EhEKCWludGVudF9pZBgBIAEoCRInCgZhY3Rpb24YAiABKA4yFy5hdXJhLmRuYS52MS5BY3Rpb25UeXBlEhEKCXJlYXNvbmluZxgDIAEoCRImCgVzdGVwcxgEIAMoCzIXLmF1cmEuZG5hLnYxLkludGVudFN0ZXASMwoIbWV0YWRhdGEYBSADKAsyIS5hdXJhLmRuYS52MS5JbnRlbnQuTWV0YWRhdGFFbnRyeRIoCgV0cmFjZRgGIAEoCzIZLmF1cmEuZG5hLnYxLlRyYWNlQ29udGV4dBI1CgtuZWdvdGlhdGlvbhgKIAEoCzIeLmF1cmEuZG5hLnYxLk5lZ290aWF0aW9uSW50ZW50SAASKQoFYXVkaXQYCyABKAsyGC5hdXJhLmRuYS52MS5BdWRpdEludGVudEgAEiMKAnVpGAwgASgLMhUuYXVyYS5kbmEudjEuVUlJbnRlbnRIABovCg1NZXRhZGF0YUVudHJ5EgsKA2tleRgBIAEoCRINCgV2YWx1ZRgCIAEoCToCOAFCCAoGcGFyYW1zIkQKEU5lZ290aWF0aW9uSW50ZW50Eg0KBXByaWNlGAEgASgBEg8KB21lc3NhZ2UYAiABKAkSDwoHdGhvdWdodBgDIAEoCSJDCgtBdWRpdEludGVudBIPCgdpc19wdXJlGAEgASgIEhAKCGhlcmVzaWVzGAIgAygJEhEKCW5hcnJhdGl2ZRgDIAEoCSJBCghVSUludGVudBITCgt0ZW1wbGF0ZV9pZBgBIAEoCRIMCgR0ZXh0GAIgASgJEhIKCnBhcnNlX21vZGUYAyABKAkiUQoKSW50ZW50U3RlcBINCgVza2lsbBgBIAEoCRIOCgZpbnRlbnQYAiABKAkSJAoGcGFyYW1zGAMgASgLMhQuZ29vZ2xlLnByb3RvYnVmLkFueSKVBAoLT2JzZXJ2YXRpb24SDwoHc3VjY2VzcxgBIAEoCBISCgptZXNzYWdlX2lkGAIgASgDEg0KBWVycm9yGAMgASgJEhIKCmV2ZW50X3R5cGUYBCABKAkSOAoIbWV0YWRhdGEYBSADKAsyJi5hdXJhLmRuYS52MS5PYnNlcnZhdGlvbi5NZXRhZGF0YUVudHJ5EigKBXRyYWNlGAYgASgLMhkuYXVyYS5kbmEudjEuVHJhY2VDb250ZXh0EjoKC25lZ290aWF0aW9uGAogASgLMiMuYXVyYS5kbmEudjEuTmVnb3RpYXRpb25PYnNlcnZhdGlvbkgAEi4KBWF1ZGl0GAsgASgLMh0uYXVyYS5kbmEudjEuQXVkaXRPYnNlcnZhdGlvbkgAEjQKCHRlbGVncmFtGAwgASgLMiAuYXVyYS5kbmEudjEuVGVsZWdyYW1PYnNlcnZhdGlvbkgAEiUKBGl0ZW0YDSABKAsyFS5hdXJhLmRuYS52MS5JdGVtRGF0YUgAEisKBnZpdGFscxgOIAEoCzIZLmF1cmEuZG5hLnYxLlN5c3RlbVZpdGFsc0gAEisKC2FueV9wYXlsb2FkGA8gASgLMhQuZ29vZ2xlLnByb3RvYnVmLkFueUgAGi8KDU1ldGFkYXRhRW50cnkSCwoDa2V5GAEgASgJEg0KBXZhbHVlGAIgASgJOgI4AUIGCgRkYXRhIuoBChZOZWdvdGlhdGlvbk9ic2VydmF0aW9uEhUKDXNlc3Npb25fdG9rZW4YASABKAkSHQoVdmFsaWRfdW50aWxfdGltZXN0YW1wGAIgASgDEi4KCGFjY2VwdGVkGAMgASgLMhouYXVyYS5kbmEudjEuT2ZmZXJBY2NlcHRlZEgAEjAKCWNvdW50ZXJlZBgEIAEoCzIbLmF1cmEuZG5hLnYxLk9mZmVyQ291bnRlcmVkSAASLgoIcmVqZWN0ZWQYBSABKAsyGi5hdXJhLmRuYS52MS5PZmZlclJlamVjdGVkSABCCAoGcmVzdWx0In4KDU9mZmVyQWNjZXB0ZWQSEwoLZmluYWxfcHJpY2UYASABKAESGAoQcmVzZXJ2YXRpb25fY29kZRgCIAEoCRI+Cg5jcnlwdG9fcGF5bWVudBgDIAEoCzImLmF1cmEuZG5hLnYxLkNyeXB0b1BheW1lbnRJbnN0cnVjdGlvbnMiVAoOT2ZmZXJDb3VudGVyZWQSFgoOcHJvcG9zZWRfcHJpY2UYASABKAESEwoLcmVhc29uX2NvZGUYAiABKAkSFQoNaHVtYW5fbWVzc2FnZRgDIAEoCSIkCg1PZmZlclJlamVjdGVkEhMKC3JlYXNvbl9jb2RlGAEgASgJIpgBChlDcnlwdG9QYXltZW50SW5zdHJ1Y3Rpb25zEg8KB2RlYWxfaWQYASABKAkSFgoOd2FsbGV0X2FkZHJlc3MYAiABKAkSDQoFcHJpY2UYAyABKAESEAoIY3VycmVuY3kYBCABKAkSDAoEbWVtbxgFIAEoCRIPCgduZXR3b3JrGAYgASgJEhIKCmV4cGlyZXNfYXQYByABKAMi+AEKEEF1ZGl0T2JzZXJ2YXRpb24SDwoHaXNfcHVyZRgBIAEoCBIQCghoZXJlc2llcxgCIAMoCRIRCgluYXJyYXRpdmUYAyABKAkSEQoJcmVhc29uaW5nGAQgASgJEhYKDmV4ZWN1dGlvbl90aW1lGAUgASgBEhMKC3Rva2VuX3VzYWdlGAYgASgFEj0KCG1ldGFkYXRhGAcgAygLMisuYXVyYS5kbmEudjEuQXVkaXRPYnNlcnZhdGlvbi5NZXRhZGF0YUVudHJ5Gi8KDU1ldGFkYXRhRW50cnkSCwoDa2V5GAEgASgJEg0KBXZhbHVlGAIgASgJOgI4ASI8ChNUZWxlZ3JhbU9ic2VydmF0aW9uEhIKCm1lc3NhZ2VfaWQYASABKAMSEQoJZGVsaXZlcmVkGAIgASgIImgKDFNlYXJjaFJlc3VsdBISCgppZGVudGlmaWVyGAEgASgJEgwKBG5hbWUYAiABKAkSDQoFcHJpY2UYAyABKAESEwoLZGVzY3JpcHRpb24YBCABKAkSEgoKc2ltaWxhcml0eRgFIAEoASKzAgoOQmVlT2JzZXJ2YXRpb24SDwoHc3VjY2VzcxgBIAEoCBIaChJnaXRodWJfY29tbWVudF91cmwYAiABKAkSFwoPbmF0c19ldmVudF9zZW50GAMgASgIEhAKCGluanVyaWVzGAQgAygJEi0KBnJlcG9ydBgFIAEoCzIdLmF1cmEuZG5hLnYxLkF1ZGl0T2JzZXJ2YXRpb24SLAoHY29udGV4dBgGIAEoCzIbLmF1cmEuZG5hLnYxLkJlZUNvbnRleHREYXRhEjsKCG1ldGFkYXRhGAcgAygLMikuYXVyYS5kbmEudjEuQmVlT2JzZXJ2YXRpb24uTWV0YWRhdGFFbnRyeRovCg1NZXRhZGF0YUVudHJ5EgsKA2tleRgBIAEoCRINCgV2YWx1ZRgCIAEoCToCOAEi2QMKBUV2ZW50EhAKCGV2ZW50X2lkGAEgASgJEg0KBXRvcGljGAIgASgJEi0KCXRpbWVzdGFtcBgDIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXASMgoIbWV0YWRhdGEYBCADKAsyIC5hdXJhLmRuYS52MS5FdmVudC5NZXRhZGF0YUVudHJ5EigKBXRyYWNlGAUgASgLMhkuYXVyYS5kbmEudjEuVHJhY2VDb250ZXh0EjQKC25lZ290aWF0aW9uGAogASgLMh0uYXVyYS5kbmEudjEuTmVnb3RpYXRpb25FdmVudEgAEioKBnZpdGFscxgLIAEoCzIYLmF1cmEuZG5hLnYxLlZpdGFsc0V2ZW50SAASKAoFYWxlcnQYDCABKAsyFy5hdXJhLmRuYS52MS5BbGVydEV2ZW50SAASMAoJaGVhcnRiZWF0GA0gASgLMhsuYXVyYS5kbmEudjEuSGVhcnRiZWF0RXZlbnRIABIoCgVhdWRpdBgOIAEoCzIXLmF1cmEuZG5hLnYxLkF1ZGl0RXZlbnRIABovCg1NZXRhZGF0YUVudHJ5EgsKA2tleRgBIAEoCRINCgV2YWx1ZRgCIAEoCToCOAFCCQoHcGF5bG9hZCKIAQoQTmVnb3RpYXRpb25FdmVudBIVCg1zZXNzaW9uX3Rva2VuGAEgASgJEicKBmFjdGlvbhgCIAEoDjIXLmF1cmEuZG5hLnYxLkFjdGlvblR5cGUSDQoFcHJpY2UYAyABKAESEgoKaWRlbnRpZmllchgEIAEoCRIRCglhZ2VudF9kaWQYBSABKAkifQoLVml0YWxzRXZlbnQSDwoHc2VydmljZRgBIAEoCRIpCgZzdGF0dXMYAiABKA4yGS5hdXJhLmRuYS52MS5WaXRhbHNTdGF0dXMSGQoRY3B1X3VzYWdlX3BlcmNlbnQYAyABKAESFwoPbWVtb3J5X3VzYWdlX21iGAQgASgBIlsKCkFsZXJ0RXZlbnQSLAoIc2V2ZXJpdHkYASABKA4yGi5hdXJhLmRuYS52MS5BbGVydFNldmVyaXR5Eg8KB21lc3NhZ2UYAiABKAkSDgoGc291cmNlGAMgASgJImEKDkhlYXJ0YmVhdEV2ZW50Eg8KB3NlcnZpY2UYASABKAkSEwoLaW5zdGFuY2VfaWQYAiABKAkSKQoGc3RhdHVzGAMgASgOMhkuYXVyYS5kbmEudjEuVml0YWxzU3RhdHVzImQKCkF1ZGl0RXZlbnQSEQoJcmVwb19uYW1lGAEgASgJEg8KB2lzX3B1cmUYAiABKAgSEAoIaGVyZXNpZXMYAyADKAkSIAoYbmVnb3RpYXRpb25fc3VjY2Vzc19yYXRlGAQgASgBIs0BCgxTeXN0ZW1WaXRhbHMSKQoGc3RhdHVzGAEgASgOMhkuYXVyYS5kbmEudjEuVml0YWxzU3RhdHVzEhkKEWNwdV91c2FnZV9wZXJjZW50GAIgASgBEhcKD21lbW9yeV91c2FnZV9tYhgDIAEoARItCgl0aW1lc3RhbXAYBCABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wEg4KBmNhY2hlZBgFIAEoCBIQCgh3YXJuaW5ncxgGIAMoCRINCgVlcnJvchgHIAEoCSqSAQoKU2lnbmFsVHlwZRIbChdTSUdOQUxfVFlQRV9VTlNQRUNJRklFRBAAEhsKF1NJR05BTF9UWVBFX05FR09USUFUSU9OEAESFQoRU0lHTkFMX1RZUEVfQVVESVQQAhIYChRTSUdOQUxfVFlQRV9URUxFR1JBTRADEhkKFVNJR05BTF9UWVBFX0hFQVJUQkVBVBAEKnMKC0NvbnRleHRUeXBlEhwKGENPTlRFWFRfVFlQRV9VTlNQRUNJRklFRBAAEhUKEUNPTlRFWFRfVFlQRV9ISVZFEAESFAoQQ09OVEVYVF9UWVBFX0JFRRACEhkKFUNPTlRFWFRfVFlQRV9URUxFR1JBTRADKr0BCgpBY3Rpb25UeXBlEhsKF0FDVElPTl9UWVBFX1VOU1BFQ0lGSUVEEAASFgoSQUNUSU9OX1RZUEVfQUNDRVBUEAESFwoTQUNUSU9OX1RZUEVfQ09VTlRFUhACEhYKEkFDVElPTl9UWVBFX1JFSkVDVBADEhUKEUFDVElPTl9UWVBFX0FVRElUEAQSGwoXQUNUSU9OX1RZUEVfVUlfUkVRVUlSRUQQBRIVChFBQ1RJT05fVFlQRV9FUlJPUhAGKpsBCg1BbGVydFNldmVyaXR5Eh4KGkFMRVJUX1NFVkVSSVRZX1VOU1BFQ0lGSUVEEAASFwoTQUxFUlRfU0VWRVJJVFlfSU5GTxABEhoKFkFMRVJUX1NFVkVSSVRZX1dBUk5JTkcQAhIYChRBTEVSVF9TRVZFUklUWV9FUlJPUhADEhsKF0FMRVJUX1NFVkVSSVRZX0NSSVRJQ0FMEAQqeAoMVml0YWxzU3RhdHVzEh0KGVZJVEFMU19TVEFUVVNfVU5TUEVDSUZJRUQQABIUChBWSVRBTFNfU1RBVFVTX09LEAESGgoWVklUQUxTX1NUQVRVU19ERUdSQURFRBACEhcKE1ZJVEFMU19TVEFUVVNfRVJST1IQA2IGcHJvdG8z", [file_google_protobuf_timestamp, file_google_protobuf_any]);
 
 /**
  * @generated from message aura.dna.v1.TraceContext
@@ -134,14 +134,14 @@ export const SignalSchema: GenMessage<Signal> = /*@__PURE__*/
  */
 export type NegotiationSignal = Message<"aura.dna.v1.NegotiationSignal"> & {
   /**
-   * @generated from field: string item_id = 1;
+   * @generated from field: string identifier = 1;
    */
-  itemId: string;
+  identifier: string;
 
   /**
-   * @generated from field: double bid_amount = 2;
+   * @generated from field: double price = 2;
    */
-  bidAmount: number;
+  price: number;
 
   /**
    * @generated from field: string currency_code = 3;
@@ -171,9 +171,9 @@ export type AgentIdentity = Message<"aura.dna.v1.AgentIdentity"> & {
   did: string;
 
   /**
-   * @generated from field: float reputation_score = 2;
+   * @generated from field: float reputation = 2;
    */
-  reputationScore: number;
+  reputation: number;
 };
 
 /**
@@ -336,9 +336,9 @@ export const ContextSchema: GenMessage<Context> = /*@__PURE__*/
  */
 export type HiveContextData = Message<"aura.dna.v1.HiveContextData"> & {
   /**
-   * @generated from field: string item_id = 1;
+   * @generated from field: string identifier = 1;
    */
-  itemId: string;
+  identifier: string;
 
   /**
    * @generated from field: aura.dna.v1.NegotiationOffer offer = 2;
@@ -368,9 +368,9 @@ export const HiveContextDataSchema: GenMessage<HiveContextData> = /*@__PURE__*/
  */
 export type NegotiationOffer = Message<"aura.dna.v1.NegotiationOffer"> & {
   /**
-   * @generated from field: double bid_amount = 1;
+   * @generated from field: double price = 1;
    */
-  bidAmount: number;
+  price: number;
 
   /**
    * @generated from field: float reputation = 2;
@@ -395,9 +395,9 @@ export const NegotiationOfferSchema: GenMessage<NegotiationOffer> = /*@__PURE__*
  */
 export type ItemData = Message<"aura.dna.v1.ItemData"> & {
   /**
-   * @generated from field: string id = 1;
+   * @generated from field: string identifier = 1;
    */
-  id: string;
+  identifier: string;
 
   /**
    * @generated from field: string name = 2;
@@ -450,6 +450,21 @@ export type BeeContextData = Message<"aura.dna.v1.BeeContextData"> & {
    * @generated from field: map<string, double> hive_metrics = 4;
    */
   hiveMetrics: { [key: string]: number };
+
+  /**
+   * @generated from field: string event_name = 5;
+   */
+  eventName: string;
+
+  /**
+   * @generated from field: map<string, string> event_data = 6;
+   */
+  eventData: { [key: string]: string };
+
+  /**
+   * @generated from field: map<string, string> metadata = 7;
+   */
+  metadata: { [key: string]: string };
 };
 
 /**
@@ -725,6 +740,24 @@ export type Observation = Message<"aura.dna.v1.Observation"> & {
      */
     value: TelegramObservation;
     case: "telegram";
+  } | {
+    /**
+     * @generated from field: aura.dna.v1.ItemData item = 13;
+     */
+    value: ItemData;
+    case: "item";
+  } | {
+    /**
+     * @generated from field: aura.dna.v1.SystemVitals vitals = 14;
+     */
+    value: SystemVitals;
+    case: "vitals";
+  } | {
+    /**
+     * @generated from field: google.protobuf.Any any_payload = 15;
+     */
+    value: Any;
+    case: "anyPayload";
   } | { case: undefined; value?: undefined };
 };
 
@@ -866,9 +899,9 @@ export type CryptoPaymentInstructions = Message<"aura.dna.v1.CryptoPaymentInstru
   walletAddress: string;
 
   /**
-   * @generated from field: double amount = 3;
+   * @generated from field: double price = 3;
    */
-  amount: number;
+  price: number;
 
   /**
    * @generated from field: string currency = 4;
@@ -931,6 +964,11 @@ export type AuditObservation = Message<"aura.dna.v1.AuditObservation"> & {
    * @generated from field: int32 token_usage = 6;
    */
   tokenUsage: number;
+
+  /**
+   * @generated from field: map<string, string> metadata = 7;
+   */
+  metadata: { [key: string]: string };
 };
 
 /**
@@ -961,6 +999,90 @@ export type TelegramObservation = Message<"aura.dna.v1.TelegramObservation"> & {
  */
 export const TelegramObservationSchema: GenMessage<TelegramObservation> = /*@__PURE__*/
   messageDesc(file_aura_dna_v1_dna, 25);
+
+/**
+ * @generated from message aura.dna.v1.SearchResult
+ */
+export type SearchResult = Message<"aura.dna.v1.SearchResult"> & {
+  /**
+   * @generated from field: string identifier = 1;
+   */
+  identifier: string;
+
+  /**
+   * @generated from field: string name = 2;
+   */
+  name: string;
+
+  /**
+   * @generated from field: double price = 3;
+   */
+  price: number;
+
+  /**
+   * @generated from field: string description = 4;
+   */
+  description: string;
+
+  /**
+   * @generated from field: double similarity = 5;
+   */
+  similarity: number;
+};
+
+/**
+ * Describes the message aura.dna.v1.SearchResult.
+ * Use `create(SearchResultSchema)` to create a new message.
+ */
+export const SearchResultSchema: GenMessage<SearchResult> = /*@__PURE__*/
+  messageDesc(file_aura_dna_v1_dna, 26);
+
+/**
+ * @generated from message aura.dna.v1.BeeObservation
+ */
+export type BeeObservation = Message<"aura.dna.v1.BeeObservation"> & {
+  /**
+   * @generated from field: bool success = 1;
+   */
+  success: boolean;
+
+  /**
+   * @generated from field: string github_comment_url = 2;
+   */
+  githubCommentUrl: string;
+
+  /**
+   * @generated from field: bool nats_event_sent = 3;
+   */
+  natsEventSent: boolean;
+
+  /**
+   * @generated from field: repeated string injuries = 4;
+   */
+  injuries: string[];
+
+  /**
+   * @generated from field: aura.dna.v1.AuditObservation report = 5;
+   */
+  report?: AuditObservation;
+
+  /**
+   * @generated from field: aura.dna.v1.BeeContextData context = 6;
+   */
+  context?: BeeContextData;
+
+  /**
+   * @generated from field: map<string, string> metadata = 7;
+   */
+  metadata: { [key: string]: string };
+};
+
+/**
+ * Describes the message aura.dna.v1.BeeObservation.
+ * Use `create(BeeObservationSchema)` to create a new message.
+ */
+export const BeeObservationSchema: GenMessage<BeeObservation> = /*@__PURE__*/
+  messageDesc(file_aura_dna_v1_dna, 27);
 
 /**
  * @generated from message aura.dna.v1.Event
@@ -1034,7 +1156,7 @@ export type Event = Message<"aura.dna.v1.Event"> & {
  * Use `create(EventSchema)` to create a new message.
  */
 export const EventSchema: GenMessage<Event> = /*@__PURE__*/
-  messageDesc(file_aura_dna_v1_dna, 26);
+  messageDesc(file_aura_dna_v1_dna, 28);
 
 /**
  * @generated from message aura.dna.v1.NegotiationEvent
@@ -1056,9 +1178,9 @@ export type NegotiationEvent = Message<"aura.dna.v1.NegotiationEvent"> & {
   price: number;
 
   /**
-   * @generated from field: string item_id = 4;
+   * @generated from field: string identifier = 4;
    */
-  itemId: string;
+  identifier: string;
 
   /**
    * @generated from field: string agent_did = 5;
@@ -1071,7 +1193,7 @@ export type NegotiationEvent = Message<"aura.dna.v1.NegotiationEvent"> & {
  * Use `create(NegotiationEventSchema)` to create a new message.
  */
 export const NegotiationEventSchema: GenMessage<NegotiationEvent> = /*@__PURE__*/
-  messageDesc(file_aura_dna_v1_dna, 27);
+  messageDesc(file_aura_dna_v1_dna, 29);
 
 /**
  * @generated from message aura.dna.v1.VitalsEvent
@@ -1103,7 +1225,7 @@ export type VitalsEvent = Message<"aura.dna.v1.VitalsEvent"> & {
  * Use `create(VitalsEventSchema)` to create a new message.
  */
 export const VitalsEventSchema: GenMessage<VitalsEvent> = /*@__PURE__*/
-  messageDesc(file_aura_dna_v1_dna, 28);
+  messageDesc(file_aura_dna_v1_dna, 30);
 
 /**
  * @generated from message aura.dna.v1.AlertEvent
@@ -1130,7 +1252,7 @@ export type AlertEvent = Message<"aura.dna.v1.AlertEvent"> & {
  * Use `create(AlertEventSchema)` to create a new message.
  */
 export const AlertEventSchema: GenMessage<AlertEvent> = /*@__PURE__*/
-  messageDesc(file_aura_dna_v1_dna, 29);
+  messageDesc(file_aura_dna_v1_dna, 31);
 
 /**
  * @generated from message aura.dna.v1.HeartbeatEvent
@@ -1157,7 +1279,7 @@ export type HeartbeatEvent = Message<"aura.dna.v1.HeartbeatEvent"> & {
  * Use `create(HeartbeatEventSchema)` to create a new message.
  */
 export const HeartbeatEventSchema: GenMessage<HeartbeatEvent> = /*@__PURE__*/
-  messageDesc(file_aura_dna_v1_dna, 30);
+  messageDesc(file_aura_dna_v1_dna, 32);
 
 /**
  * @generated from message aura.dna.v1.AuditEvent
@@ -1189,7 +1311,7 @@ export type AuditEvent = Message<"aura.dna.v1.AuditEvent"> & {
  * Use `create(AuditEventSchema)` to create a new message.
  */
 export const AuditEventSchema: GenMessage<AuditEvent> = /*@__PURE__*/
-  messageDesc(file_aura_dna_v1_dna, 31);
+  messageDesc(file_aura_dna_v1_dna, 33);
 
 /**
  * @generated from message aura.dna.v1.SystemVitals
@@ -1236,7 +1358,7 @@ export type SystemVitals = Message<"aura.dna.v1.SystemVitals"> & {
  * Use `create(SystemVitalsSchema)` to create a new message.
  */
 export const SystemVitalsSchema: GenMessage<SystemVitals> = /*@__PURE__*/
-  messageDesc(file_aura_dna_v1_dna, 32);
+  messageDesc(file_aura_dna_v1_dna, 34);
 
 /**
  * @generated from enum aura.dna.v1.SignalType

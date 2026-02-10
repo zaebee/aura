@@ -1,5 +1,6 @@
 import asyncio
 import json
+import subprocess  # nosec
 
 
 import nats
@@ -74,8 +75,6 @@ class BeeConnector(Connector[AuditObservation, BeeObservation, BeeContext]):
         )
 
     async def _commit_changes(self) -> None:
-        import subprocess  # nosec
-
         root = find_hive_root()
 
         def git_commit() -> None:

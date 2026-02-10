@@ -25,8 +25,8 @@ async def test_aggregator_healing_on_prometheus_timeout(mocker):
         "httpx.AsyncClient.get", side_effect=httpx.TimeoutException("Timeout!")
     )
     metrics = await aggregator.get_system_metrics()
-    assert metrics["status"] == "unstable"
-    assert "Timeout" in metrics["error"] or "fetch_error" in metrics["error"]
+    assert metrics.status.name == "VITALS_STATUS_ERROR"
+    assert "Timeout" in metrics.error or "fetch_error" in metrics.error
 
 
 @pytest.mark.asyncio
@@ -45,8 +45,8 @@ async def test_aggregator_healing_on_prometheus_connection_error(mocker):
         "httpx.AsyncClient.get", side_effect=httpx.ConnectError("Connection refused")
     )
     metrics = await aggregator.get_system_metrics()
-    assert metrics["status"] == "unstable"
-    assert "ConnectError" in metrics["error"] or "fetch_error" in metrics["error"]
+    assert metrics.status.name == "VITALS_STATUS_ERROR"
+    assert "ConnectError" in metrics.error or "fetch_error" in metrics.error
 
 
 @pytest.mark.asyncio
@@ -80,9 +80,9 @@ async def test_aggregator_healing_with_cache_fallback(mocker):
 
     # First call to fill cache
     res1 = await aggregator.get_system_metrics()
-    assert res1["cpu_usage_percent"] == 42.0
-    assert res1["memory_usage_mb"] == 84.0
-    assert res1["cached"] is False
+    assert res1.cpu_usage_percent == 42.0
+    assert res1.memory_usage_mb == 84.0
+    assert res1.cached is False
 
     # 2. Mock failure for second call
     mock_get.side_effect = httpx.ConnectError("Failed now")
@@ -93,6 +93,6 @@ async def test_aggregator_healing_with_cache_fallback(mocker):
     metrics = await aggregator.get_system_metrics()
 
     # Should return cached data
-    assert metrics["cpu_usage_percent"] == 42.0
-    assert metrics["cached"] is True
-    assert "Stale data" in metrics["error"]
+    assert metrics.cpu_usage_percent == 42.0
+    assert metrics.cached is True
+    assert "Stale data" in metrics.error

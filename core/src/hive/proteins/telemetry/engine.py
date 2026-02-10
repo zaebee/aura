@@ -6,7 +6,7 @@ from typing import Any, cast
 
 import httpx
 import structlog
-from aura_core import SystemVitals
+from aura_core.gen.aura.dna.v1 import SystemVitals, VitalsStatus
 from opentelemetry import trace
 from opentelemetry.exporter.otlp.proto.grpc.trace_exporter import OTLPSpanExporter
 from opentelemetry.sdk.resources import Resource
@@ -75,8 +75,31 @@ class MetricsCache:
 
 async def fetch_vitals(metrics_cache: MetricsCache, settings: Any) -> SystemVitals:
     cached = metrics_cache.get()
+
+    def _to_status(s: Any) -> VitalsStatus:
+        if isinstance(s, VitalsStatus):
+            return s
+        if isinstance(s, int):
+            return cast(VitalsStatus, s)
+        s_str = str(s).lower()
+        if "ok" in s_str:
+            return cast(VitalsStatus, VitalsStatus.VITALS_STATUS_OK)
+        if "degraded" in s_str or "partial" in s_str:
+            return cast(VitalsStatus, VitalsStatus.VITALS_STATUS_DEGRADED)
+        return cast(VitalsStatus, VitalsStatus.VITALS_STATUS_ERROR)
+
     if cached:
-        return SystemVitals(**{**cached, "cached": True})
+        return SystemVitals(
+            status=_to_status(cached["status"]),
+            cpu_usage_percent=float(cast(float, cached["cpu_usage_percent"])),
+            memory_usage_mb=float(cast(float, cached["memory_usage_mb"])),
+            timestamp=cached["timestamp"]
+            if isinstance(cached["timestamp"], datetime)
+            else datetime.now(UTC),
+            cached=True,
+            warnings=cast(list[str], cached.get("warnings", [])),
+            error=str(cached.get("error", "")),
+        )
 
     cpu_q = (
         'avg(rate(container_cpu_usage_seconds_total{namespace="default"}[5m])) * 100'
@@ -111,44 +134,64 @@ async def fetch_vitals(metrics_cache: MetricsCache, settings: Any) -> SystemVita
                 cached_dict = metrics_cache.get(ignore_ttl=True)
                 if cached_dict:
                     return SystemVitals(
-                        **{
-                            **cached_dict,
-                            "cached": True,
-                            "error": f"Stale data due to: {e_msg}",
-                        }
+                        status=_to_status(cached_dict["status"]),
+                        cpu_usage_percent=float(
+                            cast(float, cached_dict["cpu_usage_percent"])
+                        ),
+                        memory_usage_mb=float(
+                            cast(float, cached_dict["memory_usage_mb"])
+                        ),
+                        timestamp=cached_dict["timestamp"]
+                        if isinstance(cached_dict["timestamp"], datetime)
+                        else datetime.now(UTC),
+                        cached=True,
+                        error=f"Stale data due to: {e_msg}",
                     )
                 return SystemVitals(
-                    status="unstable",
-                    timestamp=datetime.now(UTC).isoformat(),
+                    status=cast(VitalsStatus, VitalsStatus.VITALS_STATUS_ERROR),
+                    timestamp=datetime.now(UTC),
                     error=e_msg,
                 )
 
             m_dict = {
-                "status": "ok",
+                "status": VitalsStatus.VITALS_STATUS_OK,
                 "cpu_usage_percent": round(cpu, 2),
                 "memory_usage_mb": round(mem, 2),
-                "timestamp": datetime.now(UTC).isoformat(),
+                "timestamp": datetime.now(UTC),
                 "cached": False,
             }
             if errs:
-                m_dict["status"] = "PARTIAL"
+                m_dict["status"] = VitalsStatus.VITALS_STATUS_DEGRADED
                 m_dict["warnings"] = errs  # type: ignore
             metrics_cache.set(m_dict)
-            return SystemVitals(**m_dict)
+
+            return SystemVitals(
+                status=cast(VitalsStatus, m_dict["status"]),
+                cpu_usage_percent=float(cast(float, m_dict["cpu_usage_percent"])),
+                memory_usage_mb=float(cast(float, m_dict["memory_usage_mb"])),
+                timestamp=cast(datetime, m_dict["timestamp"]),
+                cached=False,
+                warnings=cast(list[str], m_dict.get("warnings", [])),
+            )
     except Exception as e:
         logger.error("monitoring_failure", error=str(e))
         e_msg = f"{type(e).__name__}: {str(e)}"
         cached_dict = metrics_cache.get(ignore_ttl=True)
         if cached_dict:
             return SystemVitals(
-                **{
-                    **cached_dict,
-                    "cached": True,
-                    "error": f"Stale data due to: {e_msg}",
-                }
+                status=_to_status(cached_dict["status"]),
+                cpu_usage_percent=float(cast(float, cached_dict["cpu_usage_percent"])),
+                memory_usage_mb=float(cast(float, cached_dict["memory_usage_mb"])),
+                timestamp=cached_dict["timestamp"]
+                if isinstance(cached_dict["timestamp"], datetime)
+                else datetime.now(UTC),
+                cached=True,
+                error=f"Stale data due to: {e_msg}",
             )
         return SystemVitals(
-            status="unstable", timestamp=datetime.now(UTC).isoformat(), error=e_msg
+            status=cast(VitalsStatus, VitalsStatus.VITALS_STATUS_ERROR),
+            timestamp=datetime.now(UTC),
+            error=e_msg,
         )
 
 

@@ -4,15 +4,25 @@ Pulse Protein Internal - NATS JetStream Provider for Binary Bloodstream.
 Handles binary proto serialization and JetStream publishing.
 """
 
+import json
 import logging
 import uuid
 from datetime import UTC, datetime
-from typing import Any
+from typing import Any, cast
 
 import nats
 import nats.errors
-from aura.dna.v1 import dna_pb2
-from google.protobuf.timestamp_pb2 import Timestamp
+from aura_core.gen.aura.dna.v1 import (
+    ActionType,
+    AlertEvent,
+    AlertSeverity,
+    AuditEvent,
+    Event,
+    HeartbeatEvent,
+    NegotiationEvent,
+    VitalsEvent,
+    VitalsStatus,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -44,28 +54,12 @@ class JetStreamProvider:
             logger.warning(f"NATS connection failed: {e}")
             return False
 
-    def _create_timestamp(self) -> Timestamp:
-        """Create a protobuf Timestamp for now."""
-        ts = Timestamp()
-        ts.FromDatetime(datetime.now(UTC))
-        return ts
-
-    def _create_trace_context(
-        self, trace_id: str | None = None, span_id: str | None = None
-    ) -> dna_pb2.TraceContext:
-        """Create trace context for OTel propagation."""
-        trace = dna_pb2.TraceContext()
-        trace.trace_id = trace_id or uuid.uuid4().hex
-        trace.span_id = span_id or uuid.uuid4().hex[:16]
-        trace.trace_flags = "01"  # Sampled
-        return trace
-
     async def publish_negotiation_event(
         self,
         session_token: str,
         action: str,
         price: float,
-        item_id: str,
+        identifier: str,
         agent_did: str,
         trace_id: str | None = None,
         span_id: str | None = None,
@@ -76,21 +70,21 @@ class JetStreamProvider:
             return False
 
         try:
-            event = dna_pb2.Event()
-            event.event_id = f"neg-{uuid.uuid4().hex[:8]}"
-            event.topic = f"aura.hive.events.negotiation_{action}"
-            event.timestamp.CopyFrom(self._create_timestamp())
-            event.trace.CopyFrom(self._create_trace_context(trace_id, span_id))
-
-            # Set negotiation payload
-            event.negotiation.session_token = session_token
-            event.negotiation.action = self._action_to_enum(action)  # type: ignore[assignment]
-            event.negotiation.price = price
-            event.negotiation.item_id = item_id
-            event.negotiation.agent_did = agent_did
+            event = Event(
+                event_id=f"neg-{uuid.uuid4().hex[:8]}",
+                topic=f"aura.hive.events.negotiation_{action}",
+                timestamp=datetime.now(UTC),
+                negotiation=NegotiationEvent(
+                    session_token=session_token,
+                    action=self._action_to_enum(action),
+                    price=price,
+                    identifier=identifier,
+                    agent_did=agent_did,
+                ),
+            )
 
             # Serialize and publish
-            binary_data = event.SerializeToString()
+            binary_data = bytes(event)
             ack = await self.js.publish(event.topic, binary_data)
 
             logger.debug(
@@ -116,19 +110,19 @@ class JetStreamProvider:
             return False
 
         try:
-            event = dna_pb2.Event()
-            event.event_id = f"hb-{uuid.uuid4().hex[:8]}"
-            event.topic = "aura.hive.heartbeat"
-            event.timestamp.CopyFrom(self._create_timestamp())
-            event.trace.CopyFrom(self._create_trace_context(trace_id, span_id))
-
-            # Set heartbeat payload
-            event.heartbeat.service = service
-            event.heartbeat.instance_id = instance_id or uuid.uuid4().hex[:8]
-            event.heartbeat.status = self._status_to_enum(status)  # type: ignore[assignment]
+            event = Event(
+                event_id=f"hb-{uuid.uuid4().hex[:8]}",
+                topic="aura.hive.heartbeat",
+                timestamp=datetime.now(UTC),
+                heartbeat=HeartbeatEvent(
+                    service=service,
+                    instance_id=instance_id or uuid.uuid4().hex[:8],
+                    status=self._status_to_enum(status),
+                ),
+            )
 
             # Serialize and publish
-            binary_data = event.SerializeToString()
+            binary_data = bytes(event)
             ack = await self.js.publish(event.topic, binary_data)
 
             logger.debug(
@@ -154,19 +148,19 @@ class JetStreamProvider:
             return False
 
         try:
-            event = dna_pb2.Event()
-            event.event_id = f"vit-{uuid.uuid4().hex[:8]}"
-            event.topic = f"aura.hive.vitals.{service}"
-            event.timestamp.CopyFrom(self._create_timestamp())
-            event.trace.CopyFrom(self._create_trace_context(trace_id, span_id))
+            event = Event(
+                event_id=f"vit-{uuid.uuid4().hex[:8]}",
+                topic=f"aura.hive.vitals.{service}",
+                timestamp=datetime.now(UTC),
+                vitals=VitalsEvent(
+                    service=service,
+                    status=self._status_to_enum(status),
+                    cpu_usage_percent=cpu_usage,
+                    memory_usage_mb=memory_usage,
+                ),
+            )
 
-            # Set vitals payload
-            event.vitals.service = service
-            event.vitals.status = self._status_to_enum(status)  # type: ignore[assignment]
-            event.vitals.cpu_usage_percent = cpu_usage
-            event.vitals.memory_usage_mb = memory_usage
-
-            binary_data = event.SerializeToString()
+            binary_data = bytes(event)
             ack = await self.js.publish(event.topic, binary_data)
 
             logger.debug(f"Published vitals: stream={ack.stream}, seq={ack.seq}")
@@ -189,18 +183,18 @@ class JetStreamProvider:
             return False
 
         try:
-            event = dna_pb2.Event()
-            event.event_id = f"alert-{uuid.uuid4().hex[:8]}"
-            event.topic = f"aura.hive.events.alert_{severity}"
-            event.timestamp.CopyFrom(self._create_timestamp())
-            event.trace.CopyFrom(self._create_trace_context(trace_id, span_id))
+            event = Event(
+                event_id=f"alert-{uuid.uuid4().hex[:8]}",
+                topic=f"aura.hive.events.alert_{severity}",
+                timestamp=datetime.now(UTC),
+                alert=AlertEvent(
+                    severity=self._severity_to_enum(severity),
+                    message=message,
+                    source=source,
+                ),
+            )
 
-            # Set alert payload
-            event.alert.severity = self._severity_to_enum(severity)  # type: ignore[assignment]
-            event.alert.message = message
-            event.alert.source = source
-
-            binary_data = event.SerializeToString()
+            binary_data = bytes(event)
             ack = await self.js.publish(event.topic, binary_data)
 
             logger.debug(f"Published alert: stream={ack.stream}, seq={ack.seq}")
@@ -224,19 +218,19 @@ class JetStreamProvider:
             return False
 
         try:
-            event = dna_pb2.Event()
-            event.event_id = f"audit-{uuid.uuid4().hex[:8]}"
-            event.topic = "aura.hive.audit.report"
-            event.timestamp.CopyFrom(self._create_timestamp())
-            event.trace.CopyFrom(self._create_trace_context(trace_id, span_id))
+            event = Event(
+                event_id=f"audit-{uuid.uuid4().hex[:8]}",
+                topic="aura.hive.audit.report",
+                timestamp=datetime.now(UTC),
+                audit=AuditEvent(
+                    repo_name=repo_name,
+                    is_pure=is_pure,
+                    heresies=heresies,
+                    negotiation_success_rate=negotiation_success_rate,
+                ),
+            )
 
-            # Set audit payload
-            event.audit.repo_name = repo_name
-            event.audit.is_pure = is_pure
-            event.audit.heresies.extend(heresies)
-            event.audit.negotiation_success_rate = negotiation_success_rate
-
-            binary_data = event.SerializeToString()
+            binary_data = bytes(event)
             ack = await self.js.publish(event.topic, binary_data)
 
             logger.debug(f"Published audit: stream={ack.stream}, seq={ack.seq}")
@@ -256,8 +250,6 @@ class JetStreamProvider:
             return False
 
         try:
-            import json
-
             data = json.dumps(payload).encode()
             ack = await self.js.publish(topic, data)
             logger.warning(f"Published raw JSON (deprecated): {topic}, seq={ack.seq}")
@@ -272,36 +264,44 @@ class JetStreamProvider:
             await self.nc.close()
             logger.info("NATS connection closed")
 
-    def _action_to_enum(self, action: str) -> int:
+    def _action_to_enum(self, action: str) -> ActionType:
         """Convert action string to ActionType enum."""
         mapping = {
-            "accept": dna_pb2.ACTION_TYPE_ACCEPT,
-            "counter": dna_pb2.ACTION_TYPE_COUNTER,
-            "reject": dna_pb2.ACTION_TYPE_REJECT,
-            "audit": dna_pb2.ACTION_TYPE_AUDIT,
-            "ui_required": dna_pb2.ACTION_TYPE_UI_REQUIRED,
-            "error": dna_pb2.ACTION_TYPE_ERROR,
+            "accept": ActionType.ACTION_TYPE_ACCEPT,
+            "counter": ActionType.ACTION_TYPE_COUNTER,
+            "reject": ActionType.ACTION_TYPE_REJECT,
+            "audit": ActionType.ACTION_TYPE_AUDIT,
+            "ui_required": ActionType.ACTION_TYPE_UI_REQUIRED,
+            "error": ActionType.ACTION_TYPE_ERROR,
         }
-        return int(mapping.get(action.lower(), dna_pb2.ACTION_TYPE_UNSPECIFIED))
+        return cast(
+            ActionType, mapping.get(action.lower(), ActionType.ACTION_TYPE_UNSPECIFIED)
+        )
 
-    def _status_to_enum(self, status: str) -> int:
+    def _status_to_enum(self, status: str) -> VitalsStatus:
         """Convert status string to VitalsStatus enum."""
         mapping = {
-            "ok": dna_pb2.VITALS_STATUS_OK,
-            "degraded": dna_pb2.VITALS_STATUS_DEGRADED,
-            "error": dna_pb2.VITALS_STATUS_ERROR,
+            "ok": VitalsStatus.VITALS_STATUS_OK,
+            "degraded": VitalsStatus.VITALS_STATUS_DEGRADED,
+            "error": VitalsStatus.VITALS_STATUS_ERROR,
         }
-        return int(mapping.get(status.lower(), dna_pb2.VITALS_STATUS_UNSPECIFIED))
+        return cast(
+            VitalsStatus,
+            mapping.get(status.lower(), VitalsStatus.VITALS_STATUS_UNSPECIFIED),
+        )
 
-    def _severity_to_enum(self, severity: str) -> int:
+    def _severity_to_enum(self, severity: str) -> AlertSeverity:
         """Convert severity string to AlertSeverity enum."""
         mapping = {
-            "info": dna_pb2.ALERT_SEVERITY_INFO,
-            "warning": dna_pb2.ALERT_SEVERITY_WARNING,
-            "error": dna_pb2.ALERT_SEVERITY_ERROR,
-            "critical": dna_pb2.ALERT_SEVERITY_CRITICAL,
+            "info": AlertSeverity.ALERT_SEVERITY_INFO,
+            "warning": AlertSeverity.ALERT_SEVERITY_WARNING,
+            "error": AlertSeverity.ALERT_SEVERITY_ERROR,
+            "critical": AlertSeverity.ALERT_SEVERITY_CRITICAL,
         }
-        return int(mapping.get(severity.lower(), dna_pb2.ALERT_SEVERITY_UNSPECIFIED))
+        return cast(
+            AlertSeverity,
+            mapping.get(severity.lower(), AlertSeverity.ALERT_SEVERITY_UNSPECIFIED),
+        )
 
 
 class JetStreamSubscriber:
@@ -367,7 +367,7 @@ class JetStreamSubscriber:
         consumer: str,
         batch: int = 10,
         timeout: float = 1.0,
-    ) -> list[dna_pb2.Event]:
+    ) -> list[Event]:
         """
         Fetch a batch of binary proto events from a consumer.
 
@@ -386,8 +386,7 @@ class JetStreamSubscriber:
 
             for msg in msgs:
                 try:
-                    event = dna_pb2.Event()
-                    event.ParseFromString(msg.data)
+                    event = Event().parse(msg.data)
                     events.append(event)
                     await msg.ack()
                 except Exception as e:

@@ -19,7 +19,7 @@ async def test_telemetry_skill_health_check():
     skill = TelemetrySkill()
     obs = await skill.execute("health_check", {})
     assert obs.success is True
-    assert obs.data["status"] == "healthy"
+    assert obs.metadata["status"] == "healthy"
 
 
 @pytest.mark.asyncio

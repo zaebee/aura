@@ -1,9 +1,12 @@
 import asyncio
+import json
 import logging
 from datetime import UTC, datetime
 from typing import Any, cast
 
-from aura_core import Observation, SkillProtocol
+from aura_core import SkillProtocol
+from aura_core.gen.aura.dna.v1 import ItemData, Observation
+from pgvector.sqlalchemy import Vector
 from sqlalchemy import Engine, text
 from sqlalchemy.orm import Session, sessionmaker
 
@@ -15,7 +18,13 @@ from .engine import (
     InventoryItem,
     LockedDeal,
 )
-from .schema import DealSchema, ItemSchema
+from .schema import (
+    CreateDealParams,
+    DealSchema,
+    ItemSchema,
+    ReadItemParams,
+    VectorSearchParams,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -68,8 +77,6 @@ class PersistenceSkill(
         if not self.settings or not self.provider:
             return False
 
-        from pgvector.sqlalchemy import Vector
-
         # DNA Rule: Dynamic configuration of vector dimension
         InventoryItem.__table__.c.embedding.type = Vector(
             self.settings.vector_dimension
@@ -119,51 +126,67 @@ class PersistenceSkill(
             return Observation(success=False, error=str(e))
 
     async def _read_item_handler(self, params: dict[str, Any]) -> Observation:
-        item_id = params.get("item_id")
-        if not item_id:
-            return Observation(success=False, error="item_id_required")
+        p = ReadItemParams.model_validate(params)
+        identifier = p.identifier or p.item_id
+        if not identifier:
+            return Observation(success=False, error="identifier_required")
 
-        def fetch() -> dict[str, Any] | None:
+        def fetch() -> ItemData | None:
             with self._get_session() as session:
-                item = session.query(InventoryItem).filter_by(id=item_id).first()
+                item = session.query(InventoryItem).filter_by(id=identifier).first()
                 if item:
-                    return ItemSchema.model_validate(item).model_dump()
+                    s = ItemSchema.model_validate(item)
+                    return ItemData(
+                        identifier=s.id,
+                        name=s.name,
+                        base_price=s.base_price,
+                        floor_price=s.floor_price,
+                        meta=s.meta,
+                    )
                 return None
 
         result = await asyncio.to_thread(fetch)
         if result:
-            return Observation(success=True, data=result)
+            return Observation(success=True, item=result)
         return Observation(success=False, error="item_not_found")
 
     async def _get_first_item(self, params: dict[str, Any]) -> Observation:
-        def fetch() -> dict[str, Any] | None:
+        def fetch() -> ItemData | None:
             with self._get_session() as session:
                 item = session.query(InventoryItem).first()
                 if item:
-                    return ItemSchema.model_validate(item).model_dump()
+                    s = ItemSchema.model_validate(item)
+                    return ItemData(
+                        identifier=s.id,
+                        name=s.name,
+                        base_price=s.base_price,
+                        floor_price=s.floor_price,
+                        meta=s.meta,
+                    )
                 return None
 
         result = await asyncio.to_thread(fetch)
         if result:
-            return Observation(success=True, data=result)
+            return Observation(success=True, item=result)
         return Observation(success=False, error="no_items_found")
 
     async def _create_deal(self, params: dict[str, Any]) -> Observation:
         try:
+            p = CreateDealParams.model_validate(params)
 
             def create() -> bool:
                 with self._get_session() as session:
                     deal = LockedDeal(
-                        id=params["id"],
-                        item_id=params["item_id"],
-                        item_name=params["item_name"],
-                        final_price=params["final_price"],
-                        currency=params["currency"],
-                        payment_memo=params["payment_memo"],
-                        secret_content=params["secret_content"],
+                        id=p.id,
+                        identifier=p.identifier or p.item_id,
+                        item_name=p.item_name,
+                        final_price=p.final_price,
+                        currency=p.currency,
+                        payment_memo=p.payment_memo,
+                        secret_content=p.secret_content,
                         status=DealStatus.PENDING,
-                        buyer_did=params.get("buyer_did"),
-                        expires_at=params["expires_at"],
+                        buyer_did=p.buyer_did,
+                        expires_at=p.expires_at,
                     )
                     session.add(deal)
                     session.commit()
@@ -188,7 +211,10 @@ class PersistenceSkill(
 
         result = await asyncio.to_thread(fetch)
         if result:
-            return Observation(success=True, data=result)
+            # We don't have a Deal proto message yet, so use metadata for now or wrap in any_payload
+            return Observation(
+                success=True, metadata={"deal": json.dumps(result, default=str)}
+            )
         return Observation(success=False, error="deal_not_found")
 
     async def _get_deal_by_memo_handler(self, params: dict[str, Any]) -> Observation:
@@ -205,7 +231,9 @@ class PersistenceSkill(
 
         result = await asyncio.to_thread(fetch)
         if result:
-            return Observation(success=True, data=result)
+            return Observation(
+                success=True, metadata={"deal": json.dumps(result, default=str)}
+            )
         return Observation(success=False, error="deal_not_found")
 
     async def _update_deal_status(self, params: dict[str, Any]) -> Observation:
@@ -268,35 +296,46 @@ class PersistenceSkill(
             return Observation(success=False, error=str(e))
 
     async def _vector_search(self, params: dict[str, Any]) -> Observation:
-        query_vector = params.get("query_vector")
-        limit = params.get("limit", 5)
-        min_similarity = params.get("min_similarity")
+        p = VectorSearchParams.model_validate(params)
 
-        def search() -> list[dict[str, Any]]:
+        def search() -> list[ItemData]:
             with self._get_session() as session:
                 results = (
                     session.query(
                         InventoryItem,
-                        InventoryItem.embedding.cosine_distance(query_vector).label(
+                        InventoryItem.embedding.cosine_distance(p.query_vector).label(
                             "distance"
                         ),
                     )
-                    .order_by(InventoryItem.embedding.cosine_distance(query_vector))
-                    .limit(limit)
+                    .order_by(InventoryItem.embedding.cosine_distance(p.query_vector))
+                    .limit(p.limit)
                     .all()
                 )
 
                 response_items = []
                 for item, distance in results:
                     similarity = 1 - distance
-                    if min_similarity and similarity < min_similarity:
+                    if p.min_similarity and similarity < p.min_similarity:
                         continue
 
+                    s = ItemSchema.model_validate(item)
                     response_items.append(
-                        ItemSchema.model_validate(item).model_dump()
-                        | {"similarity_score": similarity}
+                        ItemData(
+                            identifier=s.id,
+                            name=s.name,
+                            base_price=s.base_price,
+                            floor_price=s.floor_price,
+                            meta={**s.meta, "similarity_score": str(similarity)},
+                        )
                     )
                 return response_items
 
         results = await asyncio.to_thread(search)
-        return Observation(success=True, data=results)
+        # Wrap results in metadata with JSON for now for search results
+        return Observation(
+            success=True,
+            metadata={
+                "results_count": str(len(results)),
+                "results_json": json.dumps([it.to_dict() for it in results]),
+            },
+        )

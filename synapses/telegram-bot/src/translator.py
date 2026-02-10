@@ -56,11 +56,11 @@ class TelegramTranslator:
                 signal_type=cast(SignalType, SignalType.SIGNAL_TYPE_NEGOTIATION),
                 timestamp=datetime.now(UTC),
                 negotiation=NegotiationSignal(
-                    item_id=item_id,
-                    bid_amount=bid_amount,
+                    identifier=item_id,
+                    price=bid_amount,
                     agent=AgentIdentity(
                         did=f"tg:{user_id}",
-                        reputation_score=1.0,
+                        reputation=1.0,
                     ),
                 ),
                 metadata={
@@ -125,15 +125,15 @@ class TelegramTranslator:
             neg = event.negotiation
             action = neg.action
             price = neg.price
-            item_id = neg.item_id
+            identifier = neg.identifier
 
             if action == ActionType.ACTION_TYPE_ACCEPT:
-                message = f"✅ *Deal Accepted!*\nItem: `{item_id}`\nFinal Price: `${price:.2f}`"
+                message = f"✅ *Deal Accepted!*\nItem: `{identifier}`\nFinal Price: `${price:.2f}`"
             elif action == ActionType.ACTION_TYPE_COUNTER:
-                message = f"🔄 *Counter-offer Received*\nItem: `{item_id}`\nProposed Price: `${price:.2f}`\n\nWhat is your response?"
+                message = f"🔄 *Counter-offer Received*\nItem: `{identifier}`\nProposed Price: `${price:.2f}`\n\nWhat is your response?"
             elif action == ActionType.ACTION_TYPE_REJECT:
-                message = f"❌ *Offer Rejected*\nItem: `{item_id}`\nThe agent was not interested in your bid."
+                message = f"❌ *Offer Rejected*\nItem: `{identifier}`\nThe agent was not interested in your bid."
             elif action == ActionType.ACTION_TYPE_ERROR:
-                message = f"⚠️ *Negotiation Error*\nItem: `{item_id}`\nSomething went wrong during the process."
+                message = f"⚠️ *Negotiation Error*\nItem: `{identifier}`\nSomething went wrong during the process."
 
         return chat_id, message

@@ -16,7 +16,7 @@ class NegotiationEventParams(BaseModel):
     session_token: str
     action: str  # accept, counter, reject
     price: float
-    item_id: str
+    identifier: str
     agent_did: str
 
 

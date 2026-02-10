@@ -4,8 +4,8 @@ import structlog
 from aura_core import (
     Aggregator,
     Connector,
+    Context,
     Generator,
-    HiveContext,
     IntentAction,
     Membrane,
     Observation,
@@ -21,9 +21,7 @@ logger = structlog.get_logger(__name__)
 tracer = trace.get_tracer(__name__)
 
 
-class MetabolicLoop(
-    BaseMetabolicLoop[Any, HiveContext, IntentAction, Observation, Any]
-):
+class MetabolicLoop(BaseMetabolicLoop[Any, Context, IntentAction, Observation, Any]):
     """
     Orchestrates the ATCG flow with core-specific monitoring via Telemetry Protein.
     Purified: No manual vitals injection in the loop; Nucleotides are Pure Pipes.
@@ -31,11 +29,11 @@ class MetabolicLoop(
 
     def __init__(
         self,
-        aggregator: Aggregator[Any, HiveContext],
-        transformer: Transformer[HiveContext, IntentAction],
-        connector: Connector[IntentAction, Observation, HiveContext],
+        aggregator: Aggregator[Any, Context],
+        transformer: Transformer[Context, IntentAction],
+        connector: Connector[IntentAction, Observation, Context],
         generator: Generator[Observation, Any],
-        membrane: Membrane[Any, IntentAction, HiveContext],
+        membrane: Membrane[Any, IntentAction, Context],
         registry: SkillRegistry | None = None,
     ):
         super().__init__(aggregator, transformer, connector, generator, membrane)

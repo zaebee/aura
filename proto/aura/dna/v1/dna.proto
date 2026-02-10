@@ -52,15 +52,15 @@ enum SignalType {
 }
 
 message NegotiationSignal {
-  string item_id = 1;
-  double bid_amount = 2;
+  string identifier = 1;
+  double price = 2;
   string currency_code = 3;
   AgentIdentity agent = 4;
 }
 
 message AgentIdentity {
   string did = 1;
-  float reputation_score = 2;
+  float reputation = 2;
 }
 
 message AuditSignal {
@@ -109,20 +109,20 @@ enum ContextType {
 }
 
 message HiveContextData {
-  string item_id = 1;
+  string identifier = 1;
   NegotiationOffer offer = 2;
   ItemData item = 3;
   string request_id = 4;
 }
 
 message NegotiationOffer {
-  double bid_amount = 1;
+  double price = 1;
   float reputation = 2;
   string agent_did = 3;
 }
 
 message ItemData {
-  string id = 1;
+  string identifier = 1;
   string name = 2;
   double base_price = 3;
   double floor_price = 4;
@@ -134,6 +134,9 @@ message BeeContextData {
   string git_diff = 2;
   repeated string filesystem_map = 3;
   map<string, double> hive_metrics = 4;
+  string event_name = 5;
+  map<string, string> event_data = 6;
+  map<string, string> metadata = 7;
 }
 
 message TelegramContextData {
@@ -215,6 +218,9 @@ message Observation {
     NegotiationObservation negotiation = 10;
     AuditObservation audit = 11;
     TelegramObservation telegram = 12;
+    ItemData item = 13;
+    SystemVitals vitals = 14;
+    google.protobuf.Any any_payload = 15;
   }
 }
 
@@ -248,7 +254,7 @@ message OfferRejected {
 message CryptoPaymentInstructions {
   string deal_id = 1;
   string wallet_address = 2;
-  double amount = 3;
+  double price = 3;
   string currency = 4;
   string memo = 5;
   string network = 6;
@@ -262,11 +268,30 @@ message AuditObservation {
   string reasoning = 4;
   double execution_time = 5;
   int32 token_usage = 6;
+  map<string, string> metadata = 7;
 }
 
 message TelegramObservation {
   int64 message_id = 1;
   bool delivered = 2;
+}
+
+message SearchResult {
+  string identifier = 1;
+  string name = 2;
+  double price = 3;
+  string description = 4;
+  double similarity = 5;
+}
+
+message BeeObservation {
+  bool success = 1;
+  string github_comment_url = 2;
+  bool nats_event_sent = 3;
+  repeated string injuries = 4;
+  AuditObservation report = 5;
+  BeeContextData context = 6;
+  map<string, string> metadata = 7;
 }
 
 // =============================================================================
@@ -294,7 +319,7 @@ message NegotiationEvent {
   string session_token = 1;
   ActionType action = 2;
   double price = 3;
-  string item_id = 4;
+  string identifier = 4;
   string agent_did = 5;
 }
 

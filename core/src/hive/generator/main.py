@@ -2,7 +2,11 @@ import uuid
 from typing import Any
 
 import structlog
-from aura_core import Event, Generator, Observation, SkillRegistry
+from aura_core import Generator, SkillRegistry
+from aura_core.gen.aura.dna.v1 import (
+    Event,
+    Observation,
+)
 
 from config import get_settings
 
@@ -40,16 +44,21 @@ class HiveGenerator(Generator[Observation, Event]):
             # Extract negotiation data from observation
             session_token = ""  # nosec B105
             price = 0.0
-            item_id = ""
+            identifier = ""
             agent_did = ""
 
-            if hasattr(observation.data, "session_token"):
-                session_token = observation.data.session_token
+            if observation.negotiation:
+                session_token = observation.negotiation.session_token
             if observation.metadata:
                 decision = observation.metadata.get("decision")
                 if decision:
-                    price = getattr(decision, "price", 0.0)
-                item_id = observation.metadata.get("item_id", "")
+                    # decision is Intent
+                    if hasattr(decision, "negotiation") and decision.negotiation:
+                        price = decision.negotiation.price
+                    else:
+                        # might be a string from get_action_name metadata
+                        pass
+                identifier = observation.metadata.get("item_id", "")
                 agent_did = observation.metadata.get("agent_did", "")
 
             # Emit binary negotiation event via Pulse Protein
@@ -60,7 +69,7 @@ class HiveGenerator(Generator[Observation, Event]):
                     "session_token": session_token,
                     "action": action,
                     "price": price,
-                    "item_id": item_id,
+                    "identifier": identifier,
                     "agent_did": agent_did,
                     "trace_id": trace_id,
                     "span_id": span_id,

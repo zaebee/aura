@@ -1,3 +1,4 @@
+import json
 import logging
 from typing import Any
 
@@ -71,18 +72,23 @@ class TransactionSkill(
         p = PaymentVerificationParams(**params)
         proof = await self.provider.verify_payment(p.amount, p.memo, p.currency)
         if proof:
-            return Observation(success=True, data=PaymentProof(**proof).model_dump())
+            return Observation(
+                success=True,
+                metadata={
+                    "payment_proof": json.dumps(PaymentProof(**proof).model_dump())
+                },
+            )
         return Observation(success=False, error="payment_not_found")
 
     async def _encrypt_secret(self, params: dict[str, Any]) -> Observation:
         assert self.encryption is not None
         encrypted = self.encryption.encrypt(params["secret"])
-        return Observation(success=True, data=encrypted)
+        return Observation(success=True, metadata={"encrypted": encrypted.decode()})
 
     async def _decrypt_secret(self, params: dict[str, Any]) -> Observation:
         assert self.encryption is not None
-        decrypted = self.encryption.decrypt(params["encrypted_secret"])
-        return Observation(success=True, data=decrypted)
+        decrypted = self.encryption.decrypt(params["encrypted_secret"].encode())
+        return Observation(success=True, metadata={"decrypted": decrypted})
 
     async def _convert_price(self, params: dict[str, Any]) -> Observation:
         assert self.converter is not None
@@ -91,16 +97,20 @@ class TransactionSkill(
             params["usd_amount"],
             params.get("currency", self.settings.currency),
         )
-        return Observation(success=True, data=amount)
+        return Observation(success=True, metadata={"crypto_amount": str(amount)})
 
     async def _get_address(self, params: dict[str, Any]) -> Observation:
         assert self.provider is not None
-        return Observation(success=True, data=str(self.provider.keypair.pubkey()))
+        return Observation(
+            success=True, metadata={"address": str(self.provider.keypair.pubkey())}
+        )
 
     async def _get_network_name(self, params: dict[str, Any]) -> Observation:
         assert self.settings is not None
         # Return network name from settings (e.g., "solana-mainnet")
-        return Observation(success=True, data=self.settings.solana_network or "solana")
+        return Observation(
+            success=True, metadata={"network": self.settings.solana_network or "solana"}
+        )
 
     async def close(self) -> None:
         if self.provider:

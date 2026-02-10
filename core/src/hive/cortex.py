@@ -1,4 +1,4 @@
-from typing import TYPE_CHECKING, Any, cast
+from typing import Any, cast
 
 import dspy
 import structlog
@@ -29,10 +29,8 @@ from hive.proteins.transaction.engine import (
     SecretEncryption,
     SolanaProvider,
 )
+from hive.services.market import MarketService
 from hive.transformer import AuraTransformer
-
-if TYPE_CHECKING:
-    from hive.metabolism import MetabolicLoop
 
 logger = structlog.get_logger("hive.cortex")
 
@@ -69,8 +67,6 @@ class HiveCell:
         # Market Service (Higher-order organ)
         market_service = None
         if self.settings.crypto.enabled:
-            from hive.services.market import MarketService
-
             persistence = cast(SkillProtocol, self.registry.get("persistence"))
             transaction = cast(SkillProtocol, self.registry.get("transaction"))
             market_service = MarketService(

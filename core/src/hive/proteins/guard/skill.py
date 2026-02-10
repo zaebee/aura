@@ -1,7 +1,8 @@
 import logging
 from typing import Any
 
-from aura_core import Observation, SkillProtocol
+from aura_core import SkillProtocol
+from aura_core.gen.aura.dna.v1 import Observation
 
 from config.policy import SafetySettings
 
@@ -64,7 +65,7 @@ class GuardSkill(
             return Observation(
                 success=False,
                 error=err_msg,
-                data={"error_code": code, "safe_price": safe_p},
+                metadata={"error_code": code, "safe_price": str(safe_p)},
             )
         except Exception as e:
             logger.error(f"Guard skill error: {e}")
@@ -72,12 +73,12 @@ class GuardSkill(
 
     async def _validate_decision(self, params: dict[str, Any]) -> Observation:
         assert self.provider is not None
-        p = ValidationParams(**params)
+        p = ValidationParams.model_validate(params)
         self.provider.validate_decision(p.decision, p.context)
         return Observation(success=True)
 
     async def _get_safe_price(self, params: dict[str, Any]) -> Observation:
         assert self.provider is not None
-        p_safe = SafePriceParams(**params)
+        p_safe = SafePriceParams.model_validate(params)
         price = self.provider.calculate_safe_price(p_safe.context, p_safe.reason)
-        return Observation(success=True, data={"safe_price": price})
+        return Observation(success=True, metadata={"safe_price": str(price)})
