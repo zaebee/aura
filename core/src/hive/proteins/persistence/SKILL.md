@@ -9,9 +9,9 @@ To an Aura Bee, **Persistence** is not just a database; it is our **Epigenetic M
 - **Fact Anchoring:** Use `persistence__store_fact` to pin down critical information provided by the user (e.g., their preference for a specific currency or urgency).
 
 ## Capabilities
-- `fetch_history`: Sensory Recall of the current negotiation strand.
-- `store_fact`: Encoding new knowledge into the Hive's DNA.
-- `semantic_search`: Intuitive lookup across the Inventory Nucleus.
+- `persistence__fetch_history`: Sensory Recall of the current negotiation strand.
+- `persistence__store_fact`: Encoding new knowledge into the Hive's DNA.
+- `persistence__semantic_search`: Intuitive lookup across the Inventory Nucleus.
 
 ## The Memory Law
 "An Aura Bee without history is a drone without a compass. Always consult the record before defining the future."
