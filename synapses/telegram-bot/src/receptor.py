@@ -1,3 +1,5 @@
+from io import BytesIO
+
 import structlog
 from aiogram import F, Router
 from aiogram.filters import Command, CommandObject
@@ -115,8 +117,6 @@ class TelegramReceptor:
             return
 
         # Download photo
-        from io import BytesIO
-
         result: BytesIO = await message.bot.download_file(file_path)  # type: ignore
         image_bytes = result.read()
 

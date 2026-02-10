@@ -1,4 +1,5 @@
 import base64
+import hashlib
 import json
 from typing import Any
 
@@ -51,14 +52,12 @@ class PerceptionEngine:
                 result = response.json()
                 response_text = result.get("response", "")
                 return self.map_text_to_item(response_text)
-        except Exception as e:
+        except (httpx.RequestError, httpx.HTTPStatusError) as e:
             logger.error("perception_engine_error", error=str(e))
             return self._get_fallback_item(str(e))
 
     def map_text_to_item(self, text: str) -> dict[str, Any]:
         """The Mapping Enzyme: maps text response into Item-like dict."""
-        import hashlib
-
         try:
             data = json.loads(text)
             # Use a stable hash for asset ID
@@ -75,7 +74,7 @@ class PerceptionEngine:
                 "floor_price": float(data.get("floor_price", 0.0)),
                 "meta": meta,
             }
-        except Exception as e:
+        except (json.JSONDecodeError, TypeError, KeyError) as e:
             logger.error("mapping_error", error=str(e), text=text)
             return self._get_fallback_item(f"Parse error: {e}")
 
