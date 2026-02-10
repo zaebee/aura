@@ -104,6 +104,10 @@ class TelegramReceptor:
 
         # Get the largest photo
         photo = message.photo[-1]
+        if not message.bot:
+            await message.answer("Internal error: bot not initialized.")
+            return
+
         file = await message.bot.get_file(photo.file_id)
         file_path = file.file_path
         if not file_path:
