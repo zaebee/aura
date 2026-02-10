@@ -1,6 +1,6 @@
-import logging
 from typing import Any
 
+import structlog
 from aura_core import Observation, SkillProtocol
 
 from config.perception import PerceptionSettings
@@ -8,7 +8,7 @@ from config.perception import PerceptionSettings
 from .engine import PerceptionEngine
 from .schema import PerceiveImageParams, PerceiveImageResult
 
-logger = logging.getLogger(__name__)
+logger = structlog.get_logger(__name__)
 
 
 class PerceptionSkill(

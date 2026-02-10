@@ -79,19 +79,11 @@ class HiveAggregator(Aggregator[Any, HiveContext]):
                             reputation=proto_signal.perception.agent.reputation_score,
                             agent_did=proto_signal.perception.agent.did,
                         )
-                        # Inject perceived item into context directly to bypass DB if needed,
-                        # but HiveContext expects item_data.
-                        item_data = {
-                            "id": item["id"],
-                            "name": item["name"],
-                            "base_price": item["base_price"],
-                            "floor_price": item["floor_price"],
-                            "meta": item["meta"] or {},
-                        }
+                        # Inject perceived item into context directly to bypass DB if needed.
                         return HiveContext(
                             item_id=item_id,
                             offer=offer,
-                            item_data=item_data,
+                            item_data=item,
                             system_health=await self.get_vitals(),
                             request_id=request_id,
                             metadata={"brain_path": self.brain_path, "source": "perception"},
