@@ -2,7 +2,6 @@ import asyncio
 import os
 import shutil
 import signal
-import subprocess  # nosec B404
 from collections.abc import Callable
 from typing import Any
 
