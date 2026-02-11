@@ -3,12 +3,12 @@ import hashlib
 import os
 import secrets
 import signal
-import subprocess  # nosec B404
 from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 
-import requests
+import aiofiles
+import httpx
 import structlog
 import toml
 
@@ -28,12 +28,14 @@ class Umbilical:
         punk_key: str,
         frp_port: int = 7000,
         worker_id: str | None = None,
+        nats_active: bool = True,
     ) -> None:
         self.hive_host: str = hive_host
         self.frp_port: int = frp_port
         self.frp_token: str = frp_token
         self.punk_key: str = punk_key
         self.worker_id: str = worker_id or secrets.token_hex(4)
+        self.nats_active: bool = nats_active
         self.proxy_name: str = f"ollama-worker-{self.worker_id}"
 
         self.work_dir: Path = Path.home() / ".aura" / "worker"
@@ -43,7 +45,7 @@ class Umbilical:
 
         self.process: asyncio.subprocess.Process | None = None
 
-    def ensure_frpc(self) -> None:
+    async def ensure_frpc(self) -> None:
         if self.frpc_path.exists():
             return
 
@@ -54,16 +56,17 @@ class Umbilical:
         frp_url: str = f"https://github.com/fatedier/frp/releases/download/v{self.FRPC_VERSION}/{frp_file}"
 
         logger.info("Downloading frpc", version=self.FRPC_VERSION)
-        response: requests.Response = requests.get(frp_url, stream=True, timeout=30)  # nosec B113
-        response.raise_for_status()
 
         tar_path: Path = self.bin_dir / frp_file
         sha256 = hashlib.sha256()
 
-        with open(tar_path, "wb") as f:
-            for chunk in response.iter_content(chunk_size=8192):
-                f.write(chunk)
-                sha256.update(chunk)
+        async with httpx.AsyncClient(follow_redirects=True) as client:
+            async with client.stream("GET", frp_url, timeout=60.0) as response:
+                response.raise_for_status()
+                async with aiofiles.open(tar_path, "wb") as f:
+                    async for chunk in response.aiter_bytes(chunk_size=8192):
+                        await f.write(chunk)
+                        sha256.update(chunk)
 
         if sha256.hexdigest() != self.FRPC_SHA256:
             tar_path.unlink()
@@ -72,21 +75,23 @@ class Umbilical:
             )
 
         logger.info("Checksum verified. Extracting...")
-        subprocess.run(
-            ["tar", "-xzf", str(tar_path), "-C", str(self.bin_dir)],
-            check=True,  # nosec B603 B607
+        tar_proc = await asyncio.create_subprocess_exec(
+            "tar", "-xzf", str(tar_path), "-C", str(self.bin_dir),
         )
+        await tar_proc.wait()
 
         extracted_dir: Path = self.bin_dir / f"frp_{self.FRPC_VERSION}_linux_amd64"
         (extracted_dir / "frpc").rename(self.frpc_path)
 
         # Cleanup
         tar_path.unlink()
-        subprocess.run(["rm", "-rf", str(extracted_dir)], check=True)  # nosec B603 B607
+        rm_proc = await asyncio.create_subprocess_exec("rm", "-rf", str(extracted_dir))
+        await rm_proc.wait()
+
         self.frpc_path.chmod(0o755)
         logger.info("frpc installed", path=str(self.frpc_path))
 
-    def _generate_config(self) -> None:
+    async def _generate_config(self) -> None:
         config_data: dict[str, Any] = {
             "serverAddr": self.hive_host,
             "serverPort": self.frp_port,
@@ -102,7 +107,11 @@ class Umbilical:
                     "localPort": 11434,
                 }
             ],
-            "visitors": [
+            "visitors": [],
+        }
+
+        if self.nats_active:
+            config_data["visitors"].append(
                 {
                     "name": f"nats-visitor-{self.worker_id}",
                     "type": "stcp",
@@ -111,10 +120,10 @@ class Umbilical:
                     "bindAddr": "127.0.0.1",
                     "bindPort": 4222,
                 }
-            ],
-        }
-        with open(self.config_path, "w") as f:
-            toml.dump(config_data, f)
+            )
+
+        async with aiofiles.open(self.config_path, "w") as f:
+            await f.write(toml.dumps(config_data))
 
     async def cleanup_zombies(self) -> None:
         """Kill any process listening on port 7000."""
@@ -136,8 +145,8 @@ class Umbilical:
             logger.warning("Failed to clean up zombie processes on port 7000", exc_info=True)
 
     async def start(self, log_callback: Callable[[Any], None] = print) -> None:
-        await asyncio.to_thread(self.ensure_frpc)
-        await asyncio.to_thread(self._generate_config)
+        await self.ensure_frpc()
+        await self._generate_config()
 
         log_callback(f"--- Starting Umbilical (STCP Tunnel: {self.proxy_name}) ---")
 

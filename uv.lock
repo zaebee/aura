@@ -466,6 +466,7 @@ name = "aura-worker"
 version = "0.1.0"
 source = { editable = "packages/aura-worker" }
 dependencies = [
+    { name = "aiofiles" },
     { name = "aura-core" },
     { name = "gradio" },
     { name = "httpx" },
@@ -485,6 +486,7 @@ ml = [
 
 [package.metadata]
 requires-dist = [
+    { name = "aiofiles", specifier = ">=24.0.0" },
     { name = "aura-core", editable = "packages/aura-core" },
     { name = "gradio", specifier = ">=4.0.0" },
     { name = "httpx", specifier = ">=0.27.0" },

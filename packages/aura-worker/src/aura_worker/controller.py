@@ -30,6 +30,7 @@ class WorkerController:
         self.ui_log_queue: asyncio.Queue[str] = asyncio.Queue(maxsize=5000)
         self.full_logs: list[str] = []
         self._logging_configured: bool = False
+        self.nats_enabled: bool = True
 
     def log(self, message: Any) -> None:
         """Internal log callback that secretes logs into the UI queue."""
@@ -66,6 +67,13 @@ class WorkerController:
                 return "Node is already running."
 
         try:
+            # MLS Mode Check
+            self.nats_enabled = (
+                nats_url.lower().strip() not in ["none", "", "null"]
+                if nats_url
+                else False
+            )
+
             progress(0, desc="Starting Ollama...")
             await self.node.start_ollama(log_callback=self.log)
 
@@ -79,27 +87,33 @@ class WorkerController:
                 punk_key=punk_key,
                 frp_port=int(frp_port),
                 worker_id=self.worker_id,
+                nats_active=self.nats_enabled,
             )
             await self.umbilical.start(log_callback=self.log)
 
-            # Initialize Log Protein and Metabolic Loop
-            progress(0.8, desc="Synchronizing with Hive Bloodstream...")
-            self.log_handler = HiveLogHandler(
-                worker_name=self.worker_id, nats_url=nats_url, ui_queue=self.ui_log_queue
-            )
-            self.metabolism = MetabolicLoop(
-                worker_name=self.worker_id, nats_url=nats_url
-            )
+            if self.nats_enabled:
+                # Initialize Log Protein and Metabolic Loop
+                progress(0.8, desc="Synchronizing with Hive Bloodstream...")
+                self.log_handler = HiveLogHandler(
+                    worker_name=self.worker_id,
+                    nats_url=nats_url,
+                    ui_queue=self.ui_log_queue,
+                )
+                self.metabolism = MetabolicLoop(
+                    worker_name=self.worker_id, nats_url=nats_url
+                )
 
-            # Setup standard logging
-            root_logger = logging.getLogger()
-            self.original_log_level = root_logger.level
-            root_logger.addHandler(self.log_handler)
-            root_logger.setLevel(logging.INFO)
-            self._logging_configured = True
+                # Setup standard logging
+                root_logger = logging.getLogger()
+                self.original_log_level = root_logger.level
+                root_logger.addHandler(self.log_handler)
+                root_logger.setLevel(logging.INFO)
+                self._logging_configured = True
 
-            await self.log_handler.start()
-            await self.metabolism.start(kill_callback=self.stop)
+                await self.log_handler.start()
+                await self.metabolism.start(kill_callback=self.stop)
+            else:
+                self.log("--- MLS Mode Active: NATS Bloodstream Bypassed ---")
 
             async with self.node.lock:
                 self.node.is_running = True
@@ -140,6 +154,9 @@ class WorkerController:
         return "Node Stopped"
 
     async def test_pulse(self) -> str:
+        if not self.nats_enabled:
+            return "❌ Test Pulse disabled in MLS Mode."
+
         if not self.log_handler or not self.log_handler.is_connected:
             return "❌ NATS not connected. Start the node first."
 
@@ -168,7 +185,9 @@ class WorkerController:
         node_status: str = await self.node.get_status()
         nats_status: str = "🔴 Offline"
 
-        if self.metabolism and self.metabolism.is_connected:
+        if not self.nats_enabled:
+            nats_status = "⚪ Disabled (MLS Mode)"
+        elif self.metabolism and self.metabolism.is_connected:
             nats_status = "🟢 Connected (Pulse Active)"
         elif self.node.is_running:
             nats_status = "🟠 Pending (Connecting...)"

@@ -1,6 +1,7 @@
 import os
 
 import gradio as gr
+import nest_asyncio
 from dotenv import load_dotenv
 
 from .controller import WorkerController
@@ -11,6 +12,7 @@ def launch_interactive_node():
     Launches the Aura Interactive Worker Node UI.
     Utilizes Async Metabolism for non-blocking execution in Colab/Jupyter.
     """
+    nest_asyncio.apply()
     load_dotenv()
 
     # Env Var Overrides
@@ -24,7 +26,17 @@ def launch_interactive_node():
     async def refresh_ui():
         node_status, nats_status, requests_processed = await controller.get_status()
         logs = await controller.get_ui_logs()
-        return node_status, nats_status, requests_processed, logs
+
+        # Test Pulse is only available if NATS is enabled AND the node is running
+        pulse_interactive = getattr(controller, "nats_enabled", True) and controller.node.is_running
+
+        return (
+            node_status,
+            nats_status,
+            requests_processed,
+            logs,
+            gr.update(interactive=pulse_interactive),
+        )
 
     with gr.Blocks(title="Aura Node", theme=gr.themes.Soft()) as demo:
         gr.Markdown("# 🐝 Aura Interactive Worker Node")
@@ -71,7 +83,10 @@ def launch_interactive_node():
         )
 
         timer = gr.Timer(2)
-        timer.tick(refresh_ui, outputs=[status_label, nats_label, stats_box, log_output])
+        timer.tick(
+            refresh_ui,
+            outputs=[status_label, nats_label, stats_box, log_output, test_pulse_btn],
+        )
 
         start_btn.click(
             controller.start,
