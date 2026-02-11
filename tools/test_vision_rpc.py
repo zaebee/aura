@@ -4,8 +4,9 @@ import json
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
-from nats.aio.msg import Msg
 from aura_worker.metabolism.main import MetabolicLoop
+from nats.aio.msg import Msg
+
 
 @pytest.mark.asyncio
 async def test_vision_rpc_handler():

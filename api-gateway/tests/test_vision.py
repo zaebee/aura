@@ -1,9 +1,12 @@
 import json
+from unittest.mock import AsyncMock, MagicMock, patch
+
+import nats
 import pytest
 from fastapi.testclient import TestClient
-from unittest.mock import AsyncMock, patch, MagicMock
-from main import app, settings
-import nats
+from main import app
+from security import verify_signature
+
 
 @pytest.fixture
 def client():
@@ -20,7 +23,6 @@ async def test_analyze_vision_endpoint():
     # 2. Patch global nc and verify_signature dependency
     with patch("main.nc", mock_nc):
         # We override the dependency to skip signature verification for this test
-        from security import verify_signature
         app.dependency_overrides[verify_signature] = lambda: "did:key:test"
 
         client = TestClient(app)
