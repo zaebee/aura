@@ -7,6 +7,7 @@ from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 
+import aiofiles
 import httpx
 import structlog
 import toml
@@ -62,9 +63,9 @@ class Umbilical:
         async with httpx.AsyncClient(follow_redirects=True) as client:
             async with client.stream("GET", frp_url, timeout=60.0) as response:
                 response.raise_for_status()
-                with open(tar_path, "wb") as f:
+                async with aiofiles.open(tar_path, "wb") as f:
                     async for chunk in response.aiter_bytes(chunk_size=8192):
-                        f.write(chunk)
+                        await f.write(chunk)
                         sha256.update(chunk)
 
         if sha256.hexdigest() != self.FRPC_SHA256:
@@ -90,7 +91,7 @@ class Umbilical:
         self.frpc_path.chmod(0o755)
         logger.info("frpc installed", path=str(self.frpc_path))
 
-    def _generate_config(self) -> None:
+    async def _generate_config(self) -> None:
         config_data: dict[str, Any] = {
             "serverAddr": self.hive_host,
             "serverPort": self.frp_port,
@@ -121,8 +122,8 @@ class Umbilical:
                 }
             )
 
-        with open(self.config_path, "w") as f:
-            toml.dump(config_data, f)
+        async with aiofiles.open(self.config_path, "w") as f:
+            await f.write(toml.dumps(config_data))
 
     async def cleanup_zombies(self) -> None:
         """Kill any process listening on port 7000."""
@@ -145,7 +146,7 @@ class Umbilical:
 
     async def start(self, log_callback: Callable[[Any], None] = print) -> None:
         await self.ensure_frpc()
-        await asyncio.to_thread(self._generate_config)
+        await self._generate_config()
 
         log_callback(f"--- Starting Umbilical (STCP Tunnel: {self.proxy_name}) ---")
 
