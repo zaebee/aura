@@ -6,7 +6,7 @@ import subprocess  # nosec B404
 from collections.abc import Callable
 from typing import Any
 
-import requests
+import httpx
 import structlog
 import torch
 
@@ -20,11 +20,10 @@ class AuraNode:
         self.is_running: bool = False
         self.requests_processed: int = 0
         self.lock: asyncio.Lock = asyncio.Lock()
-        self.gpu_active: bool
-        self.gpu_info: str
-        self.gpu_active, self.gpu_info = self._check_gpu()
+        self.gpu_active: bool = False
+        self.gpu_info: str = "Checking GPU..."
 
-    def _check_gpu(self) -> tuple[bool, str]:
+    async def _check_gpu(self) -> tuple[bool, str]:
         """System Check Enzyme: verify if a GPU is active."""
         try:
             if torch.cuda.is_available():
@@ -36,15 +35,15 @@ class AuraNode:
 
         # Fallback to nvidia-smi
         try:
-            result = subprocess.run(
-                ["nvidia-smi", "--query-gpu=name", "--format=csv,noheader"],  # nosec B603 B607
-                capture_output=True,
-                text=True,
-                check=False,
+            proc = await asyncio.create_subprocess_exec(
+                "nvidia-smi", "--query-gpu=name", "--format=csv,noheader",
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.PIPE,
             )
-            if result.returncode == 0:
-                return True, f"GPU Active: {result.stdout.strip()}"
-        except (FileNotFoundError, subprocess.SubprocessError):  # nosec B110
+            stdout, _ = await proc.communicate()
+            if proc.returncode == 0:
+                return True, f"GPU Active: {stdout.decode().strip()}"
+        except (FileNotFoundError, Exception):  # nosec B110
             # nvidia-smi not found or failed to run
             pass
 
@@ -74,6 +73,9 @@ class AuraNode:
             if self.ollama_process:
                 return
 
+            # Verify GPU before starting
+            self.gpu_active, self.gpu_info = await self._check_gpu()
+
             await self.cleanup_zombies()
 
             if shutil.which("ollama") is None:
@@ -101,14 +103,14 @@ class AuraNode:
             asyncio.create_task(self._read_output(self.ollama_process, log_callback))
 
         # Wait for ollama to be up
-        for _ in range(30):
-            try:
-                loop: asyncio.AbstractEventLoop = asyncio.get_running_loop()
-                await loop.run_in_executor(None, lambda: requests.get("http://localhost:11434", timeout=5))  # nosec B113
-                log_callback("Ollama server is up.")
-                return
-            except Exception:  # nosec B110
-                await asyncio.sleep(1)
+        async with httpx.AsyncClient() as client:
+            for _ in range(30):
+                try:
+                    await client.get("http://localhost:11434", timeout=5)
+                    log_callback("Ollama server is up.")
+                    return
+                except Exception:  # nosec B110
+                    await asyncio.sleep(1)
 
         await self.stop_ollama()
         raise RuntimeError("Ollama failed to start within 30 seconds.")
@@ -163,6 +165,9 @@ class AuraNode:
 
     async def get_status(self) -> str:
         async with self.lock:
+            base_status = self.status
             if not self.gpu_active:
+                if self.is_running:
+                    return f"{base_status} (⚠️ CPU MODE)"
                 return "⚠️ DEGRADED (CPU MODE)"
-            return self.status
+            return base_status
