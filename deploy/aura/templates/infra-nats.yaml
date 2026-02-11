@@ -1,3 +1,11 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: "{{ .Release.Name }}-nats-config"
+data:
+  nats.conf: |
+    max_payload: 8mb
+---
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -15,11 +23,13 @@ spec:
       containers:
       - name: nats
         image: nats:2.10-alpine
-        {{- if .Values.nats.jetstream.enabled }}
         args:
+          - "-c"
+          - "/etc/nats/nats.conf"
+          {{- if .Values.nats.jetstream.enabled }}
           - "--js"
           - "--sd=/data/jetstream"
-        {{- end }}
+          {{- end }}
         resources:
           limits:
             cpu: 100m
@@ -44,13 +54,18 @@ spec:
           periodSeconds: 10
           timeoutSeconds: 3
           failureThreshold: 2
-        {{- if .Values.nats.jetstream.enabled }}
         volumeMounts:
+        - name: nats-config
+          mountPath: /etc/nats
+        {{- if .Values.nats.jetstream.enabled }}
         - name: nats-data
           mountPath: /data/jetstream
         {{- end }}
-      {{- if .Values.nats.jetstream.enabled }}
       volumes:
+      - name: nats-config
+        configMap:
+          name: "{{ .Release.Name }}-nats-config"
+      {{- if .Values.nats.jetstream.enabled }}
       - name: nats-data
         persistentVolumeClaim:
           claimName: {{ .Release.Name }}-nats-js-pvc

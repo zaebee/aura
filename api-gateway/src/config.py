@@ -17,6 +17,9 @@ class Settings(BaseSettings):
     core_service_host: str = Field(...)  # type: ignore
     negotiation_timeout: float = 60.0
 
+    # NATS Connection
+    nats_url: str = Field("nats://localhost:4222")
+
     # HTTP Server
     http_port: int = 8000
     log_level: str = "info"

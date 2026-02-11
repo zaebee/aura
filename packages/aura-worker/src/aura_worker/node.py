@@ -7,7 +7,11 @@ from typing import Any
 
 import httpx
 import structlog
-import torch
+
+try:
+    import torch
+except ImportError:
+    torch = None  # type: ignore
 
 logger = structlog.get_logger(__name__)
 
@@ -25,10 +29,10 @@ class AuraNode:
     async def _check_gpu(self) -> tuple[bool, str]:
         """System Check Enzyme: verify if a GPU is active."""
         try:
-            if torch.cuda.is_available():
+            if torch and torch.cuda.is_available():
                 device_name = torch.cuda.get_device_name(0)
                 return True, f"GPU Active: {device_name}"
-        except (ImportError, RuntimeError):  # nosec B110
+        except (ImportError, RuntimeError, AttributeError):  # nosec B110
             # Catch specific errors related to torch or CUDA availability
             pass
 
@@ -186,3 +190,37 @@ class AuraNode:
                     return f"{base_status} (⚠️ CPU MODE)"
                 return "⚠️ DEGRADED (CPU MODE)"
             return base_status
+
+    async def analyze_vision(self, image_bytes: bytes, prompt: str) -> dict[str, Any]:
+        """High-precision identification of vehicles via local Ollama."""
+        import base64
+
+        base64_image = base64.b64encode(image_bytes).decode("utf-8")
+
+        payload = {
+            "model": "gemma3:latest",  # Worker standard for vision
+            "prompt": prompt,
+            "stream": False,
+            "images": [base64_image],
+            "format": "json",
+        }
+
+        async with httpx.AsyncClient(timeout=120.0) as client:
+            try:
+                response = await client.post(
+                    "http://localhost:11434/api/generate", json=payload
+                )
+                response.raise_for_status()
+                result = response.json()
+                response_text = result.get("response", "{}")
+
+                import json
+
+                try:
+                    return json.loads(response_text)
+                except json.JSONDecodeError:
+                    return {"error": "Invalid JSON from Ollama", "raw": response_text}
+
+            except Exception as e:
+                logger.error("vision_analysis_failed", error=str(e))
+                return {"error": str(e)}

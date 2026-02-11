@@ -100,15 +100,20 @@ async def verify_signature(
     try:
         # Read and hash request body
         body_bytes = await request.body()
-        if body_bytes:
-            body_json = json.loads(body_bytes.decode("utf-8"))
-            body_canonical = json.dumps(
-                body_json, sort_keys=True, separators=(",", ":")
-            )
-            body_hash = hashlib.sha256(body_canonical.encode("utf-8")).hexdigest()
+        content_type = request.headers.get("content-type", "")
 
-            # Store the parsed body in request.state for later use by FastAPI
-            request.state.parsed_body = body_json
+        if body_bytes:
+            if "application/json" in content_type:
+                body_json = json.loads(body_bytes.decode("utf-8"))
+                body_canonical = json.dumps(
+                    body_json, sort_keys=True, separators=(",", ":")
+                )
+                body_hash = hashlib.sha256(body_canonical.encode("utf-8")).hexdigest()
+                request.state.parsed_body = body_json
+            else:
+                # For multipart/form-data or other types, hash the raw bytes
+                body_hash = hashlib.sha256(body_bytes).hexdigest()
+                request.state.parsed_body = {}
         else:
             body_hash = hashlib.sha256(b"").hexdigest()
             request.state.parsed_body = {}
