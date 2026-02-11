@@ -151,15 +151,27 @@ class AuraTransformer(Transformer[HiveContext, IntentAction]):
             raw_thought = result.get("thought", "")
             wrapped_thought = f"<think>\n{raw_thought}\n</think>" if raw_thought else ""
 
+            action_metadata = {
+                **result.get("metadata", {}),
+                "brain_path": self.brain_path,
+            }
+
+            # If it's a vision-based discovery or its confirmation, propagate result
+            is_vision = context.metadata.get("source") == "vision"
+            is_vision_confirm = (
+                context.metadata.get("source") == "telegram"
+                and "list_now" in context.metadata.get("callback_data", "")
+            )
+            if (is_vision or is_vision_confirm) and context.item_data:
+                import json
+                action_metadata["vision_result"] = json.dumps(context.item_data)
+
             return IntentAction(
                 action=cast(ActionType, map_action(result["action"])),
                 price=result["price"],
                 message=result["message"],
                 thought=wrapped_thought,
-                metadata={
-                    **result.get("metadata", {}),
-                    "brain_path": self.brain_path,
-                },
+                metadata=action_metadata,
             )
 
         except Exception as e:
