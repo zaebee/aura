@@ -81,7 +81,7 @@ $(PROTO_SENTINEL): $(PROTO_SOURCES) buf.gen.yaml
 		echo "from betterproto.lib.google import protobuf" > packages/aura-core/src/aura_core/gen/aura/dna/google/__init__.py; \
 	fi
 	if [ -f "packages/aura-core/src/aura_core/gen/aura/negotiation/v1.py" ]; then \
-		sed -i 's/from .aura.dna import v1/from aura.dna import v1/' packages/aura-core/src/aura_core/gen/aura/negotiation/v1.py; \
+		sed -i 's/from .aura.dna import v1/from aura_core.gen.aura.dna import v1/' packages/aura-core/src/aura_core/gen/aura/negotiation/v1.py; \
 	fi
 	touch $(PROTO_SENTINEL)
 
