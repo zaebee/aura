@@ -1,4 +1,5 @@
 import os
+from typing import Any
 
 import gradio as gr
 import nest_asyncio
@@ -7,7 +8,7 @@ from dotenv import load_dotenv
 from .controller import WorkerController
 
 
-def launch_interactive_node():
+def launch_interactive_node() -> None:
     """
     Launches the Aura Interactive Worker Node UI.
     Utilizes Async Metabolism for non-blocking execution in Colab/Jupyter.
@@ -23,12 +24,14 @@ def launch_interactive_node():
 
     controller = WorkerController()
 
-    async def refresh_ui():
+    async def refresh_ui() -> Any:
         node_status, nats_status, requests_processed = await controller.get_status()
         logs = await controller.get_ui_logs()
 
         # Test Pulse is only available if NATS is enabled AND the node is running
-        pulse_interactive = getattr(controller, "nats_enabled", True) and controller.node.is_running
+        pulse_interactive = (
+            getattr(controller, "nats_enabled", True) and controller.node.is_running
+        )
 
         return (
             node_status,
@@ -104,4 +107,11 @@ def launch_interactive_node():
         test_pulse_btn.click(controller.test_pulse, outputs=[log_output])
 
     # Use prevent_thread_lock=True to allow the notebook to continue executing other cells
-    demo.launch(share=True, inline=False, prevent_thread_lock=True)
+    demo.launch(
+        share=True,
+        inline=False,
+        prevent_thread_lock=True,
+        debug=True,
+        server_port=7860,
+        show_error=True,
+    )

@@ -1,5 +1,6 @@
 import asyncio
 import logging
+from typing import Any
 
 from nats.aio.client import Client as NATS
 
@@ -18,7 +19,7 @@ class MetabolicLoop:
         self.nc = NATS()
         self._kill_callback = None
 
-    async def start(self, kill_callback=None):
+    async def start(self, kill_callback: Any | None = None) -> bool:
         """Connect to NATS and subscribe to command signals."""
         self._kill_callback = kill_callback
         try:
@@ -40,13 +41,13 @@ class MetabolicLoop:
             logger.warning("MetabolicLoop NATS connection pending.")
             return False
 
-    async def stop(self):
+    async def stop(self) -> None:
         """Disconnect from NATS."""
         if self.nc.is_connected:
             await self.nc.drain()
             await self.nc.close()
 
-    async def _handle_message(self, msg):
+    async def _handle_message(self, msg: Any) -> None:
         """Handle incoming command messages."""
         try:
             data = msg.data.decode().strip().lower()
@@ -64,4 +65,4 @@ class MetabolicLoop:
 
     @property
     def is_connected(self) -> bool:
-        return self.nc.is_connected
+        return bool(self.nc.is_connected)

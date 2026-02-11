@@ -35,7 +35,9 @@ class AuraNode:
         # Fallback to nvidia-smi
         try:
             proc = await asyncio.create_subprocess_exec(
-                "nvidia-smi", "--query-gpu=name", "--format=csv,noheader",
+                "nvidia-smi",
+                "--query-gpu=name",
+                "--format=csv,noheader",
                 stdout=asyncio.subprocess.PIPE,
                 stderr=asyncio.subprocess.PIPE,
             )
@@ -52,7 +54,9 @@ class AuraNode:
         """Kill any process listening on port 11434."""
         try:
             process = await asyncio.create_subprocess_exec(
-                "lsof", "-t", "-i:11434",
+                "lsof",
+                "-t",
+                "-i:11434",
                 stdout=asyncio.subprocess.PIPE,
                 stderr=asyncio.subprocess.PIPE,
             )
@@ -65,7 +69,9 @@ class AuraNode:
                     except ProcessLookupError:
                         pass
         except Exception:
-            logger.warning("Failed to clean up zombie processes on port 11434", exc_info=True)
+            logger.warning(
+                "Failed to clean up zombie processes on port 11434", exc_info=True
+            )
 
     async def start_ollama(self, log_callback: Callable[[Any], None] = print) -> None:
         async with self.lock:
@@ -91,9 +97,13 @@ class AuraNode:
             # Enable debug logging for Ollama to ensure thought capture stability
             env: dict[str, str] = os.environ.copy()
             env["OLLAMA_DEBUG"] = "1"
+            env["OLLAMA_MAX_LOADED_MODELS"] = "1"
+            env["OLLAMA_NUM_PARALLEL"] = "1"
+            env["OLLAMA_FLASH_ATTENTION"] = "0"
 
             self.ollama_process = await asyncio.create_subprocess_exec(
-                "ollama", "serve",
+                "ollama",
+                "serve",
                 stdout=asyncio.subprocess.PIPE,
                 stderr=asyncio.subprocess.STDOUT,
                 env=env,
@@ -114,13 +124,17 @@ class AuraNode:
         await self.stop_ollama()
         raise RuntimeError("Ollama failed to start within 30 seconds.")
 
-    async def pull_model(self, model: str, log_callback: Callable[[Any], None] = print) -> None:
+    async def pull_model(
+        self, model: str, log_callback: Callable[[Any], None] = print
+    ) -> None:
         if not model or model.lstrip().startswith("-"):
             raise ValueError(f"Invalid model name provided: '{model}'")
         log_callback(f"--- Pulling model: {model} ---")
 
         pull_proc: asyncio.subprocess.Process = await asyncio.create_subprocess_exec(
-            "ollama", "pull", model,
+            "ollama",
+            "pull",
+            model,
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.STDOUT,
         )
@@ -137,7 +151,9 @@ class AuraNode:
         if pull_proc.returncode != 0:
             raise RuntimeError(f"Failed to pull model {model}")
 
-    async def _read_output(self, process: asyncio.subprocess.Process, log_callback: Callable[[Any], None]) -> None:
+    async def _read_output(
+        self, process: asyncio.subprocess.Process, log_callback: Callable[[Any], None]
+    ) -> None:
         if process.stdout is None:
             return
         while True:

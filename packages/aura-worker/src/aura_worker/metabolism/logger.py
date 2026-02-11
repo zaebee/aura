@@ -46,7 +46,9 @@ class HiveLogHandler(logging.Handler):
         # Put in UI queue if present
         if self.ui_queue and self.loop and self.loop.is_running():
             try:
-                self.loop.call_soon_threadsafe(self.ui_queue.put_nowait, log_entry + "\n")
+                self.loop.call_soon_threadsafe(
+                    self.ui_queue.put_nowait, log_entry + "\n"
+                )
             except (asyncio.QueueFull, RuntimeError):
                 pass
 
@@ -184,4 +186,4 @@ class HiveLogHandler(logging.Handler):
 
     @property
     def is_connected(self) -> bool:
-        return self._nats_client.is_connected
+        return bool(self._nats_client.is_connected)

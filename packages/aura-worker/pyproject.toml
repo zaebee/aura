@@ -17,6 +17,7 @@ dependencies = [
     "nats-py>=2.7.0",
     "aiofiles>=24.0.0",
     "aura-core",
+    "types-aiofiles>=25.1.0.20251011",
 ]
 
 [dependency-groups]
