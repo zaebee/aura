@@ -187,7 +187,7 @@ class TelegramReceptor:
         await self.adapter.execute(signal)
 
         await callback.answer("Listing request sent! 🚀")
-        if callback.message:
+        if isinstance(callback.message, Message):
             # Remove buttons to prevent double-click
             await callback.message.edit_reply_markup(reply_markup=None)
 
@@ -205,5 +205,5 @@ class TelegramReceptor:
         await self.adapter.execute(signal)
 
         await callback.answer("Acknowledged. Evolution in progress. 🧬")
-        if callback.message:
+        if isinstance(callback.message, Message):
             await callback.message.edit_reply_markup(reply_markup=None)
