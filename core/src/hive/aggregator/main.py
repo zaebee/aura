@@ -116,7 +116,12 @@ class HiveAggregator(Aggregator[Any, HiveContext]):
         else:
             # Handle gRPC request object
             # Support wrapped Signal in NegotiateRequest
-            if hasattr(signal, "signal") and signal.signal and signal.signal.signal_id:
+            if (
+                hasattr(signal, "signal")
+                and not isinstance(signal, Signal)
+                and signal.signal
+                and signal.signal.signal_id
+            ):
                 return await self.perceive(signal.signal, **kwargs)
 
             item_id = signal.item_id
