@@ -1,13 +1,20 @@
-import pytest
 import json
-from unittest.mock import MagicMock, AsyncMock
+from unittest.mock import AsyncMock, MagicMock
+
+import pytest
+from aura_core import SkillRegistry
+from aura_core.gen.aura.dna.v1 import (
+    AgentIdentity,
+    PerceptionSignal,
+    Signal,
+    TelegramSignal,
+)
 from hive.aggregator.main import HiveAggregator
-from hive.transformer.main import AuraTransformer
-from hive.proteins.persistence.skill import PersistenceSkill
 from hive.proteins.perception.skill import PerceptionSkill
+from hive.proteins.persistence.skill import PersistenceSkill
 from hive.proteins.reasoning.skill import ReasoningSkill
-from aura_core import SkillRegistry, HiveContext, NegotiationOffer
-from aura_core.gen.aura.dna.v1 import Signal, PerceptionSignal, AgentIdentity, TelegramSignal
+from hive.transformer.main import AuraTransformer
+
 
 @pytest.mark.asyncio
 async def test_vision_to_listing_flow(mocker):

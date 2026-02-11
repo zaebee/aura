@@ -1,9 +1,14 @@
+import json
 import uuid
 from datetime import UTC, datetime
 from typing import Any, cast
 
-import json
-from aiogram.types import CallbackQuery, InlineKeyboardButton, InlineKeyboardMarkup, Message
+from aiogram.types import (
+    CallbackQuery,
+    InlineKeyboardButton,
+    InlineKeyboardMarkup,
+    Message,
+)
 from aura_core.gen.aura.dna.v1 import (
     ActionType,
     AgentIdentity,
