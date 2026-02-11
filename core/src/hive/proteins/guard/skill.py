@@ -6,7 +6,7 @@ from aura_core import Observation, SkillProtocol
 from config.policy import SafetySettings
 
 from .engine import OutputGuard, SafetyViolation
-from .schema import SafePriceParams, ValidationParams
+from .schema import SafePriceParams, ValidationParams, VisionValidationParams
 
 logger = logging.getLogger(__name__)
 
@@ -26,6 +26,7 @@ class GuardSkill(
             "validate_margin": self._validate_decision,
             "validate_floor": self._validate_decision,
             "get_safe_price": self._get_safe_price,
+            "validate_vision": self._validate_vision,
         }
 
     def get_name(self) -> str:
@@ -81,3 +82,9 @@ class GuardSkill(
         p_safe = SafePriceParams(**params)
         price = self.provider.calculate_safe_price(p_safe.context, p_safe.reason)
         return Observation(success=True, data={"safe_price": price})
+
+    async def _validate_vision(self, params: dict[str, Any]) -> Observation:
+        assert self.provider is not None
+        p = VisionValidationParams(**params)
+        self.provider.validate_vision(p.vision_result)
+        return Observation(success=True)

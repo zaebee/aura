@@ -56,4 +56,7 @@ class PerceptionSkill(
         p = PerceiveImageParams(**params)
         item = await self.provider.perceive_image(p.image_bytes)
 
-        return Observation(success=True, data=PerceiveImageResult(item=item).model_dump())
+        if "error" in item:
+            return Observation(success=False, error=item["error"], metadata=item)
+
+        return Observation(success=True, data=PerceiveImageResult(**item).model_dump())

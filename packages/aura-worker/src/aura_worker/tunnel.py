@@ -19,7 +19,9 @@ class Umbilical:
     """Manages the secure STCP tunnel connection to the Hive Hub using frpc."""
 
     FRPC_VERSION: str = "0.61.0"
-    FRPC_SHA256: str = "720a9fe2a3299346572544909a78c023344c88bde13c55b921e298e8c5ded21f"
+    FRPC_SHA256: str = (
+        "720a9fe2a3299346572544909a78c023344c88bde13c55b921e298e8c5ded21f"
+    )
 
     def __init__(
         self,
@@ -76,7 +78,11 @@ class Umbilical:
 
         logger.info("Checksum verified. Extracting...")
         tar_proc = await asyncio.create_subprocess_exec(
-            "tar", "-xzf", str(tar_path), "-C", str(self.bin_dir),
+            "tar",
+            "-xzf",
+            str(tar_path),
+            "-C",
+            str(self.bin_dir),
         )
         await tar_proc.wait()
 
@@ -129,7 +135,9 @@ class Umbilical:
         """Kill any process listening on port 7000."""
         try:
             process: asyncio.subprocess.Process = await asyncio.create_subprocess_exec(
-                "lsof", "-t", "-i:7000",
+                "lsof",
+                "-t",
+                "-i:7000",
                 stdout=asyncio.subprocess.PIPE,
                 stderr=asyncio.subprocess.PIPE,
             )
@@ -142,7 +150,9 @@ class Umbilical:
                     except ProcessLookupError:
                         pass
         except Exception:
-            logger.warning("Failed to clean up zombie processes on port 7000", exc_info=True)
+            logger.warning(
+                "Failed to clean up zombie processes on port 7000", exc_info=True
+            )
 
     async def start(self, log_callback: Callable[[Any], None] = print) -> None:
         await self.ensure_frpc()
@@ -156,7 +166,9 @@ class Umbilical:
         await self.cleanup_zombies()
 
         self.process = await asyncio.create_subprocess_exec(
-            str(self.frpc_path), "-c", str(self.config_path),  # nosec B603
+            str(self.frpc_path),
+            "-c",
+            str(self.config_path),  # nosec B603
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.STDOUT,
         )

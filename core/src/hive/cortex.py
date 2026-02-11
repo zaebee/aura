@@ -166,7 +166,8 @@ class HiveCell:
         perception.bind(
             self.settings.perception,
             PerceptionEngine(
-                ollama_url=self.settings.perception.ollama_url,
+                ollama_url=self.settings.perception.remote_ollama_url
+                or self.settings.perception.ollama_url,
                 model=self.settings.perception.model,
             ),
         )

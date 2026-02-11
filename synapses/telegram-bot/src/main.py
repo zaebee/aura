@@ -6,6 +6,7 @@ import nats
 import structlog
 from aiogram import Bot, Dispatcher
 from effector import TelegramEffector
+from grpc_adapter import GrpcAdapter
 from health import start_health_server
 from health import state as health_state
 from nats_adapter import NatsAdapter
@@ -86,22 +87,26 @@ async def main() -> None:
     translator = TelegramTranslator()
     logger.debug("bot_and_translator_initialized")
 
-    # 4. Initialize Receptor (Inbound: Telegram -> NATS -> Core)
-    receptor = TelegramReceptor(adapter, translator)
+    # 4. Initialize gRPC Adapter
+    grpc_adapter = GrpcAdapter(tg_settings.core_grpc_url)
+    logger.info("grpc_adapter_initialized", url=tg_settings.core_grpc_url)
+
+    # 5. Initialize Receptor (Inbound: Telegram -> NATS/gRPC -> Core)
+    receptor = TelegramReceptor(adapter, translator, grpc_adapter=grpc_adapter)
     logger.debug("receptor_initialized")
 
-    # 5. Initialize Effector (Outbound: Core -> NATS -> Telegram)
+    # 6. Initialize Effector (Outbound: Core -> NATS -> Telegram)
     effector = TelegramEffector(nc, bot, translator)
     logger.debug("effector_initialized")
 
-    # 6. Setup Aiogram Dispatcher
+    # 7. Setup Aiogram Dispatcher
     dp = Dispatcher()
     dp.include_router(receptor.router)
     logger.debug("dispatcher_configured", routers=1)
 
     logger.info("synapse_ready", nats_url=tg_settings.nats_url)
 
-    # 7. Start Health probe server
+    # 8. Start Health probe server
     health_runner = await start_health_server(tg_settings.health_port)
     logger.info("health_server_started", port=tg_settings.health_port)
 
@@ -127,6 +132,7 @@ async def main() -> None:
         for task in tasks:
             task.cancel()
         await nc.close()
+        await grpc_adapter.close()
         await bot.session.close()
         logger.debug("shutdown_complete")
         await health_runner.cleanup()

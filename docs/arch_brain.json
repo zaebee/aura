@@ -113,7 +113,7 @@
         "settings_path": "src/config/policy.py",
         "protein_path": "src/hive/proteins/guard/",
         "skill_name": "GuardSkill",
-        "capabilities": ["validate_margin", "validate_floor", "sanitize_input"],
+        "capabilities": ["validate_margin", "validate_floor", "sanitize_input", "validate_vision"],
         "absorbs": ["membrane/__init__.py (OutputGuard logic)"]
       },
       {
@@ -122,7 +122,7 @@
         "protein_path": "src/hive/proteins/perception/",
         "skill_name": "PerceptionSkill",
         "capabilities": ["perceive_image"],
-        "absorbs": []
+        "absorbs": ["colab_savant_logic", "gemma3_vision_spec"]
       }
     ]
   },

@@ -8,5 +8,6 @@ class PerceptionSettings(BaseSettings):
         extra="ignore",
     )
 
+    remote_ollama_url: str = Field("http://aura-frpc-tunnel:11435")
     ollama_url: str = Field("http://localhost:11434")
     model: str = Field("gemma3:latest")

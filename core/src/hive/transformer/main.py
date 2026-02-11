@@ -108,6 +108,10 @@ class AuraTransformer(Transformer[HiveContext, IntentAction]):
             "reputation": context.offer.reputation,
             "system_constraints": constraints,
             "meta": context.item_data.get("meta", {}),
+            "vision_result": context.item_data
+            if context.metadata.get("source") == "vision"
+            else None,
+            "vision_error": context.metadata.get("vision_error"),
         }
 
     async def think(self, context: HiveContext, **kwargs: Any) -> IntentAction:

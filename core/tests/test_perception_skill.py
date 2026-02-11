@@ -40,24 +40,23 @@ async def test_perception_skill_execute(perception_settings, perception_engine):
         obs = await skill.execute("perceive_image", {"image_bytes": b"fake_image"})
 
         assert obs.success is True
-        assert obs.data["item"]["name"] == "Tesla Model 3"
-        assert obs.data["item"]["base_price"] == 40000.0
+        assert obs.data["name"] == "Tesla Model 3"
+        assert obs.data["base_price"] == 40000.0
 
 
 @pytest.mark.asyncio
 async def test_perception_engine_mapping(perception_engine):
     raw_response = """
     {
-        "name": "2024 Tesla Model 3",
-        "base_price": 45000.0,
-        "floor_price": 40000.0,
-        "meta": {
-            "color": "Red",
-            "type": "car"
-        }
+        "make": "Tesla",
+        "model": "Model 3",
+        "year": 2024,
+        "color": "Red",
+        "estimated_price": 45000.0,
+        "confidence_score": 0.95
     }
     """
-    item = perception_engine.map_text_to_item(raw_response)
+    item = perception_engine._parse_and_validate(raw_response)
     assert item["name"] == "2024 Tesla Model 3"
     assert item["base_price"] == 45000.0
     assert item["meta"]["color"] == "Red"

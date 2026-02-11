@@ -12,6 +12,18 @@ def receptor(mock_adapter):
     return TelegramReceptor(mock_adapter, TelegramTranslator())
 
 
+@pytest.fixture
+def mock_grpc_adapter():
+    return AsyncMock()
+
+
+@pytest.fixture
+def receptor_with_grpc(mock_adapter, mock_grpc_adapter):
+    return TelegramReceptor(
+        mock_adapter, TelegramTranslator(), grpc_adapter=mock_grpc_adapter
+    )
+
+
 @pytest.mark.asyncio
 async def test_cmd_start(message, receptor):
     await receptor.cmd_start(message)
@@ -77,3 +89,34 @@ async def test_process_bid_failed(message, receptor, mock_adapter):
     message.answer.assert_called()
     assert "Bid too low" in message.answer.call_args[0][0]
     state.clear.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_process_photo(message, receptor_with_grpc, mock_grpc_adapter):
+    state = AsyncMock()
+    state.get_data.return_value = {}
+
+    # Mock photo message
+    photo = MagicMock()
+    photo.file_id = "file_123"
+    message.photo = [photo]
+
+    # Mock bot methods
+    message.bot.get_file = AsyncMock(return_value=MagicMock(file_path="path/to/file"))
+    mock_file_result = MagicMock()
+    mock_file_result.read.return_value = b"fake_image_bytes"
+    message.bot.download_file = AsyncMock(return_value=mock_file_result)
+
+    # Mock gRPC response
+    from aura_core.gen.aura.negotiation.v1 import NegotiateResponse, OfferCountered
+
+    mock_response = NegotiateResponse(
+        countered=OfferCountered(human_message="I see your car. My offer is $500.")
+    )
+    mock_grpc_adapter.negotiate.return_value = mock_response
+
+    await receptor_with_grpc.process_photo(message, state)
+
+    mock_grpc_adapter.negotiate.assert_called_once()
+    message.answer.assert_any_call("Analyzing image... 👁️")
+    message.answer.assert_any_call("I see your car. My offer is $500.")

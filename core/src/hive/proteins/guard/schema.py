@@ -11,3 +11,7 @@ class ValidationParams(BaseModel):
 class SafePriceParams(BaseModel):
     context: dict[str, Any]
     reason: str = ""
+
+
+class VisionValidationParams(BaseModel):
+    vision_result: dict[str, Any]

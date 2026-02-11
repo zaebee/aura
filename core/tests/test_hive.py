@@ -46,6 +46,8 @@ async def test_aggregator_perceive(mocker):
     signal.bid_amount = 100.0
     signal.agent.did = "did:aura:123"
     signal.agent.reputation_score = 0.9
+    # Prevent infinite recursion in perceive if mock is used
+    signal.signal = None
 
     context = await aggregator.perceive(signal)
     # Manually inject vitals for direct perceive test, mirroring MetabolicLoop behavior
