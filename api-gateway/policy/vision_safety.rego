@@ -25,8 +25,8 @@ valid_auth_token if {
 
 # Validate Content-Length to prevent DoS by large images
 valid_content_length if {
-    content_length := to_number(input.headers["content-length"])
-    content_length <= max_content_length
+    input.headers["content-length"]
+    to_number(input.headers["content-length"]) <= max_content_length
 }
 
 # Error messages for debugging/feedback
@@ -35,6 +35,10 @@ errors["Missing authentication headers"] if {
 }
 
 errors["Image size exceeds maximum limit (5MB)"] if {
-    content_length := to_number(input.headers["content-length"])
-    content_length > max_content_length
+    input.headers["content-length"]
+    to_number(input.headers["content-length"]) > max_content_length
+}
+
+errors["Missing Content-Length header"] if {
+    not input.headers["content-length"]
 }

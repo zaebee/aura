@@ -9,6 +9,7 @@ spec:
   type: ClusterIP
   selector:
     app: frpc
+    component: tunnel
   ports:
     - port: 11435
       targetPort: 11435

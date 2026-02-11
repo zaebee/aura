@@ -39,4 +39,4 @@ This endpoint allows external agents or sensors to submit visual data for struct
 The Vision Cortex implements strict immune responses to prevent metabolic exhaustion:
 1. **Size Membrane:** Requests exceeding 5MB are incinerated before processing to prevent Denial of Service.
 2. **Identity Verification:** Only signed requests from verified DIDs are permitted to consume perception cycles.
-3. **Format Validation:** Only standard image formats (JPEG, PNG, WEBP) are accepted.
+3. **Format Validation:** Only standard image formats (JPEG, PNG, WEBP) are accepted. *(Note: Not yet enforced by OPA policy)*
