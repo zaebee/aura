@@ -65,31 +65,49 @@ class HiveAggregator(Aggregator[Any, HiveContext]):
                     )
                 elif proto_signal.perception:
                     # Logic for Perception Signal (Vision Integration)
+                    # Use the standardized PerceptionSkill (Phenotype Expressed)
                     obs = await self.registry.execute(
                         "perception",
                         "perceive_image",
                         {"image_bytes": proto_signal.perception.image_data},
                     )
+
+                    vision_error = None
+                    vision_result = {}
+
                     if obs.success:
-                        item = obs.data["item"]
-                        item_id = item["id"]
-                        request_id = proto_signal.signal_id
-                        offer = NegotiationOffer(
-                            bid_amount=0.0,  # Initial perception has no bid
-                            reputation=proto_signal.perception.agent.reputation_score,
-                            agent_did=proto_signal.perception.agent.did,
+                        vision_result = obs.data
+                        # The Membrane Law: Validate vision output
+                        v_obs = await self.registry.execute(
+                            "guard",
+                            "validate_vision",
+                            {"vision_result": vision_result},
                         )
-                        # Inject perceived item into context directly to bypass DB if needed.
-                        return HiveContext(
-                            item_id=item_id,
-                            offer=offer,
-                            item_data=item,
-                            system_health=await self.get_vitals(),
-                            request_id=request_id,
-                            metadata={"brain_path": self.brain_path, "source": "perception"},
-                        )
+                        if not v_obs.success:
+                            vision_error = v_obs.error
                     else:
-                        raise ValueError(f"Perception failed: {obs.error}")
+                        vision_error = obs.error
+
+                    item_id = vision_result.get("id", "perceived-vehicle")
+                    request_id = proto_signal.signal_id
+                    offer = NegotiationOffer(
+                        bid_amount=0.0,
+                        reputation=proto_signal.perception.agent.reputation_score,
+                        agent_did=proto_signal.perception.agent.did,
+                    )
+
+                    return HiveContext(
+                        item_id=item_id,
+                        offer=offer,
+                        item_data=vision_result,
+                        system_health=await self.get_vitals(),
+                        request_id=request_id,
+                        metadata={
+                            "brain_path": self.brain_path,
+                            "source": "vision",
+                            "vision_error": vision_error,
+                        },
+                    )
                 else:
                     raise ValueError("Signal does not contain a recognized payload")
             except Exception as e:
@@ -97,6 +115,10 @@ class HiveAggregator(Aggregator[Any, HiveContext]):
                 raise ValueError(f"Failed to decode binary signal: {e}") from e
         else:
             # Handle gRPC request object
+            # Support wrapped Signal in NegotiateRequest
+            if hasattr(signal, "signal") and signal.signal and signal.signal.signal_id:
+                return await self.perceive(signal.signal, **kwargs)
+
             item_id = signal.item_id
             request_id = getattr(signal, "request_id", "")
             offer = NegotiationOffer(

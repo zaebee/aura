@@ -86,3 +86,31 @@ class OutputGuard:
                 min_m = 0.1
             return float(round(floor / (1 - min_m), 2))
         return float(round(floor * 1.05, 2))
+
+    def validate_vision(self, vision_result: dict) -> bool:
+        """
+        Validate VisionSkill output.
+        Checks for confidence score and required fields.
+        """
+        if not vision_result:
+            logger.warning("vision_validation_empty")
+            raise SafetyViolation("Vision result is empty")
+
+        if "error" in vision_result:
+            logger.warning("vision_validation_error_present", error=vision_result["error"])
+            raise SafetyViolation(f"Vision skill reported error: {vision_result['error']}")
+
+        # Required fields check
+        required_fields = ["make", "model", "year", "confidence_score"]
+        for field in required_fields:
+            if field not in vision_result:
+                logger.warning("vision_validation_missing_field", field=field)
+                raise SafetyViolation(f"Vision result missing required field: {field}")
+
+        # Confidence threshold check
+        confidence = vision_result.get("confidence_score", 0.0)
+        if confidence < 0.7:
+            logger.warning("vision_validation_low_confidence", confidence=confidence)
+            raise SafetyViolation("Vision identification confidence too low")
+
+        return True

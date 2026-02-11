@@ -2,6 +2,8 @@ syntax = "proto3";
 
 package aura.negotiation.v1;
 
+import "aura/dna/v1/dna.proto";
+
 // Service for handling negotiations.
 service NegotiationService {
     // RPC method for negotiating offers.
@@ -24,6 +26,9 @@ message NegotiateRequest {
   
   // Metadata for the agent identity.
   AgentIdentity agent = 5;
+
+  // Wrapped universal Signal (Perception, Audit, etc.)
+  aura.dna.v1.Signal signal = 10;
 }
 
 message AgentIdentity {

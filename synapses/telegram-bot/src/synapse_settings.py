@@ -15,6 +15,7 @@ class TelegramSettings(BaseSettings):
 
     token: SecretStr = Field(...)  # type: ignore
     nats_url: str = Field(...)  # type: ignore
+    core_grpc_url: str = Field("localhost:50051")
     signal_subject: str = "aura.synapse.telegram.signal"
     otel_exporter_otlp_endpoint: str = (
         "http://aura-jaeger.monitoring.svc.cluster.local:4317"
