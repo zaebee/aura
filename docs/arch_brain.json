@@ -115,6 +115,14 @@
         "skill_name": "GuardSkill",
         "capabilities": ["validate_margin", "validate_floor", "sanitize_input"],
         "absorbs": ["membrane/__init__.py (OutputGuard logic)"]
+      },
+      {
+        "settings_class": "PerceptionSettings",
+        "settings_path": "src/config/perception.py",
+        "protein_path": "src/hive/proteins/perception/",
+        "skill_name": "PerceptionSkill",
+        "capabilities": ["perceive_image"],
+        "absorbs": []
       }
     ]
   },
