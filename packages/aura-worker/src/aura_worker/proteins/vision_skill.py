@@ -13,18 +13,25 @@ logger = structlog.get_logger(__name__)
 
 class VehicleSpec(BaseModel):
     """The Vehicle Spec Genotype."""
+
     make: str = Field(..., description="Vehicle manufacturer")
     model: str = Field(..., description="Vehicle model name")
     year: int = Field(..., description="Manufacturing year")
     color: str = Field(..., description="Primary exterior color")
     estimated_price: float = Field(..., description="Estimated market value in USD")
-    confidence_score: float = Field(..., description="Identification confidence (0.0-1.0)")
+    confidence_score: float = Field(
+        ..., description="Identification confidence (0.0-1.0)"
+    )
 
 
 class VisionSkill:
     """Vision Protein: Identifies vehicles using multimodal Ollama."""
 
-    def __init__(self, ollama_url: str = "http://localhost:11434", model_name: str = "gemma3:latest"):
+    def __init__(
+        self,
+        ollama_url: str = "http://localhost:11434",
+        model_name: str = "gemma3:latest",
+    ):
         self.ollama_url = ollama_url
         self.model_name = model_name
 
@@ -51,7 +58,9 @@ class VisionSkill:
                     encoded.append(source)
         return encoded
 
-    async def generate(self, image_sources: list[str | bytes], prompt_override: str | None = None) -> dict[str, Any]:
+    async def generate(
+        self, image_sources: list[str | bytes], prompt_override: str | None = None
+    ) -> dict[str, Any]:
         """Calls Ollama's /api/generate with vision support."""
         images = await self.get_encoded_images(image_sources)
         prompt = prompt_override or "Identify the vehicle in this image."
@@ -61,12 +70,14 @@ class VisionSkill:
             "prompt": f"{self.system_prompt}\n\nUser Request: {prompt}",
             "images": images,
             "stream": False,
-            "format": "json"
+            "format": "json",
         }
 
         async with httpx.AsyncClient(timeout=120.0) as client:
             try:
-                response = await client.post(f"{self.ollama_url}/api/generate", json=payload)
+                response = await client.post(
+                    f"{self.ollama_url}/api/generate", json=payload
+                )
                 response.raise_for_status()
                 result = response.json()
                 raw_output = result.get("response", "{}")
@@ -108,7 +119,7 @@ class VisionSkill:
                     "year": int(data.get("year", 0)),
                     "color": data.get("color", "Unknown"),
                     "estimated_price": float(data.get("estimated_price", 0.0)),
-                    "confidence_score": float(data.get("confidence_score", 0.0))
+                    "confidence_score": float(data.get("confidence_score", 0.0)),
                 }
         except Exception:  # nosec B110
             pass

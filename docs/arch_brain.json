@@ -122,8 +122,7 @@
         "protein_path": "src/hive/proteins/perception/",
         "skill_name": "PerceptionSkill",
         "capabilities": ["perceive_image"],
-        "absorbs": ["colab_savant_logic", "gemma3_vision_spec"],
-        "_absorbs": []
+        "absorbs": ["colab_savant_logic", "gemma3_vision_spec"]
       }
     ]
   },

@@ -5,7 +5,6 @@ from typing import Any
 
 import httpx
 import structlog
-from pydantic import ValidationError
 
 logger = structlog.get_logger(__name__)
 
@@ -99,8 +98,8 @@ class PerceptionEngine:
                 "floor_price": float(data.get("estimated_price", 0.0)) * 0.9,
                 "meta": {
                     "color": data.get("color", "Unknown"),
-                    "confidence": str(data.get("confidence_score", 0.0))
-                }
+                    "confidence": str(data.get("confidence_score", 0.0)),
+                },
             }
         except (json.JSONDecodeError, TypeError, ValueError) as e:
             logger.error("perception_mapping_error", error=str(e), text=raw_json)
@@ -113,5 +112,5 @@ class PerceptionEngine:
             "base_price": 0.0,
             "floor_price": 0.0,
             "meta": {"error": error},
-            "error": error
+            "error": error,
         }

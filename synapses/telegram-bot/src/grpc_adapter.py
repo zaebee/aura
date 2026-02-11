@@ -1,12 +1,13 @@
 import grpc
 import structlog
 from aura_core.gen.aura.negotiation.v1 import (
-    NegotiationServiceStub,
     NegotiateRequest,
     NegotiateResponse,
+    NegotiationServiceStub,
 )
 
 logger = structlog.get_logger(__name__)
+
 
 class GrpcAdapter:
     """
@@ -22,7 +23,14 @@ class GrpcAdapter:
         """Execute Negotiate unary call via gRPC."""
         try:
             logger.debug("grpc_sending_negotiate", request_id=request.request_id)
-            response = await self.stub.negotiate(request)
+            response = await self.stub.negotiate(
+                request_id=request.request_id,
+                item_id=request.item_id,
+                bid_amount=request.bid_amount,
+                currency_code=request.currency_code,
+                agent=request.agent,
+                signal=request.signal,
+            )
             logger.debug("grpc_received_negotiate_response")
             return response
         except grpc.RpcError as e:
@@ -31,5 +39,5 @@ class GrpcAdapter:
             # or let the caller handle it.
             raise
 
-    async def close(self):
+    async def close(self) -> None:
         await self.channel.close()

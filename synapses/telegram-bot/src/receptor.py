@@ -6,10 +6,10 @@ from aiogram.filters import Command, CommandObject
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
 from aiogram.types import CallbackQuery, Message
+from aura_core.gen.aura.negotiation.v1 import NegotiateRequest
 from grpc_adapter import GrpcAdapter
 from nats_adapter import NatsAdapter
 from translator import TelegramTranslator
-from aura_core.gen.aura.negotiation.v1 import NegotiateRequest
 
 logger = structlog.get_logger(__name__)
 
@@ -24,7 +24,12 @@ class TelegramReceptor:
     Converts external events into Internal Signals and sends them to Core via NATS.
     """
 
-    def __init__(self, adapter: NatsAdapter, translator: TelegramTranslator, grpc_adapter: GrpcAdapter = None):
+    def __init__(
+        self,
+        adapter: NatsAdapter,
+        translator: TelegramTranslator,
+        grpc_adapter: GrpcAdapter | None = None,
+    ):
         self.adapter = adapter
         self.grpc_adapter = grpc_adapter
         self.translator = translator
@@ -135,10 +140,7 @@ class TelegramReceptor:
         if self.grpc_adapter:
             try:
                 # Wrap Signal in NegotiateRequest
-                req = NegotiateRequest(
-                    request_id=signal.signal_id,
-                    signal=signal
-                )
+                req = NegotiateRequest(request_id=signal.signal_id, signal=signal)
                 response = await self.grpc_adapter.negotiate(req)
 
                 # Manual conversion of NegotiateResponse to UI message for simplicity here

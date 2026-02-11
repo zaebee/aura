@@ -1,7 +1,8 @@
-import logging
 from typing import Any
 
-logger = logging.getLogger(__name__)
+import structlog
+
+logger = structlog.get_logger(__name__)
 
 
 class SafetyViolation(Exception):
@@ -31,18 +32,16 @@ class OutputGuard:
 
         # 1. Price non-positive check
         if offered_price <= 0:
-            logger.warning("invalid_offered_price", extra={"price": offered_price})
+            logger.warning("invalid_offered_price", price=offered_price)
             raise SafetyViolation("Invalid offered price")
 
         # 2. Floor price violation
         if offered_price < floor_price:
             logger.warning(
                 "safety_floor_violation",
-                extra={
-                    "action": action,
-                    "offered_price": offered_price,
-                    "floor_price": floor_price,
-                },
+                action=action,
+                offered_price=offered_price,
+                floor_price=floor_price,
             )
             raise SafetyViolation("Floor price violation")
 
@@ -63,12 +62,10 @@ class OutputGuard:
         if margin < min_margin:
             logger.warning(
                 "safety_margin_violation",
-                extra={
-                    "offered_price": offered_price,
-                    "internal_cost": internal_cost,
-                    "margin": margin,
-                    "min_margin": min_margin,
-                },
+                offered_price=offered_price,
+                internal_cost=internal_cost,
+                margin=margin,
+                min_margin=min_margin,
             )
             raise SafetyViolation("Minimum profit margin violation")
 
@@ -97,8 +94,12 @@ class OutputGuard:
             raise SafetyViolation("Vision result is empty")
 
         if "error" in vision_result:
-            logger.warning("vision_validation_error_present", error=vision_result["error"])
-            raise SafetyViolation(f"Vision skill reported error: {vision_result['error']}")
+            logger.warning(
+                "vision_validation_error_present", error=vision_result["error"]
+            )
+            raise SafetyViolation(
+                f"Vision skill reported error: {vision_result['error']}"
+            )
 
         # Required fields check
         required_fields = ["make", "model", "year", "confidence_score"]

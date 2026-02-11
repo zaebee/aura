@@ -19,7 +19,9 @@ def mock_grpc_adapter():
 
 @pytest.fixture
 def receptor_with_grpc(mock_adapter, mock_grpc_adapter):
-    return TelegramReceptor(mock_adapter, TelegramTranslator(), grpc_adapter=mock_grpc_adapter)
+    return TelegramReceptor(
+        mock_adapter, TelegramTranslator(), grpc_adapter=mock_grpc_adapter
+    )
 
 
 @pytest.mark.asyncio
@@ -107,6 +109,7 @@ async def test_process_photo(message, receptor_with_grpc, mock_grpc_adapter):
 
     # Mock gRPC response
     from aura_core.gen.aura.negotiation.v1 import NegotiateResponse, OfferCountered
+
     mock_response = NegotiateResponse(
         countered=OfferCountered(human_message="I see your car. My offer is $500.")
     )

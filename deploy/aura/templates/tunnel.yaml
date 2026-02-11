@@ -71,12 +71,10 @@ spec:
   selector:
     matchLabels:
       app: frpc
-      component: tunnel
   template:
     metadata:
       labels:
         app: frpc
-        component: tunnel
     spec:
       containers:
       - name: frpc
