@@ -2,6 +2,7 @@ import logging
 from datetime import UTC, datetime
 from decimal import Decimal
 from typing import Any, Literal, cast
+from urllib.parse import quote
 
 import httpx
 from cryptography.fernet import Fernet, InvalidToken
@@ -48,9 +49,11 @@ class PriceConverter:
             raise ValueError(f"Unsupported currency: {crypto_currency}")
         return float(Decimal(str(usd_amount)) / self.FIXED_RATES[crypto_currency])
 
-    def calculate_tax_and_margin(self, price: float) -> dict[str, float]:
-        """Apply the 10% Hive Margin rule (The Homeostasis Law)."""
-        margin = price * 0.10
+    def calculate_tax_and_margin(
+        self, price: float, margin_rate: float = 0.10
+    ) -> dict[str, float]:
+        """Apply the Hive Margin rule (The Homeostasis Law)."""
+        margin = price * margin_rate
         tax = 0.0  # Future expansion
         return {
             "margin": float(round(margin, 6)),
@@ -62,7 +65,7 @@ class PriceConverter:
 # --- Solana Provider Logic ---
 
 FINALIZED_COMMITMENT = "finalized"
-TOKEN_PROGRAM_ID = "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"  # nosec
+TOKEN_PROGRAM_ID = "TokenkegQfeZyiNJbNbNbNbNbNbNbNbNbNbNbNbNbN"  # nosec
 ASSOCIATED_TOKEN_PROGRAM_ID = "ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL"  # nosec
 AMOUNT_TOLERANCE = 0.0001
 
@@ -201,7 +204,6 @@ class SolanaProvider:
         message: str = "Payment",
     ) -> str:
         recipient = str(self.keypair.pubkey())
-        from urllib.parse import quote
 
         base_url = f"solana:{recipient}"
         params = [

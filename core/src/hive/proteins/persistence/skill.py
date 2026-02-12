@@ -1,9 +1,9 @@
 import asyncio
-import logging
 from datetime import UTC, datetime
 from typing import Any, cast
 
 import redis.asyncio as redis
+import structlog
 from aura_core import Observation, SkillProtocol
 from sqlalchemy import Engine, text
 from sqlalchemy.orm import Session, sessionmaker
@@ -19,7 +19,7 @@ from .engine import (
 )
 from .schema import DealSchema, ItemSchema
 
-logger = logging.getLogger(__name__)
+logger = structlog.get_logger(__name__)
 
 
 class PersistenceSkill(
@@ -85,7 +85,7 @@ class PersistenceSkill(
             try:
                 await cast(Any, self.redis.ping())
             except Exception as e:
-                logger.error(f"redis_connection_failed: {e}")
+                logger.error("redis_connection_failed", error=e)
                 return False
 
         from pgvector.sqlalchemy import Vector

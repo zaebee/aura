@@ -101,8 +101,11 @@ class TransactionSkill(
 
     async def _calculate_tax_and_margin(self, params: dict[str, Any]) -> Observation:
         assert self.converter is not None
+        assert self.settings is not None
         p = TaxCalculationParams(**params)
-        result = self.converter.calculate_tax_and_margin(p.price)
+        result = self.converter.calculate_tax_and_margin(
+            p.price, margin_rate=self.settings.hive_margin
+        )
         return Observation(success=True, data=result)
 
     async def _encrypt_secret(self, params: dict[str, Any]) -> Observation:
