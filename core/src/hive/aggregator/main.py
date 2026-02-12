@@ -50,19 +50,50 @@ class HiveAggregator(Aggregator[Any, HiveContext]):
     async def perceive(self, signal: Any, **kwargs: Any) -> HiveContext:
         """
         Perceive signal and turn it into Context.
-        Supports both gRPC objects and binary Proto signals.
+        Supports gRPC objects, binary Proto signals, and recursive Signal wrapping.
         """
+        # 1. Initialize Default Context Components
         item_id = "unknown"
         request_id = ""
         offer = NegotiationOffer(bid_amount=0.0, reputation=1.0, agent_did="unknown")
+        item_data = {}
         metadata = {"brain_path": self.brain_path}
 
-        # 1. Decode Signal
+        # 2. Extract or Parse Signal
+        proto_signal = None
         if isinstance(signal, bytes):
             try:
                 proto_signal = Signal().parse(signal)
+            except Exception as e:
+                logger.error("binary_signal_decode_failed", error=str(e))
+                raise ValueError(f"Failed to decode binary signal: {e}") from e
+        elif isinstance(signal, Signal):
+            proto_signal = signal
+        elif (
+            hasattr(signal, "signal")
+            and signal.signal
+            and getattr(signal.signal, "signal_id", None)
+        ):
+            # It's a NegotiateRequest wrapping a Signal (Recursive normalization)
+            return await self.perceive(signal.signal, **kwargs)
+
+        # 3. Process Signal (Binary or Object-based)
+        if proto_signal:
+            try:
                 request_id = proto_signal.signal_id
                 payload_name, _ = betterproto.which_one_of(proto_signal, "payload")
+
+                # Defensive check for empty payloads (Signal Integrity)
+                if not payload_name:
+                    logger.error("empty_signal_mutation", signal_id=request_id)
+                    return HiveContext(
+                        item_id=item_id,
+                        offer=offer,
+                        item_data=item_data,
+                        system_health=await self.get_vitals(),
+                        request_id=request_id,
+                        metadata={**metadata, "error": "Empty Signal Mutation"},
+                    )
 
                 if payload_name == "negotiation":
                     neg_signal = proto_signal.negotiation
@@ -72,9 +103,10 @@ class HiveAggregator(Aggregator[Any, HiveContext]):
                         reputation=neg_signal.agent.reputation_score,
                         agent_did=neg_signal.agent.did,
                     )
+                    # Fall through to standard item data fetch
+
                 elif payload_name == "perception":
                     per_signal = proto_signal.perception
-                    # Logic for Perception Signal (Vision Integration)
                     obs = await self.registry.execute(
                         "perception",
                         "perceive_image",
@@ -82,25 +114,22 @@ class HiveAggregator(Aggregator[Any, HiveContext]):
                     )
 
                     vision_error = None
-                    vision_result = {}
-
                     if obs.success:
-                        vision_result = obs.data
-                        # The Membrane Law: Validate vision output
+                        item_data = obs.data
                         v_obs = await self.registry.execute(
                             "guard",
                             "validate_vision",
-                            {"vision_result": vision_result},
+                            {"vision_result": item_data},
                         )
                         if v_obs.success:
-                            # LTP: Store perceived asset as Ephemeral Memory
                             agent_did = per_signal.agent.did
-                            # Rely on single source of truth for configuration
                             ttl = 3600
                             if (
                                 self.settings
                                 and hasattr(self.settings, "perception")
-                                and hasattr(self.settings.perception, "ephemeral_asset_ttl")
+                                and hasattr(
+                                    self.settings.perception, "ephemeral_asset_ttl"
+                                )
                             ):
                                 ttl = self.settings.perception.ephemeral_asset_ttl
 
@@ -109,7 +138,7 @@ class HiveAggregator(Aggregator[Any, HiveContext]):
                                 "set_cache",
                                 {
                                     "key": f"ephemeral:asset:{agent_did}",
-                                    "value": vision_result,
+                                    "value": item_data,
                                     "expire": ttl,
                                 },
                             )
@@ -119,13 +148,13 @@ class HiveAggregator(Aggregator[Any, HiveContext]):
                         vision_error = obs.error
 
                     return HiveContext(
-                        item_id=vision_result.get("id", "perceived-vehicle"),
+                        item_id=item_data.get("id", "perceived-vehicle"),
                         offer=NegotiationOffer(
                             bid_amount=0.0,
                             reputation=per_signal.agent.reputation_score,
                             agent_did=per_signal.agent.did,
                         ),
-                        item_data=vision_result,
+                        item_data=item_data,
                         system_health=await self.get_vitals(),
                         request_id=request_id,
                         metadata={
@@ -134,27 +163,32 @@ class HiveAggregator(Aggregator[Any, HiveContext]):
                             "vision_error": vision_error,
                         },
                     )
+
                 elif payload_name == "telegram":
                     tel_signal = proto_signal.telegram
-                    # Logic for Telegram Signals (Callbacks from UI)
                     user_id = tel_signal.user_id
                     callback_data = tel_signal.callback_data
+                    message_text = tel_signal.message_text
                     agent_did = f"tg:{user_id}"
 
-                    item_id = "unknown"
+                    item_id = proto_signal.metadata.get("item_id", "unknown")
                     bid_amount = 0.0
-                    if callback_data.startswith("list_now:"):
-                        try:
-                            # Split into max 3 parts: list_now, item_id, price
-                            parts = callback_data.split(":", 2)
-                            if len(parts) >= 3:
-                                item_id = parts[1]
-                                bid_amount = float(parts[2])
-                        except (ValueError, IndexError):
-                            logger.warning("invalid_callback_data", data=callback_data)
+
+                    if callback_data:
+                        if callback_data.startswith("list_now:"):
+                            try:
+                                parts = callback_data.split(":", 2)
+                                if len(parts) >= 3:
+                                    item_id = parts[1]
+                                    bid_amount = float(parts[2])
+                            except (ValueError, IndexError):
+                                logger.warning("invalid_callback_data", data=callback_data)
+                    elif message_text:
+                        clean_text = message_text.strip().replace("$", "")
+                        if clean_text.replace(".", "", 1).isdigit():
+                            bid_amount = float(clean_text)
 
                     # Fetch ephemeral asset from cache
-                    item_data = {}
                     obs = await self.registry.execute(
                         "persistence",
                         "get_cache",
@@ -185,44 +219,36 @@ class HiveAggregator(Aggregator[Any, HiveContext]):
                     raise ValueError(f"Unsupported payload: {payload_name}")
 
             except Exception as e:
-                logger.error("binary_signal_decode_failed", error=str(e))
-                raise ValueError(f"Failed to decode binary signal: {e}") from e
+                logger.error("signal_processing_failed", error=str(e))
+                raise ValueError(f"Failed to process signal: {e}") from e
         else:
-            # Handle gRPC request object
-            # Support wrapped Signal in NegotiateRequest
-            if (
-                hasattr(signal, "signal")
-                and not isinstance(signal, Signal)
-                and signal.signal
-                and signal.signal.signal_id
-            ):
-                return await self.perceive(signal.signal, **kwargs)
-
-            item_id = signal.item_id
+            # 4. Handle standard gRPC objects (Fallback)
+            item_id = getattr(signal, "item_id", "unknown")
             request_id = getattr(signal, "request_id", "")
-            offer = NegotiationOffer(
-                bid_amount=signal.bid_amount,
-                reputation=signal.agent.reputation_score,
-                agent_did=signal.agent.did,
-            )
+            if hasattr(signal, "agent") and signal.agent:
+                offer = NegotiationOffer(
+                    bid_amount=getattr(signal, "bid_amount", 0.0),
+                    reputation=getattr(signal.agent, "reputation_score", 1.0),
+                    agent_did=getattr(signal.agent, "did", "unknown"),
+                )
 
-        # 2. Fetch standard item data if not already returned
-        item_data = {}
-        try:
-            obs = await self.registry.execute(
-                "persistence", "read_item", {"item_id": item_id}
-            )
-            if obs.success and obs.data:
-                item = obs.data
-                item_data = {
-                    "id": item["id"],
-                    "name": item["name"],
-                    "base_price": item["base_price"],
-                    "floor_price": item["floor_price"],
-                    "meta": item["meta"] or {},
-                }
-        except Exception as e:
-            logger.error("aggregator_persistence_error", error=str(e))
+        # 5. Fetch standard item data if not already returned or found in ephemeral cache
+        if not item_data:
+            try:
+                obs = await self.registry.execute(
+                    "persistence", "read_item", {"item_id": item_id}
+                )
+                if obs.success and obs.data:
+                    item = obs.data
+                    item_data = {
+                        "id": item["id"],
+                        "name": item["name"],
+                        "base_price": item["base_price"],
+                        "floor_price": item["floor_price"],
+                        "meta": item["meta"] or {},
+                    }
+            except Exception as e:
+                logger.error("aggregator_persistence_error", error=str(e))
 
         return HiveContext(
             item_id=item_id,
