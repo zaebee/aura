@@ -1,6 +1,7 @@
 from typing import TYPE_CHECKING, Any, cast
 
 import dspy
+import redis.asyncio as redis
 import structlog
 from aura_core import SkillProtocol, SkillRegistry, get_raw_key
 from opentelemetry.instrumentation.grpc import GrpcInstrumentorServer
@@ -75,8 +76,9 @@ class HiveCell:
 
             persistence = cast(SkillProtocol, self.registry.get("persistence"))
             transaction = cast(SkillProtocol, self.registry.get("transaction"))
+            pulse = cast(SkillProtocol, self.registry.get("pulse"))
             market_service = MarketService(
-                persistence=persistence, transaction=transaction
+                persistence=persistence, transaction=transaction, pulse=pulse
             )
             self.market_service = market_service
             logger.info("market_service_wired")
@@ -135,8 +137,9 @@ class HiveCell:
         # 1. Persistence
         engine = create_engine(str(self.settings.database.url))
         SessionLocal = sessionmaker(bind=engine)
+        redis_client = redis.from_url(str(self.settings.database.redis_url))
         persistence = PersistenceSkill()
-        persistence.bind(self.settings.database, (SessionLocal, engine))
+        persistence.bind(self.settings.database, (SessionLocal, engine, redis_client))
 
         # 2. Pulse
         pulse = PulseSkill()

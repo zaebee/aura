@@ -31,6 +31,7 @@ class MarketService:
         self,
         persistence: SkillProtocol,
         transaction: SkillProtocol,
+        pulse: SkillProtocol | None = None,
     ):
         """
         Initialize market service.
@@ -38,9 +39,11 @@ class MarketService:
         Args:
             persistence: Persistence Protein for database operations
             transaction: Transaction Protein for blockchain verification and encryption
+            pulse: Pulse Protein for event emission
         """
         self.persistence = persistence
         self.transaction = transaction
+        self.pulse = pulse
 
     async def create_offer(
         self,
@@ -51,7 +54,7 @@ class MarketService:
         currency: str,
         buyer_did: str | None = None,
         ttl_seconds: int = 3600,
-    ) -> negotiation_pb2.CryptoPaymentInstructions:
+    ) -> tuple[negotiation_pb2.CryptoPaymentInstructions, str]:
         """
         Creates a locked deal and returns payment instructions.
         """
@@ -71,9 +74,9 @@ class MarketService:
         encrypted_secret = encrypt_obs.data
 
         deal_id = uuid.uuid4()
-        # Create locked deal record via Persistence Protein
+        # Create locked deal record via Persistence Protein (Excited state in Redis)
         obs = await self.persistence.execute(
-            "create_deal",
+            "set_excited_state",
             {
                 "id": deal_id,
                 "item_id": item_id,
@@ -84,6 +87,7 @@ class MarketService:
                 "secret_content": encrypted_secret,
                 "buyer_did": buyer_did,
                 "expires_at": expires_at,
+                "ttl": ttl_seconds,
             },
         )
 
@@ -108,15 +112,30 @@ class MarketService:
         addr_obs = await self.transaction.execute("get_address", {})
         network_obs = await self.transaction.execute("get_network_name", {})
 
+        # Generate payment URI via Transaction Protein
+        uri_obs = await self.transaction.execute(
+            "generate_payment_request",
+            {
+                "amount": price,
+                "memo": memo,
+                "currency": currency,
+                "label": f"Aura Hive - {item_name}",
+            },
+        )
+        payment_uri = uri_obs.data if uri_obs.success else ""
+
         # Return payment instructions
-        return negotiation_pb2.CryptoPaymentInstructions(
-            deal_id=str(deal_id),
-            wallet_address=addr_obs.data if addr_obs.success else "unknown",
-            amount=price,
-            currency=currency,
-            memo=memo,
-            network=network_obs.data if network_obs.success else "unknown",
-            expires_at=int(expires_at.timestamp()),
+        return (
+            negotiation_pb2.CryptoPaymentInstructions(
+                deal_id=str(deal_id),
+                wallet_address=addr_obs.data if addr_obs.success else "unknown",
+                amount=price,
+                currency=currency,
+                memo=memo,
+                network=network_obs.data if network_obs.success else "unknown",
+                expires_at=int(expires_at.timestamp()),
+            ),
+            payment_uri,
         )
 
     async def check_status(
@@ -151,7 +170,7 @@ class MarketService:
 
         if deal["status"] == "PENDING":
             proof_obs = await self.transaction.execute(
-                "verify_payment",
+                "verify_settlement",
                 {
                     "amount": deal["final_price"],
                     "memo": deal["payment_memo"],
@@ -161,8 +180,9 @@ class MarketService:
 
             if proof_obs.success and proof_obs.data:
                 proof = proof_obs.data
+                # Move to Ground State (Postgres)
                 await self.persistence.execute(
-                    "update_deal_status",
+                    "confirm_ground_state",
                     {
                         "deal_id": deal_uuid,
                         "status": "PAID",
@@ -172,6 +192,19 @@ class MarketService:
                         "paid_at": proof["confirmed_at"],
                     },
                 )
+
+                # Emit NegotiationAccepted Pollen event
+                if self.pulse:
+                    await self.pulse.execute(
+                        "emit_negotiation",
+                        {
+                            "session_token": f"deal_{deal_id}",
+                            "action": "accept",
+                            "price": deal["final_price"],
+                            "item_id": deal["item_id"],
+                            "agent_did": deal["buyer_did"] or "unknown",
+                        },
+                    )
 
                 deal["status"] = "PAID"
                 deal["transaction_hash"] = proof["transaction_hash"]

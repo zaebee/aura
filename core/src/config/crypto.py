@@ -19,6 +19,8 @@ class CryptoSettings(BaseModel):
         "Gh9ZwEmdLJ8DscKNTkTqPbNwLNNBjuSzaG9Vp2KGtKJr"  # Devnet USDC
     )
 
+    wallet_address: str = ""
+
     # Deal Expiration
     deal_ttl_seconds: int = 3600  # 1 hour default
 
@@ -26,6 +28,7 @@ class CryptoSettings(BaseModel):
     secret_encryption_key: SecretStr = ""  # type: ignore # Base64-encoded Fernet key (32 bytes)
 
     # Pricing Configuration
+    hive_margin: float = 0.10  # 10% Hive Margin rule (The Homeostasis Law)
     use_fixed_rates: bool = True  # Use fixed rates (not oracle)
     sol_usd_rate: float = 100.0  # Fixed rate: 1 SOL = $100 USD
     # Note: USDC rate is always 1.0 (stablecoin)

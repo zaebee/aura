@@ -82,6 +82,7 @@ class HiveConnector(BaseConnector):
                 "decision": action,
                 "item_id": context.item_id,
                 "agent_did": context.offer.agent_did,
+                "payment_uri": context.metadata.get("payment_uri", ""),
             },
         )
 
@@ -109,7 +110,7 @@ class HiveConnector(BaseConnector):
 
             # MarketService still orchestrates complex multi-protein operations
             # but it is passed to the connector.
-            payment_instructions = await self.market_service.create_offer(
+            payment_instructions, payment_uri = await self.market_service.create_offer(
                 item_id=context.item_id,
                 item_name=item_name,
                 secret=response.accepted.reservation_code,
@@ -121,6 +122,9 @@ class HiveConnector(BaseConnector):
 
             response.accepted.ClearField("reservation_code")
             response.accepted.crypto_payment.CopyFrom(payment_instructions)
+
+            # Store payment_uri in context metadata for the Generator to pick up
+            context.metadata["payment_uri"] = payment_uri
 
             logger.info(
                 "crypto_offer_created",

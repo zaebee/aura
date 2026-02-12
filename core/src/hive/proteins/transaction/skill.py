@@ -1,14 +1,19 @@
-import logging
 from typing import Any
 
+import structlog
 from aura_core import Observation, SkillProtocol
 
 from config.crypto import CryptoSettings
 
 from .engine import PriceConverter, SecretEncryption, SolanaProvider
-from .schema import PaymentProof, PaymentVerificationParams
+from .schema import (
+    PaymentProof,
+    PaymentRequestParams,
+    PaymentVerificationParams,
+    TaxCalculationParams,
+)
 
-logger = logging.getLogger(__name__)
+logger = structlog.get_logger(__name__)
 
 
 class TransactionSkill(
@@ -25,6 +30,9 @@ class TransactionSkill(
         self.converter: PriceConverter | None = None
         self._capabilities = {
             "verify_payment": self._verify_payment,
+            "verify_settlement": self._verify_payment,
+            "generate_payment_request": self._generate_payment_request,
+            "calculate_tax_and_margin": self._calculate_tax_and_margin,
             "encrypt_secret": self._encrypt_secret,
             "decrypt_secret": self._decrypt_secret,
             "get_address": self._get_address,
@@ -45,6 +53,15 @@ class TransactionSkill(
         self.converter = provider.get("converter")
 
     async def initialize(self) -> bool:
+        if self.settings and self.settings.wallet_address and self.provider:
+            derived_addr = str(self.provider.keypair.pubkey())
+            if derived_addr != self.settings.wallet_address:
+                logger.error(
+                    "wallet_address_mismatch",
+                    expected=self.settings.wallet_address,
+                    derived=derived_addr,
+                )
+                return False
         return True
 
     async def execute(self, intent: str, params: dict[str, Any]) -> Observation:
@@ -73,6 +90,23 @@ class TransactionSkill(
         if proof:
             return Observation(success=True, data=PaymentProof(**proof).model_dump())
         return Observation(success=False, error="payment_not_found")
+
+    async def _generate_payment_request(self, params: dict[str, Any]) -> Observation:
+        assert self.provider is not None
+        p = PaymentRequestParams(**params)
+        uri = self.provider.generate_payment_request(
+            p.amount, p.memo, p.currency, p.label, p.message
+        )
+        return Observation(success=True, data=uri)
+
+    async def _calculate_tax_and_margin(self, params: dict[str, Any]) -> Observation:
+        assert self.converter is not None
+        assert self.settings is not None
+        p = TaxCalculationParams(**params)
+        result = self.converter.calculate_tax_and_margin(
+            p.price, margin_rate=self.settings.hive_margin
+        )
+        return Observation(success=True, data=result)
 
     async def _encrypt_secret(self, params: dict[str, Any]) -> Observation:
         assert self.encryption is not None

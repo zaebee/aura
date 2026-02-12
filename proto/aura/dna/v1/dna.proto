@@ -230,6 +230,7 @@ message Observation {
 message NegotiationObservation {
   string session_token = 1;
   int64 valid_until_timestamp = 2;
+  string payment_uri = 6;
 
   oneof result {
     OfferAccepted accepted = 3;
@@ -280,6 +281,20 @@ message TelegramObservation {
 
 message PerceptionObservation {
   ItemData item = 1;
+}
+
+message PaymentProof {
+  string transaction_hash = 1;
+  string block_number = 2;
+  string from_address = 3;
+  google.protobuf.Timestamp confirmed_at = 4;
+}
+
+message TransactionContext {
+  string deal_id = 1;
+  double amount = 2;
+  string currency = 3;
+  string status = 4; // excited, ground
 }
 
 // =============================================================================

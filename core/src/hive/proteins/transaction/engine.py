@@ -2,6 +2,7 @@ import logging
 from datetime import UTC, datetime
 from decimal import Decimal
 from typing import Any, Literal, cast
+from urllib.parse import quote
 
 import httpx
 from cryptography.fernet import Fernet, InvalidToken
@@ -47,6 +48,18 @@ class PriceConverter:
         if crypto_currency not in self.FIXED_RATES:
             raise ValueError(f"Unsupported currency: {crypto_currency}")
         return float(Decimal(str(usd_amount)) / self.FIXED_RATES[crypto_currency])
+
+    def calculate_tax_and_margin(
+        self, price: float, margin_rate: float = 0.10
+    ) -> dict[str, float]:
+        """Apply the Hive Margin rule (The Homeostasis Law)."""
+        margin = price * margin_rate
+        tax = 0.0  # Future expansion
+        return {
+            "margin": float(round(margin, 6)),
+            "tax": float(round(tax, 6)),
+            "total": float(round(price + margin + tax, 6)),
+        }
 
 
 # --- Solana Provider Logic ---
@@ -181,6 +194,28 @@ class SolanaProvider:
             if tx.get("blockTime")
             else datetime.now(UTC),
         }
+
+    def generate_payment_request(
+        self,
+        amount: float,
+        memo: str,
+        currency: str,
+        label: str = "Aura Hive",
+        message: str = "Payment",
+    ) -> str:
+        recipient = str(self.keypair.pubkey())
+
+        base_url = f"solana:{recipient}"
+        params = [
+            f"amount={amount}",
+            f"label={quote(label)}",
+            f"message={quote(message)}",
+            f"memo={quote(memo)}",
+        ]
+        if currency == "USDC":
+            params.append(f"spl-token={self.usdc_mint}")
+
+        return f"{base_url}?{'&'.join(params)}"
 
     async def close(self) -> None:
         await self.client.aclose()

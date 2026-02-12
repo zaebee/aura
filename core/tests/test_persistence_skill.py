@@ -1,4 +1,4 @@
-from unittest.mock import MagicMock
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 from hive.proteins.persistence.skill import PersistenceSkill
@@ -15,8 +15,10 @@ async def test_persistence_skill_initialize() -> None:
     )
     mock_sessionmaker = MagicMock()
     mock_engine = MagicMock()
+    mock_redis = AsyncMock()
+    mock_redis.ping.return_value = True
 
-    skill.bind(settings, (mock_sessionmaker, mock_engine))
+    skill.bind(settings, (mock_sessionmaker, mock_engine, mock_redis))
     success = await skill.initialize()
     assert success is True
     assert skill.settings == settings
@@ -29,7 +31,7 @@ async def test_persistence_skill_execute_unknown_intent() -> None:
         url="postgresql://user:password@localhost:5432/aura_db",
         redis_url="redis://localhost:6379/0",
     )
-    skill.bind(settings, (MagicMock(), MagicMock()))
+    skill.bind(settings, (MagicMock(), MagicMock(), MagicMock()))
     obs = await skill.execute("unknown", {})
     assert obs.success is False
     assert "Unknown intent" in obs.error
