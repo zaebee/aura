@@ -54,13 +54,6 @@ data:
     localIP = "{{ .Release.Name }}-nats"
     localPort = 4222
 
-    [[visitors]]
-    name = "ollama-worker-visitor"
-    serverName = "ollama-worker-colab-savant"
-    type = "stcp"
-    bindAddr = "127.0.0.1"
-    bindPort = 11435
-    secretKey = "{{ "{{" }} .Envs.FRP_STCP_SECRET_KEY {{ "}}" }}"
 ---
 apiVersion: apps/v1
 kind: Deployment

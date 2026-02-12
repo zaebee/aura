@@ -100,7 +100,7 @@ class WorkerController:
                     ui_queue=self.ui_log_queue,
                 )
                 self.metabolism = MetabolicLoop(
-                    worker_name=self.worker_id, nats_url=nats_url
+                    worker_name=self.worker_id, nats_url=nats_url, node=self.node
                 )
 
                 # Setup standard logging

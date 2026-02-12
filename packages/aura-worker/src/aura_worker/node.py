@@ -1,4 +1,6 @@
 import asyncio
+import base64
+import json
 import os
 import shutil
 import signal
@@ -7,9 +9,18 @@ from typing import Any
 
 import httpx
 import structlog
-import torch
+
+try:
+    import torch
+except ImportError:
+    torch = None  # type: ignore
 
 logger = structlog.get_logger(__name__)
+
+# Constants for Vision analysis
+VISION_MODEL = "gemma3:latest"
+VISION_OLLAMA_URL = "http://localhost:11434/api/generate"
+VISION_RPC_TIMEOUT = 120.0
 
 
 class AuraNode:
@@ -25,10 +36,10 @@ class AuraNode:
     async def _check_gpu(self) -> tuple[bool, str]:
         """System Check Enzyme: verify if a GPU is active."""
         try:
-            if torch.cuda.is_available():
+            if torch and torch.cuda.is_available():
                 device_name = torch.cuda.get_device_name(0)
                 return True, f"GPU Active: {device_name}"
-        except (ImportError, RuntimeError):  # nosec B110
+        except (ImportError, RuntimeError, AttributeError):  # nosec B110
             # Catch specific errors related to torch or CUDA availability
             pass
 
@@ -186,3 +197,33 @@ class AuraNode:
                     return f"{base_status} (⚠️ CPU MODE)"
                 return "⚠️ DEGRADED (CPU MODE)"
             return base_status
+
+    async def analyze_vision(
+        self, images_bytes: list[bytes], prompt: str
+    ) -> dict[str, Any]:
+        """High-precision identification of vehicles via local Ollama."""
+        images_b64 = [base64.b64encode(img).decode("utf-8") for img in images_bytes]
+
+        payload = {
+            "model": VISION_MODEL,
+            "prompt": prompt,
+            "stream": False,
+            "images": images_b64,
+            "format": "json",
+        }
+
+        async with httpx.AsyncClient(timeout=VISION_RPC_TIMEOUT) as client:
+            try:
+                response = await client.post(VISION_OLLAMA_URL, json=payload)
+                response.raise_for_status()
+                result = response.json()
+                response_text = result.get("response", "{}")
+
+                try:
+                    return json.loads(response_text)
+                except json.JSONDecodeError:
+                    return {"error": "Invalid JSON from Ollama", "raw": response_text}
+
+            except Exception as e:
+                logger.error("vision_analysis_failed", error=str(e))
+                return {"error": str(e)}

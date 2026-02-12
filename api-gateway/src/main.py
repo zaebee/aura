@@ -1,14 +1,27 @@
+import base64
+import json
 import uuid
 from collections.abc import AsyncGenerator, Awaitable, Callable
 from contextlib import asynccontextmanager
-from typing import Any
+from typing import Annotated, Any
 
 import grpc
+import nats
 from aura.negotiation.v1 import (
     negotiation_pb2,  # type: ignore
     negotiation_pb2_grpc,  # type: ignore
 )
-from fastapi import Depends, FastAPI, Header, HTTPException, Request, Response
+from fastapi import (
+    Depends,
+    FastAPI,
+    File,
+    Form,
+    Header,
+    HTTPException,
+    Request,
+    Response,
+    UploadFile,
+)
 from grpc_health.v1 import health_pb2_grpc
 from health import register_health_endpoints
 from logging_config import (
@@ -59,7 +72,7 @@ health_stub: health_pb2_grpc.HealthStub
 
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncGenerator[None]:
-    """Manage gRPC channel lifecycle (startup and shutdown)."""
+    """Manage gRPC and NATS lifecycle (startup and shutdown)."""
     global channel, stub, health_stub
 
     # --- Startup ---
@@ -67,6 +80,9 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None]:
     channel = grpc.aio.insecure_channel(settings.core_service_host)
     stub = negotiation_pb2_grpc.NegotiationServiceStub(channel)
     health_stub = health_pb2_grpc.HealthStub(channel)
+
+    # NATS Connection for Vision RPC
+    app.state.nc = await nats.connect(settings.nats_url)
 
     # Register health check endpoints
     register_health_endpoints(
@@ -87,8 +103,13 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None]:
     finally:
         # --- Shutdown ---
         logger.info("shutdown_begin", service="api-gateway")
+        if hasattr(app.state, "nc") and app.state.nc:
+            await app.state.nc.drain()
+            await app.state.nc.close()
         await channel.close()
-        logger.info("shutdown_complete", grpc_channel_closed=True)
+        logger.info(
+            "shutdown_complete", grpc_channel_closed=True, nats_connection_closed=True
+        )
 
 
 # Initialize FastAPI with lifespan manager
@@ -357,6 +378,60 @@ async def system_status() -> dict[str, Any]:
         raise HTTPException(
             status_code=500, detail="Monitoring service unavailable"
         ) from e
+
+
+@app.post("/v1/vision/analyze")
+async def analyze_vision(
+    request: Request,
+    files: Annotated[list[UploadFile], File(...)],
+    agent_did: Annotated[str, Depends(verify_signature)],
+    focus: Annotated[str | None, Form()] = None,
+) -> dict[str, Any]:
+    """
+    Vision Cortex Endpoint: Multimodal analysis via NATS RPC to worker swarm.
+    """
+    request_id = get_current_request_id() or str(uuid.uuid4())
+
+    logger.info(
+        "vision_request_received",
+        file_count=len(files),
+        focus=focus,
+        agent_did=agent_did,
+    )
+
+    try:
+        # 1. Read and encode images
+        images_b64 = []
+        for file in files:
+            image_bytes = await file.read()
+            images_b64.append(base64.b64encode(image_bytes).decode("utf-8"))
+
+        # 2. Prepare NATS RPC payload
+        payload = {
+            "images": images_b64,
+            "prompt": focus or settings.vision_default_prompt,
+            "request_id": request_id,
+        }
+
+        # 3. Request analysis from the worker swarm
+        logger.info("vision_rpc_sent", subject=settings.vision_nats_subject)
+        response = await request.app.state.nc.request(
+            settings.vision_nats_subject,
+            json.dumps(payload).encode(),
+            timeout=settings.vision_rpc_timeout,
+        )
+
+        # 4. Parse and return result
+        result = json.loads(response.data.decode())
+        if not isinstance(result, dict):
+            raise ValueError(f"Expected dict from vision worker, got {type(result)}")
+
+        result["source"] = "vision-cortex"
+        return result
+
+    except Exception as e:
+        logger.error("vision_request_failed", error=str(e), exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Vision analysis failed: {e}") from e
 
 
 @app.post("/v1/deals/{deal_id}/status")

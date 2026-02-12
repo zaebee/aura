@@ -21,6 +21,7 @@ dependencies = [
     "aura-core",
     "pynacl~=1.6.2",
     "betterproto>=2.0.0b7",
+    "nats-py>=2.9.0",
 ]
 
 [tool.uv.sources]
