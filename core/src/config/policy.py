@@ -13,3 +13,4 @@ class SafetySettings(BaseModel):
     allowed_addons: list[str] = Field(
         default_factory=lambda: ["Breakfast", "Late checkout", "Room upgrade"]
     )
+    wallet_address: str = ""

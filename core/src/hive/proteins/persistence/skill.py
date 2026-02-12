@@ -6,6 +6,7 @@ from typing import Any, cast
 from aura_core import Observation, SkillProtocol
 from sqlalchemy import Engine, text
 from sqlalchemy.orm import Session, sessionmaker
+import redis.asyncio as redis
 
 from config.database import DatabaseSettings
 
@@ -14,6 +15,7 @@ from .engine import (
     DealStatus,
     InventoryItem,
     LockedDeal,
+    RedisCache,
 )
 from .schema import DealSchema, ItemSchema
 
@@ -22,7 +24,10 @@ logger = logging.getLogger(__name__)
 
 class PersistenceSkill(
     SkillProtocol[
-        DatabaseSettings, tuple[sessionmaker, Engine], dict[str, Any], Observation
+        DatabaseSettings,
+        tuple[sessionmaker, Engine, redis.Redis],
+        dict[str, Any],
+        Observation,
     ]
 ):
     """
@@ -34,10 +39,14 @@ class PersistenceSkill(
         self.settings: DatabaseSettings | None = None
         self.provider: sessionmaker | None = None
         self.engine: Engine | None = None
+        self.redis: redis.Redis | None = None
+        self.cache: RedisCache | None = None
         self._capabilities = {
             "init_db": self._init_db,
             "read_item": self._read_item_handler,
             "create_deal": self._create_deal,
+            "set_excited_state": self._set_excited_state,
+            "confirm_ground_state": self._confirm_ground_state,
             "get_deal_by_memo": self._get_deal_by_memo_handler,
             "get_deal_by_id": self._get_deal_by_id_handler,
             "update_deal_status": self._update_deal_status,
@@ -54,10 +63,14 @@ class PersistenceSkill(
         return list(self._capabilities.keys())
 
     def bind(
-        self, settings: DatabaseSettings, provider: tuple[sessionmaker, Engine]
+        self,
+        settings: DatabaseSettings,
+        provider: tuple[sessionmaker, Engine, redis.Redis],
     ) -> None:
         self.settings = settings
-        self.provider, self.engine = provider
+        self.provider, self.engine, self.redis = provider
+        if self.redis:
+            self.cache = RedisCache(self.redis)
 
     def _get_session(self) -> Session:
         if not self.provider:
@@ -67,6 +80,13 @@ class PersistenceSkill(
     async def initialize(self) -> bool:
         if not self.settings or not self.provider:
             return False
+
+        if self.redis:
+            try:
+                await self.redis.ping()
+            except Exception as e:
+                logger.error(f"redis_connection_failed: {e}")
+                return False
 
         from pgvector.sqlalchemy import Vector
 
@@ -147,6 +167,54 @@ class PersistenceSkill(
         if result:
             return Observation(success=True, data=result)
         return Observation(success=False, error="no_items_found")
+
+    async def _set_excited_state(self, params: dict[str, Any]) -> Observation:
+        if not self.cache:
+            return Observation(success=False, error="cache_not_initialized")
+        try:
+            deal_id = params.get("id")
+            if not deal_id:
+                return Observation(success=False, error="id_required")
+            await self.cache.set_excited_state(
+                str(deal_id), params, ttl=params.get("ttl", 3600)
+            )
+            return Observation(success=True)
+        except Exception as e:
+            return Observation(success=False, error=str(e))
+
+    async def _confirm_ground_state(self, params: dict[str, Any]) -> Observation:
+        if not self.cache:
+            return Observation(success=False, error="cache_not_initialized")
+        try:
+            deal_id = params.get("deal_id")
+            if not deal_id:
+                return Observation(success=False, error="deal_id_required")
+
+            deal_data = await self.cache.get_excited_state(str(deal_id))
+            if not deal_data:
+                # Might already be in ground state
+                return Observation(success=True)
+
+            # Move to Postgres
+            # Re-map bytes and dates from Redis JSON
+            if "secret_content" in deal_data and isinstance(deal_data["secret_content"], str):
+                deal_data["secret_content"] = bytes.fromhex(deal_data["secret_content"])
+
+            if "expires_at" in deal_data and isinstance(deal_data["expires_at"], str):
+                deal_data["expires_at"] = datetime.fromisoformat(deal_data["expires_at"])
+
+            # Call _create_deal logic (save to Postgres)
+            create_obs = await self._create_deal(deal_data)
+            if create_obs.success:
+                # Update status to PAID if it was confirmed as paid
+                if params.get("status") == "PAID":
+                    await self._update_deal_status(params)
+
+                await self.cache.delete_excited_state(str(deal_id))
+                return Observation(success=True)
+            return create_obs
+        except Exception as e:
+            return Observation(success=False, error=str(e))
 
     async def _create_deal(self, params: dict[str, Any]) -> Observation:
         try:

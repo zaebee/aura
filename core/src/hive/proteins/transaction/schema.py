@@ -10,6 +10,18 @@ class PaymentVerificationParams(BaseModel):
     currency: Literal["SOL", "USDC"] = "SOL"
 
 
+class PaymentRequestParams(BaseModel):
+    amount: float
+    memo: str
+    currency: Literal["SOL", "USDC"] = "SOL"
+    label: str = "Aura Hive"
+    message: str = "Payment for item"
+
+
+class TaxCalculationParams(BaseModel):
+    price: float
+
+
 class PaymentProof(BaseModel):
     transaction_hash: str
     block_number: str

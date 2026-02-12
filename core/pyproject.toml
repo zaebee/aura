@@ -34,6 +34,7 @@ dependencies = [
     "solders>=0.21.0",
     "cryptography>=43.0.0",
     "nats-py>=2.9.0",
+    "redis>=5.0.0",
     "aura-core",
     "betterproto>=2.0.0b7",
 ]

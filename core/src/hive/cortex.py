@@ -8,6 +8,7 @@ from opentelemetry.instrumentation.langchain import LangchainInstrumentor
 from prometheus_client import start_http_server
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
+import redis.asyncio as redis
 
 from hive.aggregator import HiveAggregator
 from hive.connector import HiveConnector
@@ -75,8 +76,9 @@ class HiveCell:
 
             persistence = cast(SkillProtocol, self.registry.get("persistence"))
             transaction = cast(SkillProtocol, self.registry.get("transaction"))
+            pulse = cast(SkillProtocol, self.registry.get("pulse"))
             market_service = MarketService(
-                persistence=persistence, transaction=transaction
+                persistence=persistence, transaction=transaction, pulse=pulse
             )
             self.market_service = market_service
             logger.info("market_service_wired")
@@ -135,8 +137,9 @@ class HiveCell:
         # 1. Persistence
         engine = create_engine(str(self.settings.database.url))
         SessionLocal = sessionmaker(bind=engine)
+        redis_client = redis.from_url(str(self.settings.database.redis_url))
         persistence = PersistenceSkill()
-        persistence.bind(self.settings.database, (SessionLocal, engine))
+        persistence.bind(self.settings.database, (SessionLocal, engine, redis_client))
 
         # 2. Pulse
         pulse = PulseSkill()

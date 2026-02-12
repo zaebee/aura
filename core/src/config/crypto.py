@@ -19,6 +19,8 @@ class CryptoSettings(BaseModel):
         "Gh9ZwEmdLJ8DscKNTkTqPbNwLNNBjuSzaG9Vp2KGtKJr"  # Devnet USDC
     )
 
+    wallet_address: str = ""
+
     # Deal Expiration
     deal_ttl_seconds: int = 3600  # 1 hour default
 

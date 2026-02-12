@@ -35,7 +35,7 @@ class OutputGuard:
             logger.warning("invalid_offered_price", price=offered_price)
             raise SafetyViolation("Invalid offered price")
 
-        # 2. Floor price violation
+        # 2. Floor price violation (Metabolic Leakage Protection)
         if offered_price < floor_price:
             logger.warning(
                 "safety_floor_violation",
@@ -43,7 +43,7 @@ class OutputGuard:
                 offered_price=offered_price,
                 floor_price=floor_price,
             )
-            raise SafetyViolation("Floor price violation")
+            raise SafetyViolation("Metabolic Leakage: Amount below floor price")
 
         # 3. Margin violation
         if offered_price > 0:
