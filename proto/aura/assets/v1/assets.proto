@@ -110,11 +110,11 @@ message AvailabilityWindow {
 
 message DamagePolicy {
   enum DamageLevel {
-    UNSPECIFIED = 0;
-    MINOR = 1;
-    MODERATE = 2;
-    SEVERE = 3;
-    TOTAL_LOSS = 4;
+    DAMAGE_LEVEL_UNSPECIFIED = 0;
+    DAMAGE_LEVEL_MINOR = 1;
+    DAMAGE_LEVEL_MODERATE = 2;
+    DAMAGE_LEVEL_SEVERE = 3;
+    DAMAGE_LEVEL_TOTAL_LOSS = 4;
   }
   map<int32, double> damage_charges = 1;  // DamageLevel -> charge amount
   string currency_code = 2;                 // ISO 4217 currency code
@@ -220,10 +220,10 @@ message OperationalMetadata {
 
 message MaintenanceSchedule {
   enum MaintenanceType {
-    UNSPECIFIED = 0;
-    ROUTINE = 1;
-    SEASONAL = 2;
-    EMERGENCY = 3;
+    MAINTENANCE_TYPE_UNSPECIFIED = 0;
+    MAINTENANCE_TYPE_ROUTINE = 1;
+    MAINTENANCE_TYPE_SEASONAL = 2;
+    MAINTENANCE_TYPE_EMERGENCY = 3;
   }
   MaintenanceType type = 1;
   int32 frequency_days = 2;               // Every N days
@@ -434,15 +434,15 @@ message AssetBooking {
   google.protobuf.Timestamp end_time = 6;
 
   enum BookingStatus {
-    STATUS_UNSPECIFIED = 0;
-    STATUS_INQUIRY = 1;
-    STATUS_PENDING_OWNER_APPROVAL = 2;
-    STATUS_PENDING_RENTER_CONFIRMATION = 3;
-    STATUS_CONFIRMED = 4;
-    STATUS_ACTIVE = 5;
-    STATUS_COMPLETED = 6;
-    STATUS_CANCELLED = 7;
-    STATUS_DISPUTE = 8;
+    BOOKING_STATUS_STATUS_UNSPECIFIED = 0;
+    BOOKING_STATUS_STATUS_INQUIRY = 1;
+    BOOKING_STATUS_STATUS_PENDING_OWNER_APPROVAL = 2;
+    BOOKING_STATUS_STATUS_PENDING_RENTER_CONFIRMATION = 3;
+    BOOKING_STATUS_STATUS_CONFIRMED = 4;
+    BOOKING_STATUS_STATUS_ACTIVE = 5;
+    BOOKING_STATUS_STATUS_COMPLETED = 6;
+    BOOKING_STATUS_STATUS_CANCELLED = 7;
+    BOOKING_STATUS_STATUS_DISPUTE = 8;
   }
   BookingStatus status = 7;
 
