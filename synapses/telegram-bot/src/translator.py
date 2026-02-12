@@ -14,7 +14,6 @@ from aura_core.gen.aura.dna.v1 import (
     ActionType,
     AgentIdentity,
     Event,
-    NegotiationSignal,
     PerceptionSignal,
     Signal,
     SignalType,
@@ -55,8 +54,13 @@ class TelegramTranslator:
             if command and command.command == "search":
                 return Signal(
                     signal_id=signal_id,
-                    signal_type=cast(SignalType, SignalType.SIGNAL_TYPE_UNSPECIFIED),
+                    signal_type=cast(SignalType, SignalType.SIGNAL_TYPE_TELEGRAM),
                     timestamp=datetime.now(UTC),
+                    telegram=TelegramSignal(
+                        user_id=user_id,
+                        chat_id=chat_id,
+                        message_text=text,
+                    ),
                     metadata={
                         "chat_id": str(chat_id),
                         "user_id": str(user_id),
@@ -65,11 +69,6 @@ class TelegramTranslator:
                         "query": command.args or "",
                     },
                 )
-
-            # Simple heuristic: if it's a number, it's a bid
-            bid_amount = 0.0
-            if text.replace(".", "", 1).isdigit():
-                bid_amount = float(text)
 
             # Handle photo message (Perception)
             if kwargs.get("image_bytes"):
@@ -89,25 +88,25 @@ class TelegramTranslator:
                         "chat_id": str(chat_id),
                         "user_id": str(user_id),
                         "source": "telegram",
+                        "item_id": item_id,
                     },
                 )
 
+            # Standard message or bid - Use TelegramSignal for Signal Integrity
             return Signal(
                 signal_id=signal_id,
-                signal_type=cast(SignalType, SignalType.SIGNAL_TYPE_NEGOTIATION),
+                signal_type=cast(SignalType, SignalType.SIGNAL_TYPE_TELEGRAM),
                 timestamp=datetime.now(UTC),
-                negotiation=NegotiationSignal(
-                    item_id=item_id,
-                    bid_amount=bid_amount,
-                    agent=AgentIdentity(
-                        did=f"tg:{user_id}",
-                        reputation_score=1.0,
-                    ),
+                telegram=TelegramSignal(
+                    user_id=user_id,
+                    chat_id=chat_id,
+                    message_text=text,
                 ),
                 metadata={
                     "chat_id": str(chat_id),
                     "user_id": str(user_id),
                     "source": "telegram",
+                    "item_id": item_id,
                 },
             )
 
