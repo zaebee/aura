@@ -27,7 +27,7 @@ spec:
                 secretKeyRef:
                   name: "{{ .Release.Name }}-secrets"
                   key: "telegram-token"
-            - name: AURA_TELEGRAM__CORE_URL
+            - name: AURA_TELEGRAM__CORE_GRPC_URL
               value: "{{ .Release.Name }}-core.{{ .Release.Namespace }}.svc.cluster.local:50051"
             - name: AURA_TELEGRAM__NATS_URL
               value: "nats://{{ .Release.Name }}-nats.{{ .Release.Namespace }}.svc.cluster.local:4222"
@@ -41,25 +41,6 @@ spec:
             - name: DEBUG
               value: {{ .Values.telegram.env.DEBUG | quote }}
             {{- end }}
-            # --- Core metabolism settings (in-process HiveCell) ---
-            - name: AURA_DATABASE__URL
-              value: "postgresql://{{ .Values.postgres.auth.username }}:{{ .Values.postgres.auth.password }}@{{ .Release.Name }}-postgres.{{ .Release.Namespace }}.svc.cluster.local:5432/{{ .Values.postgres.auth.database }}"
-            - name: AURA_DATABASE__REDIS_URL
-              value: "redis://{{ .Release.Name }}-redis.{{ .Release.Namespace }}.svc.cluster.local:6379/0"
-            - name: AURA_SERVER__NATS_URL
-              value: "nats://{{ .Release.Name }}-nats.{{ .Release.Namespace }}.svc.cluster.local:4222"
-            - name: AURA_SERVER__OTEL_EXPORTER_OTLP_ENDPOINT
-              value: {{ .Values.monitoring.jaeger.collectorUrl | default (include "aura.jaeger.collectorUrl" .) | quote }}
-            - name: AURA_SERVER__METRICS_PORT
-              value: "9092"
-            - name: AURA_LLM__MODEL
-              value: "{{ .Values.telegram.env.AURA_LLM__MODEL | default "rule" }}"
-            - name: AURA_LLM__API_KEY
-              valueFrom:
-                secretKeyRef:
-                  name: "{{ .Release.Name }}-secrets"
-                  key: "api-key"
-                  optional: true
             - name: AURA_CRYPTO__ENABLED
               value: "false"
           {{- if .Values.hiveManifest.enabled }}
