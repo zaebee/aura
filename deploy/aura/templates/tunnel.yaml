@@ -64,7 +64,7 @@ spec:
   selector:
     matchLabels:
       app: frpc
-      component: tunnel
+      # component: tunnel
   template:
     metadata:
       labels:
