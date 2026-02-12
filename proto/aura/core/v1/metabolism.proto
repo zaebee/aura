@@ -1,34 +1,26 @@
-// DNA Protocol Buffers - Universal Language for the Hive
+// Metabolism Protocol Buffers - Nucleotide Signals for the Hive Core
 //
-// Binary Bloodstream: Strictly typed messages for NATS JetStream.
-// NO google.protobuf.Struct - all payloads are explicit.
+// This chromosome defines the ATCG-M metabolic pattern signals that form
+// the Hive's nervous system. It is completely decoupled from the Substrate
+// (assets) and uses only generic references to assets via identifiers.
 //
-// These definitions can be generated for TS/Go/Rust/Python.
+// The Metabolism (core) knows nothing about specific asset domains - it only
+// deals with generic asset identifiers and domain references.
 
 syntax = "proto3";
 
-package aura.dna.v1;
+package aura.core.v1;
 
+import "aura/core/v1/base.proto";
 import "google/protobuf/timestamp.proto";
 import "google/protobuf/any.proto";
-
-// =============================================================================
-// METADATA - Common fields for OTel propagation
-// =============================================================================
-
-message TraceContext {
-  string trace_id = 1;      // W3C Trace Context trace-id
-  string span_id = 2;       // W3C Trace Context span-id
-  string trace_flags = 3;   // Sampling flags
-  string trace_state = 4;   // Vendor-specific trace state
-}
 
 // =============================================================================
 // SIGNAL - Inbound stimulus to the Hive (A - Aggregator input)
 // =============================================================================
 
 message Signal {
-  string signal_id = 1;
+  string identifier = 1;  // Schema.org compliant
   SignalType signal_type = 2;
   google.protobuf.Timestamp timestamp = 3;
   map<string, string> metadata = 4;
@@ -41,6 +33,7 @@ message Signal {
     TelegramSignal telegram = 12;
     HeartbeatSignal heartbeat = 13;
     PerceptionSignal perception = 14;
+    AssetSignal asset = 15;  // Generic asset signal (decoupled)
   }
 }
 
@@ -51,18 +44,29 @@ enum SignalType {
   SIGNAL_TYPE_TELEGRAM = 3;
   SIGNAL_TYPE_HEARTBEAT = 4;
   SIGNAL_TYPE_PERCEPTION = 5;
+  SIGNAL_TYPE_ASSET = 6;  // Generic asset signals
 }
 
+// Generic Asset Signal - knows only about asset identifiers and domains
+message AssetSignal {
+  string asset_identifier = 1;           // Generic reference to any asset
+  string asset_domain = 2;                // "VEHICLE", "PROPERTY", etc. (string, not enum)
+  string signal_subtype = 3;             // "discovery", "availability_change", "price_update", "booking_request"
+  google.protobuf.Any asset_data = 4;    // Opaque payload
+}
+
+// Existing signal types (using generic asset references)
 message NegotiationSignal {
-  string item_id = 1;
-  double bid_amount = 2;
-  string currency_code = 3;
-  AgentIdentity agent = 4;
+  string item_identifier = 1;              // Generic item reference
+  string item_domain = 2;                 // "VEHICLE", "PROPERTY", etc.
+  double bid_amount = 3;
+  string currency_code = 4;
+  AgentIdentity agent = 5;
 }
 
 message AgentIdentity {
-  string did = 1;
-  float reputation_score = 2;
+  string did = 1;             // Decentralized identifier
+  float reputation_score = 2; // Reputation score from middleware
 }
 
 message AuditSignal {
@@ -88,6 +92,8 @@ message PerceptionSignal {
   bytes image_data = 1;
   string mime_type = 2;
   AgentIdentity agent = 3;
+  string perceived_asset_identifier = 4;  // Generic asset reference
+  string perceived_asset_domain = 5;     // Perceived domain
 }
 
 // =============================================================================
@@ -95,9 +101,9 @@ message PerceptionSignal {
 // =============================================================================
 
 message Context {
-  string context_id = 1;
+  string identifier = 1;  // Schema.org compliant
   ContextType context_type = 2;
-  SystemVitals system_health = 3;
+  Status system_health = 3;
   map<string, string> metadata = 4;
   TraceContext trace = 5;
 
@@ -106,6 +112,7 @@ message Context {
     HiveContextData hive = 10;
     BeeContextData bee = 11;
     TelegramContextData telegram = 12;
+    AssetContextData asset = 13;  // Generic asset context (decoupled)
   }
 }
 
@@ -114,12 +121,25 @@ enum ContextType {
   CONTEXT_TYPE_HIVE = 1;
   CONTEXT_TYPE_BEE = 2;
   CONTEXT_TYPE_TELEGRAM = 3;
+  CONTEXT_TYPE_ASSET = 4;  // Generic asset context
 }
 
+// Generic Asset Context - knows only about asset identifiers
+message AssetContextData {
+  string asset_identifier = 1;           // Generic asset reference
+  string asset_domain = 2;                // Asset domain as string
+  map<string, string> asset_metadata = 3; // Generic metadata
+  string search_query = 4;
+  map<string, string> search_parameters = 5;
+  GeographicCoordinates search_location = 6;
+  float search_radius_km = 7;
+}
+
+// Existing context types
 message HiveContextData {
-  string item_id = 1;
-  NegotiationOffer offer = 2;
-  ItemData item = 3;
+  string item_identifier = 1;
+  string item_domain = 2;                 // Generic domain reference
+  NegotiationOffer offer = 3;
   string request_id = 4;
 }
 
@@ -127,14 +147,6 @@ message NegotiationOffer {
   double bid_amount = 1;
   float reputation = 2;
   string agent_did = 3;
-}
-
-message ItemData {
-  string id = 1;
-  string name = 2;
-  double base_price = 3;
-  double floor_price = 4;
-  map<string, string> meta = 5;
 }
 
 message BeeContextData {
@@ -156,7 +168,7 @@ message TelegramContextData {
 // =============================================================================
 
 message Intent {
-  string intent_id = 1;
+  string identifier = 1;  // Schema.org compliant
   ActionType action = 2;
   string reasoning = 3;
   repeated IntentStep steps = 4;
@@ -168,23 +180,26 @@ message Intent {
     NegotiationIntent negotiation = 10;
     AuditIntent audit = 11;
     UIIntent ui = 12;
+    AssetIntent asset = 13;  // Generic asset intent (decoupled)
   }
 }
 
-enum ActionType {
-  ACTION_TYPE_UNSPECIFIED = 0;
-  ACTION_TYPE_ACCEPT = 1;
-  ACTION_TYPE_COUNTER = 2;
-  ACTION_TYPE_REJECT = 3;
-  ACTION_TYPE_AUDIT = 4;
-  ACTION_TYPE_UI_REQUIRED = 5;
-  ACTION_TYPE_ERROR = 6;
+// Generic Asset Intent - operates on asset identifiers only
+message AssetIntent {
+  string asset_identifier = 1;           // Generic asset reference
+  string asset_domain = 2;                // Target asset domain
+  ActionType action_type = 3;             // Reuses generic ActionType
+  map<string, string> action_parameters = 4;
+  google.protobuf.Any action_data = 5;    // Opaque payload
 }
 
+// Existing intent types
 message NegotiationIntent {
-  double price = 1;
-  string message = 2;
-  string thought = 3;
+  string item_identifier = 1;
+  string item_domain = 2;                 // Generic domain reference
+  double price = 3;
+  string message = 4;
+  string thought = 5;
 }
 
 message AuditIntent {
@@ -202,7 +217,6 @@ message UIIntent {
 message IntentStep {
   string skill = 1;
   string intent = 2;
-  // Use Any for step params since they vary by skill
   google.protobuf.Any params = 3;
 }
 
@@ -224,35 +238,43 @@ message Observation {
     AuditObservation audit = 11;
     TelegramObservation telegram = 12;
     PerceptionObservation perception = 13;
+    AssetObservation asset = 14;  // Generic asset observation (decoupled)
   }
 }
 
+// Generic Asset Observation - returns only asset identifiers
+message AssetObservation {
+  string asset_identifier = 1;           // Generic asset reference
+  string asset_domain = 2;                // Asset domain
+  Status status = 3;
+  string reservation_code = 4;
+  double final_price = 5;
+  string currency_code = 6;
+  map<string, string> result_data = 7;
+}
+
+// Existing observation types
 message NegotiationObservation {
-  string session_token = 1;
-  int64 valid_until_timestamp = 2;
-  string payment_uri = 6;
+  string item_identifier = 1;
+  string item_domain = 2;                 // Generic domain reference
+  int64 valid_until_timestamp = 3;
+  string payment_uri = 4;
 
   oneof result {
-    OfferAccepted accepted = 3;
-    OfferCountered countered = 4;
-    OfferRejected rejected = 5;
+    OfferAccepted accepted = 5;
+    OfferCountered countered = 6;
+    OfferRejected rejected = 7;
   }
 }
 
 message OfferAccepted {
   double final_price = 1;
-  string reservation_code = 2;
-  CryptoPaymentInstructions crypto_payment = 3;
-}
+  string currency_code = 2;
 
-message OfferCountered {
-  double proposed_price = 1;
-  string reason_code = 2;
-  string human_message = 3;
-}
-
-message OfferRejected {
-  string reason_code = 1;
+  oneof reveal_method {
+    string reservation_code = 3;
+    CryptoPaymentInstructions crypto_payment = 4;
+  }
 }
 
 message CryptoPaymentInstructions {
@@ -263,6 +285,16 @@ message CryptoPaymentInstructions {
   string memo = 5;
   string network = 6;
   int64 expires_at = 7;
+}
+
+message OfferCountered {
+  double proposed_price = 1;
+  string reason_code = 2;
+  string human_message = 3;
+}
+
+message OfferRejected {
+  string reason_code = 1;
 }
 
 message AuditObservation {
@@ -280,7 +312,8 @@ message TelegramObservation {
 }
 
 message PerceptionObservation {
-  ItemData item = 1;
+  string perceived_asset_identifier = 1;  // Generic asset reference
+  string perceived_asset_domain = 2;     // Perceived domain
 }
 
 message PaymentProof {
@@ -294,7 +327,7 @@ message TransactionContext {
   string deal_id = 1;
   double amount = 2;
   string currency = 3;
-  string status = 4; // excited, ground
+  string status = 4;
 }
 
 // =============================================================================
@@ -302,7 +335,7 @@ message TransactionContext {
 // =============================================================================
 
 message Event {
-  string event_id = 1;
+  string identifier = 1;  // Schema.org compliant
   string topic = 2;
   google.protobuf.Timestamp timestamp = 3;
   map<string, string> metadata = 4;
@@ -316,9 +349,21 @@ message Event {
     HeartbeatEvent heartbeat = 13;
     AuditEvent audit = 14;
     LogEvent log = 15;
+    AssetEvent asset = 16;  // Generic asset event (decoupled)
   }
 }
 
+// Generic Asset Event - contains only asset identifiers
+message AssetEvent {
+  string asset_identifier = 1;           // Generic asset reference
+  string asset_domain = 2;                // Asset domain
+  string event_type = 3;                 // "created", "updated", "deleted", "reserved", "sold"
+  google.protobuf.Timestamp event_time = 4;
+  string initiated_by = 5;
+  map<string, string> event_data = 6;
+}
+
+// Existing event types
 message LogEvent {
   string level = 1;
   string message = 2;
@@ -327,38 +372,29 @@ message LogEvent {
 }
 
 message NegotiationEvent {
-  string session_token = 1;
-  ActionType action = 2;
-  double price = 3;
-  string item_id = 4;
-  string agent_did = 5;
+  string item_identifier = 1;
+  string item_domain = 2;                 // Generic domain reference
+  ActionType action = 3;
+  double price = 4;
 }
 
 message VitalsEvent {
   string service = 1;
-  VitalsStatus status = 2;
+  Status status = 2;
   double cpu_usage_percent = 3;
   double memory_usage_mb = 4;
 }
 
 message AlertEvent {
-  AlertSeverity severity = 1;
+  Severity severity = 1;
   string message = 2;
   string source = 3;
-}
-
-enum AlertSeverity {
-  ALERT_SEVERITY_UNSPECIFIED = 0;
-  ALERT_SEVERITY_INFO = 1;
-  ALERT_SEVERITY_WARNING = 2;
-  ALERT_SEVERITY_ERROR = 3;
-  ALERT_SEVERITY_CRITICAL = 4;
 }
 
 message HeartbeatEvent {
   string service = 1;
   string instance_id = 2;
-  VitalsStatus status = 3;
+  Status status = 3;
 }
 
 message AuditEvent {
@@ -366,85 +402,4 @@ message AuditEvent {
   bool is_pure = 2;
   repeated string heresies = 3;
   double negotiation_success_rate = 4;
-}
-
-// =============================================================================
-// SYSTEM VITALS - Health metrics for proprioception
-// =============================================================================
-
-enum VitalsStatus {
-  VITALS_STATUS_UNSPECIFIED = 0;
-  VITALS_STATUS_OK = 1;
-  VITALS_STATUS_DEGRADED = 2;
-  VITALS_STATUS_ERROR = 3;
-}
-
-message SystemVitals {
-  VitalsStatus status = 1;
-  double cpu_usage_percent = 2;
-  double memory_usage_mb = 3;
-  google.protobuf.Timestamp timestamp = 4;
-  bool cached = 5;
-  repeated string warnings = 6;
-  string error = 7;
-}
-
-// =============================================================================
-// PRODUCT DATA - Mobility Ecosystem Support
-// =============================================================================
-
-// Vehicle types for mobility services
-enum VehicleType {
-  VEHICLE_TYPE_UNSPECIFIED = 0;
-  VEHICLE_TYPE_CAR = 1;
-  VEHICLE_TYPE_BIKE = 2;
-  VEHICLE_TYPE_SCOOTER = 3;
-  VEHICLE_TYPE_MOPED = 4;
-  VEHICLE_TYPE_E_BIKE = 5;
-  VEHICLE_TYPE_E_SCOOTER = 6;
-}
-
-// Vehicle categories for classification
-enum VehicleCategory {
-  VEHICLE_CATEGORY_UNSPECIFIED = 0;
-  VEHICLE_CATEGORY_ECONOMY = 1;
-  VEHICLE_CATEGORY_COMPACT = 2;
-  VEHICLE_CATEGORY_MIDSIZE = 3;
-  VEHICLE_CATEGORY_STANDARD = 4;
-  VEHICLE_CATEGORY_FULLSIZE = 5;
-  VEHICLE_CATEGORY_PREMIUM = 6;
-  VEHICLE_CATEGORY_LUXURY = 7;
-  VEHICLE_CATEGORY_SUV = 8;
-  VEHICLE_CATEGORY_VAN = 9;
-  VEHICLE_CATEGORY_SPORTS = 10;
-  VEHICLE_CATEGORY_EXOTIC = 11;
-}
-
-// Fuel types for different vehicle configurations
-enum FuelType {
-  FUEL_TYPE_UNSPECIFIED = 0;
-  FUEL_TYPE_PETROL = 1;
-  FUEL_TYPE_DIESEL = 2;
-  FUEL_TYPE_ELECTRIC = 3;
-  FUEL_TYPE_HYBRID = 4;
-  FUEL_TYPE_CNG = 5;
-  FUEL_TYPE_HYDROGEN = 6;
-}
-
-// Transmission types
-enum TransmissionType {
-  TRANSMISSION_TYPE_TRANSMISSION_UNSPECIFIED = 0;
-  TRANSMISSION_TYPE_TRANSMISSION_MANUAL = 1;
-  TRANSMISSION_TYPE_TRANSMISSION_AUTOMATIC = 2;
-  TRANSMISSION_TYPE_TRANSMISSION_SEMI_AUTOMATIC = 3;
-  TRANSMISSION_TYPE_TRANSMISSION_CVT = 4;
-}
-
-// Insurance tiers for rental vehicles
-enum InsuranceTier {
-  INSURANCE_TIER_UNSPECIFIED = 0;
-  INSURANCE_TIER_BASIC = 1;
-  INSURANCE_TIER_STANDARD = 2;
-  INSURANCE_TIER_PREMIUM = 3;
-  INSURANCE_TIER_ZERO_DEPOSIT = 4;
 }

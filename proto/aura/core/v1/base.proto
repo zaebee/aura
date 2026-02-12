@@ -1,0 +1,87 @@
+// Base Protocol Buffers - Fundamental Building Blocks for the Hive Core
+//
+// This file contains the most primitive types that form the foundation
+// of the Hive's genetic code. These types are completely decoupled from
+// any domain-specific concerns and represent pure biological nucleotides.
+
+syntax = "proto3";
+
+package aura.core.v1;
+
+import "google/protobuf/timestamp.proto";
+
+// =============================================================================
+// PRIMITIVE TYPES - The fundamental nucleotides of the Hive genome
+// =============================================================================
+
+// Unique identifier following Schema.org conventions
+message Identifier {
+  string identifier = 1;  // Schema.org compliant field name
+  string legacy_id = 2;   // For backward compatibility
+}
+
+// Monetary amount with currency specification
+message Money {
+  double amount = 1;
+  string currency_code = 2;  // ISO 4217 currency code (USD, EUR, etc.)
+  string currency_symbol = 3; // Optional display symbol ($, €, etc.)
+}
+
+// Geographic coordinates (decoupled from full Location)
+message GeographicCoordinates {
+  double latitude = 1;
+  double longitude = 2;
+}
+
+// System vitals and health metrics
+message SystemVitals {
+  double cpu_usage_percent = 1;
+  double memory_usage_mb = 2;
+  double disk_usage_percent = 3;
+  double network_latency_ms = 4;
+  string status = 5;         // OK, DEGRADED, ERROR, CRITICAL
+  google.protobuf.Timestamp timestamp = 6;
+}
+
+// Trace context for distributed tracing (OpenTelemetry compatible)
+message TraceContext {
+  string trace_id = 1;      // W3C Trace Context trace-id
+  string span_id = 2;       // W3C Trace Context span-id
+  string trace_flags = 3;   // Sampling flags
+  string trace_state = 4;   // Vendor-specific trace state
+}
+
+// =============================================================================
+// PRIMITIVE ENUMS - Fundamental classifications
+// =============================================================================
+
+// Standard status values
+enum Status {
+  STATUS_UNSPECIFIED = 0;
+  STATUS_OK = 1;
+  STATUS_DEGRADED = 2;
+  STATUS_ERROR = 3;
+  STATUS_CRITICAL = 4;
+}
+
+// Severity levels for alerts and events
+enum Severity {
+  SEVERITY_UNSPECIFIED = 0;
+  SEVERITY_INFO = 1;
+  SEVERITY_WARNING = 2;
+  SEVERITY_ERROR = 3;
+  SEVERITY_CRITICAL = 4;
+}
+
+// Generic action types that apply across all domains
+enum ActionType {
+  ACTION_TYPE_UNSPECIFIED = 0;
+  ACTION_TYPE_ACCEPT = 1;
+  ACTION_TYPE_COUNTER = 2;
+  ACTION_TYPE_REJECT = 3;
+  ACTION_TYPE_APPROVE = 4;
+  ACTION_TYPE_CANCEL = 5;
+  ACTION_TYPE_UPDATE = 6;
+  ACTION_TYPE_EVALUATE = 7;
+  ACTION_TYPE_ERROR = 8;
+}
