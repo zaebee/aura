@@ -56,7 +56,7 @@ class HiveAggregator(Aggregator[Any, HiveContext]):
         item_id = "unknown"
         request_id = ""
         offer = NegotiationOffer(bid_amount=0.0, reputation=1.0, agent_did="unknown")
-        item_data = {}
+        item_data: dict[str, Any] = {}
         metadata = {"brain_path": self.brain_path}
 
         # 2. Extract or Parse Signal

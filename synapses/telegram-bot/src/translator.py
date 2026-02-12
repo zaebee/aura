@@ -14,7 +14,6 @@ from aura_core.gen.aura.dna.v1 import (
     ActionType,
     AgentIdentity,
     Event,
-    NegotiationSignal,
     PerceptionSignal,
     Signal,
     SignalType,

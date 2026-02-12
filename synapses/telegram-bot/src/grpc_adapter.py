@@ -1,10 +1,10 @@
 import structlog
-from grpclib.client import Channel
 from aura_core.gen.aura.negotiation.v1 import (
     NegotiateRequest,
     NegotiateResponse,
     NegotiationServiceStub,
 )
+from grpclib.client import Channel
 
 logger = structlog.get_logger(__name__)
 
@@ -42,4 +42,4 @@ class GrpcAdapter:
             raise
 
     async def close(self) -> None:
-        await self.channel.close()
+        self.channel.close()
