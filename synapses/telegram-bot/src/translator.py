@@ -24,6 +24,16 @@ from aura_core.gen.aura.dna.v1 import (
 logger = structlog.get_logger(__name__)
 
 
+def sanitize_markdown(text: str) -> str:
+    """Escapes backticks for safe embedding in Markdown code blocks."""
+    return text.replace("`", "'")
+
+
+def sanitize_callback(text: str) -> str:
+    """Removes colons to prevent corruption of delimited callback data."""
+    return text.replace(":", "_")
+
+
 class TelegramTranslator:
     """Standardized translator for Telegram signals and events."""
 
@@ -173,8 +183,9 @@ class TelegramTranslator:
                 if vision_data_raw:
                     try:
                         v = json.loads(vision_data_raw)
-                        name = v.get("name", "Unknown Asset")
-                        color = v.get("meta", {}).get("color", "Unknown")
+                        # Sanitize LLM-generated strings to prevent Markdown/Injection attacks
+                        name = sanitize_markdown(v.get("name", "Unknown Asset"))
+                        color = sanitize_markdown(v.get("meta", {}).get("color", "Unknown"))
                         confidence = v.get("meta", {}).get("confidence", "0.0")
 
                         message = (
@@ -186,11 +197,20 @@ class TelegramTranslator:
                             f"Is this correct? Would you like to list it now?"
                         )
 
+                        # Sanitize item_id to prevent hijacking the callback_data delimiter
+                        safe_item_id = sanitize_callback(item_id)
+
                         # Add Buttons
                         keyboard = InlineKeyboardMarkup(inline_keyboard=[
                             [
-                                InlineKeyboardButton(text="✅ List Now", callback_data=f"list_now:{item_id}:{price}"),
-                                InlineKeyboardButton(text="❌ Wrong Specs", callback_data=f"wrong_specs:{item_id}")
+                                InlineKeyboardButton(
+                                    text="✅ List Now",
+                                    callback_data=f"list_now:{safe_item_id}:{price}",
+                                ),
+                                InlineKeyboardButton(
+                                    text="❌ Wrong Specs",
+                                    callback_data=f"wrong_specs:{safe_item_id}",
+                                ),
                             ]
                         ])
                     except Exception as e:

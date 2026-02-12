@@ -103,6 +103,7 @@ class AuraTransformer(Transformer[HiveContext, IntentAction]):
         if cpu_load > 80.0:
             constraints.append("SYSTEM_LOAD_HIGH: Be extremely concise.")
 
+        # Rely on single source of truth for configuration
         vision_confidence_threshold = 0.7
         if (
             self.settings

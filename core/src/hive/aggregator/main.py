@@ -95,6 +95,7 @@ class HiveAggregator(Aggregator[Any, HiveContext]):
                         if v_obs.success:
                             # LTP: Store perceived asset as Ephemeral Memory
                             agent_did = per_signal.agent.did
+                            # Rely on single source of truth for configuration
                             ttl = 3600
                             if (
                                 self.settings
@@ -143,9 +144,14 @@ class HiveAggregator(Aggregator[Any, HiveContext]):
                     item_id = "unknown"
                     bid_amount = 0.0
                     if callback_data.startswith("list_now:"):
-                        parts = callback_data.split(":")
-                        item_id = parts[1]
-                        bid_amount = float(parts[2])
+                        try:
+                            # Split into max 3 parts: list_now, item_id, price
+                            parts = callback_data.split(":", 2)
+                            if len(parts) >= 3:
+                                item_id = parts[1]
+                                bid_amount = float(parts[2])
+                        except (ValueError, IndexError):
+                            logger.warning("invalid_callback_data", data=callback_data)
 
                     # Fetch ephemeral asset from cache
                     item_data = {}
