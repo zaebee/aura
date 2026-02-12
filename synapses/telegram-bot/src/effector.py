@@ -47,12 +47,15 @@ class TelegramEffector:
             logger.debug("effector_received_event", topic=proto_event.topic)
 
             # 2. Translate internal event to user-friendly message
-            chat_id, markdown = self.translator.from_event(proto_event)
+            chat_id, markdown, keyboard = self.translator.from_event(proto_event)
 
             # 3. Deliver to External World
             if chat_id and markdown:
                 await self.bot.send_message(
-                    chat_id=chat_id, text=markdown, parse_mode="Markdown"
+                    chat_id=chat_id,
+                    text=markdown,
+                    parse_mode="Markdown",
+                    reply_markup=keyboard,
                 )
                 logger.info(
                     "effector_notification_sent",

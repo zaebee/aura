@@ -1,3 +1,4 @@
+import json
 import time
 from typing import Any, cast
 
@@ -102,6 +103,15 @@ class AuraTransformer(Transformer[HiveContext, IntentAction]):
         if cpu_load > 80.0:
             constraints.append("SYSTEM_LOAD_HIGH: Be extremely concise.")
 
+        # Rely on single source of truth for configuration
+        vision_confidence_threshold = 0.7
+        if (
+            self.settings
+            and hasattr(self.settings, "perception")
+            and hasattr(self.settings.perception, "confidence_threshold")
+        ):
+            vision_confidence_threshold = self.settings.perception.confidence_threshold
+
         return {
             "base_price": context.item_data.get("base_price", 0.0),
             "floor_price": context.item_data.get("floor_price", 0.0),
@@ -112,6 +122,7 @@ class AuraTransformer(Transformer[HiveContext, IntentAction]):
             if context.metadata.get("source") == "vision"
             else None,
             "vision_error": context.metadata.get("vision_error"),
+            "vision_confidence_threshold": vision_confidence_threshold,
         }
 
     async def think(self, context: HiveContext, **kwargs: Any) -> IntentAction:
@@ -151,15 +162,26 @@ class AuraTransformer(Transformer[HiveContext, IntentAction]):
             raw_thought = result.get("thought", "")
             wrapped_thought = f"<think>\n{raw_thought}\n</think>" if raw_thought else ""
 
+            action_metadata = {
+                **result.get("metadata", {}),
+                "brain_path": self.brain_path,
+            }
+
+            # If it's a vision-based discovery or its confirmation, propagate result
+            is_vision = context.metadata.get("source") == "vision"
+            is_vision_confirm = (
+                context.metadata.get("source") == "telegram"
+                and "list_now" in context.metadata.get("callback_data", "")
+            )
+            if (is_vision or is_vision_confirm) and context.item_data:
+                action_metadata["vision_result"] = json.dumps(context.item_data)
+
             return IntentAction(
                 action=cast(ActionType, map_action(result["action"])),
                 price=result["price"],
                 message=result["message"],
                 thought=wrapped_thought,
-                metadata={
-                    **result.get("metadata", {}),
-                    "brain_path": self.brain_path,
-                },
+                metadata=action_metadata,
             )
 
         except Exception as e:

@@ -1,8 +1,15 @@
+import json
 import uuid
 from datetime import UTC, datetime
 from typing import Any, cast
 
-from aiogram.types import CallbackQuery, Message
+import structlog
+from aiogram.types import (
+    CallbackQuery,
+    InlineKeyboardButton,
+    InlineKeyboardMarkup,
+    Message,
+)
 from aura_core.gen.aura.dna.v1 import (
     ActionType,
     AgentIdentity,
@@ -13,6 +20,18 @@ from aura_core.gen.aura.dna.v1 import (
     SignalType,
     TelegramSignal,
 )
+
+logger = structlog.get_logger(__name__)
+
+
+def sanitize_markdown(text: str) -> str:
+    """Escapes backticks for safe embedding in Markdown code blocks."""
+    return text.replace("`", "'")
+
+
+def sanitize_callback(text: str) -> str:
+    """Removes colons to prevent corruption of delimited callback data."""
+    return text.replace(":", "_")
 
 
 class TelegramTranslator:
@@ -118,10 +137,10 @@ class TelegramTranslator:
             timestamp=datetime.now(UTC),
         )
 
-    def from_event(self, event: Event) -> tuple[int, str]:
+    def from_event(self, event: Event) -> tuple[int, str, Any | None]:
         """
-        Convert internal NATS event to (chat_id, user-friendly markdown).
-        Returns (0, "") if the event is not relevant to this synapse.
+        Convert internal NATS event to (chat_id, user-friendly markdown, optional keyboard).
+        Returns (0, "", None) if the event is not relevant to this synapse.
         """
         chat_id = int(event.metadata.get("chat_id", "0"))
         # TODO: Relying on session_token being a digit to fall back and find
@@ -140,9 +159,10 @@ class TelegramTranslator:
             if session_id and session_id.isdigit():
                 chat_id = int(session_id)
             else:
-                return 0, ""
+                return 0, "", None
 
         message = ""
+        keyboard = None
         if event.negotiation:
             neg = event.negotiation
             action = neg.action
@@ -157,5 +177,48 @@ class TelegramTranslator:
                 message = f"❌ *Offer Rejected*\nItem: `{item_id}`\nThe agent was not interested in your bid."
             elif action == ActionType.ACTION_TYPE_ERROR:
                 message = f"⚠️ *Negotiation Error*\nItem: `{item_id}`\nSomething went wrong during the process."
+            elif action == ActionType.ACTION_TYPE_UI_REQUIRED:
+                # Handle Vision Report Card
+                vision_data_raw = event.metadata.get("vision_result")
+                if vision_data_raw:
+                    try:
+                        v = json.loads(vision_data_raw)
+                        # Sanitize LLM-generated strings to prevent Markdown/Injection attacks
+                        name = sanitize_markdown(v.get("name", "Unknown Asset"))
+                        color = sanitize_markdown(v.get("meta", {}).get("color", "Unknown"))
+                        confidence = v.get("meta", {}).get("confidence", "0.0")
 
-        return chat_id, message
+                        message = (
+                            f"👁️ *AURA VISION REPORT*\n\n"
+                            f"*Asset:* `{name}`\n"
+                            f"*Color:* `{color}`\n"
+                            f"*Confidence:* `{float(confidence)*100:.1f}%`\n"
+                            f"*Proposed Rent Price:* `${price:.2f}/day`\n\n"
+                            f"Is this correct? Would you like to list it now?"
+                        )
+
+                        # Sanitize item_id to prevent hijacking the callback_data delimiter
+                        safe_item_id = sanitize_callback(item_id)
+
+                        # Add Buttons
+                        keyboard = InlineKeyboardMarkup(inline_keyboard=[
+                            [
+                                InlineKeyboardButton(
+                                    text="✅ List Now",
+                                    callback_data=f"list_now:{safe_item_id}:{price}",
+                                ),
+                                InlineKeyboardButton(
+                                    text="❌ Wrong Specs",
+                                    callback_data=f"wrong_specs:{safe_item_id}",
+                                ),
+                            ]
+                        ])
+                    except Exception as e:
+                        logger.error(
+                            "vision_report_card_parsing_error", error=str(e), exc_info=True
+                        )
+                        message = f"⚠️ *Vision Processing Error*\nCould not parse report: {e}"
+                else:
+                    message = f"👤 *Human Required*\nAgent needs manual intervention for Item `{item_id}`."
+
+        return chat_id, message, keyboard

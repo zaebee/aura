@@ -47,6 +47,12 @@ class TelegramReceptor:
         )(self.process_bid)
         self.router.callback_query(F.data == "pay_stub")(self.process_pay_stub)
         self.router.message(F.photo)(self.process_photo)
+        self.router.callback_query(F.data.startswith("list_now:"))(
+            self.process_list_now
+        )
+        self.router.callback_query(F.data.startswith("wrong_specs:"))(
+            self.process_wrong_specs
+        )
 
     async def cmd_start(self, message: Message) -> None:
         await message.answer(
@@ -168,3 +174,36 @@ class TelegramReceptor:
         # If it was successful, the effector will handle the outgoing event if it's sent via NATS,
         # but since we are using await self.adapter.execute(signal), we get the observation back.
         # NatsAdapter.execute usually returns the observation from the request-reply pattern.
+
+    async def process_list_now(self, callback: CallbackQuery, state: FSMContext) -> None:
+        """Handle 'List Now' confirmation from Vision Report Card."""
+        if not callback.data:
+            return
+
+        # Translate callback to Signal
+        signal = self.translator.to_signal(callback)
+
+        # Execute via NATS
+        await self.adapter.execute(signal)
+
+        await callback.answer("Listing request sent! 🚀")
+        if isinstance(callback.message, Message):
+            # Remove buttons to prevent double-click
+            await callback.message.edit_reply_markup(reply_markup=None)
+
+    async def process_wrong_specs(
+        self, callback: CallbackQuery, state: FSMContext
+    ) -> None:
+        """Handle 'Wrong Specs' correction from user (Double Strand Break)."""
+        if not callback.data:
+            return
+
+        # Translate callback to Signal
+        signal = self.translator.to_signal(callback)
+
+        # Execute via NATS
+        await self.adapter.execute(signal)
+
+        await callback.answer("Acknowledged. Evolution in progress. 🧬")
+        if isinstance(callback.message, Message):
+            await callback.message.edit_reply_markup(reply_markup=None)
