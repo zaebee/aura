@@ -1,10 +1,15 @@
 import asyncio
+import base64
+import json
 import logging
 from typing import Any
 
 from nats.aio.client import Client as NATS
 
 logger = logging.getLogger(__name__)
+
+# NATS Subject for Vision RPC
+VISION_ANALYZE_SUBJECT = "aura.worker.v1.vision.analyze"
 
 
 class MetabolicLoop:
@@ -46,7 +51,7 @@ class MetabolicLoop:
             # Subject: aura.worker.v1.vision.analyze
             # Queue group: vision_swarm
             await self.nc.subscribe(
-                "aura.worker.v1.vision.analyze",
+                VISION_ANALYZE_SUBJECT,
                 queue="vision_swarm",
                 cb=self._handle_vision_request,
             )
@@ -81,24 +86,25 @@ class MetabolicLoop:
 
     async def _handle_vision_request(self, msg: Any) -> None:
         """Handle incoming Vision RPC requests."""
-        import base64
-        import json
-
         try:
             payload = json.loads(msg.data.decode())
-            image_b64 = payload.get("image")
+            # Support both single image (legacy) and multiple images
+            images_b64 = payload.get("images", [])
+            if not images_b64 and payload.get("image"):
+                images_b64 = [payload.get("image")]
+
             prompt = payload.get("prompt", "Analyze this image.")
 
-            if not image_b64:
-                await msg.respond(json.dumps({"error": "No image provided"}).encode())
+            if not images_b64:
+                await msg.respond(json.dumps({"error": "No images provided"}).encode())
                 return
 
             if not self.node:
                 await msg.respond(json.dumps({"error": "Node not initialized"}).encode())
                 return
 
-            image_bytes = base64.b64decode(image_b64)
-            result = await self.node.analyze_vision(image_bytes, prompt)
+            images_bytes = [base64.b64decode(img) for img in images_b64]
+            result = await self.node.analyze_vision(images_bytes, prompt)
 
             await msg.respond(json.dumps(result).encode())
 

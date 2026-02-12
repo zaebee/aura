@@ -29,7 +29,7 @@ async def test_vision_rpc_handler():
     await metabolism._handle_vision_request(mock_msg)
 
     # 3. Assertions
-    mock_node.analyze_vision.assert_called_once_with(b"fake-image-bytes", "Identify this car")
+    mock_node.analyze_vision.assert_called_once_with([b"fake-image-bytes"], "Identify this car")
 
     # Check response
     respond_args = mock_msg.respond.call_args[0][0]

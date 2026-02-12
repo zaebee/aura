@@ -68,13 +68,12 @@ GrpcInstrumentorClient().instrument()
 channel: grpc.aio.Channel
 stub: negotiation_pb2_grpc.NegotiationServiceStub
 health_stub: health_pb2_grpc.HealthStub
-nc: nats.NATS = None  # type: ignore
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncGenerator[None]:
     """Manage gRPC and NATS lifecycle (startup and shutdown)."""
-    global channel, stub, health_stub, nc
+    global channel, stub, health_stub
 
     # --- Startup ---
     logger.info("startup_begin", service="api-gateway")
@@ -83,7 +82,7 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None]:
     health_stub = health_pb2_grpc.HealthStub(channel)
 
     # NATS Connection for Vision RPC
-    nc = await nats.connect(settings.nats_url)
+    app.state.nc = await nats.connect(settings.nats_url)
 
     # Register health check endpoints
     register_health_endpoints(
@@ -104,8 +103,9 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None]:
     finally:
         # --- Shutdown ---
         logger.info("shutdown_begin", service="api-gateway")
-        await nc.drain()
-        await nc.close()
+        if hasattr(app.state, "nc") and app.state.nc:
+            await app.state.nc.drain()
+            await app.state.nc.close()
         await channel.close()
         logger.info(
             "shutdown_complete", grpc_channel_closed=True, nats_connection_closed=True
@@ -382,7 +382,8 @@ async def system_status() -> dict[str, Any]:
 
 @app.post("/v1/vision/analyze")
 async def analyze_vision(
-    file: Annotated[UploadFile, File(...)],
+    request: Request,
+    files: Annotated[list[UploadFile], File(...)],
     agent_did: Annotated[str, Depends(verify_signature)],
     focus: Annotated[str | None, Form()] = None,
 ) -> dict[str, Any]:
@@ -393,29 +394,31 @@ async def analyze_vision(
 
     logger.info(
         "vision_request_received",
-        filename=file.filename,
+        file_count=len(files),
         focus=focus,
         agent_did=agent_did,
     )
 
     try:
-        # 1. Read and encode image
-        image_bytes = await file.read()
-        image_b64 = base64.b64encode(image_bytes).decode("utf-8")
+        # 1. Read and encode images
+        images_b64 = []
+        for file in files:
+            image_bytes = await file.read()
+            images_b64.append(base64.b64encode(image_bytes).decode("utf-8"))
 
         # 2. Prepare NATS RPC payload
         payload = {
-            "image": image_b64,
-            "prompt": focus or "Identify the vehicle and its attributes.",
+            "images": images_b64,
+            "prompt": focus or settings.vision_default_prompt,
             "request_id": request_id,
         }
 
         # 3. Request analysis from the worker swarm
-        logger.info("vision_rpc_sent", subject="aura.worker.v1.vision.analyze")
-        response = await nc.request(
-            "aura.worker.v1.vision.analyze",
+        logger.info("vision_rpc_sent", subject=settings.vision_nats_subject)
+        response = await request.app.state.nc.request(
+            settings.vision_nats_subject,
             json.dumps(payload).encode(),
-            timeout=120.0,
+            timeout=settings.vision_rpc_timeout,
         )
 
         # 4. Parse and return result

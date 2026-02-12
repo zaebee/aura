@@ -18,7 +18,12 @@ class Settings(BaseSettings):
     negotiation_timeout: float = 60.0
 
     # NATS Connection
-    nats_url: str = Field("nats://localhost:4222")
+    nats_url: str = Field("nats://aura-nats.aura.svc.cluster.local:4222")
+
+    # Vision Cortex Settings
+    vision_nats_subject: str = "aura.worker.v1.vision.analyze"
+    vision_rpc_timeout: float = 120.0
+    vision_default_prompt: str = "Identify the vehicle and its attributes."
 
     # HTTP Server
     http_port: int = 8000
