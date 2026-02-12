@@ -1,0 +1,405 @@
+// Metabolism Protocol Buffers - Nucleotide Signals for the Hive Core
+//
+// This chromosome defines the ATCG-M metabolic pattern signals that form
+// the Hive's nervous system. It is completely decoupled from the Substrate
+// (assets) and uses only generic references to assets via identifiers.
+//
+// The Metabolism (core) knows nothing about specific asset domains - it only
+// deals with generic asset identifiers and domain references.
+
+syntax = "proto3";
+
+package aura.core.v1;
+
+import "proto/aura/core/v1/base.proto";
+import "google/protobuf/timestamp.proto";
+import "google/protobuf/any.proto";
+
+// =============================================================================
+// SIGNAL - Inbound stimulus to the Hive (A - Aggregator input)
+// =============================================================================
+
+message Signal {
+  string identifier = 1;  // Schema.org compliant
+  SignalType signal_type = 2;
+  google.protobuf.Timestamp timestamp = 3;
+  map<string, string> metadata = 4;
+  TraceContext trace = 5;
+
+  // Strictly typed payload - no Struct
+  oneof payload {
+    NegotiationSignal negotiation = 10;
+    AuditSignal audit = 11;
+    TelegramSignal telegram = 12;
+    HeartbeatSignal heartbeat = 13;
+    PerceptionSignal perception = 14;
+    AssetSignal asset = 15;  // Generic asset signal (decoupled)
+  }
+}
+
+enum SignalType {
+  SIGNAL_TYPE_UNSPECIFIED = 0;
+  SIGNAL_TYPE_NEGOTIATION = 1;
+  SIGNAL_TYPE_AUDIT = 2;
+  SIGNAL_TYPE_TELEGRAM = 3;
+  SIGNAL_TYPE_HEARTBEAT = 4;
+  SIGNAL_TYPE_PERCEPTION = 5;
+  SIGNAL_TYPE_ASSET = 6;  // Generic asset signals
+}
+
+// Generic Asset Signal - knows only about asset identifiers and domains
+message AssetSignal {
+  string asset_identifier = 1;           // Generic reference to any asset
+  string asset_domain = 2;                // "VEHICLE", "PROPERTY", etc. (string, not enum)
+  string signal_subtype = 3;             // "discovery", "availability_change", "price_update", "booking_request"
+  google.protobuf.Any asset_data = 4;    // Opaque payload
+}
+
+// Existing signal types (using generic asset references)
+message NegotiationSignal {
+  string item_identifier = 1;              // Generic item reference
+  string item_domain = 2;                 // "VEHICLE", "PROPERTY", etc.
+  double bid_amount = 3;
+  string currency_code = 4;
+  AgentIdentity agent = 5;
+}
+
+message AgentIdentity {
+  string did = 1;             // Decentralized identifier
+  float reputation_score = 2; // Reputation score from middleware
+}
+
+message AuditSignal {
+  string repo_name = 1;
+  string git_diff = 2;
+  repeated string filesystem_map = 3;
+  string event_name = 4;
+}
+
+message TelegramSignal {
+  int64 user_id = 1;
+  int64 chat_id = 2;
+  string message_text = 3;
+  string callback_data = 4;
+}
+
+message HeartbeatSignal {
+  string service_name = 1;
+  string instance_id = 2;
+}
+
+message PerceptionSignal {
+  bytes image_data = 1;
+  string mime_type = 2;
+  AgentIdentity agent = 3;
+  string perceived_asset_identifier = 4;  // Generic asset reference
+  string perceived_asset_domain = 5;     // Perceived domain
+}
+
+// =============================================================================
+// CONTEXT - Enriched understanding after Aggregator processing
+// =============================================================================
+
+message Context {
+  string identifier = 1;  // Schema.org compliant
+  ContextType context_type = 2;
+  Status system_health = 3;
+  map<string, string> metadata = 4;
+  TraceContext trace = 5;
+
+  // Strictly typed context data
+  oneof data {
+    HiveContextData hive = 10;
+    BeeContextData bee = 11;
+    TelegramContextData telegram = 12;
+    AssetContextData asset = 13;  // Generic asset context (decoupled)
+  }
+}
+
+enum ContextType {
+  CONTEXT_TYPE_UNSPECIFIED = 0;
+  CONTEXT_TYPE_HIVE = 1;
+  CONTEXT_TYPE_BEE = 2;
+  CONTEXT_TYPE_TELEGRAM = 3;
+  CONTEXT_TYPE_ASSET = 4;  // Generic asset context
+}
+
+// Generic Asset Context - knows only about asset identifiers
+message AssetContextData {
+  string asset_identifier = 1;           // Generic asset reference
+  string asset_domain = 2;                // Asset domain as string
+  map<string, string> asset_metadata = 3; // Generic metadata
+  string search_query = 4;
+  map<string, string> search_parameters = 5;
+  GeographicCoordinates search_location = 6;
+  float search_radius_km = 7;
+}
+
+// Existing context types
+message HiveContextData {
+  string item_identifier = 1;
+  string item_domain = 2;                 // Generic domain reference
+  NegotiationOffer offer = 3;
+  string request_id = 4;
+}
+
+message NegotiationOffer {
+  double bid_amount = 1;
+  float reputation = 2;
+  string agent_did = 3;
+}
+
+message BeeContextData {
+  string repo_name = 1;
+  string git_diff = 2;
+  repeated string filesystem_map = 3;
+  map<string, double> hive_metrics = 4;
+}
+
+message TelegramContextData {
+  int64 user_id = 1;
+  int64 chat_id = 2;
+  string message_text = 3;
+  string fsm_state = 4;
+}
+
+// =============================================================================
+// INTENT - Decision made by the Transformer (T output)
+// =============================================================================
+
+message Intent {
+  string identifier = 1;  // Schema.org compliant
+  ActionType action = 2;
+  string reasoning = 3;
+  repeated IntentStep steps = 4;
+  map<string, string> metadata = 5;
+  TraceContext trace = 6;
+
+  // Strictly typed action params
+  oneof params {
+    NegotiationIntent negotiation = 10;
+    AuditIntent audit = 11;
+    UIIntent ui = 12;
+    AssetIntent asset = 13;  // Generic asset intent (decoupled)
+  }
+}
+
+// Generic Asset Intent - operates on asset identifiers only
+message AssetIntent {
+  string asset_identifier = 1;           // Generic asset reference
+  string asset_domain = 2;                // Target asset domain
+  ActionType action_type = 3;             // Reuses generic ActionType
+  map<string, string> action_parameters = 4;
+  google.protobuf.Any action_data = 5;    // Opaque payload
+}
+
+// Existing intent types
+message NegotiationIntent {
+  string item_identifier = 1;
+  string item_domain = 2;                 // Generic domain reference
+  double price = 3;
+  string message = 4;
+  string thought = 5;
+}
+
+message AuditIntent {
+  bool is_pure = 1;
+  repeated string heresies = 2;
+  string narrative = 3;
+}
+
+message UIIntent {
+  string template_id = 1;
+  string text = 2;
+  string parse_mode = 3;
+}
+
+message IntentStep {
+  string skill = 1;
+  string intent = 2;
+  google.protobuf.Any params = 3;
+}
+
+// =============================================================================
+// OBSERVATION - Result of Connector execution (C output)
+// =============================================================================
+
+message Observation {
+  bool success = 1;
+  int64 message_id = 2;
+  string error = 3;
+  string event_type = 4;
+  map<string, string> metadata = 5;
+  TraceContext trace = 6;
+
+  // Strictly typed observation data
+  oneof data {
+    NegotiationObservation negotiation = 10;
+    AuditObservation audit = 11;
+    TelegramObservation telegram = 12;
+    PerceptionObservation perception = 13;
+    AssetObservation asset = 14;  // Generic asset observation (decoupled)
+  }
+}
+
+// Generic Asset Observation - returns only asset identifiers
+message AssetObservation {
+  string asset_identifier = 1;           // Generic asset reference
+  string asset_domain = 2;                // Asset domain
+  Status status = 3;
+  string reservation_code = 4;
+  double final_price = 5;
+  string currency_code = 6;
+  map<string, string> result_data = 7;
+}
+
+// Existing observation types
+message NegotiationObservation {
+  string item_identifier = 1;
+  string item_domain = 2;                 // Generic domain reference
+  int64 valid_until_timestamp = 3;
+  string payment_uri = 4;
+
+  oneof result {
+    OfferAccepted accepted = 5;
+    OfferCountered countered = 6;
+    OfferRejected rejected = 7;
+  }
+}
+
+message OfferAccepted {
+  double final_price = 1;
+  string currency_code = 2;
+
+  oneof reveal_method {
+    string reservation_code = 3;
+    CryptoPaymentInstructions crypto_payment = 4;
+  }
+}
+
+message CryptoPaymentInstructions {
+  string deal_id = 1;
+  string wallet_address = 2;
+  double amount = 3;
+  string currency = 4;
+  string memo = 5;
+  string network = 6;
+  int64 expires_at = 7;
+}
+
+message OfferCountered {
+  double proposed_price = 1;
+  string reason_code = 2;
+  string human_message = 3;
+}
+
+message OfferRejected {
+  string reason_code = 1;
+}
+
+message AuditObservation {
+  bool is_pure = 1;
+  repeated string heresies = 2;
+  string narrative = 3;
+  string reasoning = 4;
+  double execution_time = 5;
+  int32 token_usage = 6;
+}
+
+message TelegramObservation {
+  int64 message_id = 1;
+  bool delivered = 2;
+}
+
+message PerceptionObservation {
+  string perceived_asset_identifier = 1;  // Generic asset reference
+  string perceived_asset_domain = 2;     // Perceived domain
+}
+
+message PaymentProof {
+  string transaction_hash = 1;
+  string block_number = 2;
+  string from_address = 3;
+  google.protobuf.Timestamp confirmed_at = 4;
+}
+
+message TransactionContext {
+  string deal_id = 1;
+  double amount = 2;
+  string currency = 3;
+  string status = 4;
+}
+
+// =============================================================================
+// EVENT - Emitted to the Hive's bloodstream (G output -> NATS JetStream)
+// =============================================================================
+
+message Event {
+  string identifier = 1;  // Schema.org compliant
+  string topic = 2;
+  google.protobuf.Timestamp timestamp = 3;
+  map<string, string> metadata = 4;
+  TraceContext trace = 5;
+
+  // Strictly typed event payload
+  oneof payload {
+    NegotiationEvent negotiation = 10;
+    VitalsEvent vitals = 11;
+    AlertEvent alert = 12;
+    HeartbeatEvent heartbeat = 13;
+    AuditEvent audit = 14;
+    LogEvent log = 15;
+    AssetEvent asset = 16;  // Generic asset event (decoupled)
+  }
+}
+
+// Generic Asset Event - contains only asset identifiers
+message AssetEvent {
+  string asset_identifier = 1;           // Generic asset reference
+  string asset_domain = 2;                // Asset domain
+  string event_type = 3;                 // "created", "updated", "deleted", "reserved", "sold"
+  google.protobuf.Timestamp event_time = 4;
+  string initiated_by = 5;
+  map<string, string> event_data = 6;
+}
+
+// Existing event types
+message LogEvent {
+  string level = 1;
+  string message = 2;
+  string logger_name = 3;
+  string worker_name = 4;
+}
+
+message NegotiationEvent {
+  string item_identifier = 1;
+  string item_domain = 2;                 // Generic domain reference
+  ActionType action = 3;
+  double price = 4;
+}
+
+message VitalsEvent {
+  string service = 1;
+  Status status = 2;
+  double cpu_usage_percent = 3;
+  double memory_usage_mb = 4;
+}
+
+message AlertEvent {
+  Severity severity = 1;
+  string message = 2;
+  string source = 3;
+}
+
+message HeartbeatEvent {
+  string service = 1;
+  string instance_id = 2;
+  Status status = 3;
+}
+
+message AuditEvent {
+  string repo_name = 1;
+  bool is_pure = 2;
+  repeated string heresies = 3;
+  double negotiation_success_rate = 4;
+}
