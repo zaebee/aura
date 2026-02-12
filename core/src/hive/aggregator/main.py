@@ -95,13 +95,21 @@ class HiveAggregator(Aggregator[Any, HiveContext]):
                         if v_obs.success:
                             # LTP: Store perceived asset as Ephemeral Memory
                             agent_did = per_signal.agent.did
+                            ttl = 3600
+                            if (
+                                self.settings
+                                and hasattr(self.settings, "perception")
+                                and hasattr(self.settings.perception, "ephemeral_asset_ttl")
+                            ):
+                                ttl = self.settings.perception.ephemeral_asset_ttl
+
                             await self.registry.execute(
                                 "persistence",
                                 "set_cache",
                                 {
                                     "key": f"ephemeral:asset:{agent_did}",
                                     "value": vision_result,
-                                    "expire": 3600,
+                                    "expire": ttl,
                                 },
                             )
                         else:

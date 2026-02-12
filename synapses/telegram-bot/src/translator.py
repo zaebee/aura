@@ -3,6 +3,7 @@ import uuid
 from datetime import UTC, datetime
 from typing import Any, cast
 
+import structlog
 from aiogram.types import (
     CallbackQuery,
     InlineKeyboardButton,
@@ -19,6 +20,8 @@ from aura_core.gen.aura.dna.v1 import (
     SignalType,
     TelegramSignal,
 )
+
+logger = structlog.get_logger(__name__)
 
 
 class TelegramTranslator:
@@ -191,6 +194,9 @@ class TelegramTranslator:
                             ]
                         ])
                     except Exception as e:
+                        logger.error(
+                            "vision_report_card_parsing_error", error=str(e), exc_info=True
+                        )
                         message = f"⚠️ *Vision Processing Error*\nCould not parse report: {e}"
                 else:
                     message = f"👤 *Human Required*\nAgent needs manual intervention for Item `{item_id}`."

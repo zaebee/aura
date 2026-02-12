@@ -1,3 +1,4 @@
+import json
 import time
 from typing import Any, cast
 
@@ -102,6 +103,14 @@ class AuraTransformer(Transformer[HiveContext, IntentAction]):
         if cpu_load > 80.0:
             constraints.append("SYSTEM_LOAD_HIGH: Be extremely concise.")
 
+        vision_confidence_threshold = 0.7
+        if (
+            self.settings
+            and hasattr(self.settings, "perception")
+            and hasattr(self.settings.perception, "confidence_threshold")
+        ):
+            vision_confidence_threshold = self.settings.perception.confidence_threshold
+
         return {
             "base_price": context.item_data.get("base_price", 0.0),
             "floor_price": context.item_data.get("floor_price", 0.0),
@@ -112,6 +121,7 @@ class AuraTransformer(Transformer[HiveContext, IntentAction]):
             if context.metadata.get("source") == "vision"
             else None,
             "vision_error": context.metadata.get("vision_error"),
+            "vision_confidence_threshold": vision_confidence_threshold,
         }
 
     async def think(self, context: HiveContext, **kwargs: Any) -> IntentAction:
@@ -163,7 +173,6 @@ class AuraTransformer(Transformer[HiveContext, IntentAction]):
                 and "list_now" in context.metadata.get("callback_data", "")
             )
             if (is_vision or is_vision_confirm) and context.item_data:
-                import json
                 action_metadata["vision_result"] = json.dumps(context.item_data)
 
             return IntentAction(

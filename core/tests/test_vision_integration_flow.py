@@ -1,7 +1,11 @@
 import json
+from typing import TYPE_CHECKING
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
+
+if TYPE_CHECKING:
+    from pytest_mock import MockerFixture
 from aura_core import SkillRegistry
 from aura_core.gen.aura.dna.v1 import (
     AgentIdentity,
@@ -17,7 +21,7 @@ from hive.transformer.main import AuraTransformer
 
 
 @pytest.mark.asyncio
-async def test_vision_to_listing_flow(mocker):
+async def test_vision_to_listing_flow(mocker: "MockerFixture"):
     # 1. Setup Registry and Skills
     registry = SkillRegistry()
 
