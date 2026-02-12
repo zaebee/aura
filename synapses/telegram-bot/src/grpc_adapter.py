@@ -1,3 +1,4 @@
+import grpclib.exceptions
 import structlog
 from aura_core.gen.aura.negotiation.v1 import (
     NegotiateRequest,
@@ -16,7 +17,8 @@ class GrpcAdapter:
 
     def __init__(self, core_grpc_url: str):
         self.core_grpc_url = core_grpc_url
-        host, port = core_grpc_url.split(":")
+        # Use rsplit to correctly handle IPv6 addresses which contain multiple colons
+        host, port = core_grpc_url.rsplit(":", 1)
         self.channel = Channel(host, int(port))
         self.stub = NegotiationServiceStub(self.channel)
 
@@ -35,7 +37,7 @@ class GrpcAdapter:
             )
             logger.debug("grpc_received_negotiate_response")
             return response
-        except Exception as e:
+        except grpclib.exceptions.GRPCError as e:
             logger.error("grpc_negotiate_failed", error=str(e))
             # Return an empty response with an error-like state if possible,
             # or let the caller handle it.
