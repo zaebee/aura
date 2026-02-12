@@ -3,10 +3,10 @@ import logging
 from datetime import UTC, datetime
 from typing import Any, cast
 
+import redis.asyncio as redis
 from aura_core import Observation, SkillProtocol
 from sqlalchemy import Engine, text
 from sqlalchemy.orm import Session, sessionmaker
-import redis.asyncio as redis
 
 from config.database import DatabaseSettings
 
@@ -83,7 +83,7 @@ class PersistenceSkill(
 
         if self.redis:
             try:
-                await self.redis.ping()
+                await cast(Any, self.redis.ping())
             except Exception as e:
                 logger.error(f"redis_connection_failed: {e}")
                 return False

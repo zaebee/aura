@@ -1,6 +1,6 @@
-import logging
 from typing import Any
 
+import structlog
 from aura_core import Observation, SkillProtocol
 
 from config.crypto import CryptoSettings
@@ -13,7 +13,7 @@ from .schema import (
     TaxCalculationParams,
 )
 
-logger = logging.getLogger(__name__)
+logger = structlog.get_logger(__name__)
 
 
 class TransactionSkill(

@@ -2,7 +2,7 @@ import enum
 import json
 import uuid
 from datetime import UTC, datetime
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, cast
 
 import redis.asyncio as redis
 from pgvector.sqlalchemy import Vector
@@ -93,7 +93,9 @@ class RedisCache:
     def __init__(self, redis_client: redis.Redis):
         self.redis = redis_client
 
-    async def set_excited_state(self, deal_id: str, deal_data: dict, ttl: int = 3600):
+    async def set_excited_state(
+        self, deal_id: str, deal_data: dict, ttl: int = 3600
+    ) -> None:
         """Store deal in 'Excited' state (unpaid, Redis)."""
         key = f"deal:excited:{deal_id}"
         # Convert bytes to hex for JSON serialization if needed
@@ -111,15 +113,15 @@ class RedisCache:
 
         await self.redis.set(key, json.dumps(serializable_data), ex=ttl)
 
-    async def get_excited_state(self, deal_id: str) -> dict | None:
+    async def get_excited_state(self, deal_id: str) -> dict[str, Any] | None:
         """Retrieve deal from 'Excited' state."""
         key = f"deal:excited:{deal_id}"
         data = await self.redis.get(key)
         if data:
-            return json.loads(data)
+            return cast(dict[str, Any], json.loads(data))
         return None
 
-    async def delete_excited_state(self, deal_id: str):
+    async def delete_excited_state(self, deal_id: str) -> None:
         """Remove deal from 'Excited' state."""
         key = f"deal:excited:{deal_id}"
         await self.redis.delete(key)

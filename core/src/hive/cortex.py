@@ -1,6 +1,7 @@
 from typing import TYPE_CHECKING, Any, cast
 
 import dspy
+import redis.asyncio as redis
 import structlog
 from aura_core import SkillProtocol, SkillRegistry, get_raw_key
 from opentelemetry.instrumentation.grpc import GrpcInstrumentorServer
@@ -8,7 +9,6 @@ from opentelemetry.instrumentation.langchain import LangchainInstrumentor
 from prometheus_client import start_http_server
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
-import redis.asyncio as redis
 
 from hive.aggregator import HiveAggregator
 from hive.connector import HiveConnector

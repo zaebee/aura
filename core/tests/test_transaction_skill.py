@@ -1,11 +1,16 @@
-import pytest
-from hive.proteins.transaction.skill import TransactionSkill
-
-
 from unittest.mock import MagicMock
+
+import pytest
+from hive.proteins.transaction.engine import (
+    PriceConverter,
+    SecretEncryption,
+    SolanaProvider,
+)
+from hive.proteins.transaction.skill import TransactionSkill
 from solders.keypair import Keypair
+
 from config.crypto import CryptoSettings
-from hive.proteins.transaction.engine import PriceConverter, SecretEncryption, SolanaProvider
+
 
 @pytest.mark.asyncio
 async def test_transaction_skill_execute_not_initialized():
