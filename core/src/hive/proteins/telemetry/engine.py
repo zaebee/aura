@@ -77,9 +77,9 @@ async def fetch_vitals(metrics_cache: MetricsCache, settings: Any) -> SystemVita
     cached_dict = metrics_cache.get()
     if cached_dict:
         return SystemVitals(
-            status=cached_dict.get("status", "ok"),
-            cpu_usage_percent=cached_dict.get("cpu_usage_percent", 0.0),
-            memory_usage_mb=cached_dict.get("memory_usage_mb", 0.0),
+            status=str(cached_dict.get("status", "ok")),
+            cpu_usage_percent=float(cached_dict.get("cpu_usage_percent", 0.0)),
+            memory_usage_mb=float(cached_dict.get("memory_usage_mb", 0.0)),
             timestamp=datetime.now(UTC),
             cached=True
         )
@@ -118,8 +118,8 @@ async def fetch_vitals(metrics_cache: MetricsCache, settings: Any) -> SystemVita
                 if cached_dict:
                     return SystemVitals(
                         status="degraded",
-                        cpu_usage_percent=cached_dict.get("cpu_usage_percent", 0.0),
-                        memory_usage_mb=cached_dict.get("memory_usage_mb", 0.0),
+                        cpu_usage_percent=float(cached_dict.get("cpu_usage_percent", 0.0)),
+                        memory_usage_mb=float(cached_dict.get("memory_usage_mb", 0.0)),
                         timestamp=datetime.now(UTC),
                         cached=True,
                         error=f"Stale data due to: {e_msg}",
@@ -142,11 +142,11 @@ async def fetch_vitals(metrics_cache: MetricsCache, settings: Any) -> SystemVita
 
             metrics_cache.set(m_dict)
             return SystemVitals(
-                status=m_dict["status"],
-                cpu_usage_percent=m_dict["cpu_usage_percent"],
-                memory_usage_mb=m_dict["memory_usage_mb"],
-                timestamp=m_dict["timestamp"],
-                cached=m_dict["cached"]
+                status=str(m_dict["status"]),
+                cpu_usage_percent=float(m_dict["cpu_usage_percent"]),
+                memory_usage_mb=float(m_dict["memory_usage_mb"]),
+                timestamp=cast(datetime, m_dict["timestamp"]),
+                cached=bool(m_dict["cached"])
             )
     except Exception as e:
         logger.error("monitoring_failure", error=str(e))
@@ -155,8 +155,8 @@ async def fetch_vitals(metrics_cache: MetricsCache, settings: Any) -> SystemVita
         if cached_dict:
             return SystemVitals(
                 status="degraded",
-                cpu_usage_percent=cached_dict.get("cpu_usage_percent", 0.0),
-                memory_usage_mb=cached_dict.get("memory_usage_mb", 0.0),
+                cpu_usage_percent=float(cached_dict.get("cpu_usage_percent", 0.0)),
+                memory_usage_mb=float(cached_dict.get("memory_usage_mb", 0.0)),
                 timestamp=datetime.now(UTC),
                 cached=True,
                 error=f"Stale data due to: {e_msg}",

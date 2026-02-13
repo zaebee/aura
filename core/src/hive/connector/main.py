@@ -12,6 +12,7 @@ from aura_core import (
     SkillRegistry,
 )
 from aura_core.gen.aura.core.v1 import (
+    ActionType,
     NegotiationObservation,
     OfferAccepted,
     OfferCountered,
@@ -41,7 +42,7 @@ class HiveConnector(BaseConnector):
         """
         logger.debug("connector_act_started", action=action.action)
 
-        action_name = action.action.name.lower().replace("action_type_", "")
+        action_name = ActionType(action.action).name.lower().replace("action_type_", "")
 
         # 1. Handle Polymorphic Search
         if action_name == "evaluate" and action.asset and action.asset.asset_identifier == "search":

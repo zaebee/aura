@@ -37,14 +37,12 @@ class HiveGenerator(Generator[Observation, Event]):
         if observation.event_type and observation.event_type.startswith("negotiation_"):
             action = observation.event_type.replace("negotiation_", "")
 
-            # Extract negotiation data from observation
+            # Extract negotiation data from observation metadata
             session_token = ""  # nosec B105
             price = 0.0
             item_id = ""
             agent_did = ""
 
-            if hasattr(observation.data, "session_token"):
-                session_token = observation.data.session_token
             if observation.metadata:
                 decision = observation.metadata.get("decision")
                 if decision:

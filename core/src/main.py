@@ -9,7 +9,13 @@ import grpc
 import grpc.aio
 from aura.assets.v1 import assets_pb2 as standard_asset_pb2
 from aura.negotiation.v1 import negotiation_pb2, negotiation_pb2_grpc
-from aura_core.gen.aura.core.v1 import NegotiationObservation, Vector
+from aura_core.gen.aura.core.v1 import (
+    NegotiationObservation,
+    OfferAccepted,
+    OfferCountered,
+    OfferRejected,
+    Vector,
+)
 from grpc_health.v1 import health_pb2, health_pb2_grpc
 from hive.cortex import HiveCell
 from hive.metabolism import MetabolicLoop
@@ -82,18 +88,21 @@ class NegotiationService(negotiation_pb2_grpc.NegotiationServiceServicer):
 
                     # Map result oneof
                     res_name, res_val = betterproto.which_one_of(neg_obs, "result")
-                    if res_name == "accepted":
-                        response.accepted.final_price = res_val.final_price
-                        reveal_name, reveal_val = betterproto.which_one_of(res_val, "reveal_method")
+                    if res_name == "accepted" and res_val:
+                        res_accepted = cast(OfferAccepted, res_val)
+                        response.accepted.final_price = res_accepted.final_price
+                        reveal_name, reveal_val = betterproto.which_one_of(res_accepted, "reveal_method")
                         if reveal_name == "reservation_code":
-                            response.accepted.reservation_code = reveal_val
+                            response.accepted.reservation_code = str(reveal_val)
                         # Add crypto_payment mapping if needed
-                    elif res_name == "countered":
-                        response.countered.proposed_price = res_val.proposed_price
-                        response.countered.human_message = res_val.human_message
-                        response.countered.reason_code = res_val.reason_code
-                    elif res_name == "rejected":
-                        response.rejected.reason_code = res_val.reason_code
+                    elif res_name == "countered" and res_val:
+                        res_countered = cast(OfferCountered, res_val)
+                        response.countered.proposed_price = res_countered.proposed_price
+                        response.countered.human_message = res_countered.human_message
+                        response.countered.reason_code = res_countered.reason_code
+                    elif res_name == "rejected" and res_val:
+                        res_rejected = cast(OfferRejected, res_val)
+                        response.rejected.reason_code = res_rejected.reason_code
 
                 except Exception as e:
                     logger.warning("negotiate_mapping_failed", error=str(e))

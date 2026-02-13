@@ -261,7 +261,7 @@ class JetStreamProvider:
 
     def _action_to_enum(self, action: str) -> ActionType:
         """Convert action string to ActionType enum."""
-        mapping = {
+        mapping: dict[str, ActionType] = {
             "accept": ActionType.ACTION_TYPE_ACCEPT,
             "counter": ActionType.ACTION_TYPE_COUNTER,
             "reject": ActionType.ACTION_TYPE_REJECT,
@@ -273,7 +273,7 @@ class JetStreamProvider:
 
     def _status_to_enum(self, status: str) -> Status:
         """Convert status string to Status enum."""
-        mapping = {
+        mapping: dict[str, Status] = {
             "ok": Status.STATUS_OK,
             "degraded": Status.STATUS_DEGRADED,
             "error": Status.STATUS_ERROR,
@@ -283,7 +283,7 @@ class JetStreamProvider:
 
     def _severity_to_enum(self, severity: str) -> Severity:
         """Convert severity string to Severity enum."""
-        mapping = {
+        mapping: dict[str, Severity] = {
             "info": Severity.SEVERITY_INFO,
             "warning": Severity.SEVERITY_WARNING,
             "error": Severity.SEVERITY_ERROR,

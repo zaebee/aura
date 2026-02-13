@@ -1,9 +1,10 @@
-from typing import Any
+from typing import Any, cast
 
 import betterproto
 import structlog
-from aura_core import HiveContext, IntentAction, Membrane, SkillRegistry
+from aura_core import ActionType, HiveContext, IntentAction, Membrane, SkillRegistry
 from aura_core.gen.aura.assets import v1 as asset_pb2
+from aura_core.gen.aura.core.v1 import NegotiationIntent
 
 from config import get_settings
 
@@ -72,9 +73,6 @@ class HiveMembrane(Membrane[Any, IntentAction, HiveContext]):
             except Exception as e:
                 logger.warning("membrane_asset_parse_failed", error=str(e))
 
-        # ActionType is an enum
-        from aura_core.gen.aura.core.v1 import ActionType
-
         # 1. Handle explicit failures
         if decision.action == ActionType.ACTION_TYPE_ERROR:
             safe_price = floor_price * 1.05
@@ -99,11 +97,13 @@ class HiveMembrane(Membrane[Any, IntentAction, HiveContext]):
             )
 
         # 2. DLP Check
-        message = decision.negotiation.message if decision.negotiation else ""
-        if "floor_price" in message.lower():
-            if decision.negotiation:
-                decision.negotiation.message = "I cannot disclose internal pricing details."
-                decision.negotiation.thought += " [MEMBRANE: DLP block]"
+        neg_name, neg_val = betterproto.which_one_of(decision, "params")
+        if neg_name == "negotiation":
+            neg_intent = cast(NegotiationIntent, neg_val)
+            message = neg_intent.message
+            if "floor_price" in message.lower():
+                neg_intent.message = "I cannot disclose internal pricing details."
+                neg_intent.thought += " [MEMBRANE: DLP block]"
 
         if decision.action not in [ActionType.ACTION_TYPE_ACCEPT, ActionType.ACTION_TYPE_COUNTER]:
             return decision
@@ -121,7 +121,10 @@ class HiveMembrane(Membrane[Any, IntentAction, HiveContext]):
             "base_price": base_price
         }
 
-        price = decision.negotiation.price if decision.negotiation else 0.0
+        price = 0.0
+        neg_name, neg_val = betterproto.which_one_of(decision, "params")
+        if neg_name == "negotiation":
+            price = cast(NegotiationIntent, neg_val).price
 
         # Guard expects action as string? Engine might need it.
         action_str = decision.action.name.lower().replace("action_type_", "")
@@ -148,10 +151,15 @@ class HiveMembrane(Membrane[Any, IntentAction, HiveContext]):
     def _override_with_safe_offer(
         self, original: IntentAction, safe_price: float, reason: str
     ) -> IntentAction:
-        from aura_core.gen.aura.core.v1 import ActionType, NegotiationIntent
         rounded_price = round(safe_price, 2)
-        orig_price = original.negotiation.price if original.negotiation else 0.0
-        orig_thought = original.negotiation.thought if original.negotiation else ""
+        orig_price = 0.0
+        orig_thought = ""
+
+        neg_name, neg_val = betterproto.which_one_of(original, "params")
+        if neg_name == "negotiation":
+            neg_orig = cast(NegotiationIntent, neg_val)
+            orig_price = neg_orig.price
+            orig_thought = neg_orig.thought
 
         new_thought = f"Membrane Override: {reason}. LLM suggested {original.action} at {orig_price}."
         if orig_thought:
