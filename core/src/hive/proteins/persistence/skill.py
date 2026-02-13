@@ -422,7 +422,9 @@ class PersistenceSkill(
     async def _get_cache_handler(self, params: dict[str, Any]) -> Observation:
         if not self.redis:
             return Observation(success=False, error="redis_not_initialized")
-        key = params.get("key")
+        key = str(params.get("key", ""))
+        if not key:
+             return Observation(success=False, error="key_required")
         val = await self.redis.get(key)
         if val:
             # If it's stored as JSON, we should return it as payload
@@ -442,12 +444,18 @@ class PersistenceSkill(
     async def _set_cache_handler(self, params: dict[str, Any]) -> Observation:
         if not self.redis:
             return Observation(success=False, error="redis_not_initialized")
-        key = params.get("key")
+        key = str(params.get("key", ""))
+        if not key:
+             return Observation(success=False, error="key_required")
         value = params.get("value")
         expire = params.get("expire", 3600)
 
         if isinstance(value, (dict, list)):
             value = json.dumps(value)
 
-        await self.redis.set(key, value, ex=expire)
+        # Ensure value is something Redis can handle
+        if value is None:
+             value = ""
+
+        await self.redis.set(key, str(value), ex=expire)
         return Observation(success=True)

@@ -261,35 +261,37 @@ class JetStreamProvider:
 
     def _action_to_enum(self, action: str) -> ActionType:
         """Convert action string to ActionType enum."""
-        mapping: dict[str, ActionType] = {
-            "accept": ActionType.ACTION_TYPE_ACCEPT,
-            "counter": ActionType.ACTION_TYPE_COUNTER,
-            "reject": ActionType.ACTION_TYPE_REJECT,
-            "audit": ActionType.ACTION_TYPE_AUDIT,
-            "ui_required": ActionType.ACTION_TYPE_UI_REQUIRED,
-            "error": ActionType.ACTION_TYPE_ERROR,
+        mapping: dict[str, int] = {
+            "accept": int(ActionType.ACTION_TYPE_ACCEPT),
+            "counter": int(ActionType.ACTION_TYPE_COUNTER),
+            "reject": int(ActionType.ACTION_TYPE_REJECT),
+            "audit": int(ActionType.ACTION_TYPE_AUDIT),
+            "ui_required": int(ActionType.ACTION_TYPE_UI_REQUIRED),
+            "error": int(ActionType.ACTION_TYPE_ERROR),
         }
-        return mapping.get(action.lower(), ActionType.ACTION_TYPE_UNSPECIFIED)
+        return ActionType(
+            mapping.get(action.lower(), int(ActionType.ACTION_TYPE_UNSPECIFIED))
+        )
 
     def _status_to_enum(self, status: str) -> Status:
         """Convert status string to Status enum."""
-        mapping: dict[str, Status] = {
-            "ok": Status.STATUS_OK,
-            "degraded": Status.STATUS_DEGRADED,
-            "error": Status.STATUS_ERROR,
-            "critical": Status.STATUS_CRITICAL,
+        mapping: dict[str, int] = {
+            "ok": int(Status.STATUS_OK),
+            "degraded": int(Status.STATUS_DEGRADED),
+            "error": int(Status.STATUS_ERROR),
+            "critical": int(Status.STATUS_CRITICAL),
         }
-        return mapping.get(status.lower(), Status.STATUS_UNSPECIFIED)
+        return Status(mapping.get(status.lower(), int(Status.STATUS_UNSPECIFIED)))
 
     def _severity_to_enum(self, severity: str) -> Severity:
         """Convert severity string to Severity enum."""
-        mapping: dict[str, Severity] = {
-            "info": Severity.SEVERITY_INFO,
-            "warning": Severity.SEVERITY_WARNING,
-            "error": Severity.SEVERITY_ERROR,
-            "critical": Severity.SEVERITY_CRITICAL,
+        mapping: dict[str, int] = {
+            "info": int(Severity.SEVERITY_INFO),
+            "warning": int(Severity.SEVERITY_WARNING),
+            "error": int(Severity.SEVERITY_ERROR),
+            "critical": int(Severity.SEVERITY_CRITICAL),
         }
-        return mapping.get(severity.lower(), Severity.SEVERITY_UNSPECIFIED)
+        return Severity(mapping.get(severity.lower(), int(Severity.SEVERITY_UNSPECIFIED)))
 
 
 class JetStreamSubscriber:

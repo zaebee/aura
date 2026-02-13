@@ -118,7 +118,9 @@ async def fetch_vitals(metrics_cache: MetricsCache, settings: Any) -> SystemVita
                 if cached_dict:
                     return SystemVitals(
                         status="degraded",
-                        cpu_usage_percent=float(cached_dict.get("cpu_usage_percent", 0.0)),
+                        cpu_usage_percent=float(
+                            cached_dict.get("cpu_usage_percent", 0.0)
+                        ),
                         memory_usage_mb=float(cached_dict.get("memory_usage_mb", 0.0)),
                         timestamp=datetime.now(UTC),
                         cached=True,
@@ -130,7 +132,7 @@ async def fetch_vitals(metrics_cache: MetricsCache, settings: Any) -> SystemVita
                     error=e_msg,
                 )
 
-            m_dict = {
+            m_dict: dict[str, Any] = {
                 "status": "ok",
                 "cpu_usage_percent": round(cpu, 2),
                 "memory_usage_mb": round(mem, 2),

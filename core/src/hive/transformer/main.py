@@ -27,17 +27,19 @@ def map_action(action_str: str | None) -> ActionType:
     Converts LLM strings to strict ActionType enum.
     """
     if not action_str:
-        return ActionType.ACTION_TYPE_UNSPECIFIED
+        return ActionType(int(ActionType.ACTION_TYPE_UNSPECIFIED))
 
-    mapping: dict[str, ActionType] = {
-        "accept": ActionType.ACTION_TYPE_ACCEPT,
-        "counter": ActionType.ACTION_TYPE_COUNTER,
-        "counteroffer": ActionType.ACTION_TYPE_COUNTER,
-        "reject": ActionType.ACTION_TYPE_REJECT,
-        "ui_required": ActionType.ACTION_TYPE_UI_REQUIRED,
-        "error": ActionType.ACTION_TYPE_ERROR,
+    mapping: dict[str, int] = {
+        "accept": int(ActionType.ACTION_TYPE_ACCEPT),
+        "counter": int(ActionType.ACTION_TYPE_COUNTER),
+        "counteroffer": int(ActionType.ACTION_TYPE_COUNTER),
+        "reject": int(ActionType.ACTION_TYPE_REJECT),
+        "ui_required": int(ActionType.ACTION_TYPE_UI_REQUIRED),
+        "error": int(ActionType.ACTION_TYPE_ERROR),
     }
-    return mapping.get(action_str.lower(), ActionType.ACTION_TYPE_UNSPECIFIED)
+    return ActionType(
+        mapping.get(action_str.lower(), int(ActionType.ACTION_TYPE_UNSPECIFIED))
+    )
 
 
 class RuleBasedStrategy:
@@ -62,7 +64,7 @@ class RuleBasedStrategy:
         if not item_data:
             return IntentAction(
                 identifier=request_id or "",
-                action=ActionType.ACTION_TYPE_REJECT,
+                action=ActionType(int(ActionType.ACTION_TYPE_REJECT)),
                 reasoning="Item not found",
                 negotiation=NegotiationIntent(
                     price=0.0,
@@ -76,7 +78,7 @@ class RuleBasedStrategy:
         if bid > self.trigger_price:
             return IntentAction(
                 identifier=request_id or "",
-                action=ActionType.ACTION_TYPE_UI_REQUIRED,
+                action=ActionType(int(ActionType.ACTION_TYPE_UI_REQUIRED)),
                 reasoning=f"Bid of ${bid} exceeds security threshold",
                 negotiation=NegotiationIntent(
                     price=bid,
@@ -91,7 +93,7 @@ class RuleBasedStrategy:
         if bid < floor_price:
             return IntentAction(
                 identifier=request_id or "",
-                action=ActionType.ACTION_TYPE_COUNTER,
+                action=ActionType(int(ActionType.ACTION_TYPE_COUNTER)),
                 reasoning=f"Bid {bid} below floor {floor_price}. Countering.",
                 negotiation=NegotiationIntent(
                     price=floor_price,
@@ -104,7 +106,7 @@ class RuleBasedStrategy:
         # Rule: Bid at or above floor price - accept
         return IntentAction(
             identifier=request_id or "",
-            action=ActionType.ACTION_TYPE_ACCEPT,
+            action=ActionType(int(ActionType.ACTION_TYPE_ACCEPT)),
             reasoning="Bid at or above floor price. Accepting.",
             negotiation=NegotiationIntent(
                 price=bid,
@@ -191,16 +193,16 @@ class AuraTransformer(Transformer[HiveContext, IntentAction]):
 
         # 1. Handle Polymorphic Search
         if context.context_type == ContextType.CONTEXT_TYPE_ASSET and context.asset:
-             return IntentAction(
-                 identifier=context.identifier,
-                 action=ActionType.ACTION_TYPE_EVALUATE,
-                 asset=AssetIntent(
-                     asset_identifier="search",
-                     asset_domain="VEHICLE",
-                     action_type=ActionType.ACTION_TYPE_EVALUATE,
-                     action_parameters={"query": context.asset.search_query}
-                 )
-             )
+            return IntentAction(
+                identifier=context.identifier,
+                action=ActionType(int(ActionType.ACTION_TYPE_EVALUATE)),
+                asset=AssetIntent(
+                    asset_identifier="search",
+                    asset_domain="VEHICLE",
+                    action_type=ActionType(int(ActionType.ACTION_TYPE_EVALUATE)),
+                    action_parameters={"query": context.asset.search_query},
+                ),
+            )
 
         # 2. Rule-based fallback if requested
         if self.settings and self.settings.llm.model.lower() == "rule":
@@ -239,8 +241,10 @@ class AuraTransformer(Transformer[HiveContext, IntentAction]):
             if not obs.success:
                 logger.error("reasoning_protein_failed", error=obs.error)
                 return IntentAction(
-                    identifier=context.hive.request_id if context.hive else context.identifier,
-                    action=ActionType.ACTION_TYPE_ERROR,
+                    identifier=context.hive.request_id
+                    if context.hive
+                    else context.identifier,
+                    action=ActionType(int(ActionType.ACTION_TYPE_ERROR)),
                     reasoning=obs.error or "unknown_error",
                 )
 
@@ -280,7 +284,9 @@ class AuraTransformer(Transformer[HiveContext, IntentAction]):
         except Exception as e:
             logger.error("transformer_error", error=str(e), exc_info=True)
             return IntentAction(
-                identifier=context.hive.request_id if context.hive else context.identifier,
-                action=ActionType.ACTION_TYPE_ERROR,
+                identifier=context.hive.request_id
+                if context.hive
+                else context.identifier,
+                action=ActionType(int(ActionType.ACTION_TYPE_ERROR)),
                 reasoning=str(e),
             )

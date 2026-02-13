@@ -22,9 +22,11 @@ class HiveMembrane(Membrane[Any, IntentAction, HiveContext]):
         # Normalize bid extraction from Signal proto or legacy object
         bid = 0.0
         try:
-            payload_name, payload = betterproto.which_one_of(signal, "payload")
-            if payload_name == "negotiation":
-                bid = payload.bid_amount
+            res = betterproto.which_one_of(signal, "payload")
+            payload_name = res[0]
+            payload = res[1]
+            if payload_name == "negotiation" and payload:
+                bid = getattr(payload, "bid_amount", 0.0)
         except Exception:
             bid = getattr(signal, "bid_amount", 0.0)
 
@@ -39,15 +41,21 @@ class HiveMembrane(Membrane[Any, IntentAction, HiveContext]):
 
         # Scan fields for injection
         try:
-            payload_name, payload = betterproto.which_one_of(signal, "payload")
-            if payload_name == "negotiation":
+            res = betterproto.which_one_of(signal, "payload")
+            payload_name = res[0]
+            payload = res[1]
+            if payload_name == "negotiation" and payload:
                 if any(p in payload.agent.did.lower() for p in injection_patterns):
                     payload.agent.did = "REDACTED"
-                    logger.warning("membrane_inbound_injection_detected", field="agent.did")
-            elif payload_name == "perception":
-                 if any(p in payload.agent.did.lower() for p in injection_patterns):
+                    logger.warning(
+                        "membrane_inbound_injection_detected", field="agent.did"
+                    )
+            elif payload_name == "perception" and payload:
+                if any(p in payload.agent.did.lower() for p in injection_patterns):
                     payload.agent.did = "REDACTED"
-                    logger.warning("membrane_inbound_injection_detected", field="agent.did")
+                    logger.warning(
+                        "membrane_inbound_injection_detected", field="agent.did"
+                    )
         except Exception:
             # Fallback for legacy mocks
             did = getattr(getattr(signal, "agent", None), "did", "")
@@ -74,7 +82,7 @@ class HiveMembrane(Membrane[Any, IntentAction, HiveContext]):
                 logger.warning("membrane_asset_parse_failed", error=str(e))
 
         # 1. Handle explicit failures
-        if decision.action == ActionType.ACTION_TYPE_ERROR:
+        if decision.action == int(ActionType.ACTION_TYPE_ERROR):
             safe_price = floor_price * 1.05
             if self.registry:
                 obs_safe = await self.registry.execute(
@@ -97,15 +105,20 @@ class HiveMembrane(Membrane[Any, IntentAction, HiveContext]):
             )
 
         # 2. DLP Check
-        neg_name, neg_val = betterproto.which_one_of(decision, "params")
-        if neg_name == "negotiation":
+        res_params = betterproto.which_one_of(decision, "params")
+        neg_name = res_params[0]
+        neg_val = res_params[1]
+        if neg_name == "negotiation" and neg_val:
             neg_intent = cast(NegotiationIntent, neg_val)
             message = neg_intent.message
-            if "floor_price" in message.lower():
+            if message and "floor_price" in message.lower():
                 neg_intent.message = "I cannot disclose internal pricing details."
                 neg_intent.thought += " [MEMBRANE: DLP block]"
 
-        if decision.action not in [ActionType.ACTION_TYPE_ACCEPT, ActionType.ACTION_TYPE_COUNTER]:
+        if decision.action not in [
+            int(ActionType.ACTION_TYPE_ACCEPT),
+            int(ActionType.ACTION_TYPE_COUNTER),
+        ]:
             return decision
 
         # 3. Call Guard Protein for validation
@@ -122,12 +135,19 @@ class HiveMembrane(Membrane[Any, IntentAction, HiveContext]):
         }
 
         price = 0.0
-        neg_name, neg_val = betterproto.which_one_of(decision, "params")
-        if neg_name == "negotiation":
+        res_params = betterproto.which_one_of(decision, "params")
+        neg_name = res_params[0]
+        neg_val = res_params[1]
+        if neg_name == "negotiation" and neg_val:
             price = cast(NegotiationIntent, neg_val).price
 
         # Guard expects action as string? Engine might need it.
-        action_str = decision.action.name.lower().replace("action_type_", "")
+        action_map = {
+            int(ActionType.ACTION_TYPE_ACCEPT): "accept",
+            int(ActionType.ACTION_TYPE_COUNTER): "counter",
+            int(ActionType.ACTION_TYPE_REJECT): "reject",
+        }
+        action_str = action_map.get(int(decision.action), "unknown")
 
         obs = await self.registry.execute(
             "guard",
@@ -167,7 +187,7 @@ class HiveMembrane(Membrane[Any, IntentAction, HiveContext]):
 
         return IntentAction(
             identifier=original.identifier,
-            action=ActionType.ACTION_TYPE_COUNTER,
+            action=ActionType(int(ActionType.ACTION_TYPE_COUNTER)),
             reasoning=new_thought,
             negotiation=NegotiationIntent(
                 price=rounded_price,

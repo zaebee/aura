@@ -64,7 +64,7 @@ class HiveAggregator(Aggregator[Any, HiveContext]):
         item_id = "unknown"
         request_id = ""
         offer = NegotiationOffer(bid_amount=0.0, reputation=1.0, agent_did="unknown")
-        metadata = {"brain_path": self.brain_path}
+        metadata = {"brain_path": self.brain_path or ""}
 
         # Standardized Proprioception
         vitals = await self.get_vitals()
@@ -194,7 +194,7 @@ class HiveAggregator(Aggregator[Any, HiveContext]):
                         metadata={
                             **metadata,
                             "source": "vision",
-                            "vision_error": vision_error,
+                            "vision_error": vision_error or "",
                         },
                     )
 
@@ -253,7 +253,7 @@ class HiveAggregator(Aggregator[Any, HiveContext]):
                         metadata={
                             **metadata,
                             "source": "telegram",
-                            "callback_data": callback_data,
+                            "callback_data": callback_data or "",
                         },
                     )
 

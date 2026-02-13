@@ -141,7 +141,8 @@ class TransactionSkill(
     async def _encrypt_secret(self, params: dict[str, Any]) -> Observation:
         assert self.encryption is not None
         encrypted = self.encryption.encrypt(params["secret"])
-        val = protobuf.StringValue(value=encrypted)
+        # StringValue expects str, so we hex-encode the bytes
+        val = protobuf.StringValue(value=encrypted.hex())
         return Observation(success=True, payload=self._pack_payload(val))
 
     async def _decrypt_secret(self, params: dict[str, Any]) -> Observation:

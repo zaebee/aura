@@ -42,7 +42,14 @@ class HiveConnector(BaseConnector):
         """
         logger.debug("connector_act_started", action=action.action)
 
-        action_name = ActionType(action.action).name.lower().replace("action_type_", "")
+        action_map = {
+            int(ActionType.ACTION_TYPE_ACCEPT): "accept",
+            int(ActionType.ACTION_TYPE_COUNTER): "counter",
+            int(ActionType.ACTION_TYPE_REJECT): "reject",
+            int(ActionType.ACTION_TYPE_EVALUATE): "evaluate",
+            int(ActionType.ACTION_TYPE_UI_REQUIRED): "ui_required",
+        }
+        action_name = action_map.get(int(action.action), "unknown")
 
         # 1. Handle Polymorphic Search
         if action_name == "evaluate" and action.asset and action.asset.asset_identifier == "search":
