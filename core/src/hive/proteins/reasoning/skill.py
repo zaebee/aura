@@ -1,14 +1,17 @@
 import asyncio
+import json
 import logging
 from typing import Any
 
 import dspy
 from aura_core import Observation, SkillProtocol
+from aura_core.gen.aura.core.v1 import NegotiationIntent
+from aura_core.gen.aura.core.v1.google import protobuf
 
 from config.llm import LLMSettings
 
 from .engine import generate_embedding, load_brain
-from .schema import EmbeddingParams, NegotiationParams, NegotiationResult
+from .schema import EmbeddingParams, NegotiationParams
 
 logger = logging.getLogger(__name__)
 
@@ -89,14 +92,27 @@ class ReasoningSkill(
             )
 
         result = await asyncio.to_thread(call)
-        data = {
-            "action": result["action"]["action"],
-            "price": result["action"]["price"],
-            "message": result["action"]["message"],
-            "thought": result.get("thought", ""),
-            "metadata": result.get("metadata", {}),
-        }
-        return Observation(success=True, data=NegotiationResult(**data).model_dump())
+
+        # result["action"] is usually a Pydantic model or dict with 'action', 'price', 'message'
+        action_data = result.get("action", {})
+        if hasattr(action_data, "model_dump"):
+            action_data = action_data.model_dump()
+
+        intent = NegotiationIntent(
+            price=float(action_data.get("price", 0.0)),
+            message=action_data.get("message", ""),
+            thought=result.get("thought", "")
+        )
+
+        any_payload = protobuf.Any()
+        any_payload.value = bytes(intent)
+
+        return Observation(
+            success=True,
+            event_type=action_data.get("action", "unknown"),
+            payload=any_payload,
+            metadata=result.get("metadata", {})
+        )
 
     async def _generate_embedding(self, params: dict[str, Any]) -> Observation:
         if not self._embed_model:
@@ -104,4 +120,17 @@ class ReasoningSkill(
         p_emb = EmbeddingParams(**params)
 
         emb = await asyncio.to_thread(generate_embedding, p_emb.text, self._embed_model)
-        return Observation(success=True, data=emb)
+
+        # emb is a list of floats. SSA wants native.
+        # Let's use a repeated float if we had one, or just pack in Any.
+        # Since pgvector wants a list, we can use metadata or a custom Vector proto.
+        # I added Vector to base.proto! Let's use it.
+        from aura_core.gen.aura.core.v1 import Vector
+        vector_msg = Vector(values=emb)
+
+        any_payload = protobuf.Any()
+        any_payload.value = bytes(vector_msg)
+
+        return Observation(
+            success=True, payload=any_payload
+        )

@@ -1,9 +1,9 @@
+import json
 import time
 import uuid
 from typing import Any
 
 import structlog
-from aura.negotiation.v1 import negotiation_pb2
 from aura_core import (
     BaseConnector,
     HiveContext,
@@ -11,7 +11,17 @@ from aura_core import (
     Observation,
     SkillRegistry,
 )
-from aura_core.gen.aura.dna.v1 import ActionType
+from aura_core.gen.aura.core.v1 import (
+    ActionType,
+    NegotiationObservation,
+    OfferAccepted,
+    OfferCountered,
+    OfferRejected,
+    AssetObservation,
+    Status,
+)
+from aura_core.gen.aura.assets import v1 as asset_pb2
+from aura_core.gen.aura.core.v1.google import protobuf
 
 logger = structlog.get_logger(__name__)
 
@@ -35,103 +45,91 @@ class HiveConnector(BaseConnector):
         """
         logger.debug("connector_act_started", action=action.action)
 
-        # 1. Map IntentAction to Protobuf NegotiateResponse
-        response = negotiation_pb2.NegotiateResponse()
-        response.session_token = "sess_" + (context.request_id or str(uuid.uuid4()))
-        response.valid_until_timestamp = int(time.time() + 600)
+        action_name = action.action.name.lower().replace("action_type_", "")
 
-        # Handle both string and ActionType enum
-        action_val = action.action
-        if isinstance(action_val, ActionType):
-            raw_name = ActionType(action_val).name
-            action_name = (
-                raw_name.lower().replace("action_type_", "")
-                if raw_name
-                else "unspecified"
-            )
-        else:
-            action_name = str(action_val).lower() if action_val else "unknown"
+        # 1. Handle Polymorphic Search
+        if action_name == "evaluate" and action.asset and action.asset.asset_identifier == "search":
+             return await self._handle_search(action, context)
+
+        # 2. Map IntentAction to modular NegotiationObservation
+        neg_obs = NegotiationObservation(
+            item_identifier=context.hive.item_identifier if context.hive else "unknown",
+            valid_until_timestamp=int(time.time() + 600),
+        )
+
+        price = action.negotiation.price if action.negotiation else 0.0
+        message = action.negotiation.message if action.negotiation else ""
 
         if action_name == "accept":
-            response.accepted.final_price = action.price
-            response.accepted.reservation_code = f"HIVE-{uuid.uuid4()}"
-
-            if self.settings and self.settings.crypto.enabled and self.market_service:
-                await self._handle_crypto_lock(response, action, context)
-
+            neg_obs.accepted = OfferAccepted(
+                final_price=price,
+                reservation_code=f"HIVE-{uuid.uuid4()}"
+            )
         elif action_name == "counter":
-            response.countered.proposed_price = action.price
-            response.countered.human_message = action.message
-            response.countered.reason_code = "NEGOTIATION_ONGOING"
-
+            neg_obs.countered = OfferCountered(
+                proposed_price=price,
+                human_message=message,
+                reason_code="NEGOTIATION_ONGOING"
+            )
         elif action_name == "reject":
-            response.rejected.reason_code = "OFFER_TOO_LOW"
-
+            neg_obs.rejected = OfferRejected(reason_code="OFFER_TOO_LOW")
         elif action_name == "ui_required":
-            response.rejected.reason_code = "UI_REQUIRED"
-
+            neg_obs.rejected = OfferRejected(reason_code="UI_REQUIRED")
         else:
             logger.error("unknown_action_type", action=action_name)
-            response.rejected.reason_code = "INTERNAL_ERROR"
+            neg_obs.rejected = OfferRejected(reason_code="INTERNAL_ERROR")
+
+        # SSA Directive: native binary payload
+        any_payload = protobuf.Any()
+        any_payload.value = bytes(neg_obs)
 
         return Observation(
             success=True,
-            data=response,
+            payload=any_payload,
             event_type=f"negotiation_{action_name}",
             metadata={
-                "decision": action,
-                "item_id": context.item_id,
-                "agent_did": context.offer.agent_did,
+                "item_id": context.hive.item_identifier if context.hive else "unknown",
+                "agent_did": context.hive.offer.agent_did if context.hive else "unknown",
                 "payment_uri": context.metadata.get("payment_uri", ""),
             },
         )
 
-    async def _handle_crypto_lock(
-        self,
-        response: negotiation_pb2.NegotiateResponse,
-        action: IntentAction,
-        context: HiveContext,
-    ) -> None:
-        """Encrypts the reservation code and creates a locked deal via Skills/MarketService."""
-        try:
-            item_name = context.item_data.get("name", "Aura Item")
+    async def _handle_search(self, action: IntentAction, context: HiveContext) -> Observation:
+        query = action.asset.action_parameters.get("query", "")
 
-            # Use Transaction Skill for price conversion
-            obs = await self.registry.execute(
-                "transaction",
-                "convert_price",
-                {"usd_amount": action.price, "currency": self.settings.crypto.currency},
-            )
+        # 1. Generate Embedding
+        embed_obs = await self.registry.execute(
+            "reasoning", "generate_embedding", {"text": query}
+        )
+        if not embed_obs.success:
+             return Observation(success=False, error=f"Embedding failed: {embed_obs.error}")
 
-            if not obs.success:
-                raise ValueError(f"Price conversion failed: {obs.error}")
+        # Unpack Vector from payload
+        from aura_core.gen.aura.core.v1 import Vector
+        vector_msg = Vector().parse(embed_obs.payload.value)
 
-            crypto_amount = obs.data
+        # 2. Vector Search
+        search_obs = await self.registry.execute(
+            "persistence",
+            "vector_search",
+            {
+                "query_vector": list(vector_msg.values),
+                "limit": 5,
+            },
+        )
 
-            # MarketService still orchestrates complex multi-protein operations
-            # but it is passed to the connector.
-            payment_instructions, payment_uri = await self.market_service.create_offer(
-                item_id=context.item_id,
-                item_name=item_name,
-                secret=response.accepted.reservation_code,
-                price=crypto_amount,
-                currency=self.settings.crypto.currency,
-                buyer_did=context.offer.agent_did,
-                ttl_seconds=self.settings.crypto.deal_ttl_seconds,
-            )
+        if not search_obs.success:
+             return Observation(success=False, error=f"Search failed: {search_obs.error}")
 
-            response.accepted.ClearField("reservation_code")
-            response.accepted.crypto_payment.CopyFrom(payment_instructions)
+        # 3. Format results
+        results = json.loads(search_obs.metadata.get("item_data", "[]"))
 
-            # Store payment_uri in context metadata for the Generator to pick up
-            context.metadata["payment_uri"] = payment_uri
+        # We can return the results in metadata for the bot to parse,
+        # or we can use a custom observation.
+        # Let's use AssetObservation as a container if it fits, or just JSON in metadata for multiple.
 
-            logger.info(
-                "crypto_offer_created",
-                deal_id=payment_instructions.deal_id,
-                amount=crypto_amount,
-                currency=self.settings.crypto.currency,
-            )
-
-        except ValueError as e:
-            logger.warning("crypto_lock_failed", error=str(e), exc_info=True)
+        return Observation(
+            success=True,
+            event_type="search_results",
+            metadata={"item_data": json.dumps(results)}
+        )

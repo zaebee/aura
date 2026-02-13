@@ -74,9 +74,15 @@ class MetricsCache:
 
 
 async def fetch_vitals(metrics_cache: MetricsCache, settings: Any) -> SystemVitals:
-    cached = metrics_cache.get()
-    if cached:
-        return SystemVitals(**{**cached, "cached": True})
+    cached_dict = metrics_cache.get()
+    if cached_dict:
+        return SystemVitals(
+            status=cached_dict.get("status", "ok"),
+            cpu_usage_percent=cached_dict.get("cpu_usage_percent", 0.0),
+            memory_usage_mb=cached_dict.get("memory_usage_mb", 0.0),
+            timestamp=datetime.now(UTC),
+            cached=True
+        )
 
     cpu_q = (
         'avg(rate(container_cpu_usage_seconds_total{namespace="default"}[5m])) * 100'
@@ -111,15 +117,16 @@ async def fetch_vitals(metrics_cache: MetricsCache, settings: Any) -> SystemVita
                 cached_dict = metrics_cache.get(ignore_ttl=True)
                 if cached_dict:
                     return SystemVitals(
-                        **{
-                            **cached_dict,
-                            "cached": True,
-                            "error": f"Stale data due to: {e_msg}",
-                        }
+                        status="degraded",
+                        cpu_usage_percent=cached_dict.get("cpu_usage_percent", 0.0),
+                        memory_usage_mb=cached_dict.get("memory_usage_mb", 0.0),
+                        timestamp=datetime.now(UTC),
+                        cached=True,
+                        error=f"Stale data due to: {e_msg}",
                     )
                 return SystemVitals(
                     status="unstable",
-                    timestamp=datetime.now(UTC).isoformat(),
+                    timestamp=datetime.now(UTC),
                     error=e_msg,
                 )
 
@@ -127,28 +134,35 @@ async def fetch_vitals(metrics_cache: MetricsCache, settings: Any) -> SystemVita
                 "status": "ok",
                 "cpu_usage_percent": round(cpu, 2),
                 "memory_usage_mb": round(mem, 2),
-                "timestamp": datetime.now(UTC).isoformat(),
+                "timestamp": datetime.now(UTC),
                 "cached": False,
             }
             if errs:
                 m_dict["status"] = "PARTIAL"
-                m_dict["warnings"] = errs  # type: ignore
+
             metrics_cache.set(m_dict)
-            return SystemVitals(**m_dict)
+            return SystemVitals(
+                status=m_dict["status"],
+                cpu_usage_percent=m_dict["cpu_usage_percent"],
+                memory_usage_mb=m_dict["memory_usage_mb"],
+                timestamp=m_dict["timestamp"],
+                cached=m_dict["cached"]
+            )
     except Exception as e:
         logger.error("monitoring_failure", error=str(e))
         e_msg = f"{type(e).__name__}: {str(e)}"
         cached_dict = metrics_cache.get(ignore_ttl=True)
         if cached_dict:
             return SystemVitals(
-                **{
-                    **cached_dict,
-                    "cached": True,
-                    "error": f"Stale data due to: {e_msg}",
-                }
+                status="degraded",
+                cpu_usage_percent=cached_dict.get("cpu_usage_percent", 0.0),
+                memory_usage_mb=cached_dict.get("memory_usage_mb", 0.0),
+                timestamp=datetime.now(UTC),
+                cached=True,
+                error=f"Stale data due to: {e_msg}",
             )
         return SystemVitals(
-            status="unstable", timestamp=datetime.now(UTC).isoformat(), error=e_msg
+            status="unstable", timestamp=datetime.now(UTC), error=e_msg
         )
 
 

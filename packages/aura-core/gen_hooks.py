@@ -34,7 +34,7 @@ class CustomBuildHook(BuildHookInterface):
 
         logger.info("🧬 Bio-Digital Transcription starting...")
 
-        proto_file = proto_dir / "aura" / "dna" / "v1" / "dna.proto"
+        proto_files = list(proto_dir.rglob("*.proto"))
 
         try:
             result = subprocess.run(  # nosec B603
@@ -44,7 +44,7 @@ class CustomBuildHook(BuildHookInterface):
                     "grpc_tools.protoc",
                     f"--proto_path={proto_dir}",
                     f"--python_betterproto_out={out_dir}",
-                    str(proto_file),
+                    *[str(p) for p in proto_files],
                 ],
                 capture_output=True,
                 text=True,
@@ -54,14 +54,30 @@ class CustomBuildHook(BuildHookInterface):
                 logger.error(f"❌ Protoc Error:\n{result.stderr}")
                 raise RuntimeError("Protoc failed")
 
-            google_shim_dir = Path(out_dir) / "aura" / "dna" / "google"
-            google_shim_dir.mkdir(parents=True, exist_ok=True)
+            # SSA Alignment: Ensure modular structure
+            # Transform v1.py to v1/__init__.py and inject shims
+            for root, dirs, files in os.walk(out_dir):
+                for f in files:
+                    if f.endswith(".py") and f != "__init__.py":
+                        module_name = f[:-3]
+                        module_path = Path(root) / f
+                        package_dir = Path(root) / module_name
 
-            shim_file = google_shim_dir / "__init__.py"
-            with open(shim_file, "w") as f:
-                f.write("# 🧬 Aura Hive Google Shim for Betterproto\n")
-                f.write("from betterproto.lib.google import protobuf\n")
+                        # Only do this for aura packages (nested)
+                        if "aura" in str(module_path):
+                            package_dir.mkdir(exist_ok=True)
+                            init_file = package_dir / "__init__.py"
+                            module_path.rename(init_file)
+                            logger.debug("Modularized %s", module_name)
 
+                if "google" in dirs:
+                    # If we modularized v1, google might be a sibling of v1 or inside it.
+                    # betterproto usually puts it as a sibling of the generated file.
+                    # But if we move the file into v1/, we should move google too if it was meant to be relative.
+                    pass
+
+            # Final recursive shim and init injection
+            self._inject_shims(out_dir)
             self._ensure_init_files(out_dir)
 
             logger.info("✅ DNA expressed and packages initialized.")
@@ -69,6 +85,16 @@ class CustomBuildHook(BuildHookInterface):
         except Exception as e:
             logger.critical("Critical Transcription failure", exc_info=True)
             raise e
+
+    def _inject_shims(self, base_path: Path) -> None:
+        for root, dirs, _ in os.walk(base_path):
+            if "google" in dirs:
+                google_shim_dir = Path(root) / "google"
+                google_shim_dir.mkdir(parents=True, exist_ok=True)
+                shim_file = google_shim_dir / "__init__.py"
+                with open(shim_file, "w") as f:
+                    f.write("# 🧬 Aura Hive Google Shim for Betterproto\n")
+                    f.write("from betterproto.lib.google import protobuf\n")
 
     def _ensure_init_files(self, base_path: Path) -> None:
         for root, dirs, _ in os.walk(base_path):

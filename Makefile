@@ -75,13 +75,21 @@ $(PROTO_SENTINEL): $(PROTO_SOURCES) buf.gen.yaml
 	# Uses buf.gen.yaml which leverages betterproto
 	mkdir -p packages/aura-core/src/aura_core/gen
 	buf generate
-	# Fix betterproto google import shim if needed
-	if [ -d "packages/aura-core/src/aura_core/gen/aura/dna" ]; then \
-		mkdir -p packages/aura-core/src/aura_core/gen/aura/dna/google; \
-		echo "from betterproto.lib.google import protobuf" > packages/aura-core/src/aura_core/gen/aura/dna/google/__init__.py; \
-	fi
-	if [ -f "packages/aura-core/src/aura_core/gen/aura/negotiation/v1.py" ]; then \
-		sed -i 's/from .aura.dna import v1/from aura_core.gen.aura.dna import v1/' packages/aura-core/src/aura_core/gen/aura/negotiation/v1.py; \
+	# Modularize betterproto output (v1.py -> v1/__init__.py)
+	for f in $$(find packages/aura-core/src/aura_core/gen/aura -name "*.py" -not -name "__init__.py"); do \
+		dir=$${f%.py}; \
+		mkdir -p $$dir; \
+		mv $$f $$dir/__init__.py; \
+	done
+	# Fix betterproto google import shim if needed (recursive)
+	find packages/aura-core/src/aura_core/gen -type d -name "google" -exec sh -c 'echo "from betterproto.lib.google import protobuf" > {}/__init__.py' \;
+	# Fix betterproto relative imports and naming conflicts for the negotiation service
+	if [ -f "packages/aura-core/src/aura_core/gen/aura/negotiation/v1/__init__.py" ]; then \
+		sed -i 's/from .aura.core import v1/from aura_core.gen.aura.core import v1 as core_v1/' packages/aura-core/src/aura_core/gen/aura/negotiation/v1/__init__.py; \
+		sed -i 's/from .aura.assets import v1/from aura_core.gen.aura.assets import v1 as assets_v1/' packages/aura-core/src/aura_core/gen/aura/negotiation/v1/__init__.py; \
+		sed -i 's/results: List\[v1.Asset\]/results: List\[assets_v1.Asset\]/' packages/aura-core/src/aura_core/gen/aura/negotiation/v1/__init__.py; \
+		sed -i 's/signal: v1.Signal/signal: core_v1.Signal/' packages/aura-core/src/aura_core/gen/aura/negotiation/v1/__init__.py; \
+		sed -i 's/Optional\[v1.Signal\]/Optional\[core_v1.Signal\]/' packages/aura-core/src/aura_core/gen/aura/negotiation/v1/__init__.py; \
 	fi
 	touch $(PROTO_SENTINEL)
 

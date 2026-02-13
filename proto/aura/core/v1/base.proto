@@ -41,6 +41,8 @@ message SystemVitals {
   double network_latency_ms = 4;
   string status = 5;         // OK, DEGRADED, ERROR, CRITICAL
   google.protobuf.Timestamp timestamp = 6;
+  bool cached = 7;
+  string error = 8;
 }
 
 // Trace context for distributed tracing (OpenTelemetry compatible)
@@ -49,6 +51,11 @@ message TraceContext {
   string span_id = 2;       // W3C Trace Context span-id
   string trace_flags = 3;   // Sampling flags
   string trace_state = 4;   // Vendor-specific trace state
+}
+
+// Semantic Vector for embeddings (The SSA Directive)
+message Vector {
+  repeated float values = 1;
 }
 
 // =============================================================================
@@ -84,4 +91,6 @@ enum ActionType {
   ACTION_TYPE_UPDATE = 6;
   ACTION_TYPE_EVALUATE = 7;
   ACTION_TYPE_ERROR = 8;
+  ACTION_TYPE_AUDIT = 9;       // Legacy compatibility
+  ACTION_TYPE_UI_REQUIRED = 10; // Legacy compatibility
 }

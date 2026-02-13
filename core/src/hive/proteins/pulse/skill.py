@@ -6,6 +6,7 @@ from config.server import ServerSettings
 
 from .engine import JetStreamProvider
 from .schema import EventParams, NegotiationEventParams
+from hive.metabolism.security import AuditSigner
 
 
 class PulseSkill(
@@ -18,6 +19,7 @@ class PulseSkill(
     def __init__(self) -> None:
         self.settings: ServerSettings | None = None
         self.provider: JetStreamProvider | None = None
+        self.signer: AuditSigner | None = None
         self._capabilities = {
             "emit_heartbeat": self._emit_heartbeat,
             "emit_negotiation": self._emit_negotiation,
@@ -36,6 +38,19 @@ class PulseSkill(
     def bind(self, settings: ServerSettings, provider: JetStreamProvider) -> None:
         self.settings = settings
         self.provider = provider
+
+        # SSA Alignment: Try to get event_signing_key through various means
+        key = ""
+        if settings:
+             if hasattr(settings, "event_signing_key"):
+                 key = settings.event_signing_key
+             elif isinstance(settings, dict):
+                 key = settings.get("event_signing_key", "")
+
+        if key:
+            self.signer = AuditSigner(key)
+            if self.provider:
+                self.provider.set_signer(self.signer)
 
     async def initialize(self) -> bool:
         if not self.provider:

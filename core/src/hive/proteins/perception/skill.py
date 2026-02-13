@@ -2,11 +2,13 @@ from typing import Any
 
 import structlog
 from aura_core import Observation, SkillProtocol
+from aura_core.gen.aura.assets import v1 as asset_pb2
+from aura_core.gen.aura.core.v1.google import protobuf
 
 from config.perception import PerceptionSettings
 
 from .engine import PerceptionEngine
-from .schema import PerceiveImageParams, PerceiveImageResult
+from .schema import PerceiveImageParams
 
 logger = structlog.get_logger(__name__)
 
@@ -57,6 +59,26 @@ class PerceptionSkill(
         item = await self.provider.perceive_image(p.image_bytes)
 
         if "error" in item:
-            return Observation(success=False, error=item["error"], metadata=item)
+            return Observation(success=False, error=item["error"])
 
-        return Observation(success=True, data=PerceiveImageResult(**item).model_dump())
+        # Map internal item dict to Asset proto
+        asset = asset_pb2.Asset(
+            identifier=item.get("id", "unknown"),
+            vehicle=asset_pb2.VehicleAttributes(
+                brand=item.get("make", ""),
+                model=item.get("model", ""),
+                year=int(item.get("year", 0))
+            ),
+            rental_terms=asset_pb2.RentalTerms(
+                price_tiers=[asset_pb2.PriceTier(price_per_day=float(item.get("base_price", 0.0)))]
+            )
+        )
+
+        any_payload = protobuf.Any()
+        any_payload.value = bytes(asset)
+
+        return Observation(
+            success=True,
+            payload=any_payload,
+            metadata={"confidence_score": str(item.get("confidence_score", 0.0))}
+        )

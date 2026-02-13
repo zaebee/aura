@@ -1,10 +1,11 @@
 import asyncio
-import json
 import os
-import time
+import uuid
+from datetime import UTC, datetime
 
 import nats
 import structlog
+from aura_core.gen.aura.core.v1 import Event, NegotiationEvent, ActionType
 
 # Configure logging
 structlog.configure(
@@ -20,14 +21,20 @@ logger = structlog.get_logger(__name__)
 async def main():
     # Use AURA_NATS_URL or fallback to nats:4222 for Hive internal networking
     nats_url = os.environ.get("AURA_NATS_URL", "nats://nats:4222")
-    topic = "aura.hive.events.NegotiationAccepted"
+    topic = "aura.hive.events.negotiation_accept"
 
-    payload = {
-        "success": True,
-        "event_type": "NegotiationAccepted",
-        "timestamp": time.time(),
-        "session_token": "manual-pulse-token",  # nosec
-    }
+    # Create binary proto Event
+    event = Event(
+        identifier=f"man-{uuid.uuid4().hex[:8]}",
+        topic=topic,
+        timestamp=datetime.now(UTC),
+        negotiation=NegotiationEvent(
+            item_identifier="manual-item",
+            action=ActionType.ACTION_TYPE_ACCEPT,
+            price=100.0
+        ),
+        metadata={"session_token": "manual-pulse-token"}
+    )
 
     # Redact credentials for safe logging
     safe_url = nats_url
@@ -40,7 +47,7 @@ async def main():
     try:
         nc = await nats.connect(nats_url)
         logger.info("publishing_to_nats", topic=topic)
-        await nc.publish(topic, json.dumps(payload).encode())
+        await nc.publish(topic, bytes(event))
         await nc.flush()
         await nc.close()
         logger.info("pulse_triggered_successfully")

@@ -34,6 +34,7 @@ message Signal {
     HeartbeatSignal heartbeat = 13;
     PerceptionSignal perception = 14;
     AssetSignal asset = 15;  // Generic asset signal (decoupled)
+    SearchSignal search = 16;
   }
 }
 
@@ -45,6 +46,7 @@ enum SignalType {
   SIGNAL_TYPE_HEARTBEAT = 4;
   SIGNAL_TYPE_PERCEPTION = 5;
   SIGNAL_TYPE_ASSET = 6;  // Generic asset signals
+  SIGNAL_TYPE_SEARCH = 7;
 }
 
 // Generic Asset Signal - knows only about asset identifiers and domains
@@ -96,6 +98,13 @@ message PerceptionSignal {
   string perceived_asset_domain = 5;     // Perceived domain
 }
 
+message SearchSignal {
+  string query = 1;
+  int32 limit = 2;
+  float min_similarity = 3;
+  AgentIdentity agent = 4;
+}
+
 // =============================================================================
 // CONTEXT - Enriched understanding after Aggregator processing
 // =============================================================================
@@ -106,6 +115,7 @@ message Context {
   Status system_health = 3;
   map<string, string> metadata = 4;
   TraceContext trace = 5;
+  SystemVitals vitals = 6;
 
   // Strictly typed context data
   oneof data {
@@ -141,6 +151,7 @@ message HiveContextData {
   string item_domain = 2;                 // Generic domain reference
   NegotiationOffer offer = 3;
   string request_id = 4;
+  google.protobuf.Any asset_payload = 5;
 }
 
 message NegotiationOffer {
@@ -240,6 +251,9 @@ message Observation {
     PerceptionObservation perception = 13;
     AssetObservation asset = 14;  // Generic asset observation (decoupled)
   }
+
+  // Pure binary payload (The SSA Directive: Reject JSON Hacks)
+  google.protobuf.Any payload = 15;
 }
 
 // Generic Asset Observation - returns only asset identifiers

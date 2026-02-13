@@ -329,16 +329,21 @@ async def search_items(
             method="Search",
             result_count=len(response.results),
         )
-        results = [
-            {
-                "id": r.item_id,
+
+        # SSA Alignment: Updated mapping for modular Asset chromosome
+        results = []
+        for r in response.results:
+             price = 0.0
+             if r.rental_terms and r.rental_terms.price_tiers:
+                 price = r.rental_terms.price_tiers[0].price_per_day
+
+             results.append({
+                "id": r.identifier,
                 "name": r.name,
-                "price": r.base_price,
-                "score": round(r.similarity_score, 4),
-                "details": r.description_snippet,
-            }
-            for r in response.results
-        ]
+                "price": price,
+                "score": 1.0, # similarity_score no longer in Asset proto
+                "details": r.description,
+            })
 
         logger.info("search_completed", result_count=len(results))
 

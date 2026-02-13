@@ -10,7 +10,7 @@ from aiogram.types import (
     InlineKeyboardMarkup,
     Message,
 )
-from aura_core.gen.aura.dna.v1 import (
+from aura_core.gen.aura.core.v1 import (
     ActionType,
     AgentIdentity,
     Event,
@@ -18,6 +18,7 @@ from aura_core.gen.aura.dna.v1 import (
     Signal,
     SignalType,
     TelegramSignal,
+    SearchSignal,
 )
 
 logger = structlog.get_logger(__name__)
@@ -53,27 +54,25 @@ class TelegramTranslator:
 
             if command and command.command == "search":
                 return Signal(
-                    signal_id=signal_id,
-                    signal_type=cast(SignalType, SignalType.SIGNAL_TYPE_TELEGRAM),
+                    identifier=signal_id,
+                    signal_type=cast(SignalType, SignalType.SIGNAL_TYPE_SEARCH),
                     timestamp=datetime.now(UTC),
-                    telegram=TelegramSignal(
-                        user_id=user_id,
-                        chat_id=chat_id,
-                        message_text=text,
+                    search=SearchSignal(
+                        query=command.args or "",
+                        limit=5,
+                        agent=AgentIdentity(did=f"tg:{user_id}", reputation_score=1.0)
                     ),
                     metadata={
                         "chat_id": str(chat_id),
                         "user_id": str(user_id),
                         "source": "telegram",
-                        "intent": "search",
-                        "query": command.args or "",
                     },
                 )
 
             # Handle photo message (Perception)
             if kwargs.get("image_bytes"):
                 return Signal(
-                    signal_id=signal_id,
+                    identifier=signal_id,
                     signal_type=cast(SignalType, SignalType.SIGNAL_TYPE_PERCEPTION),
                     timestamp=datetime.now(UTC),
                     perception=PerceptionSignal(
@@ -94,7 +93,7 @@ class TelegramTranslator:
 
             # Standard message or bid - Use TelegramSignal for Signal Integrity
             return Signal(
-                signal_id=signal_id,
+                identifier=signal_id,
                 signal_type=cast(SignalType, SignalType.SIGNAL_TYPE_TELEGRAM),
                 timestamp=datetime.now(UTC),
                 telegram=TelegramSignal(
@@ -115,7 +114,7 @@ class TelegramTranslator:
             chat_id = event.message.chat.id if event.message else 0
 
             return Signal(
-                signal_id=signal_id,
+                identifier=signal_id,
                 signal_type=cast(SignalType, SignalType.SIGNAL_TYPE_TELEGRAM),
                 timestamp=datetime.now(UTC),
                 telegram=TelegramSignal(
@@ -131,7 +130,7 @@ class TelegramTranslator:
             )
 
         return Signal(
-            signal_id=signal_id,
+            identifier=signal_id,
             signal_type=cast(SignalType, SignalType.SIGNAL_TYPE_UNSPECIFIED),
             timestamp=datetime.now(UTC),
         )
@@ -142,23 +141,8 @@ class TelegramTranslator:
         Returns (0, "", None) if the event is not relevant to this synapse.
         """
         chat_id = int(event.metadata.get("chat_id", "0"))
-        # TODO: Relying on session_token being a digit to fall back and find
-        # the chat_id is fragile. This creates a tight, implicit coupling
-        # between how sessions are created and how events are processed.
-        # A more robust solution would be to ensure that any event destined
-        # for a Telegram user explicitly includes the chat_id in its metadata.
-        # This makes the contract clear and avoids potential issues
-        # if the session token format changes.
         if not chat_id:
-            # Try to extract from session_token if we used chat_id as session_token
-            session_id = ""
-            if event.negotiation:
-                session_id = event.negotiation.session_token
-
-            if session_id and session_id.isdigit():
-                chat_id = int(session_id)
-            else:
-                return 0, "", None
+             return 0, "", None
 
         message = ""
         keyboard = None
@@ -166,7 +150,7 @@ class TelegramTranslator:
             neg = event.negotiation
             action = neg.action
             price = neg.price
-            item_id = neg.item_id
+            item_id = neg.item_identifier
 
             if action == ActionType.ACTION_TYPE_ACCEPT:
                 message = f"✅ *Deal Accepted!*\nItem: `{item_id}`\nFinal Price: `${price:.2f}`"

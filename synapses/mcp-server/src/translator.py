@@ -3,7 +3,7 @@ from datetime import UTC, datetime
 from typing import Any, cast
 
 from aura_core import Observation
-from aura_core.gen.aura.dna.v1 import (
+from aura_core.gen.aura.core.v1 import (
     AgentIdentity,
     NegotiationSignal,
     Signal,

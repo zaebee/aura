@@ -9,6 +9,7 @@ from hive.proteins.transaction.engine import (
 from hive.proteins.transaction.skill import TransactionSkill
 from solders.keypair import Keypair
 from solders.pubkey import Pubkey
+from aura_core.gen.aura.core.v1.google import protobuf
 
 from config.crypto import CryptoSettings
 
@@ -39,8 +40,8 @@ async def test_transaction_skill_calculate_tax_and_margin():
 
     obs = await skill.execute("calculate_tax_and_margin", {"price": 100.0})
     assert obs.success is True
-    assert obs.data["margin"] == 10.0
-    assert obs.data["total"] == 110.0
+    assert obs.metadata["margin"] == "10.0"
+    assert obs.metadata["total"] == "110.0"
 
 @pytest.mark.asyncio
 @patch("hive.proteins.transaction.engine.Pubkey.from_string")
@@ -85,6 +86,11 @@ async def test_transaction_skill_generate_payment_request(mock_from_string):
         "currency": "SOL"
     })
     assert obs.success is True
-    assert "solana:" in obs.data
-    assert "amount=1.5" in obs.data
-    assert "memo=test-memo" in obs.data
+
+    # Unpack payload
+    uri_val = protobuf.StringValue().parse(obs.payload.value)
+    uri = uri_val.value
+
+    assert "solana:" in uri
+    assert "amount=1.5" in uri
+    assert "memo=test-memo" in uri

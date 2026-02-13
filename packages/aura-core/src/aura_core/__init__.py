@@ -1,3 +1,5 @@
+from typing import Any
+
 from .dna import (
     Aggregator,
     Connector,
@@ -5,6 +7,22 @@ from .dna import (
     Membrane,
     SkillProtocol,
     Transformer,
+)
+from .gen.aura.core.v1 import (
+    ActionType,
+    AgentIdentity,
+    Event,
+    Money,
+    NegotiationOffer,
+    Observation,
+    Signal,
+    SystemVitals,
+)
+from .gen.aura.core.v1 import (
+    Context as HiveContext,
+)
+from .gen.aura.core.v1 import (
+    Intent as IntentAction,
 )
 from .manifest import (
     ALLOWED_CHAMBERS,
@@ -21,25 +39,14 @@ from .metabolism import (
     MetabolicLoop,
     SkillRegistry,
 )
-from .types import (
-    AuditObservation,
-    BeeContext,
-    BeeObservation,
-    Event,
-    FailureIntent,
-    HiveContext,
-    IntentAction,
-    NegotiationOffer,
-    NegotiationResult,
-    Observation,
-    SearchResult,
-    Signal,
-    SystemVitals,
-    TelegramContext,
-    UIAction,
-    get_raw_key,
-    map_action,
-)
+
+
+# Utils
+def get_raw_key(key_field: Any) -> str:
+    from pydantic import SecretStr
+    if isinstance(key_field, SecretStr):
+        return key_field.get_secret_value()
+    return str(key_field)
 
 __all__ = [
     # Manifest (Geography)
@@ -62,22 +69,16 @@ __all__ = [
     "BaseConnector",
     "SkillRegistry",
     "MetabolicLoop",
-    # Types
+    # Types (Genomic DNA)
     "Signal",
     "NegotiationOffer",
     "HiveContext",
     "IntentAction",
     "get_raw_key",
-    "FailureIntent",
     "Observation",
     "Event",
-    "SearchResult",
     "SystemVitals",
-    "NegotiationResult",
-    "map_action",
-    "BeeContext",
-    "AuditObservation",
-    "BeeObservation",
-    "TelegramContext",
-    "UIAction",
+    "ActionType",
+    "AgentIdentity",
+    "Money",
 ]

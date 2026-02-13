@@ -18,6 +18,7 @@ import argparse
 import asyncio
 import logging
 import sys
+from datetime import UTC, datetime
 
 import nats
 from nats.js.api import (
@@ -40,7 +41,6 @@ STREAMS = [
         description="All Hive events - negotiation, heartbeat, alerts",
         subjects=["aura.hive.events.>", "aura.hive.heartbeat"],
         retention=RetentionPolicy.LIMITS,
-        # max_age=24 * 60 * 60 * 1_000_000_000,  # 24 hours in nanoseconds
         storage=StorageType.FILE,
         num_replicas=1,
         discard="old",
@@ -52,7 +52,6 @@ STREAMS = [
         description="System health metrics for proprioception",
         subjects=["aura.hive.vitals.>"],
         retention=RetentionPolicy.LIMITS,
-        # max_age=1 * 60 * 60 * 1_000_000_000,  # 1 hour in nanoseconds
         storage=StorageType.MEMORY,  # Fast access, ephemeral
         num_replicas=1,
         discard="old",
@@ -64,7 +63,6 @@ STREAMS = [
         description="Architectural audit events for the Keeper",
         subjects=["aura.hive.audit.>"],
         retention=RetentionPolicy.LIMITS,
-        # max_age=7 * 24 * 60 * 60 * 1_000_000_000,  # 7 days in nanoseconds
         storage=StorageType.FILE,
         num_replicas=1,
         discard="old",
@@ -78,7 +76,7 @@ CONSUMERS = [
     {
         "stream": "AURA_EVENTS",
         "config": ConsumerConfig(
-            durable_name="core-processor",
+            durable_name="core-signal-processor",
             description="Core service event processor",
             deliver_policy=DeliverPolicy.NEW,
             ack_wait=30,  # 30 seconds to ack
@@ -213,18 +211,22 @@ async def publish_test_event(nats_url: str) -> bool:
 
         # Import proto (generated)
         try:
-            from hive.proto.aura.dna.v1 import dna_pb2
+            from aura_core.gen.aura.core.v1 import Event, HeartbeatEvent, Status
 
             # Create a test heartbeat event
-            event = dna_pb2.Event()
-            event.event_id = "test-001"
-            event.topic = "aura.hive.heartbeat"
-            event.heartbeat.service = "init_bloodstream"
-            event.heartbeat.instance_id = "test"
-            event.heartbeat.status = dna_pb2.VITALS_STATUS_OK
+            event = Event(
+                identifier="test-001",
+                topic="aura.hive.heartbeat",
+                timestamp=datetime.now(UTC),
+                heartbeat=HeartbeatEvent(
+                    service="init_bloodstream",
+                    instance_id="test",
+                    status=Status.STATUS_OK
+                )
+            )
 
             # Serialize to binary
-            binary_data = event.SerializeToString()
+            binary_data = bytes(event)
             logger.info(f"  Serialized event: {len(binary_data)} bytes")
 
             # Publish via JetStream

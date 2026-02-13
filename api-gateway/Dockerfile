@@ -25,11 +25,8 @@ COPY agents/bee-keeper/pyproject.toml /app/agents/bee-keeper/
 
 # Generate Protobuf code
 RUN buf generate && \
-    # Fix betterproto google import shim
-    if [ -d "packages/aura-core/src/aura_core/gen/aura/dna" ]; then \
-        mkdir -p packages/aura-core/src/aura_core/gen/aura/dna/google; \
-        echo "from betterproto.lib.google import protobuf" > packages/aura-core/src/aura_core/gen/aura/dna/google/__init__.py; \
-    fi
+    # Fix betterproto google import shim (Modular DNA)
+    find packages/aura-core/src/aura_core/gen -type d -name "google" -exec sh -c 'echo "from betterproto.lib.google import protobuf" > {}/__init__.py' \;
 
 # Install dependencies non-editable and scoped to the package, without installing the project itself
 RUN uv sync --frozen --no-dev --no-editable --package api-gateway --no-install-project

@@ -1,4 +1,5 @@
 import asyncio
+import json
 import uuid
 from concurrent import futures
 from typing import Any, cast
@@ -6,6 +7,7 @@ from typing import Any, cast
 import grpc
 import grpc.aio
 from aura.negotiation.v1 import negotiation_pb2, negotiation_pb2_grpc
+from aura.assets.v1 import assets_pb2 as standard_asset_pb2
 from grpc_health.v1 import health_pb2, health_pb2_grpc
 from hive.cortex import HiveCell
 from hive.metabolism import MetabolicLoop
@@ -17,6 +19,7 @@ from hive.metabolism.logging_config import (
 )
 from nats_gateway import NatsSignalGateway
 from opentelemetry import trace
+from aura_core.gen.aura.core.v1 import Vector, NegotiationObservation, OfferAccepted, OfferCountered, OfferRejected
 
 from config import settings
 
@@ -65,7 +68,39 @@ class NegotiationService(negotiation_pb2_grpc.NegotiationServiceServicer):
 
         try:
             observation = await self.metabolism.execute(request)
-            return observation.data  # type: ignore
+
+            # Map betterproto Observation to standard negotiation_pb2.NegotiateResponse
+            response = negotiation_pb2.NegotiateResponse()
+            response.session_token = f"sess_{request_id}"
+
+            if observation.payload:
+                try:
+                    # Parse binary payload from Observation
+                    neg_obs = NegotiationObservation().parse(observation.payload.value)
+                    response.valid_until_timestamp = neg_obs.valid_until_timestamp
+
+                    # Map result oneof
+                    res_name, res_val = betterproto.which_one_of(neg_obs, "result")
+                    if res_name == "accepted":
+                        response.accepted.final_price = res_val.final_price
+                        reveal_name, reveal_val = betterproto.which_one_of(res_val, "reveal_method")
+                        if reveal_name == "reservation_code":
+                            response.accepted.reservation_code = reveal_val
+                        # Add crypto_payment mapping if needed
+                    elif res_name == "countered":
+                        response.countered.proposed_price = res_val.proposed_price
+                        response.countered.human_message = res_val.human_message
+                        response.countered.reason_code = res_val.reason_code
+                    elif res_name == "rejected":
+                        response.rejected.reason_code = res_val.reason_code
+
+                except Exception as e:
+                    logger.warning("negotiate_mapping_failed", error=str(e))
+                    response.rejected.reason_code = "MAPPING_ERROR"
+            else:
+                 response.rejected.reason_code = "EMPTY_OBSERVATION"
+
+            return response
 
         except ValueError as e:
             logger.warning("invalid_argument", error=str(e))
@@ -118,10 +153,13 @@ class NegotiationService(negotiation_pb2_grpc.NegotiationServiceServicer):
                 context.set_details(f"Failed to generate embedding: {embed_obs.error}")
                 return negotiation_pb2.SearchResponse()
 
+            # embed_obs.payload contains Vector proto
+            vector_msg = Vector().parse(embed_obs.payload.value)
+
             obs = await persistence.execute(
                 "vector_search",
                 {
-                    "query_vector": embed_obs.data,
+                    "query_vector": list(vector_msg.values),
                     "limit": request.limit or 5,
                     "min_similarity": request.min_similarity,
                 },
@@ -132,16 +170,15 @@ class NegotiationService(negotiation_pb2_grpc.NegotiationServiceServicer):
                 context.set_details(f"Search failed: {obs.error}")
                 return negotiation_pb2.SearchResponse()
 
-            response_items = [
-                negotiation_pb2.SearchResultItem(
-                    item_id=item["id"],
-                    name=item["name"],
-                    base_price=item["base_price"],
-                    similarity_score=item["similarity_score"],
-                    description_snippet=str(item["meta"]),
-                )
-                for item in obs.data
-            ]
+            response_items = []
+            # obs.data contains list of dicts from persistence
+            for item in json.loads(obs.metadata.get("item_data", "[]")):
+                asset = standard_asset_pb2.Asset()
+                asset.identifier = item["id"]
+                asset.name = item["name"]
+                asset.description = json.dumps(item.get("meta", {}))
+                # Map other fields as needed
+                response_items.append(asset)
 
             return negotiation_pb2.SearchResponse(results=response_items)
 
@@ -167,7 +204,7 @@ class NegotiationService(negotiation_pb2_grpc.NegotiationServiceServicer):
                 status=vitals.status,
                 cpu_usage_percent=vitals.cpu_usage_percent,
                 memory_usage_mb=vitals.memory_usage_mb,
-                timestamp=vitals.timestamp,
+                timestamp=vitals.timestamp.isoformat() if hasattr(vitals.timestamp, "isoformat") else str(vitals.timestamp),
                 cached=vitals.cached,
             )
         except Exception as e:
@@ -271,11 +308,13 @@ async def serve() -> None:
                 if not persistence:
                     continue
                 obs = await persistence.execute("get_first_item", {})
-                if obs.success and obs.data:
-                    item = obs.data
+                if obs.success and obs.payload:
+                    from aura_core.gen.aura.assets import v1 as asset_pb2
+                    asset = asset_pb2.Asset().parse(obs.payload.value)
+
                     mock_signal = negotiation_pb2.NegotiateRequest(
-                        item_id=item["id"],
-                        bid_amount=item["base_price"]
+                        item_id=asset.identifier,
+                        bid_amount=asset.rental_terms.price_tiers[0].price_per_day
                         * settings.heartbeat.bid_multiplier,
                         currency_code="USD",
                         agent=negotiation_pb2.AgentIdentity(

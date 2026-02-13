@@ -1,10 +1,13 @@
 import asyncio
+import json
 from datetime import UTC, datetime
 from typing import Any, cast
 
 import redis.asyncio as redis
 import structlog
 from aura_core import Observation, SkillProtocol
+from aura_core.gen.aura.assets import v1 as asset_pb2
+from aura_core.gen.aura.core.v1.google import protobuf
 from sqlalchemy import Engine, text
 from sqlalchemy.orm import Session, sessionmaker
 
@@ -54,6 +57,8 @@ class PersistenceSkill(
             "list_items_semantic_search": self._vector_search,
             "get_first_item": self._get_first_item,
             "upsert_item": self._upsert_item,
+            "get_cache": self._get_cache_handler,
+            "set_cache": self._set_cache_handler,
         }
 
     def get_name(self) -> str:
@@ -138,6 +143,28 @@ class PersistenceSkill(
         except Exception as e:
             return Observation(success=False, error=str(e))
 
+    def _map_to_asset(self, item_dict: dict[str, Any]) -> asset_pb2.Asset:
+        return asset_pb2.Asset(
+            identifier=item_dict.get("id", ""),
+            vehicle=asset_pb2.VehicleAttributes(
+                brand=item_dict.get("meta", {}).get("make", ""),
+                model=item_dict.get("meta", {}).get("model", ""),
+                year=int(item_dict.get("meta", {}).get("year", 0)),
+                specifications=item_dict.get("meta", {})
+            ),
+            rental_terms=asset_pb2.RentalTerms(
+                price_tiers=[asset_pb2.PriceTier(price_per_day=float(item_dict.get("base_price", 0.0)))]
+            )
+        )
+
+    def _pack_payload(self, message: Any) -> protobuf.Any:
+        any_payload = protobuf.Any()
+        if hasattr(message, "SerializeToString"):
+             any_payload.value = message.SerializeToString()
+        else:
+             any_payload.value = bytes(message)
+        return any_payload
+
     async def _read_item_handler(self, params: dict[str, Any]) -> Observation:
         item_id = params.get("item_id")
         if not item_id:
@@ -152,7 +179,12 @@ class PersistenceSkill(
 
         result = await asyncio.to_thread(fetch)
         if result:
-            return Observation(success=True, data=result)
+            asset = self._map_to_asset(result)
+            return Observation(
+                success=True,
+                payload=self._pack_payload(asset),
+                metadata={"floor_price": str(result.get("floor_price", 0.0))}
+            )
         return Observation(success=False, error="item_not_found")
 
     async def _get_first_item(self, params: dict[str, Any]) -> Observation:
@@ -165,7 +197,12 @@ class PersistenceSkill(
 
         result = await asyncio.to_thread(fetch)
         if result:
-            return Observation(success=True, data=result)
+            asset = self._map_to_asset(result)
+            return Observation(
+                success=True,
+                payload=self._pack_payload(asset),
+                metadata={"floor_price": str(result.get("floor_price", 0.0))}
+            )
         return Observation(success=False, error="no_items_found")
 
     async def _set_excited_state(self, params: dict[str, Any]) -> Observation:
@@ -256,7 +293,12 @@ class PersistenceSkill(
 
         result = await asyncio.to_thread(fetch)
         if result:
-            return Observation(success=True, data=result)
+            # For now, return as string-encoded JSON in payload or just use metadata
+            # SSA wants binary. Let's use StringValue as a bridge if no Deal proto.
+            val = protobuf.StringValue(value=json.dumps(result))
+            return Observation(
+                success=True, payload=self._pack_payload(val)
+            )
         return Observation(success=False, error="deal_not_found")
 
     async def _get_deal_by_memo_handler(self, params: dict[str, Any]) -> Observation:
@@ -273,7 +315,10 @@ class PersistenceSkill(
 
         result = await asyncio.to_thread(fetch)
         if result:
-            return Observation(success=True, data=result)
+            val = protobuf.StringValue(value=json.dumps(result))
+            return Observation(
+                success=True, payload=self._pack_payload(val)
+            )
         return Observation(success=False, error="deal_not_found")
 
     async def _update_deal_status(self, params: dict[str, Any]) -> Observation:
@@ -291,7 +336,7 @@ class PersistenceSkill(
                     deal.status = DealStatus(status)
                     if status == "PAID":
                         deal.transaction_hash = params.get("transaction_hash")
-                        deal.block_number = params.get("block_number")
+                        deal.block_number = str(params.get("block_number", ""))
                         deal.from_address = params.get("from_address")
                         deal.paid_at = params.get("paid_at", datetime.now(UTC))
 
@@ -367,4 +412,42 @@ class PersistenceSkill(
                 return response_items
 
         results = await asyncio.to_thread(search)
-        return Observation(success=True, data=results)
+        # For multiple items, packing is harder. Use JSON as a fallback for lists for now?
+        # Or return only the first one if we need pure binary.
+        # Let's use JSON for multiple results to maintain functionality.
+        return Observation(
+            success=True, metadata={"item_data": json.dumps(results)}
+        )
+
+    async def _get_cache_handler(self, params: dict[str, Any]) -> Observation:
+        if not self.redis:
+            return Observation(success=False, error="redis_not_initialized")
+        key = params.get("key")
+        val = await self.redis.get(key)
+        if val:
+            # If it's stored as JSON, we should return it as payload
+            try:
+                data = json.loads(val)
+                if isinstance(data, dict) and "make" in data:
+                    # It's a cached asset
+                    asset = self._map_to_asset({"meta": data, "id": data.get("id", "perceived-vehicle"), "base_price": data.get("base_price", 0.0)})
+                    return Observation(success=True, payload=self._pack_payload(asset))
+            except:
+                pass
+
+            any_val = protobuf.BytesValue(value=val if isinstance(val, bytes) else val.encode())
+            return Observation(success=True, payload=self._pack_payload(any_val))
+        return Observation(success=False, error="cache_miss")
+
+    async def _set_cache_handler(self, params: dict[str, Any]) -> Observation:
+        if not self.redis:
+            return Observation(success=False, error="redis_not_initialized")
+        key = params.get("key")
+        value = params.get("value")
+        expire = params.get("expire", 3600)
+
+        if isinstance(value, (dict, list)):
+            value = json.dumps(value)
+
+        await self.redis.set(key, value, ex=expire)
+        return Observation(success=True)

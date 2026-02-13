@@ -43,3 +43,10 @@ class ServerSettings(BaseModel):
         "nats://nats:4222",
         validation_alias=AliasChoices("AURA_SERVER__NATS_URL", "NATS_URL"),
     )
+
+    event_signing_key: str = Field(
+        "",
+        validation_alias=AliasChoices(
+            "AURA_SERVER__EVENT_SIGNING_KEY", "EVENT_SIGNING_KEY"
+        ),
+    )

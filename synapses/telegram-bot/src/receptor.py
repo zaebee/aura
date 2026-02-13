@@ -1,11 +1,12 @@
 from io import BytesIO
+import json
 
 import structlog
 from aiogram import F, Router
 from aiogram.filters import Command, CommandObject
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
-from aiogram.types import CallbackQuery, Message
+from aiogram.types import CallbackQuery, Message, InlineKeyboardButton, InlineKeyboardMarkup
 from aura_core.gen.aura.negotiation.v1 import NegotiateRequest
 from grpc_adapter import GrpcAdapter
 from nats_adapter import NatsAdapter
@@ -57,8 +58,8 @@ class TelegramReceptor:
     async def cmd_start(self, message: Message) -> None:
         await message.answer(
             "Welcome to Aura! 🤖\n"
-            "I can help you find hotels and negotiate the best prices.\n"
-            "Use /search <destination> to start."
+            "I can help you find items and negotiate the best prices.\n"
+            "Use /search <query> to start."
         )
 
     async def cmd_search(self, message: Message, command: CommandObject) -> None:
@@ -70,7 +71,35 @@ class TelegramReceptor:
         signal = self.translator.to_signal(message, command=command)
 
         # 2. Send Signal to Core via NATS and wait for Observation
-        await self.adapter.execute(signal)
+        observation = await self.adapter.execute(signal)
+
+        if observation.success and observation.event_type == "search_results":
+             results_raw = observation.metadata.get("item_data", "[]")
+             results = json.loads(results_raw)
+             if not results:
+                 await message.answer("No items found matching your query.")
+                 return
+
+             response_text = "🔍 *Search Results:*\n\n"
+             keyboard_buttons = []
+
+             for item in results:
+                 item_id = item.get("id", "unknown")
+                 name = item.get("name", "Unknown Item")
+                 price = item.get("base_price", 0.0)
+
+                 response_text += f"• *{name}*\n  Price: ${price}/day\n  ID: `{item_id}`\n\n"
+                 keyboard_buttons.append([
+                     InlineKeyboardButton(text=f"Select {name}", callback_data=f"select:{item_id}")
+                 ])
+
+             await message.answer(
+                 response_text,
+                 parse_mode="Markdown",
+                 reply_markup=InlineKeyboardMarkup(inline_keyboard=keyboard_buttons)
+             )
+        elif not observation.success:
+             await message.answer(f"Search failed: {observation.error}")
 
     async def process_select_hotel(
         self, callback: CallbackQuery, state: FSMContext
@@ -107,7 +136,7 @@ class TelegramReceptor:
             await message.answer(f"Sorry, something went wrong: {observation.error}")
             return
 
-        if observation.event_type == "deal_accepted":
+        if observation.event_type in ["deal_accepted", "negotiation_accept"]:
             await state.clear()
 
     async def process_pay_stub(self, callback: CallbackQuery) -> None:
@@ -146,12 +175,9 @@ class TelegramReceptor:
         if self.grpc_adapter:
             try:
                 # Wrap Signal in NegotiateRequest
-                req = NegotiateRequest(request_id=signal.signal_id, signal=signal)
+                req = NegotiateRequest(request_id=signal.identifier, signal=signal)
                 response = await self.grpc_adapter.negotiate(req)
 
-                # Manual conversion of NegotiateResponse to UI message for simplicity here
-                # In a full implementation, the effector would handle this,
-                # but gRPC is synchronous-unary here.
                 if response.countered:
                     await message.answer(response.countered.human_message)
                 elif response.accepted:
@@ -170,10 +196,6 @@ class TelegramReceptor:
         if not observation.success:
             await message.answer(f"Perception failed: {observation.error}")
             return
-
-        # If it was successful, the effector will handle the outgoing event if it's sent via NATS,
-        # but since we are using await self.adapter.execute(signal), we get the observation back.
-        # NatsAdapter.execute usually returns the observation from the request-reply pattern.
 
     async def process_list_now(self, callback: CallbackQuery, state: FSMContext) -> None:
         """Handle 'List Now' confirmation from Vision Report Card."""

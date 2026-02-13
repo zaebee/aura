@@ -5,7 +5,7 @@ This module contains the executable machinery that powers the Hive's metabolism.
 The Protocols (the "Law") live in dna.py; this module provides the "Engine".
 """
 
-from typing import Any, cast
+from typing import Any
 
 import opentelemetry.trace as trace
 
@@ -17,7 +17,7 @@ from .dna import (
     SkillProtocol,
     Transformer,
 )
-from .types import Observation
+from .gen.aura.core.v1 import Observation
 
 tracer = trace.get_tracer(__name__)
 
@@ -44,7 +44,25 @@ class SkillRegistry:
             span.set_attribute("intent", intent)
             try:
                 result = await skill.execute(intent, params)
-                obs = cast(Observation, result)
+                # Ensure we return a proto Observation
+                if isinstance(result, Observation):
+                    obs = result
+                else:
+                    # Backward compatibility for skills still returning dataclasses
+                    obs = Observation(
+                        success=getattr(result, "success", False),
+                        error=getattr(result, "error", ""),
+                        event_type=getattr(result, "event_type", ""),
+                    )
+                    # Try to capture data if it exists
+                    data = getattr(result, "data", None)
+                    if data:
+                        import json
+                        try:
+                            obs.metadata["item_data"] = json.dumps(data)
+                        except Exception:
+                            obs.metadata["item_data"] = str(data)
+
                 span.set_attribute("success", obs.success)
                 return obs
             except Exception as e:

@@ -2,6 +2,8 @@ import logging
 from typing import Any
 
 from aura_core import Observation, SkillProtocol
+from aura_core.gen.aura.core.v1 import SystemVitals
+from aura_core.gen.aura.core.v1.google import protobuf
 
 from config.server import ServerSettings
 
@@ -58,10 +60,17 @@ class TelemetrySkill(SkillProtocol[ServerSettings, Any, dict[str, Any], Observat
 
     async def _fetch_metrics(self, params: dict[str, Any]) -> Observation:
         vitals = await fetch_vitals(self._metrics_cache, self.settings)
-        return Observation(success=True, data=vitals.model_dump())
+
+        any_payload = protobuf.Any()
+        any_payload.value = bytes(vitals)
+
+        return Observation(success=True, payload=any_payload)
 
     async def _health_check(self, params: dict[str, Any]) -> Observation:
-        return Observation(success=True, data={"status": "healthy"})
+        val = protobuf.StringValue(value="healthy")
+        any_payload = protobuf.Any()
+        any_payload.value = bytes(val)
+        return Observation(success=True, payload=any_payload)
 
     async def _increment_counter(self, params: dict[str, Any]) -> Observation:
         p = MetricIncrementParams(**params)

@@ -2,7 +2,8 @@ syntax = "proto3";
 
 package aura.negotiation.v1;
 
-import "aura/dna/v1/dna.proto";
+import "aura/core/v1/metabolism.proto";
+import "aura/assets/v1/assets.proto";
 
 // Service for handling negotiations.
 service NegotiationService {
@@ -28,7 +29,7 @@ message NegotiateRequest {
   AgentIdentity agent = 5;
 
   // Wrapped universal Signal (Perception, Audit, etc.)
-  aura.dna.v1.Signal signal = 10;
+  aura.core.v1.Signal signal = 10;
 }
 
 message AgentIdentity {
@@ -125,15 +126,7 @@ message SearchRequest {
 }
 
 message SearchResponse {
-  repeated SearchResultItem results = 1;
-}
-
-message SearchResultItem {
-  string item_id = 1;
-  string name = 2;
-  double base_price = 3;
-  double similarity_score = 4; // Насколько это соответствует запросу
-  string description_snippet = 5; // Для контекста агенту
+  repeated aura.assets.v1.Asset results = 1;
 }
 
 message GetSystemStatusRequest {}

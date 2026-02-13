@@ -15,7 +15,7 @@ from typing import TYPE_CHECKING, Any
 import nats
 import nats.errors
 import structlog
-from aura_core.gen.aura.dna.v1 import Observation as ProtoObservation
+from aura_core.gen.aura.core.v1 import Observation as ProtoObservation
 
 if TYPE_CHECKING:
     from nats.aio.msg import Msg
@@ -86,7 +86,7 @@ class NatsSignalGateway:
             #    The aggregator detects bytes and parses them as a proto Signal.
             observation = await self.metabolism.execute(msg.data, is_nats=True)
 
-            # 2. Convert dataclass Observation to proto Observation
+            # 2. Convert internal Observation to proto Observation
             proto_obs = self._to_proto_observation(observation)
 
             # 3. Reply with serialized proto Observation
@@ -125,18 +125,24 @@ class NatsSignalGateway:
                     )
 
     def _to_proto_observation(self, observation: Any) -> ProtoObservation:
-        """Convert aura_core.types.Observation dataclass to proto Observation."""
+        """Convert internal Observation to proto Observation."""
         metadata: dict[str, str] = {}
         if observation.metadata:
             for key, value in observation.metadata.items():
                 metadata[key] = str(value)
 
-        return ProtoObservation(
+        proto_obs = ProtoObservation(
             success=observation.success,
             error=observation.error or "",
             event_type=observation.event_type or "",
             metadata=metadata,
         )
+
+        # SSA Directive: Propagate binary payload
+        if hasattr(observation, "payload") and observation.payload:
+            proto_obs.payload = observation.payload
+
+        return proto_obs
 
     async def stop(self) -> None:
         """Unsubscribe and close NATS connection."""
