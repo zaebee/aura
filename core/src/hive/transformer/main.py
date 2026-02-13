@@ -1,6 +1,5 @@
-import json
 import time
-from typing import Any, cast
+from typing import Any
 
 import structlog
 from aura_core import (
@@ -14,9 +13,9 @@ from aura_core import (
 from aura_core.gen.aura.assets import v1 as asset_pb2
 from aura_core.gen.aura.core.v1 import (
     ActionType,
-    NegotiationIntent,
-    ContextType,
     AssetIntent,
+    ContextType,
+    NegotiationIntent,
 )
 
 logger = structlog.get_logger(__name__)

@@ -1,13 +1,13 @@
-import structlog
 from typing import Any
 
+import structlog
 from aura_core import Observation, SkillProtocol
 
 from config.policy import SafetySettings
+from hive.metabolism.math import HillDampener
 
 from .engine import OutputGuard, SafetyViolation
 from .schema import SafePriceParams, ValidationParams, VisionValidationParams
-from hive.metabolism.math import HillDampener
 
 logger = structlog.get_logger(__name__)
 

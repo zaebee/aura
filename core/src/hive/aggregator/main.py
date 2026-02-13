@@ -1,4 +1,3 @@
-import json
 from typing import Any, cast
 
 import betterproto
@@ -13,11 +12,11 @@ from aura_core import (
 )
 from aura_core.gen.aura.assets import v1 as asset_pb2
 from aura_core.gen.aura.core.v1 import (
+    AssetContextData,
     ContextType,
     HiveContextData,
     Signal,
     Status,
-    AssetContextData,
 )
 from aura_core.gen.aura.core.v1.google import protobuf
 

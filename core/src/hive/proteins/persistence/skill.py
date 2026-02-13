@@ -432,7 +432,7 @@ class PersistenceSkill(
                     # It's a cached asset
                     asset = self._map_to_asset({"meta": data, "id": data.get("id", "perceived-vehicle"), "base_price": data.get("base_price", 0.0)})
                     return Observation(success=True, payload=self._pack_payload(asset))
-            except:
+            except Exception:
                 pass
 
             any_val = protobuf.BytesValue(value=val if isinstance(val, bytes) else val.encode())

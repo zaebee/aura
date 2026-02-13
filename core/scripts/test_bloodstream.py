@@ -79,7 +79,7 @@ async def test_basic_nats(nats_url: str) -> bool:
     # Wait for message
     try:
         msg = await asyncio.wait_for(msg_queue.get(), timeout=2.0)
-    except asyncio.TimeoutError:
+    except TimeoutError:
         print("  ✗ No message received")
         await nc.close()
         return False

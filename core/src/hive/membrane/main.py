@@ -1,10 +1,9 @@
-import json
 from typing import Any
 
+import betterproto
 import structlog
 from aura_core import HiveContext, IntentAction, Membrane, SkillRegistry
 from aura_core.gen.aura.assets import v1 as asset_pb2
-import betterproto
 
 from config import get_settings
 

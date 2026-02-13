@@ -4,10 +4,12 @@ import uuid
 from concurrent import futures
 from typing import Any, cast
 
+import betterproto
 import grpc
 import grpc.aio
-from aura.negotiation.v1 import negotiation_pb2, negotiation_pb2_grpc
 from aura.assets.v1 import assets_pb2 as standard_asset_pb2
+from aura.negotiation.v1 import negotiation_pb2, negotiation_pb2_grpc
+from aura_core.gen.aura.core.v1 import NegotiationObservation, Vector
 from grpc_health.v1 import health_pb2, health_pb2_grpc
 from hive.cortex import HiveCell
 from hive.metabolism import MetabolicLoop
@@ -19,7 +21,6 @@ from hive.metabolism.logging_config import (
 )
 from nats_gateway import NatsSignalGateway
 from opentelemetry import trace
-from aura_core.gen.aura.core.v1 import Vector, NegotiationObservation, OfferAccepted, OfferCountered, OfferRejected
 
 from config import settings
 

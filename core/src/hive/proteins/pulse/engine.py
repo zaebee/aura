@@ -17,13 +17,13 @@ from aura_core.gen.aura.core.v1 import (
     AuditEvent,
     Event,
     HeartbeatEvent,
-    LogEvent,
     NegotiationEvent,
     Severity,
     Status,
     TraceContext,
     VitalsEvent,
 )
+
 from hive.metabolism.security import AuditSigner
 
 logger = logging.getLogger(__name__)

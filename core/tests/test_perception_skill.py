@@ -1,9 +1,9 @@
 from unittest.mock import AsyncMock, patch
 
 import pytest
+from aura_core.gen.aura.assets import v1 as asset_pb2
 from hive.proteins.perception.engine import PerceptionEngine
 from hive.proteins.perception.skill import PerceptionSkill
-from aura_core.gen.aura.assets import v1 as asset_pb2
 
 from config.perception import PerceptionSettings
 

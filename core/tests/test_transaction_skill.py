@@ -1,6 +1,7 @@
 from unittest.mock import MagicMock, patch
 
 import pytest
+from aura_core.gen.aura.core.v1.google import protobuf
 from hive.proteins.transaction.engine import (
     PriceConverter,
     SecretEncryption,
@@ -9,7 +10,6 @@ from hive.proteins.transaction.engine import (
 from hive.proteins.transaction.skill import TransactionSkill
 from solders.keypair import Keypair
 from solders.pubkey import Pubkey
-from aura_core.gen.aura.core.v1.google import protobuf
 
 from config.crypto import CryptoSettings
 

@@ -3,10 +3,10 @@ from typing import Any
 from aura_core import Observation, SkillProtocol
 
 from config.server import ServerSettings
+from hive.metabolism.security import AuditSigner
 
 from .engine import JetStreamProvider
 from .schema import EventParams, NegotiationEventParams
-from hive.metabolism.security import AuditSigner
 
 
 class PulseSkill(

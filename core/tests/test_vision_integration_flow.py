@@ -1,27 +1,26 @@
-import json
 from typing import TYPE_CHECKING
-from unittest.mock import AsyncMock, MagicMock
+from unittest.mock import AsyncMock
 
 import pytest
 
 if TYPE_CHECKING:
     from pytest_mock import MockerFixture
 from aura_core import SkillRegistry
+from aura_core.gen.aura.assets import v1 as asset_pb2
 from aura_core.gen.aura.core.v1 import (
     AgentIdentity,
+    NegotiationIntent,
+    Observation,
     PerceptionSignal,
     Signal,
     TelegramSignal,
-    Observation,
-    NegotiationIntent,
 )
-from aura_core.gen.aura.assets import v1 as asset_pb2
+from aura_core.gen.aura.core.v1.google import protobuf
 from hive.aggregator.main import HiveAggregator
 from hive.proteins.perception.skill import PerceptionSkill
 from hive.proteins.persistence.skill import PersistenceSkill
 from hive.proteins.reasoning.skill import ReasoningSkill
 from hive.transformer.main import AuraTransformer
-from aura_core.gen.aura.core.v1.google import protobuf
 
 
 @pytest.mark.asyncio

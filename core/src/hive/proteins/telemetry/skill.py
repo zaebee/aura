@@ -2,7 +2,6 @@ import logging
 from typing import Any
 
 from aura_core import Observation, SkillProtocol
-from aura_core.gen.aura.core.v1 import SystemVitals
 from aura_core.gen.aura.core.v1.google import protobuf
 
 from config.server import ServerSettings

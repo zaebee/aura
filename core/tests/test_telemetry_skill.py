@@ -1,7 +1,7 @@
 import pytest
-from hive.proteins.telemetry.skill import TelemetrySkill
 from aura_core.gen.aura.core.v1 import SystemVitals
 from aura_core.gen.aura.core.v1.google import protobuf
+from hive.proteins.telemetry.skill import TelemetrySkill
 
 from config.server import ServerSettings
 

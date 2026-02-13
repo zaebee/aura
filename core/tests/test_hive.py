@@ -1,5 +1,4 @@
 from unittest.mock import AsyncMock, MagicMock
-import json
 
 import pytest
 from aura_core import (
@@ -10,13 +9,13 @@ from aura_core import (
     SkillRegistry,
     SystemVitals,
 )
+from aura_core.gen.aura.assets import v1 as asset_pb2
 from aura_core.gen.aura.core.v1 import (
     ActionType,
+    HiveContextData,
     NegotiationIntent,
     Status,
-    HiveContextData,
 )
-from aura_core.gen.aura.assets import v1 as asset_pb2
 from aura_core.gen.aura.core.v1.google import protobuf
 from hive.aggregator import HiveAggregator
 from hive.membrane import HiveMembrane
@@ -58,7 +57,7 @@ async def test_aggregator_perceive(mocker):
     )
 
     # We need a real Signal or something that looks like it
-    from aura_core.gen.aura.core.v1 import Signal, NegotiationSignal, AgentIdentity
+    from aura_core.gen.aura.core.v1 import AgentIdentity, NegotiationSignal, Signal
     signal = Signal(
         identifier="sig1",
         negotiation=NegotiationSignal(
@@ -79,6 +78,7 @@ async def test_aggregator_perceive(mocker):
 @pytest.mark.asyncio
 async def test_membrane_outbound_override(mocker):
     from hive.proteins.guard.engine import OutputGuard
+
     from config.policy import SafetySettings
 
     registry = SkillRegistry()
@@ -126,7 +126,7 @@ async def test_membrane_outbound_override(mocker):
 async def test_membrane_inbound_sanitization():
     membrane = HiveMembrane()
 
-    from aura_core.gen.aura.core.v1 import Signal, NegotiationSignal, AgentIdentity
+    from aura_core.gen.aura.core.v1 import AgentIdentity, NegotiationSignal, Signal
     signal = Signal(
         negotiation=NegotiationSignal(
             item_identifier="normal_id",
@@ -144,7 +144,7 @@ async def test_membrane_inbound_sanitization():
 async def test_membrane_inbound_invalid_bid():
     membrane = HiveMembrane()
 
-    from aura_core.gen.aura.core.v1 import Signal, NegotiationSignal
+    from aura_core.gen.aura.core.v1 import NegotiationSignal, Signal
     signal = Signal(
         negotiation=NegotiationSignal(
             bid_amount=-10.0
@@ -158,6 +158,7 @@ async def test_membrane_inbound_invalid_bid():
 @pytest.mark.asyncio
 async def test_membrane_invalid_min_margin(mocker):
     from hive.proteins.guard.engine import OutputGuard
+
     from config.policy import SafetySettings
 
     registry = SkillRegistry()

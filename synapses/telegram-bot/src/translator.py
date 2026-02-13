@@ -15,10 +15,10 @@ from aura_core.gen.aura.core.v1 import (
     AgentIdentity,
     Event,
     PerceptionSignal,
+    SearchSignal,
     Signal,
     SignalType,
     TelegramSignal,
-    SearchSignal,
 )
 
 logger = structlog.get_logger(__name__)

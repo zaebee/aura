@@ -12,15 +12,11 @@ from aura_core import (
     SkillRegistry,
 )
 from aura_core.gen.aura.core.v1 import (
-    ActionType,
     NegotiationObservation,
     OfferAccepted,
     OfferCountered,
     OfferRejected,
-    AssetObservation,
-    Status,
 )
-from aura_core.gen.aura.assets import v1 as asset_pb2
 from aura_core.gen.aura.core.v1.google import protobuf
 
 logger = structlog.get_logger(__name__)

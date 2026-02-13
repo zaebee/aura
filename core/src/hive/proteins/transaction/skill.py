@@ -1,13 +1,10 @@
-import json
-from typing import Any, cast
+from typing import Any
 
 import betterproto
 import structlog
 from aura_core import Observation, SkillProtocol
 from aura_core.gen.aura.core.v1 import (
-    Money,
     PaymentProof,
-    TransactionContext,
 )
 from aura_core.gen.aura.core.v1.google import protobuf
 

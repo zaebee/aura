@@ -5,7 +5,7 @@ from datetime import UTC, datetime
 
 import nats
 import structlog
-from aura_core.gen.aura.core.v1 import Event, NegotiationEvent, ActionType
+from aura_core.gen.aura.core.v1 import ActionType, Event, NegotiationEvent
 
 # Configure logging
 structlog.configure(
