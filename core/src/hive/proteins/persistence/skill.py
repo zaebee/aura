@@ -1,6 +1,7 @@
 import asyncio
+from collections.abc import Callable
 from datetime import UTC, datetime
-from typing import Any, Callable, Dict, cast
+from typing import Any, cast
 
 import redis.asyncio as redis
 import structlog
@@ -28,7 +29,7 @@ class PersistenceSkill(
     SkillProtocol[
         DatabaseSettings,
         tuple[sessionmaker, Engine, redis.Redis],
-        Dict[str, Any],
+        dict[str, Any],
         Observation,
     ]
 ):
@@ -59,7 +60,7 @@ class PersistenceSkill(
         }
 
         # Asset Enzymes: Domain-to-method mapping for "Tissue Specificity"
-        self._ASSET_ENZYMES: Dict[
+        self._ASSET_ENZYMES: dict[
             int, Callable[[Asset, InventoryItem], None]
         ] = {
             int(AssetDomain.ASSET_DOMAIN_VEHICLE): self._store_vehicle_attributes,
@@ -123,7 +124,7 @@ class PersistenceSkill(
         """Handle database schema creation after successful connection."""
         await self._init_db({})
 
-    async def execute(self, intent: str, params: Dict[str, Any]) -> Observation:
+    async def execute(self, intent: str, params: dict[str, Any]) -> Observation:
         if not self.provider:
             return Observation(success=False, error="provider_not_initialized")
 
@@ -137,7 +138,7 @@ class PersistenceSkill(
             logger.error(f"Persistence skill error: {e}", exc_info=True)
             return Observation(success=False, error=str(e))
 
-    async def _init_db(self, params: Dict[str, Any]) -> Observation:
+    async def _init_db(self, params: dict[str, Any]) -> Observation:
         if not self.engine:
             return Observation(success=False, error="engine_not_initialized")
         try:
@@ -160,7 +161,7 @@ class PersistenceSkill(
             "domain": str(item.get("meta", {}).get("domain", "unknown")),
         }
 
-    async def _read_item_handler(self, params: Dict[str, Any]) -> Observation:
+    async def _read_item_handler(self, params: dict[str, Any]) -> Observation:
         item_id = params.get("item_id")
         if not item_id:
             return Observation(success=False, error="item_id_required")
@@ -177,7 +178,7 @@ class PersistenceSkill(
             return Observation(success=True, metadata=self._flat_item(result))
         return Observation(success=False, error="item_not_found")
 
-    async def _get_first_item(self, params: Dict[str, Any]) -> Observation:
+    async def _get_first_item(self, params: dict[str, Any]) -> Observation:
         def fetch() -> dict[str, Any] | None:
             with self._get_session() as session:
                 item = session.query(InventoryItem).first()
@@ -190,7 +191,7 @@ class PersistenceSkill(
             return Observation(success=True, metadata=self._flat_item(result))
         return Observation(success=False, error="no_items_found")
 
-    async def _set_excited_state(self, params: Dict[str, Any]) -> Observation:
+    async def _set_excited_state(self, params: dict[str, Any]) -> Observation:
         if not self.cache:
             return Observation(success=False, error="cache_not_initialized")
         try:
@@ -204,7 +205,7 @@ class PersistenceSkill(
         except Exception as e:
             return Observation(success=False, error=str(e))
 
-    async def _confirm_ground_state(self, params: Dict[str, Any]) -> Observation:
+    async def _confirm_ground_state(self, params: dict[str, Any]) -> Observation:
         if not self.cache:
             return Observation(success=False, error="cache_not_initialized")
         try:
@@ -238,7 +239,7 @@ class PersistenceSkill(
         except Exception as e:
             return Observation(success=False, error=str(e))
 
-    async def _create_deal(self, params: Dict[str, Any]) -> Observation:
+    async def _create_deal(self, params: dict[str, Any]) -> Observation:
         try:
 
             def create() -> bool:
@@ -264,7 +265,7 @@ class PersistenceSkill(
         except Exception as e:
             return Observation(success=False, error=str(e))
 
-    async def _get_deal_by_id_handler(self, params: Dict[str, Any]) -> Observation:
+    async def _get_deal_by_id_handler(self, params: dict[str, Any]) -> Observation:
         deal_id = params.get("deal_id")
         if not deal_id:
             return Observation(success=False, error="deal_id_required")
@@ -281,7 +282,7 @@ class PersistenceSkill(
             return Observation(success=True, metadata={k: str(v) for k, v in result.items()})
         return Observation(success=False, error="deal_not_found")
 
-    async def _get_deal_by_memo_handler(self, params: Dict[str, Any]) -> Observation:
+    async def _get_deal_by_memo_handler(self, params: dict[str, Any]) -> Observation:
         memo = params.get("memo")
         if not memo:
             return Observation(success=False, error="memo_required")
@@ -298,7 +299,7 @@ class PersistenceSkill(
             return Observation(success=True, metadata={k: str(v) for k, v in result.items()})
         return Observation(success=False, error="deal_not_found")
 
-    async def _update_deal_status(self, params: Dict[str, Any]) -> Observation:
+    async def _update_deal_status(self, params: dict[str, Any]) -> Observation:
         deal_id = params.get("deal_id")
         status = params.get("status")
 
@@ -326,7 +327,7 @@ class PersistenceSkill(
         except Exception as e:
             return Observation(success=False, error=str(e))
 
-    async def _upsert_item(self, params: Dict[str, Any]) -> Observation:
+    async def _upsert_item(self, params: dict[str, Any]) -> Observation:
         """
         Upsert an item using a native Asset object.
         Transitioning from primitive if/else to enzymatic cascades.
@@ -403,7 +404,7 @@ class PersistenceSkill(
             return
         item.meta["workspace_details"] = asset.workspace.to_dict()
 
-    async def _legacy_upsert_item(self, params: Dict[str, Any]) -> Observation:
+    async def _legacy_upsert_item(self, params: dict[str, Any]) -> Observation:
         item_id = params.get("id")
         try:
 
@@ -434,12 +435,12 @@ class PersistenceSkill(
         except Exception as e:
             return Observation(success=False, error=str(e))
 
-    async def _vector_search(self, params: Dict[str, Any]) -> Observation:
+    async def _vector_search(self, params: dict[str, Any]) -> Observation:
         query_vector = params.get("query_vector")
         limit = params.get("limit", 5)
         min_similarity = params.get("min_similarity")
 
-        def search() -> list[Dict[str, Any]]:
+        def search() -> list[dict[str, Any]]:
             with self._get_session() as session:
                 results = (
                     session.query(

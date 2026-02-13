@@ -1,4 +1,5 @@
-from typing import Any, Callable, Dict, Optional, cast
+from collections.abc import Callable
+from typing import Any, cast
 
 import betterproto
 import structlog
@@ -8,6 +9,7 @@ from aura_core import (
     resolve_brain_path,
 )
 from aura_core.gen.aura.core.v1 import (
+    AssetContextData,
     Context,
     ContextType,
     HiveContextData,
@@ -37,12 +39,13 @@ class HiveAggregator(Aggregator[Any, Context]):
         self.brain_path = resolve_brain_path(compiled_path or "")
 
         # Signal Enzymes: Dispatching based on Signal payload oneof
-        self._SIGNAL_ENZYMES: Dict[
+        self._SIGNAL_ENZYMES: dict[
             str, Callable[[Any, Signal, Context], Any]
         ] = {
             "negotiation": self._perceive_negotiation,
             "perception": self._perceive_perception,
             "telegram": self._perceive_telegram,
+            "asset": self._perceive_asset,
         }
 
     async def get_vitals(self) -> SystemVitals:
@@ -85,7 +88,7 @@ class HiveAggregator(Aggregator[Any, Context]):
         )
 
         # 3. Extract or Parse Signal
-        proto_signal: Optional[Signal] = None
+        proto_signal: Signal | None = None
         if isinstance(signal, bytes):
             try:
                 proto_signal = Signal().parse(signal)
@@ -263,6 +266,17 @@ class HiveAggregator(Aggregator[Any, Context]):
             "callback_data": callback_data,
             "item_name": str(item_data.get("name", "")),
         })
+        return context
+
+    async def _perceive_asset(self, payload: Any, signal: Signal, context: Context) -> Context:
+        """Enzyme for Generic Asset signals."""
+        context.context_type = cast(ContextType, ContextType.CONTEXT_TYPE_ASSET)
+        context.asset = AssetContextData(
+            asset_identifier=payload.asset_identifier,
+            asset_domain=payload.asset_domain,
+        )
+        context.metadata["source"] = "asset"
+        context.metadata["subtype"] = str(payload.signal_subtype)
         return context
 
     async def _enrich_context_from_persistence(self, context: Context) -> None:

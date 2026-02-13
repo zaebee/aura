@@ -113,7 +113,6 @@ async def fetch_vitals(metrics_cache: MetricsCache, settings: Any) -> SystemVita
             mem, mem_ok = process_resp(resps[1], "mem", errs)
 
             if not (cpu_ok or mem_ok):
-                e_msg = f"Metric fetch failed: {', '.join(errs)}"
                 cached_dict = metrics_cache.get(ignore_ttl=True)
                 if cached_dict:
                     return SystemVitals(

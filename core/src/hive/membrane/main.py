@@ -22,8 +22,8 @@ class HiveMembrane(Membrane[Any, Intent, Context]):
         self.registry = registry
 
     async def inspect_inbound(self, signal: Any) -> Any:
-        if hasattr(signal, "bid_amount") and getattr(signal, "bid_amount") <= 0:
-            logger.warning("membrane_inbound_invalid_bid", bid_amount=getattr(signal, "bid_amount"))
+        if hasattr(signal, "bid_amount") and signal.bid_amount <= 0:
+            logger.warning("membrane_inbound_invalid_bid", bid_amount=signal.bid_amount)
             raise ValueError("Bid amount must be positive")
 
         injection_patterns = [

@@ -12,7 +12,6 @@ from aura_core import (
 from aura_core.gen.aura.core.v1 import (
     ActionType,
     Context,
-    ContextType,
     Intent,
     NegotiationIntent,
 )
@@ -130,10 +129,8 @@ class AuraTransformer(Transformer[Context, Intent]):
         ):
             vision_confidence_threshold = self.settings.perception.confidence_threshold
 
-        bid = 0.0
         reputation = 1.0
         if context.hive and context.hive.offer:
-            bid = context.hive.offer.bid_amount
             reputation = context.hive.offer.reputation
 
         return {

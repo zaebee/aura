@@ -9,7 +9,7 @@ from aura_core.gen.aura.core.v1 import Observation
 from config.llm import LLMSettings
 
 from .engine import generate_embedding, load_brain
-from .schema import EmbeddingParams, NegotiationParams, NegotiationResult
+from .schema import EmbeddingParams, NegotiationParams
 
 logger = logging.getLogger(__name__)
 
