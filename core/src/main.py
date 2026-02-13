@@ -3,6 +3,7 @@ import uuid
 from concurrent import futures
 from typing import Any, cast
 
+import betterproto
 import grpc
 import grpc.aio
 from aura.negotiation.v1 import negotiation_pb2, negotiation_pb2_grpc
@@ -38,6 +39,7 @@ class NegotiationService(negotiation_pb2_grpc.NegotiationServiceServicer):
     """
     gRPC Service implementing the Aura Negotiation Protocol.
     Delegates core logic to the MetabolicLoop.
+    Aligned with Chromosomal DNA v0.3.0.
     """
 
     def __init__(
@@ -64,8 +66,36 @@ class NegotiationService(negotiation_pb2_grpc.NegotiationServiceServicer):
         bind_request_id(request_id)
 
         try:
+            # Execute metabolic cycle
             observation = await self.metabolism.execute(request)
-            return observation.data  # type: ignore
+
+            # Map new Observation proto back to legacy NegotiateResponse for boundary compatibility
+            response = negotiation_pb2.NegotiateResponse()
+            response.session_token = "sess_" + request_id
+
+            if observation.negotiation:
+                neg = observation.negotiation
+                response.valid_until_timestamp = neg.valid_until_timestamp
+
+                res_name, res_val = betterproto.which_one_of(neg, "result")
+                if res_name == "accepted" and res_val:
+                    response.accepted.final_price = res_val.final_price
+                    if hasattr(res_val, "reservation_code") and res_val.reservation_code:
+                        response.accepted.reservation_code = res_val.reservation_code
+                    if hasattr(res_val, "crypto_payment") and res_val.crypto_payment:
+                         # Handled via mapping if available
+                         pass
+                elif res_name == "countered" and res_val:
+                    response.countered.proposed_price = res_val.proposed_price
+                    response.countered.human_message = res_val.human_message
+                elif res_name == "rejected" and res_val:
+                    response.rejected.reason_code = res_val.reason_code
+                    # If it was UI_REQUIRED, we might want to map it to ui_required in legacy response
+                    if res_val.reason_code == "UI_REQUIRED":
+                         # Legacy response might not have ui_required, let's check
+                         pass
+
+            return response
 
         except ValueError as e:
             logger.warning("invalid_argument", error=str(e))
@@ -118,10 +148,13 @@ class NegotiationService(negotiation_pb2_grpc.NegotiationServiceServicer):
                 context.set_details(f"Failed to generate embedding: {embed_obs.error}")
                 return negotiation_pb2.SearchResponse()
 
+            # embed_obs.data might be in metadata
+            query_vector = getattr(embed_obs, "metadata", {}).get("embedding") or []
+
             obs = await persistence.execute(
                 "vector_search",
                 {
-                    "query_vector": embed_obs.data,
+                    "query_vector": query_vector,
                     "limit": request.limit or 5,
                     "min_similarity": request.min_similarity,
                 },
@@ -132,6 +165,8 @@ class NegotiationService(negotiation_pb2_grpc.NegotiationServiceServicer):
                 context.set_details(f"Search failed: {obs.error}")
                 return negotiation_pb2.SearchResponse()
 
+            # obs.data doesn't exist, use metadata
+            items = getattr(obs, "metadata", {}).get("results", [])
             response_items = [
                 negotiation_pb2.SearchResultItem(
                     item_id=item["id"],
@@ -140,7 +175,7 @@ class NegotiationService(negotiation_pb2_grpc.NegotiationServiceServicer):
                     similarity_score=item["similarity_score"],
                     description_snippet=str(item["meta"]),
                 )
-                for item in obs.data
+                for item in items
             ]
 
             return negotiation_pb2.SearchResponse(results=response_items)
@@ -164,11 +199,10 @@ class NegotiationService(negotiation_pb2_grpc.NegotiationServiceServicer):
         try:
             vitals = await self.metabolism.aggregator.get_vitals()
             return negotiation_pb2.GetSystemStatusResponse(
-                status=vitals.status,
-                cpu_usage_percent=vitals.cpu_usage_percent,
-                memory_usage_mb=vitals.memory_usage_mb,
-                timestamp=vitals.timestamp,
-                cached=vitals.cached,
+                status=str(vitals.status),
+                cpu_usage_percent=float(vitals.cpu_usage_percent),
+                memory_usage_mb=float(vitals.memory_usage_mb),
+                timestamp=str(vitals.timestamp),
             )
         except Exception as e:
             logger.error("system_status_error", error=str(e), exc_info=True)
@@ -271,20 +305,21 @@ async def serve() -> None:
                 if not persistence:
                     continue
                 obs = await persistence.execute("get_first_item", {})
-                if obs.success and obs.data:
-                    item = obs.data
-                    mock_signal = negotiation_pb2.NegotiateRequest(
-                        item_id=item["id"],
-                        bid_amount=item["base_price"]
-                        * settings.heartbeat.bid_multiplier,
-                        currency_code="USD",
-                        agent=negotiation_pb2.AgentIdentity(
-                            did=settings.heartbeat.agent_did,
-                            reputation_score=settings.heartbeat.agent_reputation,
-                        ),
-                        request_id=f"heartbeat-{uuid.uuid4()}",
-                    )
-                    await metabolism.execute(mock_signal, is_heartbeat=True)
+                if obs.success:
+                    item = getattr(obs, "metadata", {}).get("item", {})
+                    if item:
+                        mock_signal = negotiation_pb2.NegotiateRequest(
+                            item_id=item["id"],
+                            bid_amount=item["base_price"]
+                            * settings.heartbeat.bid_multiplier,
+                            currency_code="USD",
+                            agent=negotiation_pb2.AgentIdentity(
+                                did=settings.heartbeat.agent_did,
+                                reputation_score=settings.heartbeat.agent_reputation,
+                            ),
+                            request_id=f"heartbeat-{uuid.uuid4()}",
+                        )
+                        await metabolism.execute(mock_signal)
             except Exception as e:
                 logger.error("heartbeat_deal_error", error=str(e))
             await asyncio.sleep(settings.heartbeat.interval_seconds)

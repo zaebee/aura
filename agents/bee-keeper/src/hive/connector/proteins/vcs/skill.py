@@ -1,7 +1,8 @@
 from typing import Any
 
 import httpx
-from aura_core import Observation, SkillProtocol
+from aura_core import SkillProtocol
+from aura_core.gen.aura.core.v1 import Observation
 
 from .engine import GitHubProvider
 from .schema import CommentParams, ReplyParams

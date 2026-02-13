@@ -1,6 +1,7 @@
 from typing import Any
 
-from aura_core import Observation, SkillProtocol
+from aura_core import SkillProtocol
+from aura_core.gen.aura.core.v1 import Observation
 
 from config.server import ServerSettings
 

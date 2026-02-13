@@ -10,12 +10,18 @@ from datetime import UTC, datetime
 import structlog
 
 from config import KeeperSettings
-from aura_core import Aggregator, BeeContext, find_hive_root, SystemVitals
+from aura_core import Aggregator, find_hive_root
+from aura_core.gen.aura.core.v1 import (
+    Context,
+    ContextType,
+    BeeContextData,
+    SystemVitals,
+)
 
 logger = structlog.get_logger(__name__)
 
 
-class BeeAggregator(Aggregator[Any, BeeContext]):
+class BeeAggregator(Aggregator[Any, Context]):
     """A - Aggregator: Gathers signals from Git, Prometheus, and Filesystem."""
 
     async def get_vitals(self) -> SystemVitals:
@@ -32,7 +38,7 @@ class BeeAggregator(Aggregator[Any, BeeContext]):
         self.event_path = settings.github_event_path
         self.brain_status: dict[str, bool] = {}
 
-    async def perceive(self, signal: Any, **kwargs: Any) -> BeeContext:
+    async def perceive(self, signal: Any, **kwargs: Any) -> Context:
         event_name = kwargs.get("event_name", "manual")
         logger.info("bee_aggregator_perceive_started", trigger_event=event_name)
 
@@ -41,15 +47,22 @@ class BeeAggregator(Aggregator[Any, BeeContext]):
         filesystem_map = self._scan_filesystem()
         event_data = self._load_event_data()
 
-        return BeeContext(
-            git_diff=git_diff,
-            hive_metrics=hive_metrics,
-            filesystem_map=filesystem_map,
-            repo_name=self.repo_name,
-            event_name=event_name,
-            event_data=event_data,
-            metadata={"brain_status": self.brain_status},
+        context = Context(
+            identifier=self.repo_name,
+            context_type=ContextType.CONTEXT_TYPE_BEE,
+            bee=BeeContextData(
+                repo_name=self.repo_name,
+                git_diff=git_diff,
+                filesystem_map=filesystem_map,
+            ),
+            metadata={
+                "event_name": event_name,
+                "brain_status": json.dumps(self.brain_status),
+                "hive_metrics": json.dumps(hive_metrics),
+                "event_data": json.dumps(event_data),
+            },
         )
+        return context
 
     async def _get_git_diff(self) -> str:
         try:

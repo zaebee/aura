@@ -1,7 +1,8 @@
 import logging
 from typing import Any
 
-from aura_core import Observation, SkillProtocol
+from aura_core import SkillProtocol
+from aura_core.gen.aura.core.v1 import Observation
 
 from config.policy import SafetySettings
 
@@ -65,7 +66,7 @@ class GuardSkill(
             return Observation(
                 success=False,
                 error=err_msg,
-                data={"error_code": code, "safe_price": safe_p},
+                metadata={"error_code": code, "safe_price": str(safe_p)},
             )
         except Exception as e:
             logger.error(f"Guard skill error: {e}")
@@ -81,7 +82,7 @@ class GuardSkill(
         assert self.provider is not None
         p_safe = SafePriceParams(**params)
         price = self.provider.calculate_safe_price(p_safe.context, p_safe.reason)
-        return Observation(success=True, data={"safe_price": price})
+        return Observation(success=True, metadata={"safe_price": str(price)})
 
     async def _validate_vision(self, params: dict[str, Any]) -> Observation:
         assert self.provider is not None

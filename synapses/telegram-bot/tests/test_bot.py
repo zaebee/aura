@@ -2,7 +2,7 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 from aiogram.filters import CommandObject
-from aura_core.gen.aura.dna.v1 import Observation as ProtoObservation
+from aura_core.gen.aura.core.v1 import Observation as ProtoObservation
 from receptor import NegotiationStates, TelegramReceptor
 from translator import TelegramTranslator
 

@@ -2,7 +2,7 @@ syntax = "proto3";
 
 package aura.negotiation.v1;
 
-import "aura/dna/v1/dna.proto";
+import "aura/core/v1/metabolism.proto";
 
 // Service for handling negotiations.
 service NegotiationService {
@@ -28,7 +28,7 @@ message NegotiateRequest {
   AgentIdentity agent = 5;
 
   // Wrapped universal Signal (Perception, Audit, etc.)
-  aura.dna.v1.Signal signal = 10;
+  aura.core.v1.Signal signal = 10;
 }
 
 message AgentIdentity {

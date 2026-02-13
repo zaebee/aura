@@ -5,15 +5,17 @@ from aura_core import (
     Aggregator,
     Connector,
     Generator,
-    HiveContext,
-    IntentAction,
     Membrane,
-    Observation,
     SkillRegistry,
     Transformer,
 )
 from aura_core import (
     MetabolicLoop as BaseMetabolicLoop,
+)
+from aura_core.gen.aura.core.v1 import (
+    Context,
+    Intent,
+    Observation,
 )
 from opentelemetry import trace
 
@@ -22,26 +24,26 @@ tracer = trace.get_tracer(__name__)
 
 
 class MetabolicLoop(
-    BaseMetabolicLoop[Any, HiveContext, IntentAction, Observation, Any]
+    BaseMetabolicLoop[Any, Context, Intent, Observation, Any]
 ):
     """
     Orchestrates the ATCG flow with core-specific monitoring via Telemetry Protein.
-    Purified: No manual vitals injection in the loop; Nucleotides are Pure Pipes.
+    Pure Pipe: Signal -> A -> T -> M -> C -> G.
     """
 
     def __init__(
         self,
-        aggregator: Aggregator[Any, HiveContext],
-        transformer: Transformer[HiveContext, IntentAction],
-        connector: Connector[IntentAction, Observation, HiveContext],
+        aggregator: Aggregator[Any, Context],
+        transformer: Transformer[Context, Intent],
+        connector: Connector[Intent, Observation, Context],
         generator: Generator[Observation, Any],
-        membrane: Membrane[Any, IntentAction, HiveContext],
+        membrane: Membrane[Any, Intent, Context],
         registry: SkillRegistry | None = None,
     ):
         super().__init__(aggregator, transformer, connector, generator, membrane)
         self.registry = registry
 
-    async def execute(self, signal: Any, **kwargs: Any) -> Any:
+    async def execute(self, signal: Any, **kwargs: Any) -> Observation:
         """
         Execute one full metabolic cycle.
         Pure implementation: Signal -> A -> T -> C -> G (with Membrane guards).

@@ -1,23 +1,28 @@
 import time
 import uuid
-from typing import Any
+from typing import Any, cast
 
 import structlog
-from aura.negotiation.v1 import negotiation_pb2
 from aura_core import (
     BaseConnector,
-    HiveContext,
-    IntentAction,
-    Observation,
     SkillRegistry,
 )
-from aura_core.gen.aura.dna.v1 import ActionType
+from aura_core.gen.aura.core.v1 import (
+    ActionType,
+    Context,
+    Intent,
+    NegotiationObservation,
+    Observation,
+    OfferAccepted,
+    OfferCountered,
+    OfferRejected,
+)
 
 logger = structlog.get_logger(__name__)
 
 
 class HiveConnector(BaseConnector):
-    """C - Connector: Maps internal IntentAction to gRPC responses and external systems."""
+    """C - Connector: Maps internal Intent to Observations."""
 
     def __init__(
         self, registry: SkillRegistry, market_service: Any = None, settings: Any = None
@@ -27,111 +32,119 @@ class HiveConnector(BaseConnector):
         self.settings = settings
 
     async def _handle_legacy(
-        self, action: IntentAction, context: HiveContext
+        self, action: Intent, context: Context
     ) -> Observation:
         """
-        Handle legacy IntentActions that do not have steps.
-        This executes the decision and produces an observation (the gRPC response).
+        Handle Intents that do not have steps.
+        This executes the decision and produces an observation.
         """
         logger.debug("connector_act_started", action=action.action)
 
-        # 1. Map IntentAction to Protobuf NegotiateResponse
-        response = negotiation_pb2.NegotiateResponse()
-        response.session_token = "sess_" + (context.request_id or str(uuid.uuid4()))
-        response.valid_until_timestamp = int(time.time() + 600)
+        neg_obs = NegotiationObservation(
+            item_identifier=context.hive.item_identifier if context.hive else context.identifier,
+            valid_until_timestamp=int(time.time() + 600),
+        )
 
-        # Handle both string and ActionType enum
-        action_val = action.action
-        if isinstance(action_val, ActionType):
-            raw_name = ActionType(action_val).name
-            action_name = (
-                raw_name.lower().replace("action_type_", "")
-                if raw_name
-                else "unspecified"
+        action_type = action.action
+        event_type = "negotiation_unknown"
+
+        if action_type == ActionType.ACTION_TYPE_ACCEPT:
+            event_type = "negotiation_accept"
+            reservation_code = f"HIVE-{uuid.uuid4()}"
+            price = action.negotiation.price if action.negotiation else 0.0
+            neg_obs.accepted = OfferAccepted(
+                final_price=price,
+                reservation_code=reservation_code,
             )
+
+            if self.settings and hasattr(self.settings, "crypto") and self.settings.crypto.enabled and self.market_service:
+                await self._handle_crypto_lock(neg_obs, action, context)
+
+        elif action_type == ActionType.ACTION_TYPE_COUNTER:
+            event_type = "negotiation_counter"
+            price = action.negotiation.price if action.negotiation else 0.0
+            message = action.negotiation.message if action.negotiation else ""
+            neg_obs.countered = OfferCountered(
+                proposed_price=price,
+                human_message=message,
+                reason_code="NEGOTIATION_ONGOING",
+            )
+
+        elif action_type == ActionType.ACTION_TYPE_REJECT:
+            event_type = "negotiation_reject"
+            neg_obs.rejected = OfferRejected(
+                reason_code="OFFER_TOO_LOW",
+            )
+
+        elif action_type == ActionType.ACTION_TYPE_EVALUATE: # UI Required
+            event_type = "negotiation_ui_required"
+            neg_obs.rejected = OfferRejected(
+                reason_code="UI_REQUIRED",
+            )
+
         else:
-            action_name = str(action_val).lower() if action_val else "unknown"
-
-        if action_name == "accept":
-            response.accepted.final_price = action.price
-            response.accepted.reservation_code = f"HIVE-{uuid.uuid4()}"
-
-            if self.settings and self.settings.crypto.enabled and self.market_service:
-                await self._handle_crypto_lock(response, action, context)
-
-        elif action_name == "counter":
-            response.countered.proposed_price = action.price
-            response.countered.human_message = action.message
-            response.countered.reason_code = "NEGOTIATION_ONGOING"
-
-        elif action_name == "reject":
-            response.rejected.reason_code = "OFFER_TOO_LOW"
-
-        elif action_name == "ui_required":
-            response.rejected.reason_code = "UI_REQUIRED"
-
-        else:
-            logger.error("unknown_action_type", action=action_name)
-            response.rejected.reason_code = "INTERNAL_ERROR"
+            logger.error("unknown_action_type", action=action_type)
+            neg_obs.rejected = OfferRejected(reason_code="INTERNAL_ERROR")
 
         return Observation(
             success=True,
-            data=response,
-            event_type=f"negotiation_{action_name}",
+            negotiation=neg_obs,
+            event_type=event_type,
+            trace=context.trace,
             metadata={
-                "decision": action,
-                "item_id": context.item_id,
-                "agent_did": context.offer.agent_did,
-                "payment_uri": context.metadata.get("payment_uri", ""),
+                "item_id": str(context.hive.item_identifier if context.hive else context.identifier),
+                "agent_did": str(context.hive.offer.agent_did if context.hive and context.hive.offer else "unknown"),
+                "payment_uri": str(neg_obs.payment_uri or ""),
             },
         )
 
     async def _handle_crypto_lock(
         self,
-        response: negotiation_pb2.NegotiateResponse,
-        action: IntentAction,
-        context: HiveContext,
+        neg_obs: NegotiationObservation,
+        action: Intent,
+        context: Context,
     ) -> None:
         """Encrypts the reservation code and creates a locked deal via Skills/MarketService."""
         try:
-            item_name = context.item_data.get("name", "Aura Item")
+            item_id = context.hive.item_identifier if context.hive else context.identifier
+            item_name = context.metadata.get("item_name", "Aura Item")
+            price = action.negotiation.price if action.negotiation else 0.0
+            agent_did = context.hive.offer.agent_did if context.hive and context.hive.offer else "unknown"
 
             # Use Transaction Skill for price conversion
             obs = await self.registry.execute(
                 "transaction",
                 "convert_price",
-                {"usd_amount": action.price, "currency": self.settings.crypto.currency},
+                {"usd_amount": price, "currency": self.settings.crypto.currency},
             )
 
             if not obs.success:
                 raise ValueError(f"Price conversion failed: {obs.error}")
 
-            crypto_amount = obs.data
+            crypto_amount = obs.metadata.get("amount", 0.0)
 
-            # MarketService still orchestrates complex multi-protein operations
-            # but it is passed to the connector.
+            # MarketService creates the offer
             payment_instructions, payment_uri = await self.market_service.create_offer(
-                item_id=context.item_id,
+                item_id=item_id,
                 item_name=item_name,
-                secret=response.accepted.reservation_code,
+                secret=neg_obs.accepted.reservation_code,
                 price=crypto_amount,
                 currency=self.settings.crypto.currency,
-                buyer_did=context.offer.agent_did,
+                buyer_did=agent_did,
                 ttl_seconds=self.settings.crypto.deal_ttl_seconds,
             )
 
-            response.accepted.ClearField("reservation_code")
-            response.accepted.crypto_payment.CopyFrom(payment_instructions)
-
-            # Store payment_uri in context metadata for the Generator to pick up
-            context.metadata["payment_uri"] = payment_uri
+            neg_obs.accepted.reservation_code = "" # Clear plain secret
+            # Assuming payment_instructions has payment_memo
+            neg_obs.accepted.crypto_payment = cast(Any, payment_instructions)
+            neg_obs.payment_uri = payment_uri
 
             logger.info(
                 "crypto_offer_created",
-                deal_id=payment_instructions.deal_id,
+                deal_id=getattr(payment_instructions, "deal_id", "unknown"),
                 amount=crypto_amount,
                 currency=self.settings.crypto.currency,
             )
 
-        except ValueError as e:
+        except Exception as e:
             logger.warning("crypto_lock_failed", error=str(e), exc_info=True)

@@ -6,7 +6,7 @@ import uuid
 from collections import deque
 from datetime import UTC, datetime
 
-from aura_core.gen.aura.dna.v1 import Event, LogEvent
+from aura_core.gen.aura.core.v1 import Event, LogEvent
 from nats.aio.client import Client as NATS
 
 
@@ -14,6 +14,7 @@ class HiveLogHandler(logging.Handler):
     """
     Log Protein: Streams worker logs into the NATS bloodstream.
     Uses an internal asyncio.Queue to ensure logging never blocks LLM inference.
+    Aligned with Chromosomal DNA v0.3.0.
     """
 
     def __init__(
@@ -63,8 +64,9 @@ class HiveLogHandler(logging.Handler):
                 metadata["thought_state"] = "started"
 
         # Create binary Event
+        # Aligned: event_id -> identifier
         event: Event = Event(
-            event_id=str(uuid.uuid4()),
+            identifier=str(uuid.uuid4()),
             topic=f"aura.worker.{self.worker_name}.logs",
             timestamp=datetime.fromtimestamp(record.created, tz=UTC),
             log=LogEvent(
@@ -118,7 +120,7 @@ class HiveLogHandler(logging.Handler):
             return False
 
         event: Event = Event(
-            event_id=str(uuid.uuid4()),
+            identifier=str(uuid.uuid4()),
             topic=f"aura.worker.{self.worker_name}.test",
             timestamp=datetime.now(tz=UTC),
             log=LogEvent(

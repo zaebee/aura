@@ -1,14 +1,20 @@
-from typing import Any
+from typing import Any, cast
 
 import structlog
-from aura_core import FailureIntent, HiveContext, IntentAction, Membrane, SkillRegistry
+from aura_core import Membrane, SkillRegistry
+from aura_core.gen.aura.core.v1 import (
+    ActionType,
+    Context,
+    Intent,
+    NegotiationIntent,
+)
 
 from config import get_settings
 
 logger = structlog.get_logger(__name__)
 
 
-class HiveMembrane(Membrane[Any, IntentAction, HiveContext]):
+class HiveMembrane(Membrane[Any, Intent, Context]):
     """The Immune System: Deterministic Guardrails using Guard Protein."""
 
     def __init__(self, registry: SkillRegistry | None = None) -> None:
@@ -16,8 +22,8 @@ class HiveMembrane(Membrane[Any, IntentAction, HiveContext]):
         self.registry = registry
 
     async def inspect_inbound(self, signal: Any) -> Any:
-        if hasattr(signal, "bid_amount") and signal.bid_amount <= 0:
-            logger.warning("membrane_inbound_invalid_bid", bid_amount=signal.bid_amount)
+        if hasattr(signal, "bid_amount") and getattr(signal, "bid_amount") <= 0:
+            logger.warning("membrane_inbound_invalid_bid", bid_amount=getattr(signal, "bid_amount"))
             raise ValueError("Bid amount must be positive")
 
         injection_patterns = [
@@ -26,8 +32,11 @@ class HiveMembrane(Membrane[Any, IntentAction, HiveContext]):
             "you are now",
         ]
         fields_to_scan = []
-        if hasattr(signal, "item_id"):
-            fields_to_scan.append(("item_id", signal.item_id))
+        if hasattr(signal, "item_identifier"):
+             fields_to_scan.append(("item_identifier", signal.item_identifier))
+        elif hasattr(signal, "item_id"):
+             fields_to_scan.append(("item_id", signal.item_id))
+
         if hasattr(signal, "agent") and hasattr(signal.agent, "did"):
             fields_to_scan.append(("agent.did", signal.agent.did))
 
@@ -41,19 +50,22 @@ class HiveMembrane(Membrane[Any, IntentAction, HiveContext]):
                             field=field_name,
                             pattern=pattern,
                         )
-                        if field_name == "item_id":
-                            signal.item_id = "INVALID_ID_POTENTIAL_INJECTION"
+                        if field_name in ["item_id", "item_identifier"]:
+                            if hasattr(signal, "item_identifier"):
+                                signal.item_identifier = "INVALID_ID_POTENTIAL_INJECTION"
+                            elif hasattr(signal, "item_id"):
+                                signal.item_id = "INVALID_ID_POTENTIAL_INJECTION"
                         elif field_name == "agent.did":
                             signal.agent.did = "REDACTED"
         return signal
 
     async def inspect_outbound(
-        self, decision: IntentAction, context: HiveContext
-    ) -> IntentAction:
-        floor_price = context.item_data.get("floor_price", 0.0)
+        self, decision: Intent, context: Context
+    ) -> Intent:
+        floor_price = float(context.metadata.get("floor_price", "0.0"))
 
         # 1. Handle explicit failures
-        if isinstance(decision, FailureIntent) or decision.action == "error":
+        if decision.action == ActionType.ACTION_TYPE_ERROR:
             safe_price = floor_price * 1.05
             if self.registry:
                 obs_safe = await self.registry.execute(
@@ -65,64 +77,78 @@ class HiveMembrane(Membrane[Any, IntentAction, HiveContext]):
                     },
                 )
                 if obs_safe.success:
-                    safe_price = obs_safe.data["safe_price"]
+                    safe_price = getattr(obs_safe, "metadata", {}).get("safe_price", safe_price)
 
             return self._override_with_safe_offer(
                 decision, safe_price, "FAILURE_RECOVERY"
             )
 
         # 2. DLP Check
-        if "floor_price" in decision.message.lower():
-            decision.message = "I cannot disclose internal pricing details."
-            decision.thought += " [MEMBRANE: DLP block]"
+        message = decision.negotiation.message if decision.negotiation else ""
+        if "floor_price" in message.lower():
+            if decision.negotiation:
+                decision.negotiation.message = "I cannot disclose internal pricing details."
+            decision.reasoning += " [MEMBRANE: DLP block]"
 
-        if decision.action not in ["accept", "counter"]:
+        if decision.action not in [ActionType.ACTION_TYPE_ACCEPT, ActionType.ACTION_TYPE_COUNTER]:
             return decision
 
         # 3. Call Guard Protein for validation
         if not self.registry:
             return decision
 
-        internal_cost = context.item_data.get("meta", {}).get(
-            "internal_cost", floor_price
-        )
+        internal_cost = float(context.metadata.get("internal_cost", str(floor_price)))
         guard_context = {"floor_price": floor_price, "internal_cost": internal_cost}
+
+        price = decision.negotiation.price if decision.negotiation else 0.0
+        # Map ActionType to strings expected by OutputGuard
+        action_map = {
+            ActionType.ACTION_TYPE_ACCEPT: "accept",
+            ActionType.ACTION_TYPE_COUNTER: "counter",
+        }
+        action_name = action_map.get(decision.action, str(decision.action.name).lower())
 
         obs = await self.registry.execute(
             "guard",
             "validate_decision",
             {
-                "decision": {"action": decision.action, "price": decision.price},
+                "decision": {"action": action_name, "price": price},
                 "context": guard_context,
             },
         )
 
         if not obs.success:
             # Determine reason for logging/override using structured error code
-            reason = obs.data.get("error_code", "SAFETY_VIOLATION")
+            reason = "SAFETY_VIOLATION"
+            safe_price = floor_price * 1.05
+            meta = getattr(obs, "metadata", {})
+            if isinstance(meta, dict):
+                 reason = str(meta.get("error_code", "SAFETY_VIOLATION"))
+                 safe_price = float(meta.get("safe_price", safe_price))
 
-            # Use safe price provided by the Guard Protein
-            safe_price = obs.data.get("safe_price", floor_price * 1.05)
             return self._override_with_safe_offer(decision, safe_price, reason)
 
         return decision
 
     def _override_with_safe_offer(
-        self, original: IntentAction, safe_price: float, reason: str
-    ) -> IntentAction:
+        self, original: Intent, safe_price: float, reason: str
+    ) -> Intent:
         rounded_price = round(safe_price, 2)
-        new_thought = f"Membrane Override: {reason}. LLM suggested {original.action} at {getattr(original, 'price', 0.0)}."
-        if original.thought:
-            new_thought = f"{original.thought} | {new_thought}"
+        orig_price = original.negotiation.price if original.negotiation else 0.0
+        new_thought = f"Membrane Override: {reason}. LLM suggested {original.action.name} at {orig_price}."
+        if original.reasoning:
+            new_thought = f"{original.reasoning} | {new_thought}"
 
-        return IntentAction(
-            action="counter",
-            price=rounded_price,
-            message=f"I've reached my final limit for this item. My best offer is ${rounded_price:.2f}.",
-            thought=new_thought,
+        return Intent(
+            action=cast(ActionType, ActionType.ACTION_TYPE_COUNTER),
+            reasoning=new_thought,
             metadata={
-                "original_decision": original.action,
-                "original_price": getattr(original, "price", 0.0),
-                "override_reason": reason,
+                "original_decision": str(original.action.name),
+                "original_price": str(orig_price),
+                "override_reason": str(reason),
             },
+            negotiation=NegotiationIntent(
+                price=rounded_price,
+                message=f"I've reached my final limit for this item. My best offer is ${rounded_price:.2f}.",
+            )
         )

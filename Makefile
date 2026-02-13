@@ -76,12 +76,16 @@ $(PROTO_SENTINEL): $(PROTO_SOURCES) buf.gen.yaml
 	mkdir -p packages/aura-core/src/aura_core/gen
 	buf generate
 	# Fix betterproto google import shim if needed
-	if [ -d "packages/aura-core/src/aura_core/gen/aura/dna" ]; then \
-		mkdir -p packages/aura-core/src/aura_core/gen/aura/dna/google; \
-		echo "from betterproto.lib.google import protobuf" > packages/aura-core/src/aura_core/gen/aura/dna/google/__init__.py; \
+	if [ -d "packages/aura-core/src/aura_core/gen/aura/core" ]; then \
+		mkdir -p packages/aura-core/src/aura_core/gen/aura/core/google; \
+		echo "from betterproto.lib.google import protobuf" > packages/aura-core/src/aura_core/gen/aura/core/google/__init__.py; \
+	fi
+	if [ -d "packages/aura-core/src/aura_core/gen/aura/assets" ]; then \
+		mkdir -p packages/aura-core/src/aura_core/gen/aura/assets/google; \
+		echo "from betterproto.lib.google import protobuf" > packages/aura-core/src/aura_core/gen/aura/assets/google/__init__.py; \
 	fi
 	if [ -f "packages/aura-core/src/aura_core/gen/aura/negotiation/v1.py" ]; then \
-		sed -i 's/from .aura.dna import v1/from aura_core.gen.aura.dna import v1/' packages/aura-core/src/aura_core/gen/aura/negotiation/v1.py; \
+		sed -i 's/from .aura.core import v1/from aura_core.gen.aura.core import v1/' packages/aura-core/src/aura_core/gen/aura/negotiation/v1.py; \
 	fi
 	touch $(PROTO_SENTINEL)
 

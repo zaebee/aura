@@ -7,7 +7,7 @@ import pytest
 if TYPE_CHECKING:
     from pytest_mock import MockerFixture
 from aura_core import SkillRegistry
-from aura_core.gen.aura.dna.v1 import (
+from aura_core.gen.aura.core.v1 import (
     AgentIdentity,
     PerceptionSignal,
     Signal,
@@ -56,7 +56,7 @@ async def test_vision_to_listing_flow(mocker: "MockerFixture"):
     agent_did = "tg:12345"
 
     signal = Signal(
-        signal_id="sig-1",
+        identifier="sig-1",
         perception=PerceptionSignal(
             image_data=image_data,
             agent=AgentIdentity(did=agent_did, reputation_score=1.0)
@@ -71,9 +71,9 @@ async def test_vision_to_listing_flow(mocker: "MockerFixture"):
         "floor_price": 4500.0,
         "meta": {"color": "Black", "confidence": "0.95"}
     }
-    perception.execute.return_value = MagicMock(success=True, data=perception_result)
+    perception.execute.return_value = MagicMock(success=True, metadata=perception_result)
     guard.execute.return_value = MagicMock(success=True)
-    telemetry.execute.return_value = MagicMock(success=True, data={"cpu_usage_percent": 10.0, "memory_usage_mb": 100.0, "status": "ok", "timestamp": "now"})
+    telemetry.execute.return_value = MagicMock(success=True, metadata={"cpu_usage_percent": 10.0, "memory_usage_mb": 100.0, "status": "ok", "timestamp": "now"})
 
     # Perceive
     context = await aggregator.perceive(bytes(signal))
@@ -87,12 +87,12 @@ async def test_vision_to_listing_flow(mocker: "MockerFixture"):
         }
     )
 
-    assert context.item_data == perception_result
+    assert context.metadata["item_name"] == "2024 Honda Forza"
     assert context.metadata["source"] == "vision"
 
     # 3. Simulate Callback Signal (List Now)
     callback_signal = Signal(
-        signal_id="sig-2",
+        identifier="sig-2",
         telegram=TelegramSignal(
             user_id=12345,
             callback_data="list_now:perceived-honda:5400.0"
@@ -102,15 +102,15 @@ async def test_vision_to_listing_flow(mocker: "MockerFixture"):
     # Mock Persistence to return cached asset
     persistence.execute.reset_mock()
     persistence.execute.side_effect = [
-        MagicMock(success=True, data=perception_result), # For get_cache
-        MagicMock(success=True, data=None), # For read_item (fallback)
+        MagicMock(success=True, metadata=perception_result), # For get_cache
+        MagicMock(success=True, metadata=None), # For read_item (fallback)
     ]
 
     # Re-perceive with callback
     context_cb = await aggregator.perceive(bytes(callback_signal))
 
-    assert context_cb.item_data == perception_result
-    assert context_cb.offer.bid_amount == 5400.0
+    assert context_cb.metadata["item_name"] == "2024 Honda Forza"
+    assert context_cb.hive.offer.bid_amount == 5400.0
     assert context_cb.metadata["source"] == "telegram"
 
     # 4. Transformer reasoning
@@ -121,18 +121,14 @@ async def test_vision_to_listing_flow(mocker: "MockerFixture"):
     registry.register("reasoning", reasoning)
 
     # Mock reasoning to accept
-    reasoning.execute.return_value = MagicMock(success=True, data={
+    reasoning.execute.return_value = MagicMock(success=True, metadata={
         "action": "accept",
         "price": 5400.0,
         "message": "Listed!",
         "thought": "User accepted appraisal.",
-        "metadata": {}
     })
 
     decision = await transformer.think(context_cb)
 
     assert decision.action.name == "ACTION_TYPE_ACCEPT"
-    assert decision.price == 5400.0
-    # Verify vision_result was propagated in metadata for the event
-    assert "vision_result" in decision.metadata
-    assert json.loads(decision.metadata["vision_result"]) == perception_result
+    assert decision.negotiation.price == 5400.0

@@ -1,10 +1,12 @@
 import asyncio
 from datetime import UTC, datetime
-from typing import Any, cast
+from typing import Any, Callable, Dict, cast
 
 import redis.asyncio as redis
 import structlog
-from aura_core import Observation, SkillProtocol
+from aura_core import SkillProtocol
+from aura_core.gen.aura.assets.v1 import Asset, AssetDomain
+from aura_core.gen.aura.core.v1 import Observation
 from sqlalchemy import Engine, text
 from sqlalchemy.orm import Session, sessionmaker
 
@@ -26,13 +28,13 @@ class PersistenceSkill(
     SkillProtocol[
         DatabaseSettings,
         tuple[sessionmaker, Engine, redis.Redis],
-        dict[str, Any],
+        Dict[str, Any],
         Observation,
     ]
 ):
     """
     Persistence Protein: Handles all database operations.
-    Standardized following the Trinity Structure.
+    Transitioning to Enzymatic Dispatcher for domain-specific asset storage.
     """
 
     def __init__(self) -> None:
@@ -54,6 +56,16 @@ class PersistenceSkill(
             "list_items_semantic_search": self._vector_search,
             "get_first_item": self._get_first_item,
             "upsert_item": self._upsert_item,
+        }
+
+        # Asset Enzymes: Domain-to-method mapping for "Tissue Specificity"
+        self._ASSET_ENZYMES: Dict[
+            int, Callable[[Asset, InventoryItem], None]
+        ] = {
+            int(AssetDomain.ASSET_DOMAIN_VEHICLE): self._store_vehicle_attributes,
+            int(AssetDomain.ASSET_DOMAIN_PROPERTY): self._store_property_attributes,
+            int(AssetDomain.ASSET_DOMAIN_EQUIPMENT): self._store_equipment_attributes,
+            int(AssetDomain.ASSET_DOMAIN_WORKSPACE): self._store_workspace_attributes,
         }
 
     def get_name(self) -> str:
@@ -111,7 +123,7 @@ class PersistenceSkill(
         """Handle database schema creation after successful connection."""
         await self._init_db({})
 
-    async def execute(self, intent: str, params: dict[str, Any]) -> Observation:
+    async def execute(self, intent: str, params: Dict[str, Any]) -> Observation:
         if not self.provider:
             return Observation(success=False, error="provider_not_initialized")
 
@@ -122,10 +134,10 @@ class PersistenceSkill(
         try:
             return await handler(params)
         except Exception as e:
-            logger.error(f"Persistence skill error: {e}")
+            logger.error(f"Persistence skill error: {e}", exc_info=True)
             return Observation(success=False, error=str(e))
 
-    async def _init_db(self, params: dict[str, Any]) -> Observation:
+    async def _init_db(self, params: Dict[str, Any]) -> Observation:
         if not self.engine:
             return Observation(success=False, error="engine_not_initialized")
         try:
@@ -138,7 +150,17 @@ class PersistenceSkill(
         except Exception as e:
             return Observation(success=False, error=str(e))
 
-    async def _read_item_handler(self, params: dict[str, Any]) -> Observation:
+    def _flat_item(self, item: dict[str, Any]) -> dict[str, str]:
+        """Convert item dict to flat string-only metadata."""
+        return {
+            "item_id": str(item.get("id", "")),
+            "item_name": str(item.get("name", "")),
+            "base_price": str(item.get("base_price", "0.0")),
+            "floor_price": str(item.get("floor_price", "0.0")),
+            "domain": str(item.get("meta", {}).get("domain", "unknown")),
+        }
+
+    async def _read_item_handler(self, params: Dict[str, Any]) -> Observation:
         item_id = params.get("item_id")
         if not item_id:
             return Observation(success=False, error="item_id_required")
@@ -152,10 +174,10 @@ class PersistenceSkill(
 
         result = await asyncio.to_thread(fetch)
         if result:
-            return Observation(success=True, data=result)
+            return Observation(success=True, metadata=self._flat_item(result))
         return Observation(success=False, error="item_not_found")
 
-    async def _get_first_item(self, params: dict[str, Any]) -> Observation:
+    async def _get_first_item(self, params: Dict[str, Any]) -> Observation:
         def fetch() -> dict[str, Any] | None:
             with self._get_session() as session:
                 item = session.query(InventoryItem).first()
@@ -165,10 +187,10 @@ class PersistenceSkill(
 
         result = await asyncio.to_thread(fetch)
         if result:
-            return Observation(success=True, data=result)
+            return Observation(success=True, metadata=self._flat_item(result))
         return Observation(success=False, error="no_items_found")
 
-    async def _set_excited_state(self, params: dict[str, Any]) -> Observation:
+    async def _set_excited_state(self, params: Dict[str, Any]) -> Observation:
         if not self.cache:
             return Observation(success=False, error="cache_not_initialized")
         try:
@@ -182,7 +204,7 @@ class PersistenceSkill(
         except Exception as e:
             return Observation(success=False, error=str(e))
 
-    async def _confirm_ground_state(self, params: dict[str, Any]) -> Observation:
+    async def _confirm_ground_state(self, params: Dict[str, Any]) -> Observation:
         if not self.cache:
             return Observation(success=False, error="cache_not_initialized")
         try:
@@ -216,7 +238,7 @@ class PersistenceSkill(
         except Exception as e:
             return Observation(success=False, error=str(e))
 
-    async def _create_deal(self, params: dict[str, Any]) -> Observation:
+    async def _create_deal(self, params: Dict[str, Any]) -> Observation:
         try:
 
             def create() -> bool:
@@ -242,7 +264,7 @@ class PersistenceSkill(
         except Exception as e:
             return Observation(success=False, error=str(e))
 
-    async def _get_deal_by_id_handler(self, params: dict[str, Any]) -> Observation:
+    async def _get_deal_by_id_handler(self, params: Dict[str, Any]) -> Observation:
         deal_id = params.get("deal_id")
         if not deal_id:
             return Observation(success=False, error="deal_id_required")
@@ -256,10 +278,10 @@ class PersistenceSkill(
 
         result = await asyncio.to_thread(fetch)
         if result:
-            return Observation(success=True, data=result)
+            return Observation(success=True, metadata={k: str(v) for k, v in result.items()})
         return Observation(success=False, error="deal_not_found")
 
-    async def _get_deal_by_memo_handler(self, params: dict[str, Any]) -> Observation:
+    async def _get_deal_by_memo_handler(self, params: Dict[str, Any]) -> Observation:
         memo = params.get("memo")
         if not memo:
             return Observation(success=False, error="memo_required")
@@ -273,10 +295,10 @@ class PersistenceSkill(
 
         result = await asyncio.to_thread(fetch)
         if result:
-            return Observation(success=True, data=result)
+            return Observation(success=True, metadata={k: str(v) for k, v in result.items()})
         return Observation(success=False, error="deal_not_found")
 
-    async def _update_deal_status(self, params: dict[str, Any]) -> Observation:
+    async def _update_deal_status(self, params: Dict[str, Any]) -> Observation:
         deal_id = params.get("deal_id")
         status = params.get("status")
 
@@ -304,7 +326,84 @@ class PersistenceSkill(
         except Exception as e:
             return Observation(success=False, error=str(e))
 
-    async def _upsert_item(self, params: dict[str, Any]) -> Observation:
+    async def _upsert_item(self, params: Dict[str, Any]) -> Observation:
+        """
+        Upsert an item using a native Asset object.
+        Transitioning from primitive if/else to enzymatic cascades.
+        """
+        asset = params.get("asset")
+        if not asset or not isinstance(asset, Asset):
+            # Backward compatibility for legacy dictionary-based upsert
+            return await self._legacy_upsert_item(params)
+
+        try:
+
+            def upsert() -> bool:
+                with self._get_session() as session:
+                    item = session.query(InventoryItem).filter_by(id=asset.identifier).first()
+                    if not item:
+                        item = InventoryItem(id=asset.identifier)
+                        session.add(item)
+
+                    item.name = asset.name
+                    if asset.rental_terms:
+                        item.base_price = float(asset.rental_terms.base_price)
+                        # Assume floor price is 80% if not specified elsewhere
+                        item.floor_price = float(asset.rental_terms.base_price) * 0.8
+
+                    # Store common attributes in meta
+                    item.meta["description"] = asset.description
+                    item.meta["domain"] = asset.domain.name
+
+                    # Enzymatic Cascade: Apply domain-specific attributes
+                    domain_val = int(asset.domain)
+                    if domain_val in self._ASSET_ENZYMES:
+                        enzyme = self._ASSET_ENZYMES[domain_val]
+                        enzyme(asset, item)
+
+                    session.commit()
+                    return True
+
+            await asyncio.to_thread(upsert)
+            return Observation(success=True)
+        except Exception as e:
+            return Observation(success=False, error=str(e))
+
+    def _store_vehicle_attributes(self, asset: Asset, item: InventoryItem) -> None:
+        """Enzyme: Specialized storage for Vehicle tissue."""
+        # Use hasattr for oneof fields or check field directly if supported by betterproto
+        if not asset.vehicle:
+            return
+
+        vehicle_data = {
+            "brand": str(getattr(asset.vehicle, "brand", "")),
+            "model": str(getattr(asset.vehicle, "model", "")),
+            "year": int(getattr(asset.vehicle, "year", 0)),
+            "vin": str(getattr(asset.vehicle, "vin", "")),
+            "color": str(getattr(asset.vehicle, "color", "")),
+            "license_plate": str(getattr(asset.vehicle, "license_plate", "")),
+        }
+        item.meta["vehicle_details"] = vehicle_data
+
+    def _store_property_attributes(self, asset: Asset, item: InventoryItem) -> None:
+        """Enzyme: Specialized storage for Property tissue."""
+        if not asset.property:
+            return
+        item.meta["property_details"] = asset.property.to_dict()
+
+    def _store_equipment_attributes(self, asset: Asset, item: InventoryItem) -> None:
+        """Enzyme: Specialized storage for Equipment tissue."""
+        if not asset.equipment:
+            return
+        item.meta["equipment_details"] = asset.equipment.to_dict()
+
+    def _store_workspace_attributes(self, asset: Asset, item: InventoryItem) -> None:
+        """Enzyme: Specialized storage for Workspace tissue."""
+        if not asset.workspace:
+            return
+        item.meta["workspace_details"] = asset.workspace.to_dict()
+
+    async def _legacy_upsert_item(self, params: Dict[str, Any]) -> Observation:
         item_id = params.get("id")
         try:
 
@@ -335,12 +434,12 @@ class PersistenceSkill(
         except Exception as e:
             return Observation(success=False, error=str(e))
 
-    async def _vector_search(self, params: dict[str, Any]) -> Observation:
+    async def _vector_search(self, params: Dict[str, Any]) -> Observation:
         query_vector = params.get("query_vector")
         limit = params.get("limit", 5)
         min_similarity = params.get("min_similarity")
 
-        def search() -> list[dict[str, Any]]:
+        def search() -> list[Dict[str, Any]]:
             with self._get_session() as session:
                 results = (
                     session.query(
@@ -367,4 +466,5 @@ class PersistenceSkill(
                 return response_items
 
         results = await asyncio.to_thread(search)
-        return Observation(success=True, data=results)
+        import json
+        return Observation(success=True, metadata={"results_json": json.dumps(results)})

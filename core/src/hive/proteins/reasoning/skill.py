@@ -3,7 +3,8 @@ import logging
 from typing import Any
 
 import dspy
-from aura_core import Observation, SkillProtocol
+from aura_core import SkillProtocol
+from aura_core.gen.aura.core.v1 import Observation
 
 from config.llm import LLMSettings
 
@@ -90,13 +91,17 @@ class ReasoningSkill(
 
         result = await asyncio.to_thread(call)
         data = {
-            "action": result["action"]["action"],
-            "price": result["action"]["price"],
-            "message": result["action"]["message"],
-            "thought": result.get("thought", ""),
-            "metadata": result.get("metadata", {}),
+            "action": str(result["action"]["action"]),
+            "price": str(result["action"]["price"]),
+            "message": str(result["action"]["message"]),
+            "thought": str(result.get("thought", "")),
         }
-        return Observation(success=True, data=NegotiationResult(**data).model_dump())
+        # Include extra metadata as strings
+        if "metadata" in result:
+             for k, v in result["metadata"].items():
+                  data[k] = str(v)
+
+        return Observation(success=True, metadata=data)
 
     async def _generate_embedding(self, params: dict[str, Any]) -> Observation:
         if not self._embed_model:
@@ -104,4 +109,5 @@ class ReasoningSkill(
         p_emb = EmbeddingParams(**params)
 
         emb = await asyncio.to_thread(generate_embedding, p_emb.text, self._embed_model)
-        return Observation(success=True, data=emb)
+        # Store embedding in metadata or a specialized field if we had one
+        return Observation(success=True, metadata={"embedding": str(emb)})

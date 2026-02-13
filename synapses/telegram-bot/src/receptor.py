@@ -146,7 +146,7 @@ class TelegramReceptor:
         if self.grpc_adapter:
             try:
                 # Wrap Signal in NegotiateRequest
-                req = NegotiateRequest(request_id=signal.signal_id, signal=signal)
+                req = NegotiateRequest(request_id=signal.identifier, signal=signal)
                 response = await self.grpc_adapter.negotiate(req)
 
                 # Manual conversion of NegotiateResponse to UI message for simplicity here

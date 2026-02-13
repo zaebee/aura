@@ -10,10 +10,8 @@ from aiogram.types import (
     InlineKeyboardMarkup,
     Message,
 )
-from aura_core.gen.aura.dna.v1 import (
-    ActionType,
+from aura_core.gen.aura.core.v1 import (
     AgentIdentity,
-    Event,
     PerceptionSignal,
     Signal,
     SignalType,
@@ -53,7 +51,7 @@ class TelegramTranslator:
 
             if command and command.command == "search":
                 return Signal(
-                    signal_id=signal_id,
+                    identifier=signal_id,
                     signal_type=cast(SignalType, SignalType.SIGNAL_TYPE_TELEGRAM),
                     timestamp=datetime.now(UTC),
                     telegram=TelegramSignal(
@@ -66,14 +64,14 @@ class TelegramTranslator:
                         "user_id": str(user_id),
                         "source": "telegram",
                         "intent": "search",
-                        "query": command.args or "",
+                        "query": str(command.args or ""),
                     },
                 )
 
             # Handle photo message (Perception)
             if kwargs.get("image_bytes"):
                 return Signal(
-                    signal_id=signal_id,
+                    identifier=signal_id,
                     signal_type=cast(SignalType, SignalType.SIGNAL_TYPE_PERCEPTION),
                     timestamp=datetime.now(UTC),
                     perception=PerceptionSignal(
@@ -94,7 +92,7 @@ class TelegramTranslator:
 
             # Standard message or bid - Use TelegramSignal for Signal Integrity
             return Signal(
-                signal_id=signal_id,
+                identifier=signal_id,
                 signal_type=cast(SignalType, SignalType.SIGNAL_TYPE_TELEGRAM),
                 timestamp=datetime.now(UTC),
                 telegram=TelegramSignal(
@@ -115,7 +113,7 @@ class TelegramTranslator:
             chat_id = event.message.chat.id if event.message else 0
 
             return Signal(
-                signal_id=signal_id,
+                identifier=signal_id,
                 signal_type=cast(SignalType, SignalType.SIGNAL_TYPE_TELEGRAM),
                 timestamp=datetime.now(UTC),
                 telegram=TelegramSignal(
@@ -131,58 +129,47 @@ class TelegramTranslator:
             )
 
         return Signal(
-            signal_id=signal_id,
+            identifier=signal_id,
             signal_type=cast(SignalType, SignalType.SIGNAL_TYPE_UNSPECIFIED),
             timestamp=datetime.now(UTC),
         )
 
-    def from_event(self, event: Event) -> tuple[int, str, Any | None]:
+    def from_event(self, event: Any) -> tuple[int, str, Any | None]:
         """
         Convert internal NATS event to (chat_id, user-friendly markdown, optional keyboard).
-        Returns (0, "", None) if the event is not relevant to this synapse.
         """
-        chat_id = int(event.metadata.get("chat_id", "0"))
-        # TODO: Relying on session_token being a digit to fall back and find
-        # the chat_id is fragile. This creates a tight, implicit coupling
-        # between how sessions are created and how events are processed.
-        # A more robust solution would be to ensure that any event destined
-        # for a Telegram user explicitly includes the chat_id in its metadata.
-        # This makes the contract clear and avoids potential issues
-        # if the session token format changes.
-        if not chat_id:
-            # Try to extract from session_token if we used chat_id as session_token
-            session_id = ""
-            if event.negotiation:
-                session_id = event.negotiation.session_token
+        metadata = getattr(event, "metadata", {})
+        chat_id = int(metadata.get("chat_id", "0"))
 
-            if session_id and session_id.isdigit():
-                chat_id = int(session_id)
-            else:
-                return 0, "", None
+        if not chat_id:
+             return 0, "", None
 
         message = ""
         keyboard = None
-        if event.negotiation:
-            neg = event.negotiation
-            action = neg.action
-            price = neg.price
-            item_id = neg.item_id
 
-            if action == ActionType.ACTION_TYPE_ACCEPT:
+        # Observation has negotiation field
+        if hasattr(event, "negotiation") and event.negotiation:
+            neg = event.negotiation
+            item_id = neg.item_identifier
+
+            # Determine action from event_type
+            event_type = str(getattr(event, "event_type", ""))
+
+            if event_type == "negotiation_accept":
+                price = neg.accepted.final_price if neg.accepted else 0.0
                 message = f"✅ *Deal Accepted!*\nItem: `{item_id}`\nFinal Price: `${price:.2f}`"
-            elif action == ActionType.ACTION_TYPE_COUNTER:
+            elif event_type == "negotiation_counter":
+                price = neg.countered.proposed_price if neg.countered else 0.0
                 message = f"🔄 *Counter-offer Received*\nItem: `{item_id}`\nProposed Price: `${price:.2f}`\n\nWhat is your response?"
-            elif action == ActionType.ACTION_TYPE_REJECT:
+            elif event_type == "negotiation_reject":
                 message = f"❌ *Offer Rejected*\nItem: `{item_id}`\nThe agent was not interested in your bid."
-            elif action == ActionType.ACTION_TYPE_ERROR:
-                message = f"⚠️ *Negotiation Error*\nItem: `{item_id}`\nSomething went wrong during the process."
-            elif action == ActionType.ACTION_TYPE_UI_REQUIRED:
+            elif event_type == "negotiation_ui_required":
                 # Handle Vision Report Card
-                vision_data_raw = event.metadata.get("vision_result")
+                price = 0.0
+                vision_data_raw = metadata.get("vision_result")
                 if vision_data_raw:
                     try:
                         v = json.loads(vision_data_raw)
-                        # Sanitize LLM-generated strings to prevent Markdown/Injection attacks
                         name = sanitize_markdown(v.get("name", "Unknown Asset"))
                         color = sanitize_markdown(v.get("meta", {}).get("color", "Unknown"))
                         confidence = v.get("meta", {}).get("confidence", "0.0")
@@ -195,11 +182,7 @@ class TelegramTranslator:
                             f"*Proposed Rent Price:* `${price:.2f}/day`\n\n"
                             f"Is this correct? Would you like to list it now?"
                         )
-
-                        # Sanitize item_id to prevent hijacking the callback_data delimiter
                         safe_item_id = sanitize_callback(item_id)
-
-                        # Add Buttons
                         keyboard = InlineKeyboardMarkup(inline_keyboard=[
                             [
                                 InlineKeyboardButton(
@@ -213,9 +196,6 @@ class TelegramTranslator:
                             ]
                         ])
                     except Exception as e:
-                        logger.error(
-                            "vision_report_card_parsing_error", error=str(e), exc_info=True
-                        )
                         message = f"⚠️ *Vision Processing Error*\nCould not parse report: {e}"
                 else:
                     message = f"👤 *Human Required*\nAgent needs manual intervention for Item `{item_id}`."

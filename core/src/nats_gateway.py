@@ -15,7 +15,7 @@ from typing import TYPE_CHECKING, Any
 import nats
 import nats.errors
 import structlog
-from aura_core.gen.aura.dna.v1 import Observation as ProtoObservation
+from aura_core.gen.aura.core.v1 import Observation
 
 if TYPE_CHECKING:
     from nats.aio.msg import Msg
@@ -86,12 +86,9 @@ class NatsSignalGateway:
             #    The aggregator detects bytes and parses them as a proto Signal.
             observation = await self.metabolism.execute(msg.data, is_nats=True)
 
-            # 2. Convert dataclass Observation to proto Observation
-            proto_obs = self._to_proto_observation(observation)
-
-            # 3. Reply with serialized proto Observation
+            # 2. Reply with serialized proto Observation
             if msg.reply:
-                await msg.respond(bytes(proto_obs))
+                await msg.respond(bytes(observation))
                 logger.debug(
                     "gateway_replied",
                     success=observation.success,
@@ -112,7 +109,7 @@ class NatsSignalGateway:
             )
             # Try to reply with error observation so the synapse doesn't hang
             if msg.reply:
-                error_obs = ProtoObservation(
+                error_obs = Observation(
                     success=False,
                     error=f"Signal processing failed: {e}",
                 )
@@ -123,20 +120,6 @@ class NatsSignalGateway:
                         "failed_to_send_error_reply",
                         error=str(reply_err),
                     )
-
-    def _to_proto_observation(self, observation: Any) -> ProtoObservation:
-        """Convert aura_core.types.Observation dataclass to proto Observation."""
-        metadata: dict[str, str] = {}
-        if observation.metadata:
-            for key, value in observation.metadata.items():
-                metadata[key] = str(value)
-
-        return ProtoObservation(
-            success=observation.success,
-            error=observation.error or "",
-            event_type=observation.event_type or "",
-            metadata=metadata,
-        )
 
     async def stop(self) -> None:
         """Unsubscribe and close NATS connection."""
