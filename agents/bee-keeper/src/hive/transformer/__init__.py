@@ -11,16 +11,18 @@ from aura_core import (
     ALLOWED_CHAMBERS,
     ALLOWED_ROOT_FILES,
     MACRO_ATCG_FOLDERS,
-    AuditObservation,
-    BeeContext,
     Transformer,
     find_hive_root,
+)
+from aura_core.gen.aura.core.v1 import (
+    AuditObservation,
+    Context,
 )
 
 logger = structlog.get_logger(__name__)
 
 
-class BeeTransformer(Transformer[BeeContext, AuditObservation]):
+class BeeTransformer(Transformer[Context, AuditObservation]):
     """T - Transformer: Analyzes purity and generates audit observations."""
 
     def __init__(self, settings: KeeperSettings) -> None:
@@ -44,49 +46,50 @@ class BeeTransformer(Transformer[BeeContext, AuditObservation]):
         else:
             self.manifest = {}
 
-    async def think(self, context: BeeContext, **kwargs: Any) -> AuditObservation:
+    async def think(self, context: Context, **kwargs: Any) -> AuditObservation:
         return await self.reflect(context)
 
-    async def reflect(self, context: BeeContext) -> AuditObservation:
+    async def reflect(self, context: Context) -> AuditObservation:
         logger.info("bee_transformer_reflect_started")
 
         # 1. Structural Check (Deterministic)
         structural_findings = self._deterministic_audit(context)
 
+        git_diff = context.bee.git_diff
         # 2. LLM Audit (Reflective)
-        if len(context.git_diff) > 4000:
+        if len(git_diff) > 4000:
             logger.info("large_diff_detected_summarizing_first")
-            summary = await self._summarize_diff(context.git_diff)
-            context.git_diff = f"SUMMARY OF CHANGES:\n{summary}"
+            summary = await self._summarize_diff(git_diff)
+            git_diff = f"SUMMARY OF CHANGES:\n{summary}"
 
-        purity_analysis = await self._llm_audit(context)
+        purity_analysis = await self._llm_audit(context, git_diff)
 
         # ATCG Purity: Transformer returns a single AuditObservation.
-        # Reasoning and metadata contain the raw insights.
         is_pure = len(structural_findings) == 0 and purity_analysis.get("is_pure", True)
+
+        metadata = {
+            "structural_heresies": json.dumps(structural_findings),
+            "reflective_heresies": json.dumps(purity_analysis.get("heresies", [])),
+            "llm_unavailable": str(purity_analysis.get("llm_unavailable", False)),
+        }
 
         return AuditObservation(
             is_pure=is_pure,
             heresies=structural_findings,
-            narrative=purity_analysis.get("narrative", "The Hive remains silent."),
-            reasoning=purity_analysis.get("reasoning", ""),
-            token_usage=purity_analysis.get("token_usage", 0),
-            execution_time=0.0,  # Could track this if needed
-            metadata={
-                "llm_analysis": purity_analysis,
-                "structural_heresies": structural_findings,
-                "reflective_heresies": purity_analysis.get("heresies", []),
-                "llm_unavailable": purity_analysis.get("llm_unavailable", False),
-            },
+            narrative=str(purity_analysis.get("narrative", "The Hive remains silent.")),
+            reasoning=str(purity_analysis.get("reasoning", "")),
+            token_usage=int(purity_analysis.get("token_usage", 0)),
+            execution_time=0.0,
+            metadata=metadata,
         )
 
-    def _deterministic_audit(self, context: BeeContext) -> list[str]:
+    def _deterministic_audit(self, context: Context) -> list[str]:
         heresies = []
         core_path = self.manifest.get("hive", {}).get("core_path", "core/src/hive")
         allowed_files = self.manifest.get("hive", {}).get("allowed_files", [])
 
         # 1. Macro-ATCG (Root) Check
-        for item in context.filesystem_map:
+        for item in context.bee.filesystem_map:
             p = Path(item)
             # Only check top-level items
             if p.parent == Path("."):
@@ -109,7 +112,7 @@ class BeeTransformer(Transformer[BeeContext, AuditObservation]):
                     )
 
         # 2. Structural Check (Core and Allowed Chambers)
-        for file_path in context.filesystem_map:
+        for file_path in context.bee.filesystem_map:
             p = Path(file_path)
 
             # Check core Hive nucleotides
@@ -139,17 +142,16 @@ class BeeTransformer(Transformer[BeeContext, AuditObservation]):
                 )
 
         # 3. Metric Verification
-        metrics = context.hive_metrics
+        metrics = context.bee.hive_metrics
         success_rate = metrics.get("negotiation_success_rate", 1.0)
-        status = metrics.get("status", "ok")
 
-        if status != "UNKNOWN" and success_rate < 0.7:
+        if success_rate < 0.7:
             heresies.append(
                 f"Hive Alert: 'negotiation_success_rate' is {success_rate:.2f}, which is below the critical threshold of 0.7. The Hive flow is obstructed."
             )
 
         # 4. Pattern Enforcement (No raw print or os.getenv in diff)
-        diff_lines = context.git_diff.splitlines()
+        diff_lines = context.bee.git_diff.splitlines()
         current_file = ""
         for line in diff_lines:
             if line.startswith("+++ b/"):
@@ -205,7 +207,7 @@ class BeeTransformer(Transformer[BeeContext, AuditObservation]):
 
         return heresies
 
-    async def _llm_audit(self, context: BeeContext) -> dict[str, Any]:
+    async def _llm_audit(self, context: Context, git_diff: str) -> dict[str, Any]:
         prompt = f"""
         {self.persona}
 
@@ -214,13 +216,13 @@ class BeeTransformer(Transformer[BeeContext, AuditObservation]):
 
         ### Current Hive Signals
         **Git Diff:**
-        {context.git_diff}
+        {git_diff}
 
         **Filesystem Map:**
-        {context.filesystem_map}
+        {context.bee.filesystem_map}
 
         **Hive Metrics:**
-        {context.hive_metrics}
+        {context.bee.hive_metrics}
 
         ### Task
         Analyze the changes for any violations of the ATCG (Aggregator, Transformer, Connector, Generator) pattern or architectural impurities.

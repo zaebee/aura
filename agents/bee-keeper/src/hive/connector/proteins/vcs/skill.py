@@ -62,7 +62,7 @@ class VCS_Skill(SkillProtocol[Any, httpx.AsyncClient, dict[str, Any], Observatio
             commit_sha=p.commit_sha,
             body=p.body,
         )
-        return Observation(success=bool(url), data={"url": url})
+        return Observation(success=bool(url), metadata={"url": str(url)})
 
     async def _reply_to_comment(self, params: dict[str, Any]) -> Observation:
         assert self.provider is not None
@@ -73,4 +73,4 @@ class VCS_Skill(SkillProtocol[Any, httpx.AsyncClient, dict[str, Any], Observatio
             comment_id=p.comment_id,
             body=p.body,
         )
-        return Observation(success=bool(url), data={"url": url})
+        return Observation(success=bool(url), metadata={"url": str(url)})

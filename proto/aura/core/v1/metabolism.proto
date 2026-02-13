@@ -304,6 +304,7 @@ message AuditObservation {
   string reasoning = 4;
   double execution_time = 5;
   int32 token_usage = 6;
+  map<string, string> metadata = 10;
 }
 
 message TelegramObservation {

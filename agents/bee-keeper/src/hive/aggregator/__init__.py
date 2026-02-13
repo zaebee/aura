@@ -1,7 +1,7 @@
 import json
 import os
 import subprocess  # nosec
-from typing import Any
+from typing import Any, cast
 
 import httpx
 import litellm
@@ -28,7 +28,7 @@ class BeeAggregator(Aggregator[Any, Context]):
         """Proprioception for the BeeKeeper."""
         return SystemVitals(
             status="ok",
-            timestamp=datetime.now(UTC).isoformat(),
+            timestamp=datetime.now(UTC),
         )
 
     def __init__(self, settings: KeeperSettings) -> None:
@@ -49,14 +49,14 @@ class BeeAggregator(Aggregator[Any, Context]):
 
         context = Context(
             identifier=self.repo_name,
-            context_type=ContextType.CONTEXT_TYPE_BEE,
+            context_type=cast(ContextType, ContextType.CONTEXT_TYPE_BEE),
             bee=BeeContextData(
                 repo_name=self.repo_name,
                 git_diff=git_diff,
                 filesystem_map=filesystem_map,
             ),
             metadata={
-                "event_name": event_name,
+                "event_name": str(event_name),
                 "brain_status": json.dumps(self.brain_status),
                 "hive_metrics": json.dumps(hive_metrics),
                 "event_data": json.dumps(event_data),

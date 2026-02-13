@@ -1,24 +1,26 @@
 import re
 from datetime import datetime
+from typing import Any
 
 import litellm
 import structlog
+import json
 
 from config import KeeperSettings
 from aura_core import (
     ALLOWED_CHAMBERS,
-    AuditObservation,
-    BeeContext,
-    BeeObservation,
-    Event,
-    Generator,
     find_hive_root,
 )
+from aura_core.gen.aura.core.v1 import (
+    AuditObservation,
+    Context,
+)
+from ..connector import BeeObservation
 
 logger = structlog.get_logger(__name__)
 
 
-class BeeGenerator(Generator[BeeObservation, Event]):
+class BeeGenerator:
     """G - Generator: Updates documentation and chronicles."""
 
     def __init__(self, settings: KeeperSettings) -> None:
@@ -33,13 +35,13 @@ class BeeGenerator(Generator[BeeObservation, Event]):
             else "You are bee.Keeper, guardian of the Aura Hive."
         )
 
-    async def pulse(self, observation: BeeObservation) -> list[Event]:
+    async def pulse(self, observation: BeeObservation) -> list[Any]:
         """G - Generator: Standard pulse organ. Turns Observation into Events."""
         logger.info("bee_generator_pulse_started")
 
         if observation.report and observation.context:
             # 1. Update llms.txt if needed
-            if ".proto" in observation.context.git_diff:
+            if ".proto" in observation.context.bee.git_diff:
                 logger.info("proto_changes_detected_updating_llms_txt")
                 await self._update_llms_txt(observation.context)
 
@@ -52,7 +54,7 @@ class BeeGenerator(Generator[BeeObservation, Event]):
 
         return []
 
-    async def _update_llms_txt(self, context: BeeContext) -> None:
+    async def _update_llms_txt(self, context: Context) -> None:
         root = find_hive_root()
         llms_txt_path = root / "llms.txt"
         current_llms_txt = llms_txt_path.read_text() if llms_txt_path.exists() else ""
@@ -94,7 +96,7 @@ class BeeGenerator(Generator[BeeObservation, Event]):
     async def _update_hive_state(
         self,
         report: AuditObservation,
-        context: BeeContext,
+        context: Context,
         observation: BeeObservation,
     ) -> None:
         root = find_hive_root()
@@ -104,13 +106,15 @@ class BeeGenerator(Generator[BeeObservation, Event]):
         now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
         # Resource stats (pure Python)
-        metrics = context.hive_metrics
+        hive_metrics_json = context.metadata.get("hive_metrics", "{}")
+        metrics = json.loads(hive_metrics_json)
         success_rate = metrics.get("negotiation_success_rate", 0.0)
 
         # Formatting Blight vs Heresy
         # If all LLMs failed, it's a Blight
-        llm_unavailable = report.metadata.get("llm_unavailable", False)
-        brain_status = context.metadata.get("brain_status", {})
+        llm_unavailable = report.metadata.get("llm_unavailable", "False") == "True"
+        brain_status_json = context.metadata.get("brain_status", "{}")
+        brain_status = json.loads(brain_status_json)
         status_label = "PURE" if report.is_pure else "IMPURE"
 
         if llm_unavailable or (brain_status and not any(brain_status.values())):
@@ -136,11 +140,15 @@ class BeeGenerator(Generator[BeeObservation, Event]):
                 new_entry += f"- {formatted_h}\n"
 
         # Chronicle reflective findings isolated from the Transformer's deterministic logic
-        reflective_heresies = report.metadata.get("reflective_heresies", [])
-        if reflective_heresies:
-            new_entry += "\n**Reflective Insights (The Inquisitor's Eye):**\n"
-            for rh in reflective_heresies:
-                new_entry += f"- {rh}\n"
+        reflective_heresies_json = report.metadata.get("reflective_heresies", "[]")
+        try:
+             reflective_heresies = json.loads(reflective_heresies_json)
+             if reflective_heresies:
+                new_entry += "\n**Reflective Insights (The Inquisitor's Eye):**\n"
+                for rh in reflective_heresies:
+                    new_entry += f"- {rh}\n"
+        except Exception:
+             pass
 
         if observation.injuries:
             new_entry += "\n**🤕 Injuries (Physical Blockages):**\n"
@@ -148,7 +156,7 @@ class BeeGenerator(Generator[BeeObservation, Event]):
                 new_entry += f"- {injury}\n"
 
         # Hidden metadata for "Cost of Governance"
-        new_entry += f"\n<!-- metadata\nexecution_time: {report.execution_time:.2f}s\ntoken_usage: {report.token_usage}\nevent: {context.event_name}\n-->\n"
+        new_entry += f"\n<!-- metadata\nexecution_time: {report.execution_time:.2f}s\ntoken_usage: {report.token_usage}\nevent: {context.metadata.get('event_name')}\n-->\n"
         new_entry += "\n---\n\n"
 
         # To keep it simple and fulfill the log nature, we rebuild the file header + current status + audit log.
