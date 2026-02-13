@@ -1,6 +1,6 @@
 import uuid
 from datetime import UTC, datetime
-from typing import Any
+from typing import Any, cast
 
 import betterproto
 from aura_core.gen.aura.core.v1 import (
@@ -22,14 +22,14 @@ class MCPTranslator:
         if tool_name == "negotiate":
             return Signal(
                 identifier=signal_id,
-                signal_type=SignalType.SIGNAL_TYPE_NEGOTIATION,
+                signal_type=cast(SignalType, SignalType.SIGNAL_TYPE_NEGOTIATION),
                 timestamp=datetime.now(UTC),
                 negotiation=NegotiationSignal(
                     item_identifier=kwargs.get("item_id", ""),
                     bid_amount=kwargs.get("bid", 0.0),
                     agent=AgentIdentity(
                         did=kwargs.get("agent_did", "mcp-agent"),
-                        reputation=1.0,
+                        reputation_score=1.0,
                     ),
                 ),
             )
@@ -37,10 +37,10 @@ class MCPTranslator:
         if tool_name == "search":
             return Signal(
                 identifier=signal_id,
-                signal_type=SignalType.SIGNAL_TYPE_UNSPECIFIED,
+                signal_type=cast(SignalType, SignalType.SIGNAL_TYPE_UNSPECIFIED),
                 timestamp=datetime.now(UTC),
                 metadata={
-                    "query": kwargs.get("query", ""),
+                    "query": str(kwargs.get("query", "")),
                     "limit": str(kwargs.get("limit", 3)),
                     "intent": "search",
                 },
@@ -48,7 +48,7 @@ class MCPTranslator:
 
         return Signal(
             identifier=signal_id,
-            signal_type=SignalType.SIGNAL_TYPE_UNSPECIFIED,
+            signal_type=cast(SignalType, SignalType.SIGNAL_TYPE_UNSPECIFIED),
             timestamp=datetime.now(UTC),
         )
 
@@ -63,15 +63,16 @@ class MCPTranslator:
         neg = observation.negotiation
         res_name, res_val = betterproto.which_one_of(neg, "result")
 
-        if res_name == "accepted":
-            final_price = res_val.final_price
+        if res_name == "accepted" and res_val:
+            final_price = getattr(res_val, "final_price", 0.0)
             return f"🎉 SUCCESS! Negotiation accepted at ${final_price:.2f}."
-        elif res_name == "countered":
-            proposed_price = res_val.proposed_price
-            message = res_val.human_message or "No reason provided."
+        elif res_name == "countered" and res_val:
+            proposed_price = getattr(res_val, "proposed_price", 0.0)
+            message = getattr(res_val, "human_message", "No reason provided.")
             return f"🔄 COUNTER-OFFER: ${proposed_price:.2f}. Message: {message}"
-        elif res_name == "rejected":
-            return f"🚫 REJECTED. Reason: {res_val.reason_code}"
+        elif res_name == "rejected" and res_val:
+            reason_code = getattr(res_val, "reason_code", "UNKNOWN")
+            return f"🚫 REJECTED. Reason: {reason_code}"
 
         # Note: UI Required is now mapped to rejected with reason UI_REQUIRED in connector
         return f"✅ Operation completed with status: {res_name}"
