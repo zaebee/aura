@@ -1,20 +1,20 @@
 from typing import TYPE_CHECKING
-from unittest.mock import AsyncMock, MagicMock
+from unittest.mock import AsyncMock
 
 import pytest
 
 if TYPE_CHECKING:
     from pytest_mock import MockerFixture
 from aura_core import SkillRegistry
+from aura_core_gen.aura.core.google import protobuf
 from aura_core_gen.aura.core.v1 import (
     ActionType,
     AgentIdentity,
+    Observation,
     PerceptionSignal,
     Signal,
     TelegramSignal,
-    Observation,
 )
-from aura_core_gen.aura.core.google import protobuf
 from hive.aggregator.main import HiveAggregator
 from hive.proteins.perception.skill import PerceptionSkill
 from hive.proteins.persistence.skill import PersistenceSkill

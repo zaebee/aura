@@ -1,5 +1,6 @@
 """Unit tests for RuleBasedStrategy."""
 
+from aura_core_gen.aura.core.google import protobuf
 from aura_core_gen.aura.core.v1 import (
     ActionType,
     Context,
@@ -7,7 +8,6 @@ from aura_core_gen.aura.core.v1 import (
     HiveContextData,
     NegotiationOffer,
 )
-from aura_core_gen.aura.core.google import protobuf
 from hive.transformer.main import RuleBasedStrategy
 
 

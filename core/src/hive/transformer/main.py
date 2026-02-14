@@ -184,7 +184,11 @@ class AuraTransformer(Transformer[Context, Intent]):
 
             # reasoning protein returns data in metadata
             result_struct = getattr(obs, "metadata", None)
-            result = result_struct.to_dict() if hasattr(result_struct, "to_dict") else {}
+            result = (
+                result_struct.to_dict()
+                if result_struct and hasattr(result_struct, "to_dict")
+                else {}
+            )
 
             # Implement <think> tag logic for transparency
             raw_thought = result.get("thought", "")

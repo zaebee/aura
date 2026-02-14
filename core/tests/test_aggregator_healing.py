@@ -5,7 +5,6 @@ import pytest
 from aura_core import SkillRegistry
 from hive.aggregator import HiveAggregator
 from hive.proteins.telemetry import TelemetrySkill
-from aura_core_gen.aura.core.v1 import SystemVitals
 
 from config.server import ServerSettings
 
