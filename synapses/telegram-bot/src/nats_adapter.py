@@ -9,8 +9,8 @@ Two channels:
 import nats
 import nats.errors
 import structlog
-from aura_core.gen.aura.core.v1 import Observation as ProtoObservation
-from aura_core.gen.aura.core.v1 import Signal
+from aura_core_gen.aura.core.v1 import Observation as ProtoObservation
+from aura_core_gen.aura.core.v1 import Signal
 
 logger = structlog.get_logger(__name__)
 

@@ -1,7 +1,7 @@
 from typing import Any
 
 from aura_core import SkillProtocol
-from aura_core.gen.aura.core.v1 import Observation
+from aura_core_gen.aura.core.v1 import Observation
 
 from config.server import ServerSettings
 
@@ -96,7 +96,7 @@ class PulseSkill(
     async def _emit_alert(self, params: dict[str, Any]) -> Observation:
         assert self.provider is not None
         success = await self.provider.publish_alert(
-            severity=params.get("severity", "info"),
+            severity_str=params.get("severity", "info"),
             message=params.get("message", ""),
             source=params.get("source", "unknown"),
             trace_id=params.get("trace_id"),

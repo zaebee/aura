@@ -8,6 +8,7 @@ The Protocols (the "Law") live in dna.py; this module provides the "Engine".
 from typing import Any, cast
 
 import opentelemetry.trace as trace
+from aura_core_gen.aura.core.v1 import ActionType, Observation
 from pydantic import SecretStr
 
 from .dna import (
@@ -18,7 +19,6 @@ from .dna import (
     SkillProtocol,
     Transformer,
 )
-from .gen.aura.core.v1 import ActionType, Observation
 
 tracer = trace.get_tracer(__name__)
 
@@ -29,7 +29,7 @@ def map_action(action_str: str | None) -> ActionType:
     Converts LLM strings to strict ActionType enum.
     """
     if not action_str:
-        return ActionType.ACTION_TYPE_UNSPECIFIED
+        return cast(ActionType, ActionType.ACTION_TYPE_UNSPECIFIED)
 
     mapping = {
         "accept": ActionType.ACTION_TYPE_ACCEPT,
@@ -42,7 +42,8 @@ def map_action(action_str: str | None) -> ActionType:
         "evaluate": ActionType.ACTION_TYPE_EVALUATE,
         "error": ActionType.ACTION_TYPE_ERROR,
     }
-    return mapping.get(action_str.lower(), ActionType.ACTION_TYPE_UNSPECIFIED)
+    res = mapping.get(action_str.lower(), ActionType.ACTION_TYPE_UNSPECIFIED)
+    return cast(ActionType, int(res))
 
 
 def get_raw_key(key_field: SecretStr | str) -> str:
@@ -109,7 +110,11 @@ class BaseConnector(Connector[Any, Observation, Any]):
             # Fallback for single action or legacy support
             return await self._handle_legacy(action, context)
 
-        last_observation = Observation(success=True, trace=getattr(context, "trace", None))
+        from aura_core_gen.aura.core.v1 import TraceContext
+
+        last_observation = Observation(
+            success=True, trace=getattr(context, "trace", TraceContext())
+        )
 
         for i, step in enumerate(steps):
             skill_name = step.skill

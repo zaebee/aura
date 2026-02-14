@@ -213,26 +213,33 @@ async def publish_test_event(nats_url: str) -> bool:
 
         # Import proto (generated)
         try:
-            from hive.proto.aura.dna.v1 import dna_pb2
+            from datetime import UTC, datetime
+
+            from aura_core_gen.aura.core.v1 import Event, HeartbeatEvent, Status
 
             # Create a test heartbeat event
-            event = dna_pb2.Event()
-            event.event_id = "test-001"
-            event.topic = "aura.hive.heartbeat"
-            event.heartbeat.service = "init_bloodstream"
-            event.heartbeat.instance_id = "test"
-            event.heartbeat.status = dna_pb2.VITALS_STATUS_OK
+            event = Event(
+                identifier="test-001",
+                topic="aura.hive.heartbeat",
+                timestamp=datetime.now(UTC),
+                heartbeat=HeartbeatEvent(
+                    service="init_bloodstream",
+                    instance_id="test",
+                    status=Status.STATUS_OK,
+                )
+            )
 
             # Serialize to binary
-            binary_data = event.SerializeToString()
+            binary_data = bytes(event)
             logger.info(f"  Serialized event: {len(binary_data)} bytes")
 
             # Publish via JetStream
             ack = await js.publish("aura.hive.heartbeat", binary_data)
             logger.info(f"  ✓ Published to stream {ack.stream}, seq={ack.seq}")
 
-        except ImportError:
+        except ImportError as e:
             # Fallback to raw bytes if proto not generated
+            logger.warning(f"Proto import failed: {e}, using raw test message")
             logger.warning("Proto not generated, using raw test message")
             ack = await js.publish("aura.hive.heartbeat", b"test-heartbeat")
             logger.info(f"  ✓ Published raw test to stream {ack.stream}, seq={ack.seq}")

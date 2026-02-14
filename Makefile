@@ -5,13 +5,13 @@
 TAG ?= latest
 REGISTRY ?= ghcr.io/zaebee
 PLATFORM ?= linux/amd64
-DNA_PATH ?= packages/aura-core/src
-CORE_PATH ?= core:core/src:core/gen-proto
-GATEWAY_PATH ?= api-gateway/src:api-gateway/gen-proto
-TG_PATH ?= synapses/telegram-bot/src
-MCP_PATH ?= synapses/mcp-server/src:synapses/mcp-server/gen-proto
-KEEPER_PATH ?= agents/bee-keeper/src
-TOOL_PATH ?= $(CORE_PATH):$(DNA_PATH)
+DNA_PATH := packages/aura-core/src:packages/aura-core/gen-proto
+CORE_PATH := core/src:core/gen-proto:$(DNA_PATH)
+GATEWAY_PATH := api-gateway/src:api-gateway/gen-proto:$(DNA_PATH)
+TG_PATH := synapses/telegram-bot/src:$(DNA_PATH)
+MCP_PATH := synapses/mcp-server/src:synapses/mcp-server/gen-proto:core/src:$(DNA_PATH)
+KEEPER_PATH := agents/bee-keeper/src:$(DNA_PATH)
+TOOL_PATH := $(CORE_PATH):$(DNA_PATH)
 
 # Proto source files (for incremental generation)
 PROTO_SOURCES := $(wildcard proto/aura/*/v1/*.proto)
@@ -22,14 +22,14 @@ lint: $(PROTO_SENTINEL)
 	# Protobuf Lint
 	cd proto && buf lint
 	# Python Lint (Ruff)
-	PYTHONPATH=$(CORE_PATH):$(GATEWAY_PATH):$(TG_PATH):$(MCP_PATH):$(KEEPER_PATH):$(DNA_PATH) uv run ruff check .
+	PYTHONPATH=$(DNA_PATH):$(CORE_PATH):$(GATEWAY_PATH):$(TG_PATH):$(MCP_PATH):$(KEEPER_PATH) uv run ruff check .
 	# Python Type Check (Mypy)
 	# We use --explicit-package-bases to avoid double discovery when multiple paths overlap
-	MYPYPATH=$(CORE_PATH):$(DNA_PATH) uv run mypy --explicit-package-bases core/src
-	MYPYPATH=$(GATEWAY_PATH):packages/aura-core/src uv run mypy --explicit-package-bases api-gateway/src
-	MYPYPATH=$(TG_PATH):packages/aura-core/src uv run mypy --explicit-package-bases synapses/telegram-bot/src
-	MYPYPATH=$(MCP_PATH):core/src:core/gen-proto:packages/aura-core/src uv run mypy --explicit-package-bases synapses/mcp-server/src
-	MYPYPATH=$(KEEPER_PATH):packages/aura-core/src uv run mypy agents/bee-keeper/main.py agents/bee-keeper/src
+	MYPYPATH=$(CORE_PATH) uv run mypy --explicit-package-bases core/src
+	MYPYPATH=$(GATEWAY_PATH) uv run mypy --explicit-package-bases api-gateway/src
+	MYPYPATH=$(TG_PATH) uv run mypy --explicit-package-bases synapses/telegram-bot/src
+	MYPYPATH=$(MCP_PATH) uv run mypy --explicit-package-bases synapses/mcp-server/src
+	MYPYPATH=$(KEEPER_PATH) uv run mypy agents/bee-keeper/main.py agents/bee-keeper/src
 	MYPYPATH=$(DNA_PATH) uv run mypy packages/aura-core/src
 	# Security Audit (Bandit)
 	uv run bandit -r . -c pyproject.toml
@@ -71,21 +71,22 @@ build-tg:
 
 # Incremental generation: only re-run buf if .proto files changed
 $(PROTO_SENTINEL): $(PROTO_SOURCES) buf.gen.yaml
-	# Generate Protobuf code directly into packages/aura-core/src/aura_core/gen/
+	# Generate Protobuf code directly into packages/aura-core/gen-proto/aura_core_gen
 	# Uses buf.gen.yaml which leverages betterproto
-	mkdir -p packages/aura-core/src/aura_core/gen
+	mkdir -p packages/aura-core/gen-proto/aura_core_gen
 	buf generate
-	# Fix betterproto google import shim if needed
-	if [ -d "packages/aura-core/src/aura_core/gen/aura/core" ]; then \
-		mkdir -p packages/aura-core/src/aura_core/gen/aura/core/google; \
-		echo "from betterproto.lib.google import protobuf" > packages/aura-core/src/aura_core/gen/aura/core/google/__init__.py; \
+	# Fix betterproto google import shim
+	if [ -d "packages/aura-core/gen-proto/aura_core_gen/aura/core" ]; then \
+		mkdir -p packages/aura-core/gen-proto/aura_core_gen/aura/core/google; \
+		echo "from betterproto.lib.google import protobuf" > packages/aura-core/gen-proto/aura_core_gen/aura/core/google/__init__.py; \
 	fi
-	if [ -d "packages/aura-core/src/aura_core/gen/aura/assets" ]; then \
-		mkdir -p packages/aura-core/src/aura_core/gen/aura/assets/google; \
-		echo "from betterproto.lib.google import protobuf" > packages/aura-core/src/aura_core/gen/aura/assets/google/__init__.py; \
+	# Post-generation fix for double-prefix in negotiation chromosome
+	if [ -f "packages/aura-core/gen-proto/aura_core_gen/aura/negotiation/v1.py" ]; then \
+		sed -i 's/from \.aura\.core import v1/from aura_core_gen.aura.core import v1/g' packages/aura-core/gen-proto/aura_core_gen/aura/negotiation/v1.py; \
 	fi
-	if [ -f "packages/aura-core/src/aura_core/gen/aura/negotiation/v1.py" ]; then \
-		sed -i 's/from .aura.core import v1/from aura_core.gen.aura.core import v1/' packages/aura-core/src/aura_core/gen/aura/negotiation/v1.py; \
+	if [ -d "packages/aura-core/gen-proto/aura_core_gen/aura/assets" ]; then \
+		mkdir -p packages/aura-core/gen-proto/aura_core_gen/aura/assets/google; \
+		echo "from betterproto.lib.google import protobuf" > packages/aura-core/gen-proto/aura_core_gen/aura/assets/google/__init__.py; \
 	fi
 	touch $(PROTO_SENTINEL)
 

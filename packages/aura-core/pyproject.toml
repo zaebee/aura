@@ -17,8 +17,7 @@ dependencies = [
 ]
 
 [tool.hatch.build.targets.wheel]
-packages = ["src/aura_core"]
-artifacts = ["src/aura_core/gen/"]
+packages = ["src/aura_core", "gen-proto/aura_core_gen"]
 
 [tool.hatch.build.targets.sdist]
 include = [

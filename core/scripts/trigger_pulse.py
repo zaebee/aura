@@ -1,10 +1,11 @@
 import asyncio
-import json
 import os
-import time
+import uuid
+from datetime import UTC, datetime
 
 import nats
 import structlog
+from aura_core_gen.aura.core.v1 import ActionType, Event, NegotiationEvent
 
 # Configure logging
 structlog.configure(
@@ -18,35 +19,32 @@ logger = structlog.get_logger(__name__)
 
 
 async def main():
-    # Use AURA_NATS_URL or fallback to nats:4222 for Hive internal networking
-    nats_url = os.environ.get("AURA_NATS_URL", "nats://nats:4222")
-    topic = "aura.hive.events.NegotiationAccepted"
+    # Use AURA_NATS_URL or fallback to nats:4222
+    nats_url = os.environ.get("AURA_NATS_URL", "nats://localhost:4222")
+    topic = "aura.hive.events.negotiation_accept"
 
-    payload = {
-        "success": True,
-        "event_type": "NegotiationAccepted",
-        "timestamp": time.time(),
-        "session_token": "manual-pulse-token",  # nosec
-    }
+    # Create binary event
+    event = Event(
+        identifier=f"pulse-{uuid.uuid4().hex[:8]}",
+        topic=topic,
+        timestamp=datetime.now(UTC),
+        negotiation=NegotiationEvent(
+            item_identifier="item_1",
+            action=ActionType.ACTION_TYPE_ACCEPT,
+            price=100.0,
+        )
+    )
 
-    # Redact credentials for safe logging
-    safe_url = nats_url
-    if "@" in nats_url:
-        parts = nats_url.split("@")
-        protocol_parts = parts[0].split("//")
-        safe_url = f"{protocol_parts[0]}//****@{parts[1]}"
-
-    logger.info("connecting_to_nats", url=safe_url)
+    logger.info("connecting_to_nats", url=nats_url)
     try:
         nc = await nats.connect(nats_url)
         logger.info("publishing_to_nats", topic=topic)
-        await nc.publish(topic, json.dumps(payload).encode())
+        await nc.publish(topic, bytes(event))
         await nc.flush()
         await nc.close()
         logger.info("pulse_triggered_successfully")
     except Exception as e:
         logger.error("pulse_trigger_failed", error=str(e))
-        logger.info("nats_unavailability_expected_note")
 
 
 if __name__ == "__main__":

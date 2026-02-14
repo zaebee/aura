@@ -1,18 +1,29 @@
 """
 Pulse Protein Internal - NATS JetStream Provider for Binary Bloodstream.
 
-Handles binary proto serialization and JetStream publishing.
+Handles binary proto serialization and JetStream publishing using chromosomal DNA.
 """
 
 import logging
 import uuid
 from datetime import UTC, datetime
-from typing import Any
+from typing import Any, cast
 
 import nats
 import nats.errors
-from aura.dna.v1 import dna_pb2
-from google.protobuf.timestamp_pb2 import Timestamp
+from aura_core_gen.aura.core.google import protobuf
+from aura_core_gen.aura.core.v1 import (
+    ActionType,
+    AlertEvent,
+    AuditEvent,
+    Event,
+    HeartbeatEvent,
+    NegotiationEvent,
+    Severity,
+    Status,
+    TraceContext,
+    VitalsEvent,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -20,8 +31,7 @@ logger = logging.getLogger(__name__)
 class JetStreamProvider:
     """
     JetStream provider for binary proto message publishing.
-
-    Replaces JSON-over-NATS with strictly typed binary protobuf messages.
+    Uses betterproto chromosomal signals.
     """
 
     def __init__(self, nats_url: str):
@@ -44,21 +54,15 @@ class JetStreamProvider:
             logger.warning(f"NATS connection failed: {e}")
             return False
 
-    def _create_timestamp(self) -> Timestamp:
-        """Create a protobuf Timestamp for now."""
-        ts = Timestamp()
-        ts.FromDatetime(datetime.now(UTC))
-        return ts
-
     def _create_trace_context(
         self, trace_id: str | None = None, span_id: str | None = None
-    ) -> dna_pb2.TraceContext:
+    ) -> TraceContext:
         """Create trace context for OTel propagation."""
-        trace = dna_pb2.TraceContext()
-        trace.trace_id = trace_id or uuid.uuid4().hex
-        trace.span_id = span_id or uuid.uuid4().hex[:16]
-        trace.trace_flags = "01"  # Sampled
-        return trace
+        return TraceContext(
+            trace_id=trace_id or uuid.uuid4().hex,
+            span_id=span_id or uuid.uuid4().hex[:16],
+            trace_flags="01",
+        )
 
     async def publish_negotiation_event(
         self,
@@ -72,32 +76,29 @@ class JetStreamProvider:
     ) -> bool:
         """Publish a negotiation event as binary proto."""
         if not self.js:
-            logger.warning("JetStream not connected, skipping publish")
             return False
 
         try:
-            event = dna_pb2.Event()
-            event.event_id = f"neg-{uuid.uuid4().hex[:8]}"
-            event.topic = f"aura.hive.events.negotiation_{action}"
-            event.timestamp.CopyFrom(self._create_timestamp())
-            event.trace.CopyFrom(self._create_trace_context(trace_id, span_id))
-
-            # Set negotiation payload
-            event.negotiation.session_token = session_token
-            event.negotiation.action = self._action_to_enum(action)  # type: ignore[assignment]
-            event.negotiation.price = price
-            event.negotiation.item_id = item_id
-            event.negotiation.agent_did = agent_did
-
-            # Serialize and publish
-            binary_data = event.SerializeToString()
-            ack = await self.js.publish(event.topic, binary_data)
-
-            logger.debug(
-                f"Published negotiation event: stream={ack.stream}, seq={ack.seq}, bytes={len(binary_data)}"
+            event = Event(
+                identifier=f"neg-{uuid.uuid4().hex[:8]}",
+                topic=f"aura.hive.events.negotiation_{action}",
+                timestamp=datetime.now(UTC),
+                trace=self._create_trace_context(trace_id, span_id),
+                negotiation=NegotiationEvent(
+                    item_identifier=item_id,
+                    action=self._action_to_enum(action),
+                    price=price,
+                ),
+                metadata=protobuf.Struct().from_dict({
+                    "session_token": session_token,
+                    "agent_did": agent_did,
+                })
             )
-            return True
 
+            binary_data = bytes(event)
+            ack = await self.js.publish(event.topic, binary_data)
+            logger.debug(f"Published negotiation event: seq={ack.seq}")
+            return True
         except Exception as e:
             logger.error(f"Failed to publish negotiation event: {e}")
             return False
@@ -112,30 +113,25 @@ class JetStreamProvider:
     ) -> bool:
         """Publish a heartbeat event as binary proto."""
         if not self.js:
-            logger.warning("JetStream not connected, skipping heartbeat")
             return False
 
         try:
-            event = dna_pb2.Event()
-            event.event_id = f"hb-{uuid.uuid4().hex[:8]}"
-            event.topic = "aura.hive.heartbeat"
-            event.timestamp.CopyFrom(self._create_timestamp())
-            event.trace.CopyFrom(self._create_trace_context(trace_id, span_id))
-
-            # Set heartbeat payload
-            event.heartbeat.service = service
-            event.heartbeat.instance_id = instance_id or uuid.uuid4().hex[:8]
-            event.heartbeat.status = self._status_to_enum(status)  # type: ignore[assignment]
-
-            # Serialize and publish
-            binary_data = event.SerializeToString()
-            ack = await self.js.publish(event.topic, binary_data)
-
-            logger.debug(
-                f"Published heartbeat: stream={ack.stream}, seq={ack.seq}, bytes={len(binary_data)}"
+            event = Event(
+                identifier=f"hb-{uuid.uuid4().hex[:8]}",
+                topic="aura.hive.heartbeat",
+                timestamp=datetime.now(UTC),
+                trace=self._create_trace_context(trace_id, span_id),
+                heartbeat=HeartbeatEvent(
+                    service=service,
+                    instance_id=instance_id or uuid.uuid4().hex[:8],
+                    status=self._status_to_enum(status),
+                )
             )
-            return True
 
+            binary_data = bytes(event)
+            ack = await self.js.publish(event.topic, binary_data)
+            logger.debug(f"Published heartbeat: seq={ack.seq}")
+            return True
         except Exception as e:
             logger.error(f"Failed to publish heartbeat: {e}")
             return False
@@ -154,31 +150,30 @@ class JetStreamProvider:
             return False
 
         try:
-            event = dna_pb2.Event()
-            event.event_id = f"vit-{uuid.uuid4().hex[:8]}"
-            event.topic = f"aura.hive.vitals.{service}"
-            event.timestamp.CopyFrom(self._create_timestamp())
-            event.trace.CopyFrom(self._create_trace_context(trace_id, span_id))
+            event = Event(
+                identifier=f"vit-{uuid.uuid4().hex[:8]}",
+                topic=f"aura.hive.vitals.{service}",
+                timestamp=datetime.now(UTC),
+                trace=self._create_trace_context(trace_id, span_id),
+                vitals=VitalsEvent(
+                    service=service,
+                    status=self._status_to_enum(status),
+                    cpu_usage_percent=cpu_usage,
+                    memory_usage_mb=memory_usage,
+                )
+            )
 
-            # Set vitals payload
-            event.vitals.service = service
-            event.vitals.status = self._status_to_enum(status)  # type: ignore[assignment]
-            event.vitals.cpu_usage_percent = cpu_usage
-            event.vitals.memory_usage_mb = memory_usage
-
-            binary_data = event.SerializeToString()
+            binary_data = bytes(event)
             ack = await self.js.publish(event.topic, binary_data)
-
-            logger.debug(f"Published vitals: stream={ack.stream}, seq={ack.seq}")
+            logger.debug(f"Published vitals: seq={ack.seq}")
             return True
-
         except Exception as e:
             logger.error(f"Failed to publish vitals: {e}")
             return False
 
     async def publish_alert(
         self,
-        severity: str,
+        severity_str: str,
         message: str,
         source: str,
         trace_id: str | None = None,
@@ -189,23 +184,22 @@ class JetStreamProvider:
             return False
 
         try:
-            event = dna_pb2.Event()
-            event.event_id = f"alert-{uuid.uuid4().hex[:8]}"
-            event.topic = f"aura.hive.events.alert_{severity}"
-            event.timestamp.CopyFrom(self._create_timestamp())
-            event.trace.CopyFrom(self._create_trace_context(trace_id, span_id))
+            event = Event(
+                identifier=f"alert-{uuid.uuid4().hex[:8]}",
+                topic=f"aura.hive.events.alert_{severity_str}",
+                timestamp=datetime.now(UTC),
+                trace=self._create_trace_context(trace_id, span_id),
+                alert=AlertEvent(
+                    severity=self._severity_to_enum(severity_str),
+                    message=message,
+                    source=source,
+                )
+            )
 
-            # Set alert payload
-            event.alert.severity = self._severity_to_enum(severity)  # type: ignore[assignment]
-            event.alert.message = message
-            event.alert.source = source
-
-            binary_data = event.SerializeToString()
+            binary_data = bytes(event)
             ack = await self.js.publish(event.topic, binary_data)
-
-            logger.debug(f"Published alert: stream={ack.stream}, seq={ack.seq}")
+            logger.debug(f"Published alert: seq={ack.seq}")
             return True
-
         except Exception as e:
             logger.error(f"Failed to publish alert: {e}")
             return False
@@ -219,48 +213,42 @@ class JetStreamProvider:
         trace_id: str | None = None,
         span_id: str | None = None,
     ) -> bool:
-        """Publish an audit event as binary proto."""
+        """Publish an alert event as binary proto."""
         if not self.js:
             return False
 
         try:
-            event = dna_pb2.Event()
-            event.event_id = f"audit-{uuid.uuid4().hex[:8]}"
-            event.topic = "aura.hive.audit.report"
-            event.timestamp.CopyFrom(self._create_timestamp())
-            event.trace.CopyFrom(self._create_trace_context(trace_id, span_id))
+            event = Event(
+                identifier=f"audit-{uuid.uuid4().hex[:8]}",
+                topic="aura.hive.audit.report",
+                timestamp=datetime.now(UTC),
+                trace=self._create_trace_context(trace_id, span_id),
+                audit=AuditEvent(
+                    repo_name=repo_name,
+                    is_pure=is_pure,
+                    heresies=heresies,
+                    negotiation_success_rate=negotiation_success_rate,
+                )
+            )
 
-            # Set audit payload
-            event.audit.repo_name = repo_name
-            event.audit.is_pure = is_pure
-            event.audit.heresies.extend(heresies)
-            event.audit.negotiation_success_rate = negotiation_success_rate
-
-            binary_data = event.SerializeToString()
+            binary_data = bytes(event)
             ack = await self.js.publish(event.topic, binary_data)
-
-            logger.debug(f"Published audit: stream={ack.stream}, seq={ack.seq}")
+            logger.debug(f"Published audit: seq={ack.seq}")
             return True
-
         except Exception as e:
             logger.error(f"Failed to publish audit: {e}")
             return False
 
     async def publish_raw(self, topic: str, payload: dict[str, Any]) -> bool:
-        """
-        Fallback: Publish raw event (for backward compatibility).
-
-        DEPRECATED: Use typed publish methods instead.
-        """
+        """Fallback: Publish raw event (for backward compatibility)."""
         if not self.js:
             return False
 
         try:
             import json
-
             data = json.dumps(payload).encode()
-            ack = await self.js.publish(topic, data)
-            logger.warning(f"Published raw JSON (deprecated): {topic}, seq={ack.seq}")
+            await self.js.publish(topic, data)
+            logger.warning(f"Published raw JSON (deprecated): {topic}")
             return True
         except Exception as e:
             logger.error(f"Failed to publish raw: {e}")
@@ -270,45 +258,44 @@ class JetStreamProvider:
         """Close NATS connection."""
         if self.nc:
             await self.nc.close()
-            logger.info("NATS connection closed")
 
-    def _action_to_enum(self, action: str) -> int:
+    def _action_to_enum(self, action: str) -> ActionType:
         """Convert action string to ActionType enum."""
         mapping = {
-            "accept": dna_pb2.ACTION_TYPE_ACCEPT,
-            "counter": dna_pb2.ACTION_TYPE_COUNTER,
-            "reject": dna_pb2.ACTION_TYPE_REJECT,
-            "audit": dna_pb2.ACTION_TYPE_AUDIT,
-            "ui_required": dna_pb2.ACTION_TYPE_UI_REQUIRED,
-            "error": dna_pb2.ACTION_TYPE_ERROR,
+            "accept": ActionType.ACTION_TYPE_ACCEPT,
+            "counter": ActionType.ACTION_TYPE_COUNTER,
+            "reject": ActionType.ACTION_TYPE_REJECT,
+            "audit": ActionType.ACTION_TYPE_APPROVE, # Map audit to approve for now
+            "ui_required": ActionType.ACTION_TYPE_UPDATE, # Map UI to update
+            "error": ActionType.ACTION_TYPE_ERROR,
         }
-        return int(mapping.get(action.lower(), dna_pb2.ACTION_TYPE_UNSPECIFIED))
+        return cast(ActionType, mapping.get(action.lower(), ActionType.ACTION_TYPE_UNSPECIFIED))
 
-    def _status_to_enum(self, status: str) -> int:
-        """Convert status string to VitalsStatus enum."""
+    def _status_to_enum(self, status: str) -> Status:
+        """Convert status string to Status enum."""
         mapping = {
-            "ok": dna_pb2.VITALS_STATUS_OK,
-            "degraded": dna_pb2.VITALS_STATUS_DEGRADED,
-            "error": dna_pb2.VITALS_STATUS_ERROR,
+            "ok": Status.STATUS_OK,
+            "degraded": Status.STATUS_DEGRADED,
+            "unstable": Status.STATUS_DEGRADED,
+            "error": Status.STATUS_ERROR,
+            "critical": Status.STATUS_CRITICAL,
         }
-        return int(mapping.get(status.lower(), dna_pb2.VITALS_STATUS_UNSPECIFIED))
+        return cast(Status, mapping.get(status.lower(), Status.STATUS_UNSPECIFIED))
 
-    def _severity_to_enum(self, severity: str) -> int:
-        """Convert severity string to AlertSeverity enum."""
+    def _severity_to_enum(self, severity_str: str) -> Severity:
+        """Convert severity string to Severity enum."""
         mapping = {
-            "info": dna_pb2.ALERT_SEVERITY_INFO,
-            "warning": dna_pb2.ALERT_SEVERITY_WARNING,
-            "error": dna_pb2.ALERT_SEVERITY_ERROR,
-            "critical": dna_pb2.ALERT_SEVERITY_CRITICAL,
+            "info": Severity.SEVERITY_INFO,
+            "warning": Severity.SEVERITY_WARNING,
+            "error": Severity.SEVERITY_ERROR,
+            "critical": Severity.SEVERITY_CRITICAL,
         }
-        return int(mapping.get(severity.lower(), dna_pb2.ALERT_SEVERITY_UNSPECIFIED))
+        return cast(Severity, mapping.get(severity_str.lower(), Severity.SEVERITY_UNSPECIFIED))
 
 
 class JetStreamSubscriber:
     """
     JetStream subscriber for consuming binary proto messages.
-
-    Used by the Aggregator to "breathe in" events from the bloodstream.
     """
 
     def __init__(self, nats_url: str):
@@ -322,10 +309,8 @@ class JetStreamSubscriber:
         try:
             self.nc = await nats.connect(self.nats_url)
             self.js = self.nc.jetstream()
-            logger.info(f"Subscriber connected to NATS JetStream at {self.nats_url}")
             return True
-        except Exception as e:
-            logger.warning(f"Subscriber connection failed: {e}")
+        except Exception:
             return False
 
     async def subscribe(
@@ -334,31 +319,18 @@ class JetStreamSubscriber:
         consumer: str,
         callback: Any,
     ) -> bool:
-        """
-        Subscribe to a JetStream consumer and process binary proto messages.
-
-        Args:
-            stream: Stream name (e.g., "AURA_EVENTS")
-            consumer: Durable consumer name (e.g., "core-processor")
-            callback: Async function(event: dna_pb2.Event) -> None
-        """
         if not self.js:
             return False
 
         try:
-            # Pull-based subscription for reliability
             psub = await self.js.pull_subscribe(
-                subject="",  # Consumer defines the filter
+                subject="",
                 durable=consumer,
                 stream=stream,
             )
             self._subscriptions[f"{stream}:{consumer}"] = psub
-
-            logger.info(f"Subscribed to {stream}:{consumer}")
             return True
-
-        except Exception as e:
-            logger.error(f"Failed to subscribe: {e}")
+        except Exception:
             return False
 
     async def fetch_events(
@@ -367,17 +339,11 @@ class JetStreamSubscriber:
         consumer: str,
         batch: int = 10,
         timeout: float = 1.0,
-    ) -> list[dna_pb2.Event]:
-        """
-        Fetch a batch of binary proto events from a consumer.
-
-        Returns deserialized Event proto objects.
-        """
+    ) -> list[Event]:
         key = f"{stream}:{consumer}"
         psub = self._subscriptions.get(key)
 
         if not psub:
-            logger.warning(f"No subscription for {key}")
             return []
 
         events = []
@@ -386,22 +352,17 @@ class JetStreamSubscriber:
 
             for msg in msgs:
                 try:
-                    event = dna_pb2.Event()
-                    event.ParseFromString(msg.data)
+                    event = Event().parse(msg.data)
                     events.append(event)
                     await msg.ack()
                 except Exception as e:
                     logger.error(f"Failed to parse event: {e}")
-                    # NAK for redelivery
                     await msg.nak()
 
             return events
-
         except nats.errors.TimeoutError:
-            # No messages available, not an error
             return []
-        except Exception as e:
-            logger.error(f"Failed to fetch events: {e}")
+        except Exception:
             return []
 
     async def close(self) -> None:
@@ -409,13 +370,12 @@ class JetStreamSubscriber:
         for _key, psub in self._subscriptions.items():
             try:
                 await psub.unsubscribe()
-            except Exception:  # nosec B110
-                pass  # Ignore errors during cleanup
+            except Exception:  # nosec
+                pass
         self._subscriptions.clear()
 
         if self.nc:
             await self.nc.close()
-            logger.info("Subscriber connection closed")
 
 
 # Backward compatibility alias

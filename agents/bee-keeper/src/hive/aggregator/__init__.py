@@ -11,7 +11,7 @@ import structlog
 
 from config import KeeperSettings
 from aura_core import Aggregator, find_hive_root
-from aura_core.gen.aura.core.v1 import (
+from aura_core_gen.aura.core.v1 import (
     Context,
     ContextType,
     BeeContextData,
@@ -47,6 +47,8 @@ class BeeAggregator(Aggregator[Any, Context]):
         filesystem_map = self._scan_filesystem()
         event_data = self._load_event_data()
 
+        from aura_core_gen.aura.core.google import protobuf
+
         context = Context(
             identifier=self.repo_name,
             context_type=cast(ContextType, ContextType.CONTEXT_TYPE_BEE),
@@ -55,12 +57,12 @@ class BeeAggregator(Aggregator[Any, Context]):
                 git_diff=git_diff,
                 filesystem_map=filesystem_map,
             ),
-            metadata={
+            metadata=protobuf.Struct().from_dict({
                 "event_name": str(event_name),
-                "brain_status": json.dumps(self.brain_status),
-                "hive_metrics": json.dumps(hive_metrics),
-                "event_data": json.dumps(event_data),
-            },
+                "brain_status": self.brain_status,
+                "hive_metrics": hive_metrics,
+                "event_data": event_data,
+            }),
         )
         return context
 

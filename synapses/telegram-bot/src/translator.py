@@ -10,7 +10,7 @@ from aiogram.types import (
     InlineKeyboardMarkup,
     Message,
 )
-from aura_core.gen.aura.core.v1 import (
+from aura_core_gen.aura.core.v1 import (
     AgentIdentity,
     PerceptionSignal,
     Signal,
@@ -43,6 +43,11 @@ class TelegramTranslator:
         state_data = kwargs.get("state_data", {})
         item_id = str(state_data.get("item_id", ""))
 
+        signal = Signal(
+            identifier=signal_id,
+            timestamp=datetime.now(UTC),
+        )
+
         if isinstance(event, Message):
             text = event.text or ""
             user_id = event.from_user.id if event.from_user else 0
@@ -50,95 +55,87 @@ class TelegramTranslator:
             command = kwargs.get("command")
 
             if command and command.command == "search":
-                return Signal(
-                    identifier=signal_id,
-                    signal_type=cast(SignalType, SignalType.SIGNAL_TYPE_TELEGRAM),
-                    timestamp=datetime.now(UTC),
-                    telegram=TelegramSignal(
-                        user_id=user_id,
-                        chat_id=chat_id,
-                        message_text=text,
-                    ),
-                    metadata={
-                        "chat_id": str(chat_id),
-                        "user_id": str(user_id),
-                        "source": "telegram",
-                        "intent": "search",
-                        "query": str(command.args or ""),
-                    },
-                )
-
-            # Handle photo message (Perception)
-            if kwargs.get("image_bytes"):
-                return Signal(
-                    identifier=signal_id,
-                    signal_type=cast(SignalType, SignalType.SIGNAL_TYPE_PERCEPTION),
-                    timestamp=datetime.now(UTC),
-                    perception=PerceptionSignal(
-                        image_data=kwargs["image_bytes"],
-                        mime_type="image/jpeg",
-                        agent=AgentIdentity(
-                            did=f"tg:{user_id}",
-                            reputation_score=1.0,
-                        ),
-                    ),
-                    metadata={
-                        "chat_id": str(chat_id),
-                        "user_id": str(user_id),
-                        "source": "telegram",
-                        "item_id": item_id,
-                    },
-                )
-
-            # Standard message or bid - Use TelegramSignal for Signal Integrity
-            return Signal(
-                identifier=signal_id,
-                signal_type=cast(SignalType, SignalType.SIGNAL_TYPE_TELEGRAM),
-                timestamp=datetime.now(UTC),
-                telegram=TelegramSignal(
+                signal.signal_type = cast(SignalType, SignalType.SIGNAL_TYPE_TELEGRAM)
+                signal.telegram = TelegramSignal(
                     user_id=user_id,
                     chat_id=chat_id,
                     message_text=text,
-                ),
-                metadata={
+                )
+                signal.metadata.from_dict({
+                    "chat_id": str(chat_id),
+                    "user_id": str(user_id),
+                    "source": "telegram",
+                    "intent": "search",
+                    "query": str(command.args or ""),
+                })
+                return signal
+
+            # Handle photo message (Perception)
+            if kwargs.get("image_bytes"):
+                image_data = kwargs["image_bytes"]
+                if isinstance(image_data, bytes):
+                    image_data = [image_data]
+
+                signal.signal_type = cast(SignalType, SignalType.SIGNAL_TYPE_PERCEPTION)
+                signal.perception = PerceptionSignal(
+                    image_data=image_data,
+                    mime_type="image/jpeg",
+                    agent=AgentIdentity(
+                        did=f"tg:{user_id}",
+                        reputation_score=1.0,
+                    ),
+                )
+                signal.metadata.from_dict({
                     "chat_id": str(chat_id),
                     "user_id": str(user_id),
                     "source": "telegram",
                     "item_id": item_id,
-                },
+                })
+                return signal
+
+            # Standard message or bid - Use TelegramSignal for Signal Integrity
+            signal.signal_type = cast(SignalType, SignalType.SIGNAL_TYPE_TELEGRAM)
+            signal.telegram = TelegramSignal(
+                user_id=user_id,
+                chat_id=chat_id,
+                message_text=text,
             )
+            signal.metadata.from_dict({
+                "chat_id": str(chat_id),
+                "user_id": str(user_id),
+                "source": "telegram",
+                "item_id": item_id,
+            })
+            return signal
 
         if isinstance(event, CallbackQuery):
             user_id = event.from_user.id
             chat_id = event.message.chat.id if event.message else 0
 
-            return Signal(
-                identifier=signal_id,
-                signal_type=cast(SignalType, SignalType.SIGNAL_TYPE_TELEGRAM),
-                timestamp=datetime.now(UTC),
-                telegram=TelegramSignal(
-                    user_id=user_id,
-                    chat_id=chat_id,
-                    callback_data=event.data or "",
-                ),
-                metadata={
-                    "chat_id": str(chat_id),
-                    "user_id": str(user_id),
-                    "source": "telegram",
-                },
+            signal.signal_type = cast(SignalType, SignalType.SIGNAL_TYPE_TELEGRAM)
+            signal.telegram = TelegramSignal(
+                user_id=user_id,
+                chat_id=chat_id,
+                callback_data=event.data or "",
             )
+            signal.metadata.from_dict({
+                "chat_id": str(chat_id),
+                "user_id": str(user_id),
+                "source": "telegram",
+            })
+            return signal
 
-        return Signal(
-            identifier=signal_id,
-            signal_type=cast(SignalType, SignalType.SIGNAL_TYPE_UNSPECIFIED),
-            timestamp=datetime.now(UTC),
-        )
+        signal.signal_type = cast(SignalType, SignalType.SIGNAL_TYPE_UNSPECIFIED)
+        return signal
 
     def from_event(self, event: Any) -> tuple[int, str, Any | None]:
         """
         Convert internal NATS event to (chat_id, user-friendly markdown, optional keyboard).
         """
         metadata = getattr(event, "metadata", {})
+        if hasattr(metadata, "to_dict"):
+             metadata = metadata.to_dict()
+
         chat_id = int(metadata.get("chat_id", "0"))
 
         if not chat_id:
@@ -166,10 +163,12 @@ class TelegramTranslator:
             elif event_type == "negotiation_ui_required":
                 # Handle Vision Report Card
                 price = 0.0
-                vision_data_raw = metadata.get("vision_result")
-                if vision_data_raw:
+                v = metadata.get("vision_result")
+                # If vision_result is already a dict (from Struct), no need to json.loads
+                if v:
                     try:
-                        v = json.loads(vision_data_raw)
+                        if isinstance(v, str):
+                            v = json.loads(v)
                         name = sanitize_markdown(v.get("name", "Unknown Asset"))
                         color = sanitize_markdown(v.get("meta", {}).get("color", "Unknown"))
                         confidence = v.get("meta", {}).get("confidence", "0.0")

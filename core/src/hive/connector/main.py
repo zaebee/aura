@@ -7,7 +7,8 @@ from aura_core import (
     BaseConnector,
     SkillRegistry,
 )
-from aura_core.gen.aura.core.v1 import (
+from aura_core_gen.aura.core.google import protobuf
+from aura_core_gen.aura.core.v1 import (
     ActionType,
     Context,
     Intent,
@@ -91,11 +92,11 @@ class HiveConnector(BaseConnector):
             negotiation=neg_obs,
             event_type=event_type,
             trace=context.trace,
-            metadata={
+            metadata=protobuf.Struct().from_dict({
                 "item_id": str(context.hive.item_identifier if context.hive else context.identifier),
                 "agent_did": str(context.hive.offer.agent_did if context.hive and context.hive.offer else "unknown"),
                 "payment_uri": str(neg_obs.payment_uri or ""),
-            },
+            }),
         )
 
     async def _handle_crypto_lock(
@@ -107,7 +108,7 @@ class HiveConnector(BaseConnector):
         """Encrypts the reservation code and creates a locked deal via Skills/MarketService."""
         try:
             item_id = context.hive.item_identifier if context.hive else context.identifier
-            item_name = context.metadata.get("item_name", "Aura Item")
+            item_name = str(context.metadata.to_dict().get("item_name", "Aura Item"))
             price = action.negotiation.price if action.negotiation else 0.0
             agent_did = context.hive.offer.agent_did if context.hive and context.hive.offer else "unknown"
 
@@ -121,7 +122,7 @@ class HiveConnector(BaseConnector):
             if not obs.success:
                 raise ValueError(f"Price conversion failed: {obs.error}")
 
-            crypto_amount = obs.metadata.get("amount", 0.0)
+            crypto_amount = float(str(obs.metadata.to_dict().get("amount", 0.0)))
 
             # MarketService creates the offer
             payment_instructions, payment_uri = await self.market_service.create_offer(

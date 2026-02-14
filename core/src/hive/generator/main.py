@@ -4,7 +4,7 @@ from typing import Any
 import betterproto
 import structlog
 from aura_core import Generator, SkillRegistry
-from aura_core.gen.aura.core.v1 import Observation
+from aura_core_gen.aura.core.v1 import Observation
 
 from config import get_settings
 
@@ -50,7 +50,7 @@ class HiveGenerator(Generator[Observation, Any]):
                     price = getattr(res_val, "proposed_price", 0.0)
 
             if observation.metadata:
-                agent_did = observation.metadata.get("agent_did", "")
+                agent_did = str(observation.metadata.to_dict().get("agent_did", ""))
 
             # Emit binary negotiation event via Pulse Protein
             await self.registry.execute(

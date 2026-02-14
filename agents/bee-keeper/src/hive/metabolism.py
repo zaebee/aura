@@ -3,7 +3,7 @@ import time
 import structlog
 
 from config import KeeperSettings
-from aura_core.gen.aura.core.v1 import (
+from aura_core_gen.aura.core.v1 import (
     AuditObservation,
 )
 from .aggregator import BeeAggregator

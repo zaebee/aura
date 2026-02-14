@@ -3,7 +3,7 @@ from datetime import UTC, datetime
 from typing import Any, cast
 
 import betterproto
-from aura_core.gen.aura.core.v1 import (
+from aura_core_gen.aura.core.v1 import (
     AgentIdentity,
     NegotiationSignal,
     Observation,
@@ -35,16 +35,17 @@ class MCPTranslator:
             )
 
         if tool_name == "search":
-            return Signal(
+            sig = Signal(
                 identifier=signal_id,
                 signal_type=cast(SignalType, SignalType.SIGNAL_TYPE_UNSPECIFIED),
                 timestamp=datetime.now(UTC),
-                metadata={
-                    "query": str(kwargs.get("query", "")),
-                    "limit": str(kwargs.get("limit", 3)),
-                    "intent": "search",
-                },
             )
+            sig.metadata.from_dict({
+                "query": str(kwargs.get("query", "")),
+                "limit": str(kwargs.get("limit", 3)),
+                "intent": "search",
+            })
+            return sig
 
         return Signal(
             identifier=signal_id,

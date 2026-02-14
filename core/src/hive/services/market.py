@@ -1,6 +1,7 @@
 """
 Market service for managing transaction-locked negotiation deals.
 Handles deal creation, payment verification, and secret revelation.
+Aligned with chromosomal DNA v0.3.0.
 """
 
 import logging
@@ -9,8 +10,13 @@ import uuid
 from datetime import UTC, datetime, timedelta
 from typing import Any
 
-from aura.negotiation.v1 import negotiation_pb2  # type: ignore
 from aura_core import SkillProtocol
+from aura_core_gen.aura.negotiation.v1 import (
+    CheckDealStatusResponse,
+    CryptoPaymentInstructions,
+    DealSecret,
+    PaymentProof,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -18,13 +24,7 @@ logger = logging.getLogger(__name__)
 class MarketService:
     """
     Service for managing locked deals that require crypto payment.
-
-    Responsibilities:
-    - Creating locked deals with unique payment memos
-    - Encrypting secrets via Transaction Protein
-    - Checking payment status via blockchain verification
-    - Revealing decrypted secrets after payment confirmation
-    - Managing deal expiration
+    Uses betterproto chromosomal types.
     """
 
     def __init__(
@@ -33,14 +33,6 @@ class MarketService:
         transaction: SkillProtocol,
         pulse: SkillProtocol | None = None,
     ):
-        """
-        Initialize market service.
-
-        Args:
-            persistence: Persistence Protein for database operations
-            transaction: Transaction Protein for blockchain verification and encryption
-            pulse: Pulse Protein for event emission
-        """
         self.persistence = persistence
         self.transaction = transaction
         self.pulse = pulse
@@ -54,27 +46,20 @@ class MarketService:
         currency: str,
         buyer_did: str | None = None,
         ttl_seconds: int = 3600,
-    ) -> tuple[negotiation_pb2.CryptoPaymentInstructions, str]:
-        """
-        Creates a locked deal and returns payment instructions.
-        """
-        # Generate unique memo
+    ) -> tuple[CryptoPaymentInstructions, str]:
+        """Creates a locked deal and returns payment instructions."""
         memo = self._generate_unique_memo()
-
-        # Calculate expiration time
         now = datetime.now(UTC)
         expires_at = now + timedelta(seconds=ttl_seconds)
 
-        # Encrypt secret via Transaction Protein
-        encrypt_obs = await self.transaction.execute(
-            "encrypt_secret", {"secret": secret}
-        )
+        encrypt_obs = await self.transaction.execute("encrypt_secret", {"secret": secret})
         if not encrypt_obs.success:
             raise ValueError(f"Encryption failed: {encrypt_obs.error}")
-        encrypted_secret = encrypt_obs.data
+
+        # In v0.3.0, obsidian_data/metadata struct is used
+        encrypted_secret = encrypt_obs.metadata.to_dict().get("encrypted_secret") or encrypt_obs.error
 
         deal_id = uuid.uuid4()
-        # Create locked deal record via Persistence Protein (Excited state in Redis)
         obs = await self.persistence.execute(
             "set_excited_state",
             {
@@ -94,25 +79,8 @@ class MarketService:
         if not obs.success:
             raise ValueError(f"Failed to create deal: {obs.error}")
 
-        logger.info(
-            "deal_created",
-            extra={
-                "deal_id": str(deal_id),
-                "item_id": item_id,
-                "item_name": item_name,
-                "price": price,
-                "currency": currency,
-                "memo": memo,
-                "expires_at": expires_at.isoformat(),
-                "buyer_did": buyer_did,
-            },
-        )
-
-        # Get transaction provider info
         addr_obs = await self.transaction.execute("get_address", {})
         network_obs = await self.transaction.execute("get_network_name", {})
-
-        # Generate payment URI via Transaction Protein
         uri_obs = await self.transaction.execute(
             "generate_payment_request",
             {
@@ -122,53 +90,50 @@ class MarketService:
                 "label": f"Aura Hive - {item_name}",
             },
         )
-        payment_uri = uri_obs.data if uri_obs.success else ""
 
-        # Return payment instructions
+        addr = addr_obs.metadata.to_dict().get("address", "unknown")
+        network = network_obs.metadata.to_dict().get("network", "unknown")
+        payment_uri = uri_obs.metadata.to_dict().get("uri", "")
+
         return (
-            negotiation_pb2.CryptoPaymentInstructions(
+            CryptoPaymentInstructions(
                 deal_id=str(deal_id),
-                wallet_address=addr_obs.data if addr_obs.success else "unknown",
+                wallet_address=addr,
                 amount=price,
                 currency=currency,
                 memo=memo,
-                network=network_obs.data if network_obs.success else "unknown",
+                network=network,
                 expires_at=int(expires_at.timestamp()),
             ),
             payment_uri,
         )
 
-    async def check_status(
-        self, deal_id: str
-    ) -> negotiation_pb2.CheckDealStatusResponse:
-        """
-        Checks the payment status of a locked deal.
-        """
+    async def check_status(self, deal_id: str) -> CheckDealStatusResponse:
+        """Checks the payment status of a locked deal."""
         deal_uuid = uuid.UUID(deal_id)
-
-        # Query deal from Persistence Protein
         obs = await self.persistence.execute("get_deal_by_id", {"deal_id": deal_uuid})
 
-        if not obs.success or not obs.data:
-            logger.info("Deal not found", extra={"deal_id": deal_id})
-            return negotiation_pb2.CheckDealStatusResponse(status="NOT_FOUND")
+        if not obs.success:
+            return CheckDealStatusResponse(status="NOT_FOUND")
 
-        deal = obs.data
+        deal = obs.metadata.to_dict()
+        if not deal:
+             return CheckDealStatusResponse(status="NOT_FOUND")
+
         now = datetime.now(UTC)
-        expires_at = deal["expires_at"]
-        if isinstance(expires_at, str):
-            expires_at = datetime.fromisoformat(expires_at)
+        expires_at_raw = deal.get("expires_at")
+        expires_at = datetime.fromisoformat(expires_at_raw) if isinstance(expires_at_raw, str) else expires_at_raw
 
-        if deal["status"] == "PENDING" and now > expires_at:
+        if deal.get("status") == "PENDING" and now > expires_at:
             await self.persistence.execute(
                 "update_deal_status", {"deal_id": deal_uuid, "status": "EXPIRED"}
             )
-            return negotiation_pb2.CheckDealStatusResponse(status="EXPIRED")
+            return CheckDealStatusResponse(status="EXPIRED")
 
-        if deal["status"] == "PAID":
+        if deal.get("status") == "PAID":
             return await self._build_paid_response(deal)
 
-        if deal["status"] == "PENDING":
+        if deal.get("status") == "PENDING":
             proof_obs = await self.transaction.execute(
                 "verify_settlement",
                 {
@@ -178,22 +143,20 @@ class MarketService:
                 },
             )
 
-            if proof_obs.success and proof_obs.data:
-                proof = proof_obs.data
-                # Move to Ground State (Postgres)
+            if proof_obs.success:
+                proof_data = proof_obs.metadata.to_dict()
                 await self.persistence.execute(
                     "confirm_ground_state",
                     {
                         "deal_id": deal_uuid,
                         "status": "PAID",
-                        "transaction_hash": proof["transaction_hash"],
-                        "block_number": proof["block_number"],
-                        "from_address": proof["from_address"],
-                        "paid_at": proof["confirmed_at"],
+                        "transaction_hash": proof_data["transaction_hash"],
+                        "block_number": proof_data["block_number"],
+                        "from_address": proof_data["from_address"],
+                        "paid_at": proof_data["confirmed_at"],
                     },
                 )
 
-                # Emit NegotiationAccepted Pollen event
                 if self.pulse:
                     await self.pulse.execute(
                         "emit_negotiation",
@@ -202,75 +165,68 @@ class MarketService:
                             "action": "accept",
                             "price": deal["final_price"],
                             "item_id": deal["item_id"],
-                            "agent_did": deal["buyer_did"] or "unknown",
+                            "agent_did": deal.get("buyer_did") or "unknown",
                         },
                     )
 
                 deal["status"] = "PAID"
-                deal["transaction_hash"] = proof["transaction_hash"]
-                deal["block_number"] = proof["block_number"]
-                deal["from_address"] = proof["from_address"]
-                deal["paid_at"] = proof["confirmed_at"]
-
+                deal.update(proof_data)
                 return await self._build_paid_response(deal)
             else:
                 return await self._build_pending_response(deal)
 
-        return negotiation_pb2.CheckDealStatusResponse(status=deal["status"])
+        return CheckDealStatusResponse(status=str(deal.get("status", "NOT_FOUND")))
 
     def _generate_unique_memo(self) -> str:
         return secrets.token_urlsafe(6)[:8]
 
-    async def _build_paid_response(
-        self, deal: dict[str, Any]
-    ) -> negotiation_pb2.CheckDealStatusResponse:
-        """
-        Builds response for PAID deals with decrypted secret via Transaction Protein.
-        """
+    async def _build_paid_response(self, deal: dict[str, Any]) -> CheckDealStatusResponse:
         decrypt_obs = await self.transaction.execute(
             "decrypt_secret", {"encrypted_secret": deal["secret_content"]}
         )
         if not decrypt_obs.success:
             raise ValueError(f"Decryption failed: {decrypt_obs.error}")
-        decrypted_secret = decrypt_obs.data
 
-        secret = negotiation_pb2.DealSecret(
-            reservation_code=decrypted_secret,
-            item_name=deal["item_name"],
-            final_price=deal["final_price"],
-            paid_at=int(deal["paid_at"].timestamp()) if deal["paid_at"] else 0,
-        )
+        decrypted_secret = decrypt_obs.metadata.to_dict().get("secret", "")
 
-        proof = negotiation_pb2.PaymentProof(
-            transaction_hash=deal["transaction_hash"] or "",
-            block_number=deal["block_number"] or "",
-            from_address=deal["from_address"] or "",
-            confirmed_at=int(deal["paid_at"].timestamp()) if deal["paid_at"] else 0,
-        )
+        paid_at_raw = deal.get("paid_at")
+        paid_at_ts = int(datetime.fromisoformat(paid_at_raw).timestamp()) if isinstance(paid_at_raw, str) else 0
 
-        return negotiation_pb2.CheckDealStatusResponse(
+        return CheckDealStatusResponse(
             status="PAID",
-            secret=secret,
-            proof=proof,
+            secret=DealSecret(
+                reservation_code=decrypted_secret,
+                item_name=deal.get("item_name", ""),
+                final_price=float(deal.get("final_price", 0.0)),
+                paid_at=paid_at_ts,
+            ),
+            proof=PaymentProof(
+                transaction_hash=deal.get("transaction_hash") or "",
+                block_number=str(deal.get("block_number") or ""),
+                from_address=deal.get("from_address") or "",
+                confirmed_at=paid_at_ts,
+            )
         )
 
-    async def _build_pending_response(
-        self, deal: dict[str, Any]
-    ) -> negotiation_pb2.CheckDealStatusResponse:
+    async def _build_pending_response(self, deal: dict[str, Any]) -> CheckDealStatusResponse:
         addr_obs = await self.transaction.execute("get_address", {})
         network_obs = await self.transaction.execute("get_network_name", {})
 
-        instructions = negotiation_pb2.CryptoPaymentInstructions(
-            deal_id=str(deal["id"]),
-            wallet_address=addr_obs.data if addr_obs.success else "unknown",
-            amount=deal["final_price"],
-            currency=deal["currency"],
-            memo=deal["payment_memo"],
-            network=network_obs.data if network_obs.success else "unknown",
-            expires_at=int(deal["expires_at"].timestamp()),
-        )
+        addr = addr_obs.metadata.to_dict().get("address", "unknown")
+        network = network_obs.metadata.to_dict().get("network", "unknown")
 
-        return negotiation_pb2.CheckDealStatusResponse(
+        expires_at_raw = deal.get("expires_at")
+        expires_at_ts = int(datetime.fromisoformat(expires_at_raw).timestamp()) if isinstance(expires_at_raw, str) else 0
+
+        return CheckDealStatusResponse(
             status="PENDING",
-            payment_instructions=instructions,
+            payment_instructions=CryptoPaymentInstructions(
+                deal_id=str(deal.get("id")),
+                wallet_address=addr,
+                amount=float(deal.get("final_price", 0.0)),
+                currency=deal.get("currency", ""),
+                memo=deal.get("payment_memo", ""),
+                network=network,
+                expires_at=expires_at_ts,
+            )
         )

@@ -3,7 +3,7 @@ from typing import Any
 import nats
 import structlog
 from aiogram import Bot
-from aura_core.gen.aura.core.v1 import Event as ProtoEvent
+from aura_core_gen.aura.core.v1 import Event as ProtoEvent
 from opentelemetry import trace
 from translator import TelegramTranslator
 

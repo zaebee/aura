@@ -1,7 +1,7 @@
 import asyncio
 import json
 from dataclasses import dataclass, field
-from typing import Any
+from typing import Any, cast
 
 import nats
 import nats.errors
@@ -13,7 +13,7 @@ from aura_core import (
     SkillRegistry,
     find_hive_root,
 )
-from aura_core.gen.aura.core.v1 import (
+from aura_core_gen.aura.core.v1 import (
     AuditObservation,
     Context,
 )
@@ -70,7 +70,9 @@ class BeeConnector(Connector[AuditObservation, BeeObservation, Context]):
         # 1. Post to GitHub (if not a heartbeat)
         comment_url = ""
         injuries = []
-        event_name = context.metadata.get("event_name", "manual")
+
+        ctx_meta = context.metadata.to_dict() if hasattr(context.metadata, "to_dict") else {}
+        event_name = ctx_meta.get("event_name", "manual")
         if event_name != "schedule":
             comment_url = await self._post_to_github(report, context)
             if not comment_url and self.gh:
@@ -139,8 +141,8 @@ class BeeConnector(Connector[AuditObservation, BeeObservation, Context]):
             return ""
 
         message = self._format_github_message(report)
-        event_data_json = context.metadata.get("event_data", "{}")
-        event_data = json.loads(event_data_json)
+        meta = context.metadata.to_dict() if hasattr(context.metadata, "to_dict") else {}
+        event_data = cast(dict[str, Any], meta.get("event_data", {}))
 
         pr_num = None
         if "pull_request" in event_data:
@@ -160,7 +162,8 @@ class BeeConnector(Connector[AuditObservation, BeeObservation, Context]):
                 "body": message,
             },
         )
-        return str(obs.metadata.get("url", "")) if obs.success else ""
+        obs_meta = obs.metadata.to_dict() if hasattr(obs.metadata, "to_dict") else {}
+        return str(obs_meta.get("url", "")) if obs.success else ""
 
     def _format_github_message(self, report: AuditObservation) -> str:
         status_emoji = "🍯" if report.is_pure else "⚠️"
@@ -176,15 +179,12 @@ class BeeConnector(Connector[AuditObservation, BeeObservation, Context]):
         else:
             msg += "**The Hive's structure is sanctified.**\n"
 
-        reflective_heresies = report.metadata.get("reflective_heresies", "[]")
-        try:
-             reflective_heresies_list = json.loads(reflective_heresies)
-             if reflective_heresies_list:
-                msg += "\n**Reflective Insights (The Inquisitor's Eye):**\n"
-                for rh in reflective_heresies_list:
-                    msg += f"- {rh}\n"
-        except Exception:
-             pass
+        meta = report.metadata.to_dict() if hasattr(report.metadata, "to_dict") else {}
+        reflective_heresies_list: list[str] = cast(list[str], meta.get("reflective_heresies", []))
+        if reflective_heresies_list:
+            msg += "\n**Reflective Insights (The Inquisitor's Eye):**\n"
+            for rh in reflective_heresies_list:
+                msg += f"- {rh}\n"
 
         if report.reasoning:
             msg += f"\n<details>\n<summary>Keeper's Reasoning</summary>\n\n{report.reasoning}\n</details>"

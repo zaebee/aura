@@ -6,7 +6,7 @@ import uuid
 from collections import deque
 from datetime import UTC, datetime
 
-from aura_core.gen.aura.core.v1 import Event, LogEvent
+from aura_core_gen.aura.core.v1 import Event, LogEvent
 from nats.aio.client import Client as NATS
 
 

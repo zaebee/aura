@@ -12,7 +12,7 @@ from aura_core import (
 from aura_core import (
     MetabolicLoop as BaseMetabolicLoop,
 )
-from aura_core.gen.aura.core.v1 import (
+from aura_core_gen.aura.core.v1 import (
     Context,
     Intent,
     Observation,

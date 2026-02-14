@@ -1,17 +1,16 @@
 import re
 from datetime import datetime
-from typing import Any
+from typing import Any, cast
 
 import litellm
 import structlog
-import json
 
 from config import KeeperSettings
 from aura_core import (
     ALLOWED_CHAMBERS,
     find_hive_root,
 )
-from aura_core.gen.aura.core.v1 import (
+from aura_core_gen.aura.core.v1 import (
     AuditObservation,
     Context,
 )
@@ -106,15 +105,15 @@ class BeeGenerator:
         now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
         # Resource stats (pure Python)
-        hive_metrics_json = context.metadata.get("hive_metrics", "{}")
-        metrics = json.loads(hive_metrics_json)
-        success_rate = metrics.get("negotiation_success_rate", 0.0)
+        ctx_meta = context.metadata.to_dict() if hasattr(context.metadata, "to_dict") else {}
+        metrics = cast(dict[str, Any], ctx_meta.get("hive_metrics", {}))
+        success_rate = cast(float, metrics.get("negotiation_success_rate", 0.0))
 
         # Formatting Blight vs Heresy
         # If all LLMs failed, it's a Blight
-        llm_unavailable = report.metadata.get("llm_unavailable", "False") == "True"
-        brain_status_json = context.metadata.get("brain_status", "{}")
-        brain_status = json.loads(brain_status_json)
+        rep_meta = report.metadata.to_dict() if hasattr(report.metadata, "to_dict") else {}
+        llm_unavailable = bool(rep_meta.get("llm_unavailable", False))
+        brain_status = cast(dict[str, Any], ctx_meta.get("brain_status", {}))
         status_label = "PURE" if report.is_pure else "IMPURE"
 
         if llm_unavailable or (brain_status and not any(brain_status.values())):
@@ -140,15 +139,11 @@ class BeeGenerator:
                 new_entry += f"- {formatted_h}\n"
 
         # Chronicle reflective findings isolated from the Transformer's deterministic logic
-        reflective_heresies_json = report.metadata.get("reflective_heresies", "[]")
-        try:
-             reflective_heresies = json.loads(reflective_heresies_json)
-             if reflective_heresies:
-                new_entry += "\n**Reflective Insights (The Inquisitor's Eye):**\n"
-                for rh in reflective_heresies:
-                    new_entry += f"- {rh}\n"
-        except Exception:
-             pass
+        reflective_heresies: list[str] = cast(list[str], rep_meta.get("reflective_heresies", []))
+        if reflective_heresies:
+            new_entry += "\n**Reflective Insights (The Inquisitor's Eye):**\n"
+            for rh in reflective_heresies:
+                new_entry += f"- {rh}\n"
 
         if observation.injuries:
             new_entry += "\n**🤕 Injuries (Physical Blockages):**\n"
@@ -156,7 +151,7 @@ class BeeGenerator:
                 new_entry += f"- {injury}\n"
 
         # Hidden metadata for "Cost of Governance"
-        new_entry += f"\n<!-- metadata\nexecution_time: {report.execution_time:.2f}s\ntoken_usage: {report.token_usage}\nevent: {context.metadata.get('event_name')}\n-->\n"
+        new_entry += f"\n<!-- metadata\nexecution_time: {report.execution_time:.2f}s\ntoken_usage: {report.token_usage}\nevent: {ctx_meta.get('event_name')}\n-->\n"
         new_entry += "\n---\n\n"
 
         # To keep it simple and fulfill the log nature, we rebuild the file header + current status + audit log.

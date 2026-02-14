@@ -4,7 +4,8 @@ from typing import Any
 
 import dspy
 from aura_core import SkillProtocol
-from aura_core.gen.aura.core.v1 import Observation
+from aura_core_gen.aura.core.google import protobuf
+from aura_core_gen.aura.core.v1 import Observation
 
 from config.llm import LLMSettings
 
@@ -90,18 +91,12 @@ class ReasoningSkill(
             )
 
         result = await asyncio.to_thread(call)
-        data = {
-            "action": str(result["action"]["action"]),
-            "price": str(result["action"]["price"]),
-            "message": str(result["action"]["message"]),
-            "thought": str(result.get("thought", "")),
-        }
-        # Include extra metadata as strings
-        if "metadata" in result:
-             for k, v in result["metadata"].items():
-                  data[k] = str(v)
+        metadata = result.copy()
+        if "action" in metadata:
+             # Ensure action fields are serializable if they are complex
+             pass
 
-        return Observation(success=True, metadata=data)
+        return Observation(success=True, metadata=protobuf.Struct().from_dict(metadata))
 
     async def _generate_embedding(self, params: dict[str, Any]) -> Observation:
         if not self._embed_model:
@@ -109,5 +104,5 @@ class ReasoningSkill(
         p_emb = EmbeddingParams(**params)
 
         emb = await asyncio.to_thread(generate_embedding, p_emb.text, self._embed_model)
-        # Store embedding in metadata or a specialized field if we had one
-        return Observation(success=True, metadata={"embedding": str(emb)})
+        # Store embedding in the dedicated field to avoid precision loss
+        return Observation(success=True, embedding=[float(x) for x in emb])

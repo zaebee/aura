@@ -29,12 +29,13 @@ class CustomBuildHook(BuildHookInterface):
             logger.warning("DNA Source (proto) not found in: %s", possible_proto_paths)
             return
 
-        out_dir = project_root / "src" / "aura_core" / "gen"
+        out_dir = project_root / "gen-proto" / "aura_core_gen"
         out_dir.mkdir(parents=True, exist_ok=True)
 
-        logger.info("🧬 Bio-Digital Transcription starting...")
+        logger.info("🧬 Bio-Digital Transcription starting (Chromosomal split)...")
 
-        proto_file = proto_dir / "aura" / "dna" / "v1" / "dna.proto"
+        # Find all .proto files in chromosomal structure
+        proto_files = list(proto_dir.rglob("*.proto"))
 
         try:
             result = subprocess.run(  # nosec B603
@@ -44,8 +45,7 @@ class CustomBuildHook(BuildHookInterface):
                     "grpc_tools.protoc",
                     f"--proto_path={proto_dir}",
                     f"--python_betterproto_out={out_dir}",
-                    str(proto_file),
-                ],
+                ] + [str(p) for p in proto_files],
                 capture_output=True,
                 text=True,
             )
@@ -54,13 +54,15 @@ class CustomBuildHook(BuildHookInterface):
                 logger.error(f"❌ Protoc Error:\n{result.stderr}")
                 raise RuntimeError("Protoc failed")
 
-            google_shim_dir = Path(out_dir) / "aura" / "dna" / "google"
-            google_shim_dir.mkdir(parents=True, exist_ok=True)
+            # Inject Google Shim and py.typed
+            for chromosome in ["core", "assets"]:
+                shim_dir = out_dir / "aura" / chromosome / "google"
+                shim_dir.mkdir(parents=True, exist_ok=True)
+                with open(shim_dir / "__init__.py", "w") as f:
+                    f.write("from betterproto.lib.google import protobuf\n")
 
-            shim_file = google_shim_dir / "__init__.py"
-            with open(shim_file, "w") as f:
-                f.write("# 🧬 Aura Hive Google Shim for Betterproto\n")
-                f.write("from betterproto.lib.google import protobuf\n")
+            with open(out_dir / "py.typed", "w") as f:
+                f.write("")
 
             self._ensure_init_files(out_dir)
 

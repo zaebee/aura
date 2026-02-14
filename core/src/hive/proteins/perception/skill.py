@@ -2,7 +2,8 @@ from typing import Any
 
 import structlog
 from aura_core import SkillProtocol
-from aura_core.gen.aura.core.v1 import Observation
+from aura_core_gen.aura.core.google import protobuf
+from aura_core_gen.aura.core.v1 import Observation
 
 from config.perception import PerceptionSettings
 
@@ -58,6 +59,6 @@ class PerceptionSkill(
         item = await self.provider.perceive_image(p.image_bytes)
 
         if "error" in item:
-            return Observation(success=False, error=item["error"], metadata={k: str(v) for k, v in item.items()})
+            return Observation(success=False, error=item["error"], metadata=protobuf.Struct().from_dict(item))
 
-        return Observation(success=True, metadata={k: str(v) for k, v in PerceiveImageResult(**item).model_dump().items()})
+        return Observation(success=True, metadata=protobuf.Struct().from_dict(PerceiveImageResult(**item).model_dump()))

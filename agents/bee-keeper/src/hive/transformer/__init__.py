@@ -14,7 +14,7 @@ from aura_core import (
     Transformer,
     find_hive_root,
 )
-from aura_core.gen.aura.core.v1 import (
+from aura_core_gen.aura.core.v1 import (
     AuditObservation,
     Context,
 )
@@ -67,10 +67,12 @@ class BeeTransformer(Transformer[Context, AuditObservation]):
         # ATCG Purity: Transformer returns a single AuditObservation.
         is_pure = len(structural_findings) == 0 and purity_analysis.get("is_pure", True)
 
+        from aura_core_gen.aura.core.google import protobuf
+
         metadata = {
-            "structural_heresies": json.dumps(structural_findings),
-            "reflective_heresies": json.dumps(purity_analysis.get("heresies", [])),
-            "llm_unavailable": str(purity_analysis.get("llm_unavailable", False)),
+            "structural_findings": structural_findings,
+            "reflective_heresies": purity_analysis.get("heresies", []),
+            "llm_unavailable": purity_analysis.get("llm_unavailable", False),
         }
 
         return AuditObservation(
@@ -80,7 +82,7 @@ class BeeTransformer(Transformer[Context, AuditObservation]):
             reasoning=str(purity_analysis.get("reasoning", "")),
             token_usage=int(purity_analysis.get("token_usage", 0)),
             execution_time=0.0,
-            metadata=metadata,
+            metadata=protobuf.Struct().from_dict(metadata),
         )
 
     def _deterministic_audit(self, context: Context) -> list[str]:
@@ -181,7 +183,13 @@ class BeeTransformer(Transformer[Context, AuditObservation]):
                         f"Pattern Heresy: Raw 'os.getenv()' detected in diff: `{added_code}`. Use `settings` instead."
                     )
 
-                # 5. Protocol Enforcement (Ensure classes in ATCG folders implement generic protocols)
+                # 5. Genomic Purity Check (No legacy imports)
+                if "aura_core.types" in added_code:
+                    heresies.append(
+                        f"Genomic Heresy: Legacy import `aura_core.types` detected in diff: `{added_code}`. Use chromosomal DNA (`aura_core_gen.aura.*`) instead."
+                    )
+
+                # 6. Protocol Enforcement (Ensure classes in ATCG folders implement generic protocols)
                 if "class " in added_code and ":" in added_code:
                     # Check if it's in an ATCG nucleotide
                     is_atcg_file = any(

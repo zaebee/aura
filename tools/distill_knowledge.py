@@ -25,7 +25,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 
 import yaml
-from aura_core.gen.aura.knowledge.v1 import (
+from aura_core_gen.aura.knowledge.v1 import (
     ArchitecturalKnowledge,
     ATCGMPhase,
     ChamberDefinition,

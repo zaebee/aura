@@ -1,4 +1,3 @@
-import json
 import time
 from typing import Any, cast
 
@@ -9,7 +8,8 @@ from aura_core import (
     map_action,
     resolve_brain_path,
 )
-from aura_core.gen.aura.core.v1 import (
+from aura_core_gen.aura.core.google import protobuf
+from aura_core_gen.aura.core.v1 import (
     ActionType,
     Context,
     Intent,
@@ -36,7 +36,7 @@ class RuleBasedStrategy:
         context: Context,
         request_id: str | None = None,
     ) -> Intent:
-        item_data = context.metadata
+        item_data = context.metadata.to_dict()
         bid = 0.0
         if context.hive and context.hive.offer:
             bid = context.hive.offer.bid_amount
@@ -45,7 +45,7 @@ class RuleBasedStrategy:
             return Intent(
                 action=cast(ActionType, ActionType.ACTION_TYPE_REJECT),
                 reasoning="<think>Item not found. Rejecting.</think>",
-                metadata={"reason_code": "ITEM_NOT_FOUND"},
+                metadata=protobuf.Struct().from_dict({"reason_code": "ITEM_NOT_FOUND"}),
                 negotiation=NegotiationIntent(
                     price=0.0,
                     message="Item not found",
@@ -57,20 +57,20 @@ class RuleBasedStrategy:
             return Intent(
                 action=cast(ActionType, ActionType.ACTION_TYPE_EVALUATE), # UI REQUIRED Surrogate
                 reasoning="<think>Bid exceeds security threshold. UI confirmation required.</think>",
-                metadata={"template_id": "high_value_confirm"},
+                metadata=protobuf.Struct().from_dict({"template_id": "high_value_confirm"}),
                 negotiation=NegotiationIntent(
                     price=bid,
                     message=f"Bid of ${bid} exceeds security threshold",
                 ),
             )
 
-        floor_price = float(item_data.get("floor_price", "0.0"))
+        floor_price = float(str(item_data.get("floor_price", 0.0)))
         # Rule: Bid below floor price - counter with floor price
         if bid < floor_price:
             return Intent(
                 action=cast(ActionType, ActionType.ACTION_TYPE_COUNTER),
                 reasoning=f"<think>Bid {bid} below floor {floor_price}. Countering.</think>",
-                metadata={"reason_code": "BELOW_FLOOR"},
+                metadata=protobuf.Struct().from_dict({"reason_code": "BELOW_FLOOR"}),
                 negotiation=NegotiationIntent(
                     price=floor_price,
                     message=f"We cannot accept less than ${floor_price}.",
@@ -81,7 +81,7 @@ class RuleBasedStrategy:
         return Intent(
             action=cast(ActionType, ActionType.ACTION_TYPE_ACCEPT),
             reasoning="<think>Bid at or above floor price. Accepting.</think>",
-            metadata={"reservation_code": f"RULE-{int(time.time())}"},
+            metadata=protobuf.Struct().from_dict({"reservation_code": f"RULE-{int(time.time())}"}),
             negotiation=NegotiationIntent(
                 price=bid,
                 message="Offer accepted.",
@@ -104,18 +104,15 @@ class AuraTransformer(Transformer[Context, Intent]):
             compiled_path = settings.llm.compiled_program_path
         self.brain_path = resolve_brain_path(compiled_path or "")
 
-    def _get_cpu_load(self, context: Context) -> float:
-        vitals_json = context.metadata.get("vitals_json")
-        if vitals_json:
-            try:
-                vitals_dict = json.loads(vitals_json)
-                return float(vitals_dict.get("cpu_usage_percent", 0.0))
-            except Exception:
-                pass
+    def _get_cpu_load(self, metadata: dict[str, Any]) -> float:
+        vitals = metadata.get("vitals")
+        if isinstance(vitals, dict):
+            return float(vitals.get("cpu_usage_percent", 0.0))
         return 0.0
 
-    def _build_economic_context(self, context: Context) -> dict:
-        cpu_load = self._get_cpu_load(context)
+    def _build_economic_context(self, context: Context) -> dict[str, Any]:
+        metadata = context.metadata.to_dict()
+        cpu_load = self._get_cpu_load(metadata)
         constraints = []
         if cpu_load > 80.0:
             constraints.append("SYSTEM_LOAD_HIGH: Be extremely concise.")
@@ -134,15 +131,15 @@ class AuraTransformer(Transformer[Context, Intent]):
             reputation = context.hive.offer.reputation
 
         return {
-            "base_price": float(context.metadata.get("base_price", "0.0")),
-            "floor_price": float(context.metadata.get("floor_price", "0.0")),
+            "base_price": float(str(metadata.get("base_price", 0.0))),
+            "floor_price": float(str(metadata.get("floor_price", 0.0))),
             "reputation": reputation,
             "system_constraints": constraints,
-            "meta": context.metadata,
-            "vision_result": context.metadata
-            if context.metadata.get("source") == "vision"
+            "meta": metadata,
+            "vision_result": metadata
+            if metadata.get("source") == "vision"
             else None,
-            "vision_error": context.metadata.get("vision_error"),
+            "vision_error": metadata.get("vision_error"),
             "vision_confidence_threshold": vision_confidence_threshold,
         }
 
@@ -186,7 +183,8 @@ class AuraTransformer(Transformer[Context, Intent]):
                 )
 
             # reasoning protein returns data in metadata
-            result = getattr(obs, "metadata", {})
+            result_struct = getattr(obs, "metadata", None)
+            result = result_struct.to_dict() if hasattr(result_struct, "to_dict") else {}
 
             # Implement <think> tag logic for transparency
             raw_thought = result.get("thought", "")
@@ -200,7 +198,7 @@ class AuraTransformer(Transformer[Context, Intent]):
             return Intent(
                 action=cast(ActionType, map_action(str(result.get("action", "")))),
                 reasoning=wrapped_thought,
-                metadata=action_metadata,
+                metadata=protobuf.Struct().from_dict(action_metadata),
                 negotiation=NegotiationIntent(
                     price=float(result.get("price", 0.0)),
                     message=str(result.get("message", "")),

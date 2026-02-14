@@ -32,14 +32,8 @@ class MCPReceptor:
             Search hotels via Aura.
             """
             logger.info("mcp_receptor_search", query=query)
-            # For search, we might use a direct protein or a specific metabolic flow
-            # For now, we'll keep the proxy-like behavior if metabolism doesn't handle search directly
-            # but the goal is to use MetabolicLoop.execute.
-            # Assuming metabolism has a way to handle search signals.
             signal = self.translator.to_signal("search", query=query, limit=limit)
-            observation = await self.metabolism.execute(
-                signal.SerializeToString(), is_nats=True
-            )
+            observation = await self.metabolism.execute(signal)
             return cast(str, self.translator.from_observation(observation))
 
         @self.mcp.tool
@@ -49,7 +43,5 @@ class MCPReceptor:
             """
             logger.info("mcp_receptor_negotiate", item_id=item_id, bid=bid)
             signal = self.translator.to_signal("negotiate", item_id=item_id, bid=bid)
-            observation = await self.metabolism.execute(
-                signal.SerializeToString(), is_nats=True
-            )
+            observation = await self.metabolism.execute(signal)
             return cast(str, self.translator.from_observation(observation))

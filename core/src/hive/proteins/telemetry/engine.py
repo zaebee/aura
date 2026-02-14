@@ -6,7 +6,7 @@ from typing import Any, cast
 
 import httpx
 import structlog
-from aura_core.gen.aura.core.v1 import SystemVitals
+from aura_core_gen.aura.core.v1 import SystemVitals
 from opentelemetry import trace
 from opentelemetry.exporter.otlp.proto.grpc.trace_exporter import OTLPSpanExporter
 from opentelemetry.sdk.resources import Resource
@@ -82,6 +82,7 @@ async def fetch_vitals(metrics_cache: MetricsCache, settings: Any) -> SystemVita
             cpu_usage_percent=float(cached.get("cpu_usage_percent", 0.0)),
             memory_usage_mb=float(cached.get("memory_usage_mb", 0.0)),
             timestamp=datetime.now(UTC),
+            cached=True,
         )
 
     cpu_q = (
@@ -120,6 +121,7 @@ async def fetch_vitals(metrics_cache: MetricsCache, settings: Any) -> SystemVita
                         cpu_usage_percent=float(cached_dict.get("cpu_usage_percent", 0.0)),
                         memory_usage_mb=float(cached_dict.get("memory_usage_mb", 0.0)),
                         timestamp=datetime.now(UTC),
+                        cached=True,
                     )
                 return SystemVitals(
                     status="unstable",
@@ -152,6 +154,7 @@ async def fetch_vitals(metrics_cache: MetricsCache, settings: Any) -> SystemVita
                 cpu_usage_percent=float(cached_dict.get("cpu_usage_percent", 0.0)),
                 memory_usage_mb=float(cached_dict.get("memory_usage_mb", 0.0)),
                 timestamp=datetime.now(UTC),
+                cached=True,
             )
         return SystemVitals(
             status="unstable", timestamp=datetime.now(UTC)

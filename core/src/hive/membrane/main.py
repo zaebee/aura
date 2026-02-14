@@ -2,7 +2,8 @@ from typing import Any, cast
 
 import structlog
 from aura_core import Membrane, SkillRegistry
-from aura_core.gen.aura.core.v1 import (
+from aura_core_gen.aura.core.google import protobuf
+from aura_core_gen.aura.core.v1 import (
     ActionType,
     Context,
     Intent,
@@ -22,8 +23,20 @@ class HiveMembrane(Membrane[Any, Intent, Context]):
         self.registry = registry
 
     async def inspect_inbound(self, signal: Any) -> Any:
-        if hasattr(signal, "bid_amount") and signal.bid_amount <= 0:
-            logger.warning("membrane_inbound_invalid_bid", bid_amount=signal.bid_amount)
+        import betterproto
+        from aura_core_gen.aura.core.v1 import Signal
+
+        # Robust extraction for both legacy objects and Protos
+        bid_amount = 0.0
+        if isinstance(signal, Signal):
+            payload_name, payload_value = betterproto.which_one_of(signal, "payload")
+            if payload_name == "negotiation" and payload_value:
+                bid_amount = getattr(payload_value, "bid_amount", 0.0)
+        else:
+            bid_amount = getattr(signal, "bid_amount", 0.0)
+
+        if bid_amount < 0:
+            logger.warning("membrane_inbound_invalid_bid", bid_amount=bid_amount)
             raise ValueError("Bid amount must be positive")
 
         injection_patterns = [
@@ -32,13 +45,26 @@ class HiveMembrane(Membrane[Any, Intent, Context]):
             "you are now",
         ]
         fields_to_scan = []
-        if hasattr(signal, "item_identifier"):
-             fields_to_scan.append(("item_identifier", signal.item_identifier))
-        elif hasattr(signal, "item_id"):
-             fields_to_scan.append(("item_id", signal.item_id))
 
-        if hasattr(signal, "agent") and hasattr(signal.agent, "did"):
-            fields_to_scan.append(("agent.did", signal.agent.did))
+        if isinstance(signal, Signal):
+            payload_name, payload_value = betterproto.which_one_of(signal, "payload")
+            if payload_name == "negotiation" and payload_value:
+                fields_to_scan.append(("item_identifier", getattr(payload_value, "item_identifier", "")))
+                agent = getattr(payload_value, "agent", None)
+                if agent:
+                    fields_to_scan.append(("agent.did", getattr(agent, "did", "")))
+            elif payload_name == "perception" and payload_value:
+                agent = getattr(payload_value, "agent", None)
+                if agent:
+                    fields_to_scan.append(("agent.did", getattr(agent, "did", "")))
+        else:
+            if hasattr(signal, "item_identifier"):
+                fields_to_scan.append(("item_identifier", signal.item_identifier))
+            elif hasattr(signal, "item_id"):
+                fields_to_scan.append(("item_id", signal.item_id))
+
+            if hasattr(signal, "agent") and hasattr(signal.agent, "did"):
+                fields_to_scan.append(("agent.did", signal.agent.did))
 
         for field_name, value in fields_to_scan:
             if isinstance(value, str):
@@ -51,18 +77,31 @@ class HiveMembrane(Membrane[Any, Intent, Context]):
                             pattern=pattern,
                         )
                         if field_name in ["item_id", "item_identifier"]:
-                            if hasattr(signal, "item_identifier"):
-                                signal.item_identifier = "INVALID_ID_POTENTIAL_INJECTION"
-                            elif hasattr(signal, "item_id"):
-                                signal.item_id = "INVALID_ID_POTENTIAL_INJECTION"
+                            if isinstance(signal, Signal):
+                                payload_name, payload_value = betterproto.which_one_of(signal, "payload")
+                                if payload_name == "negotiation" and payload_value:
+                                    payload_value.item_identifier = "INVALID_ID_POTENTIAL_INJECTION"
+                            else:
+                                if hasattr(signal, "item_identifier"):
+                                    signal.item_identifier = "INVALID_ID_POTENTIAL_INJECTION"
+                                elif hasattr(signal, "item_id"):
+                                    signal.item_id = "INVALID_ID_POTENTIAL_INJECTION"
                         elif field_name == "agent.did":
-                            signal.agent.did = "REDACTED"
+                            if isinstance(signal, Signal):
+                                payload_name, payload_value = betterproto.which_one_of(signal, "payload")
+                                if payload_name in ["negotiation", "perception"] and payload_value:
+                                    agent = getattr(payload_value, "agent", None)
+                                    if agent:
+                                        agent.did = "REDACTED"
+                            else:
+                                signal.agent.did = "REDACTED"
         return signal
 
     async def inspect_outbound(
         self, decision: Intent, context: Context
     ) -> Intent:
-        floor_price = float(context.metadata.get("floor_price", "0.0"))
+        ctx_meta = context.metadata.to_dict()
+        floor_price = float(str(ctx_meta.get("floor_price", 0.0)))
 
         # 1. Handle explicit failures
         if decision.action == ActionType.ACTION_TYPE_ERROR:
@@ -77,7 +116,7 @@ class HiveMembrane(Membrane[Any, Intent, Context]):
                     },
                 )
                 if obs_safe.success:
-                    safe_price = getattr(obs_safe, "metadata", {}).get("safe_price", safe_price)
+                    safe_price = float(str(obs_safe.metadata.to_dict().get("safe_price", safe_price)))
 
             return self._override_with_safe_offer(
                 decision, safe_price, "FAILURE_RECOVERY"
@@ -97,7 +136,7 @@ class HiveMembrane(Membrane[Any, Intent, Context]):
         if not self.registry:
             return decision
 
-        internal_cost = float(context.metadata.get("internal_cost", str(floor_price)))
+        internal_cost = float(str(ctx_meta.get("internal_cost", floor_price)))
         guard_context = {"floor_price": floor_price, "internal_cost": internal_cost}
 
         price = decision.negotiation.price if decision.negotiation else 0.0
@@ -121,10 +160,9 @@ class HiveMembrane(Membrane[Any, Intent, Context]):
             # Determine reason for logging/override using structured error code
             reason = "SAFETY_VIOLATION"
             safe_price = floor_price * 1.05
-            meta = getattr(obs, "metadata", {})
-            if isinstance(meta, dict):
-                 reason = str(meta.get("error_code", "SAFETY_VIOLATION"))
-                 safe_price = float(meta.get("safe_price", safe_price))
+            obs_meta = obs.metadata.to_dict()
+            reason = str(obs_meta.get("error_code", "SAFETY_VIOLATION"))
+            safe_price = float(str(obs_meta.get("safe_price", safe_price)))
 
             return self._override_with_safe_offer(decision, safe_price, reason)
 
@@ -142,11 +180,11 @@ class HiveMembrane(Membrane[Any, Intent, Context]):
         return Intent(
             action=cast(ActionType, ActionType.ACTION_TYPE_COUNTER),
             reasoning=new_thought,
-            metadata={
+            metadata=protobuf.Struct().from_dict({
                 "original_decision": str(original.action.name),
                 "original_price": str(orig_price),
                 "override_reason": str(reason),
-            },
+            }),
             negotiation=NegotiationIntent(
                 price=rounded_price,
                 message=f"I've reached my final limit for this item. My best offer is ${rounded_price:.2f}.",

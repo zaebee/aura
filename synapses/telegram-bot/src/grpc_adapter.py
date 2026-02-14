@@ -1,6 +1,6 @@
 import grpclib.exceptions
 import structlog
-from aura_core.gen.aura.negotiation.v1 import (
+from aura_core_gen.aura.negotiation.v1 import (
     NegotiateRequest,
     NegotiateResponse,
     NegotiationServiceStub,

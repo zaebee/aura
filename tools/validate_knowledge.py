@@ -20,7 +20,7 @@ Checks:
 import sys
 from pathlib import Path
 
-from aura_core.gen.aura.knowledge.v1 import ArchitecturalKnowledge
+from aura_core_gen.aura.knowledge.v1 import ArchitecturalKnowledge
 
 # Add aura-core to path for imports
 repo_root = Path(__file__).parent.parent
