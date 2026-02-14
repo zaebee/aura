@@ -87,6 +87,17 @@ class LockedDeal(Base):
     )
 
 
+class SanctifiedWallet(Base):
+    __tablename__ = "sanctified_wallets"
+    identifier: Mapped[str] = mapped_column(String, primary_key=True)
+    asset_domain: Mapped[str] = mapped_column(String, nullable=False, default="")
+    sanctified_at: Mapped[datetime] = mapped_column(
+        DateTime, nullable=False, default=lambda: datetime.now(UTC)
+    )
+    sanctified_by: Mapped[str] = mapped_column(String, nullable=False, default="system")
+    meta: Mapped[dict[str, Any]] = mapped_column(JSONB, default={})
+
+
 class RedisCache:
     """Redis-based caching and excited state storage."""
 

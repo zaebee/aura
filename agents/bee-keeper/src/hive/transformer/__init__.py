@@ -14,6 +14,7 @@ from aura_core import (
     Transformer,
     find_hive_root,
 )
+from aura_core_gen.aura.core.google import protobuf
 from aura_core_gen.aura.core.v1 import (
     AuditObservation,
     Context,
@@ -66,8 +67,6 @@ class BeeTransformer(Transformer[Context, AuditObservation]):
 
         # ATCG Purity: Transformer returns a single AuditObservation.
         is_pure = len(structural_findings) == 0 and purity_analysis.get("is_pure", True)
-
-        from aura_core_gen.aura.core.google import protobuf
 
         metadata = {
             "structural_findings": structural_findings,
@@ -145,12 +144,14 @@ class BeeTransformer(Transformer[Context, AuditObservation]):
 
         # 3. Metric Verification
         metrics = context.bee.hive_metrics
-        success_rate = metrics.get("negotiation_success_rate", 1.0)
-
-        if success_rate < 0.7:
-            heresies.append(
-                f"Hive Alert: 'negotiation_success_rate' is {success_rate:.2f}, which is below the critical threshold of 0.7. The Hive flow is obstructed."
-            )
+        # Only verify metrics if status is known (not stale Prometheus data)
+        status_str = str(metrics.get("status", "")).lower()
+        if status_str not in ("unknown", ""):
+            success_rate = metrics.get("negotiation_success_rate", 1.0)
+            if success_rate < 0.7:
+                heresies.append(
+                    f"Hive Alert: 'negotiation_success_rate' is {success_rate:.2f}, which is below the critical threshold of 0.7. The Hive flow is obstructed."
+                )
 
         # 4. Pattern Enforcement (No raw print or os.getenv in diff)
         diff_lines = context.bee.git_diff.splitlines()

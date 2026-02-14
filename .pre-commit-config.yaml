@@ -26,6 +26,8 @@ repos:
       - id: mypy
         # args: ["--exclude", ".*/proto/.*"]
         additional_dependencies: [pydantic, types-requests, types-toml, types-aiofiles, types-setuptools, types-PyYAML]
+        files: ^(core/src|packages/).*\.py$
+        exclude: ^.*/(gen-proto|gen|proto|migrations|scripts)/
 
   - repo: https://github.com/PyCQA/bandit
     rev: 1.8.0

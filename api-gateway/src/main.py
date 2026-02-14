@@ -92,7 +92,7 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None]:
             await app.state.nc.drain()
             await app.state.nc.close()
 
-        channel.close() # Synchronous in grpclib
+        channel.close()  # Synchronous in grpclib
         logger.info(
             "shutdown_complete", grpc_channel_closed=True, nats_connection_closed=True
         )
@@ -140,7 +140,9 @@ async def negotiate(
     payload_dict = getattr(request.state, "parsed_body", {})
     payload = NegotiationRequestHTTP(**payload_dict)
 
-    logger.info("negotiate_request_received", item_id=payload.item_id, agent_did=agent_did)
+    logger.info(
+        "negotiate_request_received", item_id=payload.item_id, agent_did=agent_did
+    )
 
     try:
         from aura_core_gen.aura.negotiation.v1 import (
@@ -152,7 +154,7 @@ async def negotiate(
             item_id=payload.item_id,
             bid_amount=payload.bid_amount,
             currency_code=payload.currency,
-            agent=NegotiationAgentIdentity(did=agent_did, reputation_score=1.0)
+            agent=NegotiationAgentIdentity(did=agent_did, reputation_score=1.0),
         )
 
         result_name, result_val = betterproto.which_one_of(response, "result")
@@ -164,7 +166,9 @@ async def negotiate(
         }
 
         if result_name == "accepted" and result_val:
-            reveal_name, reveal_val = betterproto.which_one_of(result_val, "reveal_method")
+            reveal_name, reveal_val = betterproto.which_one_of(
+                result_val, "reveal_method"
+            )
             if reveal_name == "crypto_payment":
                 payment = result_val.crypto_payment
                 output["payment_required"] = True
@@ -199,9 +203,9 @@ async def negotiate(
 
         return output
 
-    except Exception as e:
+    except grpclib.GRPCError as e:
         logger.error("negotiate_failed", error=str(e))
-        raise HTTPException(status_code=500, detail=f"Negotiation failed: {e}") from e
+        raise HTTPException(status_code=500, detail=f"gRPC error: {e}") from e
 
 
 class SearchRequestHTTP(BaseModel):
@@ -281,8 +285,12 @@ async def analyze_vision(
             result = cast(dict[str, Any], json.loads(response.data.decode()))
         except Exception:
             from aura_core_gen.aura.core.v1 import Observation
+
             obs = Observation().parse(response.data)
-            result = cast(dict[str, Any], obs.metadata.to_dict() if hasattr(obs.metadata, "to_dict") else {})
+            result = cast(
+                dict[str, Any],
+                obs.metadata.to_dict() if hasattr(obs.metadata, "to_dict") else {},
+            )
             if not result and obs.error:
                 result = {"error": obs.error}
 
@@ -290,7 +298,9 @@ async def analyze_vision(
         return result
     except Exception as e:
         logger.error("vision_failed", error=str(e))
-        raise HTTPException(status_code=500, detail=f"Vision analysis failed: {e}") from e
+        raise HTTPException(
+            status_code=500, detail=f"Vision analysis failed: {e}"
+        ) from e
 
 
 @app.post("/v1/deals/{deal_id}/status")
