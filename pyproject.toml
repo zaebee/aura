@@ -104,6 +104,7 @@ known-first-party = ["config", "db", "embeddings", "llm_strategy", "proto"]
 
 [tool.mypy]
 python_version = "3.12"
+explicit_package_bases = true
 disallow_untyped_defs = true
 check_untyped_defs = true
 warn_return_any = true
@@ -132,19 +133,12 @@ module = [
 ignore_missing_imports = true
 
 [tool.bandit]
-exclude_dirs = ["tests", "venv", ".venv", "vision_test.py"]
+exclude_dirs = ["tests", "venv", ".venv"]
 skips = ["B101"] # B101 is assert_used, often okay in some contexts but bandit defaults can be strict.
 
 [[tool.mypy.overrides]]
 module = ["proto.*", "aura.*", "src.proto.*", "hive.proto.*", "hive.proto.aura.*"]
 ignore_errors = true
-
-# TransactionSkill uses low-level Solana primitives (keypair bytes/str coercions)
-# that return Any at the type level — suppressed here, checked via make lint with MYPYPATH.
-[[tool.mypy.overrides]]
-module = ["hive.proteins.transaction.*"]
-ignore_errors = true
-
 
 # [[tool.uv.index]]
 # url = "https://buf.build/gen/python"

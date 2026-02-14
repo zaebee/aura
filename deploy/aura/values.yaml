@@ -85,8 +85,6 @@ core:
     PYTHONPATH: /app/core/src:/app/core/gen-proto
     AURA_LLM__MODEL: "mistral/mistral-large-latest"  # Can override: openai/gpt-4o, ollama/mistral, rule
     AURA_CRYPTO__ENABLED: "false"
-    AURA_SERVER__PROMETHEUS_URL: "http://monitoring-kube-prometheus-prometheus.monitoring:9090"
-    AURA_SERVER__OTEL_EXPORTER_OTLP_ENDPOINT: ""
 
 # PostgreSQL Database Configuration
 postgres:

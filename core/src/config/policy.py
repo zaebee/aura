@@ -13,6 +13,3 @@ class SafetySettings(BaseModel):
     allowed_addons: list[str] = Field(
         default_factory=lambda: ["Breakfast", "Late checkout", "Room upgrade"]
     )
-    audit_signing_key: str = ""
-    treasury_balance: float = 0.0
-    multisig_threshold_percent: float = 0.0

@@ -20,7 +20,6 @@ from .engine import (
     InventoryItem,
     LockedDeal,
     RedisCache,
-    SanctifiedWallet,
 )
 from .schema import DealSchema, ItemSchema
 
@@ -59,12 +58,12 @@ class PersistenceSkill(
             "list_items_semantic_search": self._vector_search,
             "get_first_item": self._get_first_item,
             "upsert_item": self._upsert_item,
-            "sanctify_wallet": self._sanctify_wallet,
-            "is_wallet_sanctified": self._is_wallet_sanctified,
         }
 
         # Asset Enzymes: Domain-to-method mapping for "Tissue Specificity"
-        self._ASSET_ENZYMES: dict[int, Callable[[Asset, InventoryItem], None]] = {
+        self._ASSET_ENZYMES: dict[
+            int, Callable[[Asset, InventoryItem], None]
+        ] = {
             int(AssetDomain.ASSET_DOMAIN_VEHICLE): self._store_vehicle_attributes,
             int(AssetDomain.ASSET_DOMAIN_PROPERTY): self._store_property_attributes,
             int(AssetDomain.ASSET_DOMAIN_EQUIPMENT): self._store_equipment_attributes,
@@ -167,9 +166,7 @@ class PersistenceSkill(
 
         result = await asyncio.to_thread(fetch)
         if result:
-            return Observation(
-                success=True, metadata=protobuf.Struct().from_dict(result)
-            )
+            return Observation(success=True, metadata=protobuf.Struct().from_dict(result))
         return Observation(success=False, error="item_not_found")
 
     async def _get_first_item(self, params: dict[str, Any]) -> Observation:
@@ -182,9 +179,7 @@ class PersistenceSkill(
 
         result = await asyncio.to_thread(fetch)
         if result:
-            return Observation(
-                success=True, metadata=protobuf.Struct().from_dict(result)
-            )
+            return Observation(success=True, metadata=protobuf.Struct().from_dict(result))
         return Observation(success=False, error="no_items_found")
 
     async def _set_excited_state(self, params: dict[str, Any]) -> Observation:
@@ -216,15 +211,11 @@ class PersistenceSkill(
 
             # Move to Postgres
             # Re-map bytes and dates from Redis JSON
-            if "secret_content" in deal_data and isinstance(
-                deal_data["secret_content"], str
-            ):
+            if "secret_content" in deal_data and isinstance(deal_data["secret_content"], str):
                 deal_data["secret_content"] = bytes.fromhex(deal_data["secret_content"])
 
             if "expires_at" in deal_data and isinstance(deal_data["expires_at"], str):
-                deal_data["expires_at"] = datetime.fromisoformat(
-                    deal_data["expires_at"]
-                )
+                deal_data["expires_at"] = datetime.fromisoformat(deal_data["expires_at"])
 
             # Call _create_deal logic (save to Postgres)
             create_obs = await self._create_deal(deal_data)
@@ -279,9 +270,7 @@ class PersistenceSkill(
 
         result = await asyncio.to_thread(fetch)
         if result:
-            return Observation(
-                success=True, metadata=protobuf.Struct().from_dict(result)
-            )
+            return Observation(success=True, metadata=protobuf.Struct().from_dict(result))
         return Observation(success=False, error="deal_not_found")
 
     async def _get_deal_by_memo_handler(self, params: dict[str, Any]) -> Observation:
@@ -298,9 +287,7 @@ class PersistenceSkill(
 
         result = await asyncio.to_thread(fetch)
         if result:
-            return Observation(
-                success=True, metadata=protobuf.Struct().from_dict(result)
-            )
+            return Observation(success=True, metadata=protobuf.Struct().from_dict(result))
         return Observation(success=False, error="deal_not_found")
 
     async def _update_deal_status(self, params: dict[str, Any]) -> Observation:
@@ -345,11 +332,7 @@ class PersistenceSkill(
 
             def upsert() -> bool:
                 with self._get_session() as session:
-                    item = (
-                        session.query(InventoryItem)
-                        .filter_by(id=asset.identifier)
-                        .first()
-                    )
+                    item = session.query(InventoryItem).filter_by(id=asset.identifier).first()
                     if not item:
                         item = InventoryItem(id=asset.identifier)
                         session.add(item)
@@ -443,62 +426,6 @@ class PersistenceSkill(
         except Exception as e:
             return Observation(success=False, error=str(e))
 
-    async def _sanctify_wallet(self, params: dict[str, Any]) -> Observation:
-        wallet_address = params.get("wallet_address")
-        if not wallet_address:
-            return Observation(success=False, error="wallet_address_required")
-        try:
-
-            def upsert() -> None:
-                with self._get_session() as session:
-                    wallet = (
-                        session.query(SanctifiedWallet)
-                        .filter_by(identifier=wallet_address)
-                        .first()
-                    )
-                    if wallet:
-                        wallet.sanctified_at = datetime.now(UTC)
-                        wallet.sanctified_by = params.get("sanctified_by", "system")
-                        wallet.asset_domain = params.get(
-                            "asset_domain", wallet.asset_domain
-                        )
-                        wallet.meta = params.get("meta", wallet.meta)
-                    else:
-                        wallet = SanctifiedWallet(
-                            identifier=wallet_address,
-                            asset_domain=params.get("asset_domain", ""),
-                            sanctified_at=datetime.now(UTC),
-                            sanctified_by=params.get("sanctified_by", "system"),
-                            meta=params.get("meta", {}),
-                        )
-                        session.add(wallet)
-                    session.commit()
-
-            await asyncio.to_thread(upsert)
-            return Observation(success=True)
-        except Exception as e:
-            return Observation(success=False, error=str(e))
-
-    async def _is_wallet_sanctified(self, params: dict[str, Any]) -> Observation:
-        wallet_address = params.get("wallet_address")
-        if not wallet_address:
-            return Observation(success=False, error="wallet_address_required")
-
-        def fetch() -> bool:
-            with self._get_session() as session:
-                return (
-                    session.query(SanctifiedWallet)
-                    .filter_by(identifier=wallet_address)
-                    .first()
-                    is not None
-                )
-
-        sanctified = await asyncio.to_thread(fetch)
-        return Observation(
-            success=True,
-            metadata=protobuf.Struct().from_dict({"sanctified": sanctified}),
-        )
-
     async def _vector_search(self, params: dict[str, Any]) -> Observation:
         query_vector = params.get("query_vector")
         limit = params.get("limit", 5)
@@ -533,6 +460,4 @@ class PersistenceSkill(
         results = await asyncio.to_thread(search)
         # Struct.from_dict expects a dict with standard JSON types.
         # results is a list of dicts, which should be fine.
-        return Observation(
-            success=True, metadata=protobuf.Struct().from_dict({"results": results})
-        )
+        return Observation(success=True, metadata=protobuf.Struct().from_dict({"results": results}))

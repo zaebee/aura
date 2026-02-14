@@ -66,6 +66,15 @@ class CustomBuildHook(BuildHookInterface):
 
             self._ensure_init_files(out_dir)
 
+            # Post-generation fix for double-prefix in negotiation chromosome
+            neg_v1 = out_dir / "aura" / "negotiation" / "v1.py"
+            if neg_v1.exists():
+                content = neg_v1.read_text()
+                content = content.replace(
+                    "from .aura.core import v1", "from aura_core_gen.aura.core import v1"
+                )
+                neg_v1.write_text(content)
+
             logger.info("✅ DNA expressed and packages initialized.")
 
         except Exception as e:

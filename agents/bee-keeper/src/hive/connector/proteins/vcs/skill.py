@@ -2,7 +2,6 @@ from typing import Any
 
 import httpx
 from aura_core import SkillProtocol
-from aura_core_gen.aura.core.google import protobuf
 from aura_core_gen.aura.core.v1 import Observation
 
 from .engine import GitHubProvider
@@ -55,6 +54,8 @@ class VCS_Skill(SkillProtocol[Any, httpx.AsyncClient, dict[str, Any], Observatio
             return Observation(success=False, error=str(e))
 
     async def _post_comment(self, params: dict[str, Any]) -> Observation:
+        from aura_core_gen.aura.core.google import protobuf
+
         assert self.provider is not None
         p = CommentParams(**params)
         url = await self.provider.post_comment(
@@ -68,6 +69,8 @@ class VCS_Skill(SkillProtocol[Any, httpx.AsyncClient, dict[str, Any], Observatio
         )
 
     async def _reply_to_comment(self, params: dict[str, Any]) -> Observation:
+        from aura_core_gen.aura.core.google import protobuf
+
         assert self.provider is not None
         p = ReplyParams(**params)
         url = await self.provider.reply_to_comment(

@@ -4,18 +4,11 @@ import dspy
 import redis.asyncio as redis
 import structlog
 from aura_core import SkillProtocol, SkillRegistry, get_raw_key
-from opentelemetry.instrumentation.grpc import GrpcInstrumentorServer
-from opentelemetry.instrumentation.langchain import LangchainInstrumentor
-from prometheus_client import start_http_server
-from sqlalchemy import create_engine
-from sqlalchemy.orm import sessionmaker
-
 from hive.aggregator import HiveAggregator
 from hive.connector import HiveConnector
 from hive.generator import HiveGenerator
 from hive.membrane import HiveMembrane
 from hive.metabolism import MetabolicLoop
-from hive.metabolism.security import AuditSigner
 from hive.proteins.guard import GuardSkill
 from hive.proteins.guard.engine import OutputGuard
 from hive.proteins.perception import PerceptionSkill
@@ -34,6 +27,11 @@ from hive.proteins.transaction.engine import (
     SolanaProvider,
 )
 from hive.transformer import AuraTransformer
+from opentelemetry.instrumentation.grpc import GrpcInstrumentorServer
+from opentelemetry.instrumentation.langchain import LangchainInstrumentor
+from prometheus_client import start_http_server
+from sqlalchemy import create_engine
+from sqlalchemy.orm import sessionmaker
 
 if TYPE_CHECKING:
     from hive.metabolism import MetabolicLoop
@@ -143,14 +141,8 @@ class HiveCell:
         persistence.bind(self.settings.database, (SessionLocal, engine, redis_client))
 
         # 2. Pulse
-        signer = None
-        if self.settings.safety.audit_signing_key:
-            signer = AuditSigner(self.settings.safety.audit_signing_key)
         pulse = PulseSkill()
-        pulse.bind(
-            self.settings.server,
-            NatsProvider(self.settings.server.nats_url, signer=signer),
-        )
+        pulse.bind(self.settings.server, NatsProvider(self.settings.server.nats_url))
 
         # 3. Reasoning
         lm = None
@@ -210,10 +202,6 @@ class HiveCell:
         self.registry.register("perception", perception)
         if transaction:
             self.registry.register("transaction", transaction)
-
-        guard_skill = cast(GuardSkill, self.registry.get("guard"))
-        if guard_skill:
-            guard_skill.inject_registry(self.registry)
 
         # Initialize all proteins
         for name in self.registry.list_skills():

@@ -84,26 +84,6 @@ class OutputGuard:
             return float(round(floor / (1 - min_m), 2))
         return float(round(floor * 1.05, 2))
 
-    def validate_transaction(
-        self,
-        wallet_address: str,
-        llm_price: float,
-        bid: float,
-        base_price: float,
-        is_sanctified: bool,
-    ) -> float:
-        """
-        CRISPR Rule A: wallet must be sanctified.
-        CRISPR Rule B: price must not exceed Hill-dampened ceiling.
-        Returns the safe capped price.
-        Raises SafetyViolation if Rule A fails.
-        """
-        if not is_sanctified:
-            raise SafetyViolation(f"Wallet not sanctified: {wallet_address}")
-        from hive.metabolism.math import HillDampener
-
-        return float(HillDampener.apply(llm_price, bid, base_price))
-
     def validate_vision(self, vision_result: dict) -> bool:
         """
         Validate VisionSkill output.

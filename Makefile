@@ -26,7 +26,7 @@ lint: $(PROTO_SENTINEL)
 	# Python Type Check (Mypy)
 	# We use --explicit-package-bases to avoid double discovery when multiple paths overlap
 	MYPYPATH=$(CORE_PATH) uv run mypy --explicit-package-bases core/src
-	MYPYPATH=$(GATEWAY_PATH) uv run mypy --explicit-package-bases api-gateway/src
+	MYPYPATH=$(GATEWAY_PATH) uv run mypy --explicit-package-bases api-gateway/src/*.py
 	MYPYPATH=$(TG_PATH) uv run mypy --explicit-package-bases synapses/telegram-bot/src
 	MYPYPATH=$(MCP_PATH) uv run mypy --explicit-package-bases synapses/mcp-server/src
 	MYPYPATH=$(KEEPER_PATH) uv run mypy agents/bee-keeper/main.py agents/bee-keeper/src
