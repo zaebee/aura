@@ -34,8 +34,15 @@ class PulseSkill(
     def get_capabilities(self) -> list[str]:
         return list(self._capabilities.keys())
 
-    def bind(self, settings: ServerSettings, provider: JetStreamProvider) -> None:
+    def bind(
+        self,
+        settings: ServerSettings,
+        provider: JetStreamProvider,
+        signer: Any | None = None,
+    ) -> None:
         self.settings = settings
+        if signer is not None and provider._signer is None:
+            provider._signer = signer
         self.provider = provider
 
     async def initialize(self) -> bool:
