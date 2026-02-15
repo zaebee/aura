@@ -2,10 +2,11 @@ import uuid
 from datetime import UTC, datetime
 from typing import Any, cast
 
-from aura_core import Observation
-from aura_core.gen.aura.dna.v1 import (
+import betterproto
+from aura_core_gen.aura.core.v1 import (
     AgentIdentity,
     NegotiationSignal,
+    Observation,
     Signal,
     SignalType,
 )
@@ -20,11 +21,11 @@ class MCPTranslator:
 
         if tool_name == "negotiate":
             return Signal(
-                signal_id=signal_id,
+                identifier=signal_id,
                 signal_type=cast(SignalType, SignalType.SIGNAL_TYPE_NEGOTIATION),
                 timestamp=datetime.now(UTC),
                 negotiation=NegotiationSignal(
-                    item_id=kwargs.get("item_id", ""),
+                    item_identifier=kwargs.get("item_id", ""),
                     bid_amount=kwargs.get("bid", 0.0),
                     agent=AgentIdentity(
                         did=kwargs.get("agent_did", "mcp-agent"),
@@ -34,22 +35,20 @@ class MCPTranslator:
             )
 
         if tool_name == "search":
-            # For search, we might use metadata to pass the query
-            return Signal(
-                signal_id=signal_id,
-                signal_type=cast(
-                    SignalType, SignalType.SIGNAL_TYPE_UNSPECIFIED
-                ),  # TODO: Create a dedicated SIGNAL_TYPE_SEARCH
+            sig = Signal(
+                identifier=signal_id,
+                signal_type=cast(SignalType, SignalType.SIGNAL_TYPE_UNSPECIFIED),
                 timestamp=datetime.now(UTC),
-                metadata={
-                    "query": kwargs.get("query", ""),
-                    "limit": str(kwargs.get("limit", 3)),
-                    "intent": "search",
-                },
             )
+            sig.metadata.from_dict({
+                "query": str(kwargs.get("query", "")),
+                "limit": str(kwargs.get("limit", 3)),
+                "intent": "search",
+            })
+            return sig
 
         return Signal(
-            signal_id=signal_id,
+            identifier=signal_id,
             signal_type=cast(SignalType, SignalType.SIGNAL_TYPE_UNSPECIFIED),
             timestamp=datetime.now(UTC),
         )
@@ -59,23 +58,22 @@ class MCPTranslator:
         if not observation.success:
             return f"❌ Operation failed: {observation.error or 'Unknown error'}"
 
-        if not observation.data:
-            return "✅ Operation completed but returned no data."
+        if not observation.negotiation:
+            return "✅ Operation completed but returned no negotiation data."
 
-        response = observation.data
-        # The data is a negotiation_pb2.NegotiateResponse protobuf object
-        status = response.WhichOneof("result")
+        neg = observation.negotiation
+        res_name, res_val = betterproto.which_one_of(neg, "result")
 
-        if status == "accepted":
-            final_price = response.accepted.final_price
+        if res_name == "accepted" and res_val:
+            final_price = getattr(res_val, "final_price", 0.0)
             return f"🎉 SUCCESS! Negotiation accepted at ${final_price:.2f}."
-        elif status == "countered":
-            proposed_price = response.countered.proposed_price
-            message = response.countered.human_message or "No reason provided."
+        elif res_name == "countered" and res_val:
+            proposed_price = getattr(res_val, "proposed_price", 0.0)
+            message = getattr(res_val, "human_message", "No reason provided.")
             return f"🔄 COUNTER-OFFER: ${proposed_price:.2f}. Message: {message}"
-        elif status == "rejected":
-            return f"🚫 REJECTED. Reason: {response.rejected.reason_code}"
-        elif status == "ui_required":
-            return f"🚨 HUMAN INTERVENTION REQUIRED. Template: {response.ui_required.template_id}"
+        elif res_name == "rejected" and res_val:
+            reason_code = getattr(res_val, "reason_code", "UNKNOWN")
+            return f"🚫 REJECTED. Reason: {reason_code}"
 
-        return f"✅ Operation completed with unknown status: {status}"
+        # Note: UI Required is now mapped to rejected with reason UI_REQUIRED in connector
+        return f"✅ Operation completed with status: {res_name}"

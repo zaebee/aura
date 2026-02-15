@@ -59,7 +59,7 @@ jobs:
               with:
                   name: proto-stubs
                   path: |
-                      packages/aura-core/src/aura_core/gen
+                      packages/aura-core/gen-proto
                       core/gen-proto
                       api-gateway/gen-proto
                       synapses/telegram-bot/gen-proto

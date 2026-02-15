@@ -3,12 +3,14 @@ import logging
 from typing import Any
 
 import dspy
-from aura_core import Observation, SkillProtocol
+from aura_core import SkillProtocol
+from aura_core_gen.aura.core.google import protobuf
+from aura_core_gen.aura.core.v1 import Observation
 
 from config.llm import LLMSettings
 
 from .engine import generate_embedding, load_brain
-from .schema import EmbeddingParams, NegotiationParams, NegotiationResult
+from .schema import EmbeddingParams, NegotiationParams
 
 logger = logging.getLogger(__name__)
 
@@ -89,14 +91,12 @@ class ReasoningSkill(
             )
 
         result = await asyncio.to_thread(call)
-        data = {
-            "action": result["action"]["action"],
-            "price": result["action"]["price"],
-            "message": result["action"]["message"],
-            "thought": result.get("thought", ""),
-            "metadata": result.get("metadata", {}),
-        }
-        return Observation(success=True, data=NegotiationResult(**data).model_dump())
+        metadata = result.copy()
+        if "action" in metadata:
+             # Ensure action fields are serializable if they are complex
+             pass
+
+        return Observation(success=True, metadata=protobuf.Struct().from_dict(metadata))
 
     async def _generate_embedding(self, params: dict[str, Any]) -> Observation:
         if not self._embed_model:
@@ -104,4 +104,5 @@ class ReasoningSkill(
         p_emb = EmbeddingParams(**params)
 
         emb = await asyncio.to_thread(generate_embedding, p_emb.text, self._embed_model)
-        return Observation(success=True, data=emb)
+        # Store embedding in the dedicated field to avoid precision loss
+        return Observation(success=True, embedding=[float(x) for x in emb])

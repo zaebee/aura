@@ -1,29 +1,32 @@
-import base64
 import json
 import uuid
 from collections.abc import AsyncGenerator, Awaitable, Callable
 from contextlib import asynccontextmanager
-from typing import Annotated, Any
+from datetime import UTC, datetime
+from typing import Annotated, Any, cast
 
-import grpc
+import betterproto
+import grpclib
 import nats
-from aura.negotiation.v1 import (
-    negotiation_pb2,  # type: ignore
-    negotiation_pb2_grpc,  # type: ignore
+from aura_core_gen.aura.core.v1 import (
+    AgentIdentity,
+    PerceptionSignal,
+    Signal,
+    SignalType,
+)
+from aura_core_gen.aura.negotiation.v1 import (
+    NegotiationServiceStub,
 )
 from fastapi import (
     Depends,
     FastAPI,
     File,
     Form,
-    Header,
     HTTPException,
     Request,
     Response,
     UploadFile,
 )
-from grpc_health.v1 import health_pb2_grpc
-from health import register_health_endpoints
 from logging_config import (
     bind_request_id,
     clear_request_context,
@@ -32,7 +35,6 @@ from logging_config import (
     get_logger,
 )
 from opentelemetry.instrumentation.fastapi import FastAPIInstrumentor
-from opentelemetry.instrumentation.grpc import GrpcInstrumentorClient
 from pydantic import BaseModel
 from security import verify_signature
 from starlette.middleware.cors import CORSMiddleware
@@ -49,53 +51,36 @@ logger = get_logger("api-gateway")
 # Initialize OpenTelemetry tracing
 service_name = settings.otel_service_name
 tracer = init_telemetry(service_name, str(settings.otel_exporter_otlp_endpoint))
-logger.info(
-    "telemetry_initialized",
-    service_name=service_name,
-    endpoint=settings.otel_exporter_otlp_endpoint,
-)
 
-# Parse CORS origins from settings (comma-separated string to list)
+# Parse CORS origins
 origins = [
     origin.strip() for origin in settings.cors_origins.split(",") if origin.strip()
 ]
-logger.info("cors_configured", allowed_origins=origins)
 
-# Instrument gRPC client for distributed tracing
-GrpcInstrumentorClient().instrument()
-
-# Declare globals that will be initialized during startup
-channel: grpc.aio.Channel
-stub: negotiation_pb2_grpc.NegotiationServiceStub
-health_stub: health_pb2_grpc.HealthStub
+# Declare globals
+channel: grpclib.client.Channel
+stub: NegotiationServiceStub
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncGenerator[None]:
-    """Manage gRPC and NATS lifecycle (startup and shutdown)."""
-    global channel, stub, health_stub
+    """Manage grpclib and NATS lifecycle."""
+    global channel, stub
 
     # --- Startup ---
     logger.info("startup_begin", service="api-gateway")
-    channel = grpc.aio.insecure_channel(settings.core_service_host)
-    stub = negotiation_pb2_grpc.NegotiationServiceStub(channel)
-    health_stub = health_pb2_grpc.HealthStub(channel)
+
+    # grpclib Channel
+    host, port = settings.core_service_host.split(":")
+    channel = grpclib.client.Channel(host, int(port))
+    stub = NegotiationServiceStub(channel)
 
     # NATS Connection for Vision RPC
     app.state.nc = await nats.connect(settings.nats_url)
 
-    # Register health check endpoints
-    register_health_endpoints(
-        app,
-        health_stub,
-        health_check_timeout=settings.health_check_timeout,
-        slow_threshold_ms=settings.health_check_slow_threshold_ms,
-    )
-
     logger.info(
         "startup_complete",
         grpc_target=settings.core_service_host,
-        health_endpoints_registered=True,
     )
 
     try:
@@ -106,13 +91,13 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None]:
         if hasattr(app.state, "nc") and app.state.nc:
             await app.state.nc.drain()
             await app.state.nc.close()
-        await channel.close()
+
+        channel.close() # Synchronous in grpclib
         logger.info(
             "shutdown_complete", grpc_channel_closed=True, nats_connection_closed=True
         )
 
 
-# Initialize FastAPI with lifespan manager
 app = FastAPI(title="Aura Agent Gateway", version="1.0", lifespan=lifespan)
 app.add_middleware(
     CORSMiddleware,
@@ -122,10 +107,8 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Instrument FastAPI for automatic tracing
 FastAPIInstrumentor.instrument_app(app)
 
-# gRPC metadata key for request_id
 REQUEST_ID_METADATA_KEY = "x-request-id"
 
 
@@ -133,27 +116,10 @@ REQUEST_ID_METADATA_KEY = "x-request-id"
 async def request_id_middleware(
     request: Request, call_next: Callable[[Request], Awaitable[Response]]
 ) -> Response:
-    """Middleware to generate and bind request_id for every HTTP request."""
     request_id = str(uuid.uuid4())
     bind_request_id(request_id)
-    logger.info("request_started", method=request.method, path=str(request.url.path))
     try:
-        response = await call_next(request)
-        logger.info(
-            "request_completed",
-            method=request.method,
-            path=str(request.url.path),
-            status_code=response.status_code,
-        )
-        return response
-    except Exception as e:
-        logger.error(
-            "request_failed",
-            method=request.method,
-            path=str(request.url.path),
-            error=str(e),
-        )
-        raise
+        return await call_next(request)
     finally:
         clear_request_context()
 
@@ -168,68 +134,42 @@ class NegotiationRequestHTTP(BaseModel):
 @app.post("/v1/negotiate")
 async def negotiate(
     request: Request,
-    x_agent_token: str | None = Header(None),
     agent_did: str = Depends(verify_signature),
 ) -> dict[str, Any]:
     request_id = get_current_request_id() or str(uuid.uuid4())
-
-    # Get the parsed body from request.state (stored by verify_signature)
     payload_dict = getattr(request.state, "parsed_body", {})
     payload = NegotiationRequestHTTP(**payload_dict)
 
-    logger.info(
-        "negotiate_request_received",
-        item_id=payload.item_id,
-        bid_amount=payload.bid_amount,
-        currency=payload.currency,
-        agent_did=agent_did,  # Use the verified agent_did
-    )
-
-    # Auth Check: Signature verification is now handled by the verify_signature dependency
-    # The agent_did parameter contains the verified DID from the security headers
-
-    # Convert HTTP -> gRPC (Mapping)
-    grpc_request = negotiation_pb2.NegotiateRequest(
-        request_id=request_id,
-        item_id=payload.item_id,
-        bid_amount=payload.bid_amount,
-        currency_code=payload.currency,
-        agent=negotiation_pb2.AgentIdentity(
-            did=agent_did,  # Use the verified agent_did from security headers
-            reputation_score=1.0,
-        ),
-    )
-
-    metadata = [(REQUEST_ID_METADATA_KEY, request_id)]
+    logger.info("negotiate_request_received", item_id=payload.item_id, agent_did=agent_did)
 
     try:
-        logger.info(
-            "grpc_call_started", service="NegotiationService", method="Negotiate"
+        from aura_core_gen.aura.negotiation.v1 import (
+            AgentIdentity as NegotiationAgentIdentity,
         )
-        response = await stub.Negotiate(
-            grpc_request, metadata=metadata, timeout=settings.negotiation_timeout
+
+        response = await stub.negotiate(
+            request_id=request_id,
+            item_id=payload.item_id,
+            bid_amount=payload.bid_amount,
+            currency_code=payload.currency,
+            agent=NegotiationAgentIdentity(did=agent_did, reputation_score=1.0)
         )
-        logger.info(
-            "grpc_call_completed", service="NegotiationService", method="Negotiate"
-        )
-        result_type = response.WhichOneof("result")
+
+        result_name, result_val = betterproto.which_one_of(response, "result")
 
         output = {
             "session_token": response.session_token,
-            "status": result_type,
+            "status": result_name,
             "valid_until": response.valid_until_timestamp,
         }
 
-        if result_type == "accepted":
-            # Check if crypto payment is required (oneof field)
-            reveal_method = response.accepted.WhichOneof("reveal_method")
-
-            if reveal_method == "crypto_payment":
-                # Payment required - return payment instructions
-                payment = response.accepted.crypto_payment
+        if result_name == "accepted" and result_val:
+            reveal_name, reveal_val = betterproto.which_one_of(result_val, "reveal_method")
+            if reveal_name == "crypto_payment":
+                payment = result_val.crypto_payment
                 output["payment_required"] = True
                 output["data"] = {
-                    "final_price": response.accepted.final_price,
+                    "final_price": result_val.final_price,
                     "payment_instructions": {
                         "deal_id": payment.deal_id,
                         "wallet_address": payment.wallet_address,
@@ -240,57 +180,28 @@ async def negotiate(
                         "expires_at": payment.expires_at,
                     },
                 }
-                logger.info(
-                    "negotiation_accepted_with_payment",
-                    final_price=response.accepted.final_price,
-                    deal_id=payment.deal_id,
-                    amount=payment.amount,
-                    currency=payment.currency,
-                )
             else:
-                # Legacy path - reservation code revealed immediately
                 output["payment_required"] = False
                 output["data"] = {
-                    "final_price": response.accepted.final_price,
-                    "reservation_code": response.accepted.reservation_code,
+                    "final_price": result_val.final_price,
+                    "reservation_code": result_val.reservation_code,
                 }
-                logger.info(
-                    "negotiation_accepted",
-                    final_price=response.accepted.final_price,
-                    reservation_code=response.accepted.reservation_code,
-                )
-        elif result_type == "countered":
+        elif result_name == "countered" and result_val:
             output["data"] = {
-                "proposed_price": response.countered.proposed_price,
-                "message": response.countered.human_message,
+                "proposed_price": result_val.proposed_price,
+                "message": result_val.human_message,
             }
-            logger.info(
-                "negotiation_countered",
-                proposed_price=response.countered.proposed_price,
-            )
-        elif result_type == "ui_required":
+        elif result_name == "ui_required" and result_val:
             output["action_required"] = {
-                "template": response.ui_required.template_id,
-                "context": dict(response.ui_required.context_data),
+                "template": result_val.template_id,
+                "context": dict(result_val.context_data),
             }
-            logger.info(
-                "negotiation_ui_required",
-                template_id=response.ui_required.template_id,
-            )
-        elif result_type == "rejected":
-            logger.info("negotiation_rejected")
 
         return output
 
-    except grpc.RpcError as e:
-        logger.error(
-            "grpc_call_failed",
-            service="NegotiationService",
-            method="Negotiate",
-            error=e.details(),
-            code=str(e.code()),
-        )
-        raise HTTPException(status_code=500, detail="Core service error") from e
+    except Exception as e:
+        logger.error("negotiate_failed", error=str(e))
+        raise HTTPException(status_code=500, detail=f"Negotiation failed: {e}") from e
 
 
 class SearchRequestHTTP(BaseModel):
@@ -302,33 +213,11 @@ class SearchRequestHTTP(BaseModel):
 async def search_items(
     request: Request, agent_did: str = Depends(verify_signature)
 ) -> dict[str, Any]:
-    request_id = get_current_request_id() or str(uuid.uuid4())
-
-    # Get the parsed body from request.state (stored by verify_signature)
     payload_dict = getattr(request.state, "parsed_body", {})
     payload = SearchRequestHTTP(**payload_dict)
 
-    logger.info(
-        "search_request_received",
-        query=payload.query,
-        limit=payload.limit,
-        agent_did=agent_did,
-    )
-
-    grpc_req = negotiation_pb2.SearchRequest(query=payload.query, limit=payload.limit)
-
-    # Prepare gRPC metadata with request_id for tracing
-    metadata = [(REQUEST_ID_METADATA_KEY, request_id)]
-
     try:
-        logger.info("grpc_call_started", service="NegotiationService", method="Search")
-        response = await stub.Search(grpc_req, metadata=metadata)
-        logger.info(
-            "grpc_call_completed",
-            service="NegotiationService",
-            method="Search",
-            result_count=len(response.results),
-        )
+        response = await stub.search(query=payload.query, limit=payload.limit)
         results = [
             {
                 "id": r.item_id,
@@ -339,33 +228,16 @@ async def search_items(
             }
             for r in response.results
         ]
-
-        logger.info("search_completed", result_count=len(results))
-
         return {"results": results}
-
-    except grpc.RpcError as e:
-        logger.error(
-            "grpc_call_failed",
-            service="NegotiationService",
-            method="Search",
-            error=e.details(),
-            code=str(e.code()),
-        )
-        raise HTTPException(status_code=500, detail="Core service search error") from e
+    except Exception as e:
+        logger.error("search_failed", error=str(e))
+        raise HTTPException(status_code=500, detail="Search failed") from e
 
 
 @app.get("/v1/system/status")
 async def system_status() -> dict[str, Any]:
-    """
-    Expose internal infrastructure metrics.
-
-    Returns cluster resource usage (CPU, memory) from Prometheus.
-    """
     try:
-        grpc_request = negotiation_pb2.GetSystemStatusRequest()
-        response = await stub.GetSystemStatus(grpc_request)
-
+        response = await stub.get_system_status()
         return {
             "status": response.status,
             "cpu_usage_percent": response.cpu_usage_percent,
@@ -373,103 +245,63 @@ async def system_status() -> dict[str, Any]:
             "timestamp": response.timestamp,
             "cached": response.cached,
         }
-    except grpc.RpcError as e:
-        logger.error("system_status_grpc_error", error=e.details())
-        raise HTTPException(
-            status_code=500, detail="Monitoring service unavailable"
-        ) from e
+    except Exception as e:
+        logger.error("status_failed", error=str(e))
+        raise HTTPException(status_code=500, detail="Monitoring unavailable") from e
 
 
 @app.post("/v1/vision/analyze")
 async def analyze_vision(
-    request: Request,
+    request: Annotated[Request, Any],
     files: Annotated[list[UploadFile], File(...)],
     agent_did: Annotated[str, Depends(verify_signature)],
     focus: Annotated[str | None, Form()] = None,
 ) -> dict[str, Any]:
-    """
-    Vision Cortex Endpoint: Multimodal analysis via NATS RPC to worker swarm.
-    """
     request_id = get_current_request_id() or str(uuid.uuid4())
-
-    logger.info(
-        "vision_request_received",
-        file_count=len(files),
-        focus=focus,
-        agent_did=agent_did,
-    )
-
     try:
-        # 1. Read and encode images
-        images_b64 = []
-        for file in files:
-            image_bytes = await file.read()
-            images_b64.append(base64.b64encode(image_bytes).decode("utf-8"))
+        images_bytes = [await f.read() for f in files]
+        signal = Signal(
+            identifier=request_id,
+            signal_type=cast(SignalType, SignalType.SIGNAL_TYPE_PERCEPTION),
+            timestamp=datetime.now(UTC),
+            perception=PerceptionSignal(
+                image_data=images_bytes,
+                prompt=focus or settings.vision_default_prompt,
+                agent=AgentIdentity(did=agent_did, reputation_score=1.0),
+            ),
+        )
 
-        # 2. Prepare NATS RPC payload
-        payload = {
-            "images": images_b64,
-            "prompt": focus or settings.vision_default_prompt,
-            "request_id": request_id,
-        }
-
-        # 3. Request analysis from the worker swarm
-        logger.info("vision_rpc_sent", subject=settings.vision_nats_subject)
         response = await request.app.state.nc.request(
             settings.vision_nats_subject,
-            json.dumps(payload).encode(),
+            bytes(signal),
             timeout=settings.vision_rpc_timeout,
         )
 
-        # 4. Parse and return result
-        result = json.loads(response.data.decode())
-        if not isinstance(result, dict):
-            raise ValueError(f"Expected dict from vision worker, got {type(result)}")
+        try:
+            result = cast(dict[str, Any], json.loads(response.data.decode()))
+        except Exception:
+            from aura_core_gen.aura.core.v1 import Observation
+            obs = Observation().parse(response.data)
+            result = cast(dict[str, Any], obs.metadata.to_dict() if hasattr(obs.metadata, "to_dict") else {})
+            if not result and obs.error:
+                result = {"error": obs.error}
 
         result["source"] = "vision-cortex"
         return result
-
     except Exception as e:
-        logger.error("vision_request_failed", error=str(e), exc_info=True)
+        logger.error("vision_failed", error=str(e))
         raise HTTPException(status_code=500, detail=f"Vision analysis failed: {e}") from e
 
 
 @app.post("/v1/deals/{deal_id}/status")
-async def check_deal_status(
+async def check_deal_status_endpoint(
     deal_id: str, agent_did: str = Depends(verify_signature)
 ) -> dict[str, Any]:
-    """
-    Check the payment status of a locked deal.
-
-    After payment is confirmed, returns the secret (reservation code).
-    """
-    request_id = get_current_request_id() or str(uuid.uuid4())
-
-    logger.info(
-        "check_deal_status_request",
-        deal_id=deal_id,
-        agent_did=agent_did,
-    )
-
-    grpc_request = negotiation_pb2.CheckDealStatusRequest(deal_id=deal_id)
-    metadata = [(REQUEST_ID_METADATA_KEY, request_id)]
-
     try:
-        logger.info(
-            "grpc_call_started", service="NegotiationService", method="CheckDealStatus"
-        )
-        response = await stub.CheckDealStatus(grpc_request, metadata=metadata)
-        logger.info(
-            "grpc_call_completed",
-            service="NegotiationService",
-            method="CheckDealStatus",
-            status=response.status,
-        )
-
-        output = {"status": response.status}
+        response = await stub.check_deal_status(deal_id=deal_id)
+        output: dict[str, Any] = {"status": response.status}
 
         if response.status == "PAID":
-            # Payment confirmed - reveal secret
             output["secret"] = {
                 "reservation_code": response.secret.reservation_code,
                 "item_name": response.secret.item_name,
@@ -482,13 +314,7 @@ async def check_deal_status(
                 "from_address": response.proof.from_address,
                 "confirmed_at": response.proof.confirmed_at,
             }
-            logger.info(
-                "deal_paid_secret_revealed",
-                deal_id=deal_id,
-                transaction_hash=response.proof.transaction_hash,
-            )
         elif response.status == "PENDING":
-            # Payment not yet received - return payment instructions
             payment = response.payment_instructions
             output["payment_instructions"] = {
                 "deal_id": payment.deal_id,
@@ -499,32 +325,7 @@ async def check_deal_status(
                 "network": payment.network,
                 "expires_at": payment.expires_at,
             }
-            logger.info("deal_pending_payment", deal_id=deal_id)
-        elif response.status == "EXPIRED":
-            logger.info("deal_expired", deal_id=deal_id)
-        elif response.status == "NOT_FOUND":
-            logger.warning("deal_not_found", deal_id=deal_id)
-            raise HTTPException(status_code=404, detail="Deal not found")
-
         return output
-
-    except grpc.RpcError as e:
-        error_code = e.code()
-        logger.error(
-            "grpc_call_failed",
-            service="NegotiationService",
-            method="CheckDealStatus",
-            error=e.details(),
-            code=str(error_code),
-        )
-
-        if error_code == grpc.StatusCode.INVALID_ARGUMENT:
-            raise HTTPException(status_code=400, detail="Invalid deal_id format") from e
-        elif error_code == grpc.StatusCode.UNIMPLEMENTED:
-            raise HTTPException(
-                status_code=501, detail="Crypto payments not enabled"
-            ) from e
-        else:
-            raise HTTPException(
-                status_code=500, detail="Payment verification failed"
-            ) from e
+    except Exception as e:
+        logger.error("check_deal_failed", error=str(e))
+        raise HTTPException(status_code=500, detail="Check deal failed") from e

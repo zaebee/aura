@@ -80,7 +80,7 @@ async def seed() -> None:
             "generate_embedding", {"text": str(raw["desc"])}
         )
         if emb_obs.success:
-            vector = emb_obs.data
+            vector = list(emb_obs.embedding)
         else:
             logger.warning(
                 "embedding_generation_failed_using_dummy",

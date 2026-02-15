@@ -1,5 +1,6 @@
 import re
 from datetime import datetime
+from typing import Any, cast
 
 import litellm
 import structlog
@@ -7,18 +8,18 @@ import structlog
 from config import KeeperSettings
 from aura_core import (
     ALLOWED_CHAMBERS,
-    AuditObservation,
-    BeeContext,
-    BeeObservation,
-    Event,
-    Generator,
     find_hive_root,
 )
+from aura_core_gen.aura.core.v1 import (
+    AuditObservation,
+    Context,
+)
+from ..connector import BeeObservation
 
 logger = structlog.get_logger(__name__)
 
 
-class BeeGenerator(Generator[BeeObservation, Event]):
+class BeeGenerator:
     """G - Generator: Updates documentation and chronicles."""
 
     def __init__(self, settings: KeeperSettings) -> None:
@@ -33,13 +34,13 @@ class BeeGenerator(Generator[BeeObservation, Event]):
             else "You are bee.Keeper, guardian of the Aura Hive."
         )
 
-    async def pulse(self, observation: BeeObservation) -> list[Event]:
+    async def pulse(self, observation: BeeObservation) -> list[Any]:
         """G - Generator: Standard pulse organ. Turns Observation into Events."""
         logger.info("bee_generator_pulse_started")
 
         if observation.report and observation.context:
             # 1. Update llms.txt if needed
-            if ".proto" in observation.context.git_diff:
+            if ".proto" in observation.context.bee.git_diff:
                 logger.info("proto_changes_detected_updating_llms_txt")
                 await self._update_llms_txt(observation.context)
 
@@ -52,7 +53,7 @@ class BeeGenerator(Generator[BeeObservation, Event]):
 
         return []
 
-    async def _update_llms_txt(self, context: BeeContext) -> None:
+    async def _update_llms_txt(self, context: Context) -> None:
         root = find_hive_root()
         llms_txt_path = root / "llms.txt"
         current_llms_txt = llms_txt_path.read_text() if llms_txt_path.exists() else ""
@@ -94,7 +95,7 @@ class BeeGenerator(Generator[BeeObservation, Event]):
     async def _update_hive_state(
         self,
         report: AuditObservation,
-        context: BeeContext,
+        context: Context,
         observation: BeeObservation,
     ) -> None:
         root = find_hive_root()
@@ -104,13 +105,15 @@ class BeeGenerator(Generator[BeeObservation, Event]):
         now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
         # Resource stats (pure Python)
-        metrics = context.hive_metrics
-        success_rate = metrics.get("negotiation_success_rate", 0.0)
+        ctx_meta = context.metadata.to_dict() if hasattr(context.metadata, "to_dict") else {}
+        metrics = cast(dict[str, Any], ctx_meta.get("hive_metrics", {}))
+        success_rate = cast(float, metrics.get("negotiation_success_rate", 0.0))
 
         # Formatting Blight vs Heresy
         # If all LLMs failed, it's a Blight
-        llm_unavailable = report.metadata.get("llm_unavailable", False)
-        brain_status = context.metadata.get("brain_status", {})
+        rep_meta = report.metadata.to_dict() if hasattr(report.metadata, "to_dict") else {}
+        llm_unavailable = bool(rep_meta.get("llm_unavailable", False))
+        brain_status = cast(dict[str, Any], ctx_meta.get("brain_status", {}))
         status_label = "PURE" if report.is_pure else "IMPURE"
 
         if llm_unavailable or (brain_status and not any(brain_status.values())):
@@ -136,7 +139,7 @@ class BeeGenerator(Generator[BeeObservation, Event]):
                 new_entry += f"- {formatted_h}\n"
 
         # Chronicle reflective findings isolated from the Transformer's deterministic logic
-        reflective_heresies = report.metadata.get("reflective_heresies", [])
+        reflective_heresies: list[str] = cast(list[str], rep_meta.get("reflective_heresies", []))
         if reflective_heresies:
             new_entry += "\n**Reflective Insights (The Inquisitor's Eye):**\n"
             for rh in reflective_heresies:
@@ -148,7 +151,7 @@ class BeeGenerator(Generator[BeeObservation, Event]):
                 new_entry += f"- {injury}\n"
 
         # Hidden metadata for "Cost of Governance"
-        new_entry += f"\n<!-- metadata\nexecution_time: {report.execution_time:.2f}s\ntoken_usage: {report.token_usage}\nevent: {context.event_name}\n-->\n"
+        new_entry += f"\n<!-- metadata\nexecution_time: {report.execution_time:.2f}s\ntoken_usage: {report.token_usage}\nevent: {ctx_meta.get('event_name')}\n-->\n"
         new_entry += "\n---\n\n"
 
         # To keep it simple and fulfill the log nature, we rebuild the file header + current status + audit log.

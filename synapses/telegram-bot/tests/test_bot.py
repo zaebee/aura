@@ -2,7 +2,7 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 from aiogram.filters import CommandObject
-from aura_core.gen.aura.dna.v1 import Observation as ProtoObservation
+from aura_core_gen.aura.core.v1 import Observation as ProtoObservation
 from receptor import NegotiationStates, TelegramReceptor
 from translator import TelegramTranslator
 
@@ -108,7 +108,7 @@ async def test_process_photo(message, receptor_with_grpc, mock_grpc_adapter):
     message.bot.download_file = AsyncMock(return_value=mock_file_result)
 
     # Mock gRPC response
-    from aura_core.gen.aura.negotiation.v1 import NegotiateResponse, OfferCountered
+    from aura_core_gen.aura.negotiation.v1 import NegotiateResponse, OfferCountered
 
     mock_response = NegotiateResponse(
         countered=OfferCountered(human_message="I see your car. My offer is $500.")

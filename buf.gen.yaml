@@ -2,7 +2,7 @@ version: v2
 plugins:
   # Pydantic models from Proto (Source of Truth)
   - remote: buf.build/community/danielgtaylor-betterproto:v1.2.5
-    out: packages/aura-core/src/aura_core/gen
+    out: packages/aura-core/gen-proto/aura_core_gen
     opt:
       - pydantic_version=2
 

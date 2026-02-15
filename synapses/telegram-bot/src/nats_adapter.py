@@ -9,8 +9,8 @@ Two channels:
 import nats
 import nats.errors
 import structlog
-from aura_core.gen.aura.dna.v1 import Observation as ProtoObservation
-from aura_core.gen.aura.dna.v1 import Signal
+from aura_core_gen.aura.core.v1 import Observation as ProtoObservation
+from aura_core_gen.aura.core.v1 import Signal
 
 logger = structlog.get_logger(__name__)
 
@@ -49,7 +49,7 @@ class NatsAdapter:
             signal_bytes = bytes(signal)
             logger.debug(
                 "adapter_sending_signal",
-                signal_id=signal.signal_id,
+                signal_id=signal.identifier,
                 signal_type=signal.signal_type,
                 subject=self.signal_subject,
             )

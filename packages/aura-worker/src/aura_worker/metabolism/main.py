@@ -87,26 +87,50 @@ class MetabolicLoop:
     async def _handle_vision_request(self, msg: Any) -> None:
         """Handle incoming Vision RPC requests."""
         try:
-            payload = json.loads(msg.data.decode())
-            # Support both single image (legacy) and multiple images
-            images_b64 = payload.get("images", [])
-            if not images_b64 and payload.get("image"):
-                images_b64 = [payload.get("image")]
+            # 1. Try parsing as Signal Proto (v0.3.0)
+            try:
+                from aura_core_gen.aura.core.v1 import Observation, Signal
+                signal = Signal().parse(msg.data)
+                images_bytes = signal.perception.image_data
+                prompt = signal.perception.prompt or "Analyze this image."
+                use_proto_response = True
+            except Exception:
+                # Fallback to legacy JSON
+                payload = json.loads(msg.data.decode())
+                images_b64 = payload.get("images", [])
+                if not images_b64 and payload.get("image"):
+                    images_b64 = [payload.get("image")]
+                images_bytes = [base64.b64decode(img) for img in images_b64]
+                prompt = payload.get("prompt", "Analyze this image.")
+                use_proto_response = False
 
-            prompt = payload.get("prompt", "Analyze this image.")
-
-            if not images_b64:
-                await msg.respond(json.dumps({"error": "No images provided"}).encode())
+            if not images_bytes:
+                error_msg = "No images provided"
+                if use_proto_response:
+                    await msg.respond(bytes(Observation(success=False, error=error_msg)))
+                else:
+                    await msg.respond(json.dumps({"error": error_msg}).encode())
                 return
 
             if not self.node:
-                await msg.respond(json.dumps({"error": "Node not initialized"}).encode())
+                error_msg = "Node not initialized"
+                if use_proto_response:
+                    await msg.respond(bytes(Observation(success=False, error=error_msg)))
+                else:
+                    await msg.respond(json.dumps({"error": error_msg}).encode())
                 return
 
-            images_bytes = [base64.b64decode(img) for img in images_b64]
             result = await self.node.analyze_vision(images_bytes, prompt)
 
-            await msg.respond(json.dumps(result).encode())
+            if use_proto_response:
+                from aura_core_gen.aura.core.v1 import Observation
+                obs = Observation(success="error" not in result)
+                if "error" in result:
+                    obs.error = result["error"]
+                obs.metadata.from_dict(result)
+                await msg.respond(bytes(obs))
+            else:
+                await msg.respond(json.dumps(result).encode())
 
         except Exception as e:
             logger.error(f"Vision RPC handler error: {e}")

@@ -39,8 +39,9 @@ async def test_transaction_skill_calculate_tax_and_margin():
 
     obs = await skill.execute("calculate_tax_and_margin", {"price": 100.0})
     assert obs.success is True
-    assert obs.data["margin"] == 10.0
-    assert obs.data["total"] == 110.0
+    meta = obs.metadata.to_dict()
+    assert meta["margin"] == 10.0
+    assert meta["total"] == 110.0
 
 @pytest.mark.asyncio
 @patch("hive.proteins.transaction.engine.Pubkey.from_string")
@@ -85,6 +86,7 @@ async def test_transaction_skill_generate_payment_request(mock_from_string):
         "currency": "SOL"
     })
     assert obs.success is True
-    assert "solana:" in obs.data
-    assert "amount=1.5" in obs.data
-    assert "memo=test-memo" in obs.data
+    uri = obs.metadata.to_dict()["uri"]
+    assert "solana:" in uri
+    assert "amount=1.5" in uri
+    assert "memo=test-memo" in uri

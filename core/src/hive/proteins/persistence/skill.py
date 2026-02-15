@@ -1,10 +1,14 @@
 import asyncio
+from collections.abc import Callable
 from datetime import UTC, datetime
 from typing import Any, cast
 
 import redis.asyncio as redis
 import structlog
-from aura_core import Observation, SkillProtocol
+from aura_core import SkillProtocol
+from aura_core_gen.aura.assets.v1 import Asset, AssetDomain
+from aura_core_gen.aura.core.google import protobuf
+from aura_core_gen.aura.core.v1 import Observation
 from sqlalchemy import Engine, text
 from sqlalchemy.orm import Session, sessionmaker
 
@@ -32,7 +36,7 @@ class PersistenceSkill(
 ):
     """
     Persistence Protein: Handles all database operations.
-    Standardized following the Trinity Structure.
+    Transitioning to Enzymatic Dispatcher for domain-specific asset storage.
     """
 
     def __init__(self) -> None:
@@ -54,6 +58,16 @@ class PersistenceSkill(
             "list_items_semantic_search": self._vector_search,
             "get_first_item": self._get_first_item,
             "upsert_item": self._upsert_item,
+        }
+
+        # Asset Enzymes: Domain-to-method mapping for "Tissue Specificity"
+        self._ASSET_ENZYMES: dict[
+            int, Callable[[Asset, InventoryItem], None]
+        ] = {
+            int(AssetDomain.ASSET_DOMAIN_VEHICLE): self._store_vehicle_attributes,
+            int(AssetDomain.ASSET_DOMAIN_PROPERTY): self._store_property_attributes,
+            int(AssetDomain.ASSET_DOMAIN_EQUIPMENT): self._store_equipment_attributes,
+            int(AssetDomain.ASSET_DOMAIN_WORKSPACE): self._store_workspace_attributes,
         }
 
     def get_name(self) -> str:
@@ -122,7 +136,7 @@ class PersistenceSkill(
         try:
             return await handler(params)
         except Exception as e:
-            logger.error(f"Persistence skill error: {e}")
+            logger.error(f"Persistence skill error: {e}", exc_info=True)
             return Observation(success=False, error=str(e))
 
     async def _init_db(self, params: dict[str, Any]) -> Observation:
@@ -152,7 +166,7 @@ class PersistenceSkill(
 
         result = await asyncio.to_thread(fetch)
         if result:
-            return Observation(success=True, data=result)
+            return Observation(success=True, metadata=protobuf.Struct().from_dict(result))
         return Observation(success=False, error="item_not_found")
 
     async def _get_first_item(self, params: dict[str, Any]) -> Observation:
@@ -165,7 +179,7 @@ class PersistenceSkill(
 
         result = await asyncio.to_thread(fetch)
         if result:
-            return Observation(success=True, data=result)
+            return Observation(success=True, metadata=protobuf.Struct().from_dict(result))
         return Observation(success=False, error="no_items_found")
 
     async def _set_excited_state(self, params: dict[str, Any]) -> Observation:
@@ -256,7 +270,7 @@ class PersistenceSkill(
 
         result = await asyncio.to_thread(fetch)
         if result:
-            return Observation(success=True, data=result)
+            return Observation(success=True, metadata=protobuf.Struct().from_dict(result))
         return Observation(success=False, error="deal_not_found")
 
     async def _get_deal_by_memo_handler(self, params: dict[str, Any]) -> Observation:
@@ -273,7 +287,7 @@ class PersistenceSkill(
 
         result = await asyncio.to_thread(fetch)
         if result:
-            return Observation(success=True, data=result)
+            return Observation(success=True, metadata=protobuf.Struct().from_dict(result))
         return Observation(success=False, error="deal_not_found")
 
     async def _update_deal_status(self, params: dict[str, Any]) -> Observation:
@@ -305,6 +319,83 @@ class PersistenceSkill(
             return Observation(success=False, error=str(e))
 
     async def _upsert_item(self, params: dict[str, Any]) -> Observation:
+        """
+        Upsert an item using a native Asset object.
+        Transitioning from primitive if/else to enzymatic cascades.
+        """
+        asset = params.get("asset")
+        if not asset or not isinstance(asset, Asset):
+            # Backward compatibility for legacy dictionary-based upsert
+            return await self._legacy_upsert_item(params)
+
+        try:
+
+            def upsert() -> bool:
+                with self._get_session() as session:
+                    item = session.query(InventoryItem).filter_by(id=asset.identifier).first()
+                    if not item:
+                        item = InventoryItem(id=asset.identifier)
+                        session.add(item)
+
+                    item.name = asset.name
+                    if asset.rental_terms:
+                        item.base_price = float(asset.rental_terms.base_price)
+                        # Assume floor price is 80% if not specified elsewhere
+                        item.floor_price = float(asset.rental_terms.base_price) * 0.8
+
+                    # Store common attributes in meta
+                    item.meta["description"] = asset.description
+                    item.meta["domain"] = asset.domain.name
+
+                    # Enzymatic Cascade: Apply domain-specific attributes
+                    domain_val = int(asset.domain)
+                    if domain_val in self._ASSET_ENZYMES:
+                        enzyme = self._ASSET_ENZYMES[domain_val]
+                        enzyme(asset, item)
+
+                    session.commit()
+                    return True
+
+            await asyncio.to_thread(upsert)
+            return Observation(success=True)
+        except Exception as e:
+            return Observation(success=False, error=str(e))
+
+    def _store_vehicle_attributes(self, asset: Asset, item: InventoryItem) -> None:
+        """Enzyme: Specialized storage for Vehicle tissue."""
+        # Use hasattr for oneof fields or check field directly if supported by betterproto
+        if not asset.vehicle:
+            return
+
+        vehicle_data = {
+            "brand": str(getattr(asset.vehicle, "brand", "")),
+            "model": str(getattr(asset.vehicle, "model", "")),
+            "year": int(getattr(asset.vehicle, "year", 0)),
+            "vin": str(getattr(asset.vehicle, "vin", "")),
+            "color": str(getattr(asset.vehicle, "color", "")),
+            "license_plate": str(getattr(asset.vehicle, "license_plate", "")),
+        }
+        item.meta["vehicle_details"] = vehicle_data
+
+    def _store_property_attributes(self, asset: Asset, item: InventoryItem) -> None:
+        """Enzyme: Specialized storage for Property tissue."""
+        if not asset.property:
+            return
+        item.meta["property_details"] = asset.property.to_dict()
+
+    def _store_equipment_attributes(self, asset: Asset, item: InventoryItem) -> None:
+        """Enzyme: Specialized storage for Equipment tissue."""
+        if not asset.equipment:
+            return
+        item.meta["equipment_details"] = asset.equipment.to_dict()
+
+    def _store_workspace_attributes(self, asset: Asset, item: InventoryItem) -> None:
+        """Enzyme: Specialized storage for Workspace tissue."""
+        if not asset.workspace:
+            return
+        item.meta["workspace_details"] = asset.workspace.to_dict()
+
+    async def _legacy_upsert_item(self, params: dict[str, Any]) -> Observation:
         item_id = params.get("id")
         try:
 
@@ -367,4 +458,6 @@ class PersistenceSkill(
                 return response_items
 
         results = await asyncio.to_thread(search)
-        return Observation(success=True, data=results)
+        # Struct.from_dict expects a dict with standard JSON types.
+        # results is a list of dicts, which should be fine.
+        return Observation(success=True, metadata=protobuf.Struct().from_dict({"results": results}))

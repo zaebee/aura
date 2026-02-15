@@ -6,7 +6,7 @@ from aiogram.filters import Command, CommandObject
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
 from aiogram.types import CallbackQuery, Message
-from aura_core.gen.aura.negotiation.v1 import NegotiateRequest
+from aura_core_gen.aura.negotiation.v1 import NegotiateRequest
 from grpc_adapter import GrpcAdapter
 from nats_adapter import NatsAdapter
 from translator import TelegramTranslator
@@ -146,7 +146,7 @@ class TelegramReceptor:
         if self.grpc_adapter:
             try:
                 # Wrap Signal in NegotiateRequest
-                req = NegotiateRequest(request_id=signal.signal_id, signal=signal)
+                req = NegotiateRequest(request_id=signal.identifier, signal=signal)
                 response = await self.grpc_adapter.negotiate(req)
 
                 # Manual conversion of NegotiateResponse to UI message for simplicity here

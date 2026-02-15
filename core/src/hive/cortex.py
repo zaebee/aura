@@ -4,12 +4,6 @@ import dspy
 import redis.asyncio as redis
 import structlog
 from aura_core import SkillProtocol, SkillRegistry, get_raw_key
-from opentelemetry.instrumentation.grpc import GrpcInstrumentorServer
-from opentelemetry.instrumentation.langchain import LangchainInstrumentor
-from prometheus_client import start_http_server
-from sqlalchemy import create_engine
-from sqlalchemy.orm import sessionmaker
-
 from hive.aggregator import HiveAggregator
 from hive.connector import HiveConnector
 from hive.generator import HiveGenerator
@@ -33,6 +27,11 @@ from hive.proteins.transaction.engine import (
     SolanaProvider,
 )
 from hive.transformer import AuraTransformer
+from opentelemetry.instrumentation.grpc import GrpcInstrumentorServer
+from opentelemetry.instrumentation.langchain import LangchainInstrumentor
+from prometheus_client import start_http_server
+from sqlalchemy import create_engine
+from sqlalchemy.orm import sessionmaker
 
 if TYPE_CHECKING:
     from hive.metabolism import MetabolicLoop

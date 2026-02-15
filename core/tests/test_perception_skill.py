@@ -40,8 +40,8 @@ async def test_perception_skill_execute(perception_settings, perception_engine):
         obs = await skill.execute("perceive_image", {"image_bytes": b"fake_image"})
 
         assert obs.success is True
-        assert obs.data["name"] == "Tesla Model 3"
-        assert obs.data["base_price"] == 40000.0
+        assert obs.metadata.to_dict()["name"] == "Tesla Model 3"
+        assert obs.metadata.to_dict()["base_price"] == 40000.0
 
 
 @pytest.mark.asyncio

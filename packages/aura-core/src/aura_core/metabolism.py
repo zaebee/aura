@@ -8,6 +8,8 @@ The Protocols (the "Law") live in dna.py; this module provides the "Engine".
 from typing import Any, cast
 
 import opentelemetry.trace as trace
+from aura_core_gen.aura.core.v1 import ActionType, Observation
+from pydantic import SecretStr
 
 from .dna import (
     Aggregator,
@@ -17,9 +19,40 @@ from .dna import (
     SkillProtocol,
     Transformer,
 )
-from .types import Observation
 
 tracer = trace.get_tracer(__name__)
+
+
+def map_action(action_str: str | None) -> ActionType:
+    """
+    Standardized mapper for negotiation actions.
+    Converts LLM strings to strict ActionType enum.
+    """
+    if not action_str:
+        return cast(ActionType, ActionType.ACTION_TYPE_UNSPECIFIED)
+
+    mapping = {
+        "accept": ActionType.ACTION_TYPE_ACCEPT,
+        "counter": ActionType.ACTION_TYPE_COUNTER,
+        "counteroffer": ActionType.ACTION_TYPE_COUNTER,
+        "reject": ActionType.ACTION_TYPE_REJECT,
+        "approve": ActionType.ACTION_TYPE_APPROVE,
+        "cancel": ActionType.ACTION_TYPE_CANCEL,
+        "update": ActionType.ACTION_TYPE_UPDATE,
+        "evaluate": ActionType.ACTION_TYPE_EVALUATE,
+        "error": ActionType.ACTION_TYPE_ERROR,
+    }
+    res = mapping.get(action_str.lower(), ActionType.ACTION_TYPE_UNSPECIFIED)
+    return cast(ActionType, int(res))
+
+
+def get_raw_key(key_field: SecretStr | str) -> str:
+    """
+    Safely retrieve the raw string value from a SecretStr or a plain string.
+    """
+    if isinstance(key_field, SecretStr):
+        return key_field.get_secret_value()
+    return key_field
 
 
 class SkillRegistry:
@@ -77,17 +110,28 @@ class BaseConnector(Connector[Any, Observation, Any]):
             # Fallback for single action or legacy support
             return await self._handle_legacy(action, context)
 
-        last_observation = Observation(success=True)
+        from aura_core_gen.aura.core.v1 import TraceContext
+
+        last_observation = Observation(
+            success=True, trace=getattr(context, "trace", TraceContext())
+        )
 
         for i, step in enumerate(steps):
-            skill_name = step.get("skill")
-            intent = step.get("intent")
-            params = step.get("params", {}).copy()
+            skill_name = step.skill
+            intent = step.intent
+            # Betterproto messages don't have .copy() and params might be Any proto
+            # For now, we assume params is still used as a dict in the registry
+            # but we need to handle the conversion if it's an Any proto
+            params = getattr(step, "params", {})
 
             # Pass context and previous results to the next step
-            params["_context"] = context
-            if i > 0:
-                params["_previous_observation"] = last_observation
+            # If params is a dict, we can inject these.
+            # If it's a Proto, we might need a different mechanism.
+            if isinstance(params, dict):
+                params = params.copy()
+                params["_context"] = context
+                if i > 0:
+                    params["_previous_observation"] = last_observation
 
             # Use registry.execute for tracing and consistency
             last_observation = await self.registry.execute(skill_name, intent, params)
@@ -136,17 +180,6 @@ class MetabolicLoop[S_inv, C_cov, I_inv, O_cov, E_cov]:
             # 2. Aggregator (A)
             with tracer.start_as_current_span("nucleotide_aggregator"):
                 context = await self.aggregator.perceive(signal, **kwargs)
-
-                # Internal Proprioception: Inject system vitals into context
-                try:
-                    vitals = await self.aggregator.get_vitals()
-                    if hasattr(context, "system_health"):
-                        context.system_health = vitals
-                    elif isinstance(context, dict) and "system_health" in context:
-                        context["system_health"] = vitals
-                except Exception as e:
-                    # Proprioception should not crash the main loop
-                    trace.get_current_span().record_exception(e)
 
             # 3. Transformer (T)
             # Note: Some transformers might need extra data passed in via kwargs

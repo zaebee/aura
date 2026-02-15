@@ -3,13 +3,11 @@ import time
 import structlog
 
 from config import KeeperSettings
-from aura_core import (
+from aura_core_gen.aura.core.v1 import (
     AuditObservation,
-    BeeContext,
-    BeeObservation,
 )
 from .aggregator import BeeAggregator
-from .connector import BeeConnector
+from .connector import BeeConnector, BeeObservation
 from .generator import BeeGenerator
 from .transformer import BeeTransformer
 
@@ -32,7 +30,7 @@ class BeeMetabolism:
         start_time = time.time()
 
         # 1. Aggregator (A) - Senses the environment
-        context: BeeContext = await self.aggregator.perceive(
+        context = await self.aggregator.perceive(
             None, event_name=event_name
         )
 
@@ -43,13 +41,12 @@ class BeeMetabolism:
                 is_pure=True,
                 narrative="The Keeper performs a routine inspection. The Hive's pulse is steady.",
                 reasoning="Scheduled heartbeat run. LLM audit skipped to save honey.",
-                metadata={"heartbeat": True},
             )
         else:
             # T now performs deterministic regex audit + reflective LLM analysis
             report = await self.transformer.think(context)
 
-        report.execution_time = time.time() - start_time
+        report.execution_time = float(time.time() - start_time)
 
         # 3. Connector (C) - Interacts with the outer world (GitHub)
         observation: BeeObservation = await self.connector.act(report, context=context)
