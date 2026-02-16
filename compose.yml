@@ -65,7 +65,7 @@ services:
       PYTHONPATH: /app/api-gateway/src:/app/api-gateway/gen-proto
       AURA_GATEWAY__CORE_SERVICE_HOST: core:50051
       AURA_GATEWAY__REDIS_URL: redis://redis:6379/0
-      AURA_GATEWAY__NATS_URL: ${AURA_GATEWAY__NATS_URL-:nats://localhost:4222}
+      AURA_GATEWAY__NATS_URL: ${AURA_GATEWAY__NATS_URL}
       OTEL_SERVICE_NAME: "aura-gateway"
       OTEL_EXPORTER_OTLP_ENDPOINT: "http://jaeger:4317"
       CORS_ORIGINS: "http://localhost:3000,http://127.0.0.1:3000"
@@ -149,9 +149,9 @@ services:
     restart: on-failure
     environment:
       PYTHONPATH: /app/synapses/telegram-bot/src:/app/synapses/telegram-bot/gen-proto
-      NATS_URL: ${NATS_URL}
-      AURA_TELEGRAM__TOKEN: ${AURA_TG__TOKEN}
-      AURA_TELEGRAM__CORE_URL: ${AURA_TG__CORE_URL}
+      AURA_TELEGRAM__TOKEN: ${AURA_TELEGRAM__TOKEN}
+      AURA_TELEGRAM__NATS_URL: ${NATS_URL}
+      AURA_TELEGRAM__CORE_URL: ${AURA_TELEGRAM__CORE_URL}
     depends_on:
       core:
         condition: service_healthy
