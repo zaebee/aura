@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import asyncio
 import logging
 import re
@@ -5,8 +7,11 @@ import threading
 import uuid
 from collections import deque
 from datetime import UTC, datetime
+from typing import TYPE_CHECKING
 
-from aura_core_gen.aura.core.v1 import Event, LogEvent
+if TYPE_CHECKING:
+    from aura_core_gen.aura.core.v1 import Event
+
 from nats.aio.client import Client as NATS
 
 
@@ -65,6 +70,8 @@ class HiveLogHandler(logging.Handler):
 
         # Create binary Event
         # Aligned: event_id -> identifier
+        from aura_core_gen.aura.core.v1 import Event, LogEvent  # noqa: PLC0415
+
         event: Event = Event(
             identifier=str(uuid.uuid4()),
             topic=f"aura.worker.{self.worker_name}.logs",
@@ -118,6 +125,8 @@ class HiveLogHandler(logging.Handler):
         """Manually send a test event to NATS to verify the umbilical pulse."""
         if not self.is_connected:
             return False
+
+        from aura_core_gen.aura.core.v1 import Event, LogEvent  # noqa: PLC0415
 
         event: Event = Event(
             identifier=str(uuid.uuid4()),

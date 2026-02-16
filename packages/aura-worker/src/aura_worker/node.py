@@ -220,7 +220,7 @@ class AuraNode:
                 response_text = result.get("response", "{}")
 
                 try:
-                    return json.loads(response_text)
+                    return dict(json.loads(response_text))
                 except json.JSONDecodeError:
                     return {"error": "Invalid JSON from Ollama", "raw": response_text}
 
