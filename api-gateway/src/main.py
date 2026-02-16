@@ -131,6 +131,11 @@ class NegotiationRequestHTTP(BaseModel):
     agent_did: str
 
 
+@app.get("/healthz")
+async def healthz() -> dict[str, str]:
+    return {"status": "ok"}
+
+
 @app.post("/v1/negotiate")
 async def negotiate(
     request: Request,
