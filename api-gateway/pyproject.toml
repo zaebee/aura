@@ -8,6 +8,7 @@ dependencies = [
     "uvicorn>=0.40.0",
     "grpcio>=1.76.0",
     "grpcio-tools>=1.76.0",
+    "grpclib>=0.4.7",
     "protobuf>=6.33.5",
     "pydantic>=2.0.0",
     "pydantic-settings>=2.0.0",
