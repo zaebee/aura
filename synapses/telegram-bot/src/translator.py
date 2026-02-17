@@ -14,7 +14,6 @@ from aura_core_gen.aura.core.v1 import (
     ActionType,
     AgentIdentity,
     NegotiationSignal,
-    PerceptionSignal,
     Signal,
     SignalType,
     TelegramSignal,
@@ -156,7 +155,7 @@ class TelegramTranslator:
             event_type = str(getattr(event, "event_type", ""))
             action_name = ""
             if hasattr(neg, "action"):
-                action_name = ActionType(int(neg.action)).name
+                action_name = str(ActionType(int(neg.action)).name)
 
             if action_name == "ACTION_TYPE_ACCEPT" or event_type == "negotiation_accept":
                 # NegotiationEvent uses .price, NegotiationObservation uses .accepted.final_price

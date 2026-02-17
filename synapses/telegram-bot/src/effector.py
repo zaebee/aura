@@ -49,7 +49,7 @@ class TelegramEffector:
             log_meta = {"topic": event.topic}
             if hasattr(event, "negotiation") and event.negotiation:
                 from aura_core_gen.aura.core.v1 import ActionType
-                log_meta["action"] = ActionType(int(event.negotiation.action)).name
+                log_meta["action"] = str(ActionType(int(event.negotiation.action)).name)
 
             logger.debug("effector_received_event", **log_meta)
 
@@ -67,7 +67,7 @@ class TelegramEffector:
                 logger.info(
                     "effector_notification_sent",
                     chat_id=chat_id,
-                    topic=proto_event.topic,
+                    topic=event.topic,
                 )
 
         except Exception as e:
