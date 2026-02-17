@@ -12,6 +12,7 @@ from security import verify_signature
 def client():
     return TestClient(app)
 
+
 @pytest.mark.asyncio
 async def test_analyze_vision_endpoint():
     # 1. Setup mocks
@@ -44,8 +45,8 @@ async def test_analyze_vision_endpoint():
         headers={
             "X-Agent-ID": "did:key:test",
             "X-Timestamp": "1234567890",
-            "X-Signature": "fake-sig"
-        }
+            "X-Signature": "fake-sig",
+        },
     )
 
     # 4. Assertions
@@ -68,6 +69,7 @@ async def test_analyze_vision_endpoint():
 
     # Cleanup
     app.dependency_overrides = {}
+
 
 if __name__ == "__main__":
     # Note: running this file directly with python might be tricky due to pytest.mark.asyncio

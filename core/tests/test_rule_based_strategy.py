@@ -21,14 +21,14 @@ class TestRuleBasedStrategy:
         # Create Context
         context = Context(
             context_type=ContextType.CONTEXT_TYPE_HIVE,
-            hive=HiveContextData(
-                offer=NegotiationOffer(bid_amount=100.0)
+            hive=HiveContextData(offer=NegotiationOffer(bid_amount=100.0)),
+            metadata=protobuf.Struct().from_dict(
+                {
+                    "item_name": mock_item.name,
+                    "floor_price": str(mock_item.floor_price),
+                    "base_price": str(mock_item.base_price),
+                }
             ),
-            metadata=protobuf.Struct().from_dict({
-                "item_name": mock_item.name,
-                "floor_price": str(mock_item.floor_price),
-                "base_price": str(mock_item.base_price),
-            })
         )
 
         response = strategy.evaluate(context, request_id="test-request-1")
@@ -45,14 +45,14 @@ class TestRuleBasedStrategy:
 
         context = Context(
             context_type=ContextType.CONTEXT_TYPE_HIVE,
-            hive=HiveContextData(
-                offer=NegotiationOffer(bid_amount=1500.0)
+            hive=HiveContextData(offer=NegotiationOffer(bid_amount=1500.0)),
+            metadata=protobuf.Struct().from_dict(
+                {
+                    "item_name": mock_item.name,
+                    "floor_price": str(mock_item.floor_price),
+                    "base_price": str(mock_item.base_price),
+                }
             ),
-            metadata=protobuf.Struct().from_dict({
-                "item_name": mock_item.name,
-                "floor_price": str(mock_item.floor_price),
-                "base_price": str(mock_item.base_price),
-            })
         )
 
         response = strategy.evaluate(context, request_id="test-request-2")
@@ -68,14 +68,14 @@ class TestRuleBasedStrategy:
 
         context = Context(
             context_type=ContextType.CONTEXT_TYPE_HIVE,
-            hive=HiveContextData(
-                offer=NegotiationOffer(bid_amount=150.0)
+            hive=HiveContextData(offer=NegotiationOffer(bid_amount=150.0)),
+            metadata=protobuf.Struct().from_dict(
+                {
+                    "item_name": mock_item.name,
+                    "floor_price": str(mock_item.floor_price),
+                    "base_price": str(mock_item.base_price),
+                }
             ),
-            metadata=protobuf.Struct().from_dict({
-                "item_name": mock_item.name,
-                "floor_price": str(mock_item.floor_price),
-                "base_price": str(mock_item.base_price),
-            })
         )
 
         response = strategy.evaluate(context, request_id="test-request-3")
@@ -90,14 +90,14 @@ class TestRuleBasedStrategy:
 
         context = Context(
             context_type=ContextType.CONTEXT_TYPE_HIVE,
-            hive=HiveContextData(
-                offer=NegotiationOffer(bid_amount=175.0)
+            hive=HiveContextData(offer=NegotiationOffer(bid_amount=175.0)),
+            metadata=protobuf.Struct().from_dict(
+                {
+                    "item_name": mock_item.name,
+                    "floor_price": str(mock_item.floor_price),
+                    "base_price": str(mock_item.base_price),
+                }
             ),
-            metadata=protobuf.Struct().from_dict({
-                "item_name": mock_item.name,
-                "floor_price": str(mock_item.floor_price),
-                "base_price": str(mock_item.base_price),
-            })
         )
 
         response = strategy.evaluate(context, request_id="test-request-4")
@@ -111,14 +111,14 @@ class TestRuleBasedStrategy:
 
         context = Context(
             context_type=ContextType.CONTEXT_TYPE_HIVE,
-            hive=HiveContextData(
-                offer=NegotiationOffer(bid_amount=250.0)
+            hive=HiveContextData(offer=NegotiationOffer(bid_amount=250.0)),
+            metadata=protobuf.Struct().from_dict(
+                {
+                    "item_name": mock_item.name,
+                    "floor_price": str(mock_item.floor_price),
+                    "base_price": str(mock_item.base_price),
+                }
             ),
-            metadata=protobuf.Struct().from_dict({
-                "item_name": mock_item.name,
-                "floor_price": str(mock_item.floor_price),
-                "base_price": str(mock_item.base_price),
-            })
         )
 
         response = strategy.evaluate(context, request_id="test-request-5")
@@ -132,10 +132,8 @@ class TestRuleBasedStrategy:
 
         context = Context(
             context_type=ContextType.CONTEXT_TYPE_HIVE,
-            hive=HiveContextData(
-                offer=NegotiationOffer(bid_amount=100.0)
-            ),
-            metadata=protobuf.Struct().from_dict({}) # Empty metadata
+            hive=HiveContextData(offer=NegotiationOffer(bid_amount=100.0)),
+            metadata=protobuf.Struct().from_dict({}),  # Empty metadata
         )
 
         response = strategy.evaluate(context, request_id="test-request-6")

@@ -105,13 +105,17 @@ class BeeGenerator:
         now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
         # Resource stats (pure Python)
-        ctx_meta = context.metadata.to_dict() if hasattr(context.metadata, "to_dict") else {}
+        ctx_meta = (
+            context.metadata.to_dict() if hasattr(context.metadata, "to_dict") else {}
+        )
         metrics = cast(dict[str, Any], ctx_meta.get("hive_metrics", {}))
         success_rate = cast(float, metrics.get("negotiation_success_rate", 0.0))
 
         # Formatting Blight vs Heresy
         # If all LLMs failed, it's a Blight
-        rep_meta = report.metadata.to_dict() if hasattr(report.metadata, "to_dict") else {}
+        rep_meta = (
+            report.metadata.to_dict() if hasattr(report.metadata, "to_dict") else {}
+        )
         llm_unavailable = bool(rep_meta.get("llm_unavailable", False))
         brain_status = cast(dict[str, Any], ctx_meta.get("brain_status", {}))
         status_label = "PURE" if report.is_pure else "IMPURE"
@@ -139,7 +143,9 @@ class BeeGenerator:
                 new_entry += f"- {formatted_h}\n"
 
         # Chronicle reflective findings isolated from the Transformer's deterministic logic
-        reflective_heresies: list[str] = cast(list[str], rep_meta.get("reflective_heresies", []))
+        reflective_heresies: list[str] = cast(
+            list[str], rep_meta.get("reflective_heresies", [])
+        )
         if reflective_heresies:
             new_entry += "\n**Reflective Insights (The Inquisitor's Eye):**\n"
             for rh in reflective_heresies:

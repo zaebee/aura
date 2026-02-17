@@ -52,12 +52,16 @@ class MarketService:
         now = datetime.now(UTC)
         expires_at = now + timedelta(seconds=ttl_seconds)
 
-        encrypt_obs = await self.transaction.execute("encrypt_secret", {"secret": secret})
+        encrypt_obs = await self.transaction.execute(
+            "encrypt_secret", {"secret": secret}
+        )
         if not encrypt_obs.success:
             raise ValueError(f"Encryption failed: {encrypt_obs.error}")
 
         # In v0.3.0, obsidian_data/metadata struct is used
-        encrypted_secret = encrypt_obs.metadata.to_dict().get("encrypted_secret") or encrypt_obs.error
+        encrypted_secret = (
+            encrypt_obs.metadata.to_dict().get("encrypted_secret") or encrypt_obs.error
+        )
 
         deal_id = uuid.uuid4()
         obs = await self.persistence.execute(
@@ -118,11 +122,15 @@ class MarketService:
 
         deal = obs.metadata.to_dict()
         if not deal:
-             return CheckDealStatusResponse(status="NOT_FOUND")
+            return CheckDealStatusResponse(status="NOT_FOUND")
 
         now = datetime.now(UTC)
         expires_at_raw = deal.get("expires_at")
-        expires_at = datetime.fromisoformat(expires_at_raw) if isinstance(expires_at_raw, str) else expires_at_raw
+        expires_at = (
+            datetime.fromisoformat(expires_at_raw)
+            if isinstance(expires_at_raw, str)
+            else expires_at_raw
+        )
 
         if deal.get("status") == "PENDING" and now > expires_at:
             await self.persistence.execute(
@@ -180,7 +188,9 @@ class MarketService:
     def _generate_unique_memo(self) -> str:
         return secrets.token_urlsafe(6)[:8]
 
-    async def _build_paid_response(self, deal: dict[str, Any]) -> CheckDealStatusResponse:
+    async def _build_paid_response(
+        self, deal: dict[str, Any]
+    ) -> CheckDealStatusResponse:
         decrypt_obs = await self.transaction.execute(
             "decrypt_secret", {"encrypted_secret": deal["secret_content"]}
         )
@@ -190,7 +200,11 @@ class MarketService:
         decrypted_secret = decrypt_obs.metadata.to_dict().get("secret", "")
 
         paid_at_raw = deal.get("paid_at")
-        paid_at_ts = int(datetime.fromisoformat(paid_at_raw).timestamp()) if isinstance(paid_at_raw, str) else 0
+        paid_at_ts = (
+            int(datetime.fromisoformat(paid_at_raw).timestamp())
+            if isinstance(paid_at_raw, str)
+            else 0
+        )
 
         return CheckDealStatusResponse(
             status="PAID",
@@ -205,10 +219,12 @@ class MarketService:
                 block_number=str(deal.get("block_number") or ""),
                 from_address=deal.get("from_address") or "",
                 confirmed_at=paid_at_ts,
-            )
+            ),
         )
 
-    async def _build_pending_response(self, deal: dict[str, Any]) -> CheckDealStatusResponse:
+    async def _build_pending_response(
+        self, deal: dict[str, Any]
+    ) -> CheckDealStatusResponse:
         addr_obs = await self.transaction.execute("get_address", {})
         network_obs = await self.transaction.execute("get_network_name", {})
 
@@ -216,7 +232,11 @@ class MarketService:
         network = network_obs.metadata.to_dict().get("network", "unknown")
 
         expires_at_raw = deal.get("expires_at")
-        expires_at_ts = int(datetime.fromisoformat(expires_at_raw).timestamp()) if isinstance(expires_at_raw, str) else 0
+        expires_at_ts = (
+            int(datetime.fromisoformat(expires_at_raw).timestamp())
+            if isinstance(expires_at_raw, str)
+            else 0
+        )
 
         return CheckDealStatusResponse(
             status="PENDING",
@@ -228,5 +248,5 @@ class MarketService:
                 memo=deal.get("payment_memo", ""),
                 network=network,
                 expires_at=expires_at_ts,
-            )
+            ),
         )

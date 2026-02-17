@@ -45,7 +45,8 @@ class CustomBuildHook(BuildHookInterface):
                     "grpc_tools.protoc",
                     f"--proto_path={proto_dir}",
                     f"--python_betterproto_out={out_dir}",
-                ] + [str(p) for p in proto_files],
+                ]
+                + [str(p) for p in proto_files],
                 capture_output=True,
                 text=True,
             )
@@ -71,7 +72,8 @@ class CustomBuildHook(BuildHookInterface):
             if neg_v1.exists():
                 content = neg_v1.read_text()
                 content = content.replace(
-                    "from .aura.core import v1", "from aura_core_gen.aura.core import v1"
+                    "from .aura.core import v1",
+                    "from aura_core_gen.aura.core import v1",
                 )
                 neg_v1.write_text(content)
 

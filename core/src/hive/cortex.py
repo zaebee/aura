@@ -9,6 +9,7 @@ from hive.connector import HiveConnector
 from hive.generator import HiveGenerator
 from hive.membrane import HiveMembrane
 from hive.metabolism import MetabolicLoop
+from hive.metabolism.security import AuditSigner
 from hive.proteins.guard import GuardSkill
 from hive.proteins.guard.engine import OutputGuard
 from hive.proteins.perception import PerceptionSkill
@@ -141,8 +142,14 @@ class HiveCell:
         persistence.bind(self.settings.database, (SessionLocal, engine, redis_client))
 
         # 2. Pulse
+        signer = None
+        if self.settings.server.audit_signing_key:
+            signer = AuditSigner(self.settings.server.audit_signing_key)
         pulse = PulseSkill()
-        pulse.bind(self.settings.server, NatsProvider(self.settings.server.nats_url))
+        pulse.bind(
+            self.settings.server,
+            NatsProvider(self.settings.server.nats_url, signer=signer),
+        )
 
         # 3. Reasoning
         lm = None
@@ -202,6 +209,9 @@ class HiveCell:
         self.registry.register("perception", perception)
         if transaction:
             self.registry.register("transaction", transaction)
+
+        # Inject fully-populated registry into skills that cross-call peers
+        guard.inject_registry(self.registry)
 
         # Initialize all proteins
         for name in self.registry.list_skills():

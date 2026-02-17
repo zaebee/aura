@@ -24,6 +24,7 @@ from aura_core_gen.aura.core.v1 import (
     TraceContext,
     VitalsEvent,
 )
+from hive.metabolism.security import AuditSigner
 
 logger = logging.getLogger(__name__)
 
@@ -34,8 +35,9 @@ class JetStreamProvider:
     Uses betterproto chromosomal signals.
     """
 
-    def __init__(self, nats_url: str):
+    def __init__(self, nats_url: str, signer: AuditSigner | None = None):
         self.nats_url = nats_url
+        self._signer = signer
         self.nc: nats.NATS | None = None
         self.js: nats.js.JetStreamContext | None = None
 
@@ -89,10 +91,12 @@ class JetStreamProvider:
                     action=self._action_to_enum(action),
                     price=price,
                 ),
-                metadata=protobuf.Struct().from_dict({
-                    "session_token": session_token,
-                    "agent_did": agent_did,
-                })
+                metadata=protobuf.Struct().from_dict(
+                    {
+                        "session_token": session_token,
+                        "agent_did": agent_did,
+                    }
+                ),
             )
 
             binary_data = bytes(event)
@@ -125,11 +129,18 @@ class JetStreamProvider:
                     service=service,
                     instance_id=instance_id or uuid.uuid4().hex[:8],
                     status=self._status_to_enum(status),
-                )
+                ),
             )
 
             binary_data = bytes(event)
-            ack = await self.js.publish(event.topic, binary_data)
+            headers: dict[str, str] | None = None
+            if self._signer:
+                try:
+                    ts = datetime.now(UTC).isoformat()
+                    headers = self._signer.make_headers(event.topic, binary_data, ts)
+                except Exception:
+                    logger.warning("aromatic_seal_failed", exc_info=True)
+            ack = await self.js.publish(event.topic, binary_data, headers=headers)
             logger.debug(f"Published heartbeat: seq={ack.seq}")
             return True
         except Exception as e:
@@ -160,7 +171,7 @@ class JetStreamProvider:
                     status=self._status_to_enum(status),
                     cpu_usage_percent=cpu_usage,
                     memory_usage_mb=memory_usage,
-                )
+                ),
             )
 
             binary_data = bytes(event)
@@ -193,7 +204,7 @@ class JetStreamProvider:
                     severity=self._severity_to_enum(severity_str),
                     message=message,
                     source=source,
-                )
+                ),
             )
 
             binary_data = bytes(event)
@@ -228,11 +239,18 @@ class JetStreamProvider:
                     is_pure=is_pure,
                     heresies=heresies,
                     negotiation_success_rate=negotiation_success_rate,
-                )
+                ),
             )
 
             binary_data = bytes(event)
-            ack = await self.js.publish(event.topic, binary_data)
+            headers: dict[str, str] | None = None
+            if self._signer:
+                try:
+                    ts = datetime.now(UTC).isoformat()
+                    headers = self._signer.make_headers(event.topic, binary_data, ts)
+                except Exception:
+                    logger.warning("aromatic_seal_failed", exc_info=True)
+            ack = await self.js.publish(event.topic, binary_data, headers=headers)
             logger.debug(f"Published audit: seq={ack.seq}")
             return True
         except Exception as e:
@@ -246,6 +264,7 @@ class JetStreamProvider:
 
         try:
             import json
+
             data = json.dumps(payload).encode()
             await self.js.publish(topic, data)
             logger.warning(f"Published raw JSON (deprecated): {topic}")
@@ -265,11 +284,13 @@ class JetStreamProvider:
             "accept": ActionType.ACTION_TYPE_ACCEPT,
             "counter": ActionType.ACTION_TYPE_COUNTER,
             "reject": ActionType.ACTION_TYPE_REJECT,
-            "audit": ActionType.ACTION_TYPE_APPROVE, # Map audit to approve for now
-            "ui_required": ActionType.ACTION_TYPE_UPDATE, # Map UI to update
+            "audit": ActionType.ACTION_TYPE_APPROVE,  # Map audit to approve for now
+            "ui_required": ActionType.ACTION_TYPE_UPDATE,  # Map UI to update
             "error": ActionType.ACTION_TYPE_ERROR,
         }
-        return cast(ActionType, mapping.get(action.lower(), ActionType.ACTION_TYPE_UNSPECIFIED))
+        return cast(
+            ActionType, mapping.get(action.lower(), ActionType.ACTION_TYPE_UNSPECIFIED)
+        )
 
     def _status_to_enum(self, status: str) -> Status:
         """Convert status string to Status enum."""
@@ -290,7 +311,9 @@ class JetStreamProvider:
             "error": Severity.SEVERITY_ERROR,
             "critical": Severity.SEVERITY_CRITICAL,
         }
-        return cast(Severity, mapping.get(severity_str.lower(), Severity.SEVERITY_UNSPECIFIED))
+        return cast(
+            Severity, mapping.get(severity_str.lower(), Severity.SEVERITY_UNSPECIFIED)
+        )
 
 
 class JetStreamSubscriber:

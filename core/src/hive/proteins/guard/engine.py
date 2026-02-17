@@ -1,6 +1,7 @@
 from typing import Any
 
 import structlog
+from hive.metabolism.math import HillDampener
 
 logger = structlog.get_logger(__name__)
 
@@ -83,6 +84,20 @@ class OutputGuard:
                 min_m = 0.1
             return float(round(floor / (1 - min_m), 2))
         return float(round(floor * 1.05, 2))
+
+    def validate_transaction(
+        self,
+        wallet_address: str,
+        llm_price: float,
+        bid: float,
+        base_price: float,
+        is_sanctified: bool,
+    ) -> float:
+        """Validate a transaction: require sanctified wallet, apply Hill dampening ceiling."""
+        if not is_sanctified:
+            raise SafetyViolation(f"Wallet {wallet_address!r} is not sanctified")
+        ceiling = HillDampener.hill_cap(bid, base_price)
+        return min(llm_price, ceiling)
 
     def validate_vision(self, vision_result: dict) -> bool:
         """

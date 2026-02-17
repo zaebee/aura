@@ -90,6 +90,7 @@ class MetabolicLoop:
             # 1. Try parsing as Signal Proto (v0.3.0)
             try:
                 from aura_core_gen.aura.core.v1 import Observation, Signal
+
                 signal = Signal().parse(msg.data)
                 images_bytes = signal.perception.image_data
                 prompt = signal.perception.prompt or "Analyze this image."
@@ -107,7 +108,9 @@ class MetabolicLoop:
             if not images_bytes:
                 error_msg = "No images provided"
                 if use_proto_response:
-                    await msg.respond(bytes(Observation(success=False, error=error_msg)))
+                    await msg.respond(
+                        bytes(Observation(success=False, error=error_msg))
+                    )
                 else:
                     await msg.respond(json.dumps({"error": error_msg}).encode())
                 return
@@ -115,7 +118,9 @@ class MetabolicLoop:
             if not self.node:
                 error_msg = "Node not initialized"
                 if use_proto_response:
-                    await msg.respond(bytes(Observation(success=False, error=error_msg)))
+                    await msg.respond(
+                        bytes(Observation(success=False, error=error_msg))
+                    )
                 else:
                     await msg.respond(json.dumps({"error": error_msg}).encode())
                 return
@@ -124,6 +129,7 @@ class MetabolicLoop:
 
             if use_proto_response:
                 from aura_core_gen.aura.core.v1 import Observation
+
                 obs = Observation(success="error" not in result)
                 if "error" in result:
                     obs.error = result["error"]

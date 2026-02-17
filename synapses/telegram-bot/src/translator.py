@@ -62,13 +62,15 @@ class TelegramTranslator:
                     chat_id=chat_id,
                     message_text=text,
                 )
-                signal.metadata.from_dict({
-                    "chat_id": str(chat_id),
-                    "user_id": str(user_id),
-                    "source": "telegram",
-                    "intent": "search",
-                    "query": str(command.args or ""),
-                })
+                signal.metadata.from_dict(
+                    {
+                        "chat_id": str(chat_id),
+                        "user_id": str(user_id),
+                        "source": "telegram",
+                        "intent": "search",
+                        "query": str(command.args or ""),
+                    }
+                )
                 return signal
 
             # Handle photo message (Hybrid Negotiation Signal)
@@ -77,7 +79,9 @@ class TelegramTranslator:
                 if isinstance(image_data, bytes):
                     image_data = [image_data]
 
-                signal.signal_type = cast(SignalType, SignalType.SIGNAL_TYPE_NEGOTIATION)
+                signal.signal_type = cast(
+                    SignalType, SignalType.SIGNAL_TYPE_NEGOTIATION
+                )
                 signal.negotiation = NegotiationSignal(
                     item_identifier=item_id,
                     image_data=image_data,
@@ -87,12 +91,14 @@ class TelegramTranslator:
                         reputation_score=1.0,
                     ),
                 )
-                signal.metadata.from_dict({
-                    "chat_id": str(chat_id),
-                    "user_id": str(user_id),
-                    "source": "telegram",
-                    "item_id": item_id,
-                })
+                signal.metadata.from_dict(
+                    {
+                        "chat_id": str(chat_id),
+                        "user_id": str(user_id),
+                        "source": "telegram",
+                        "item_id": item_id,
+                    }
+                )
                 return signal
 
             # Standard message or bid - Use TelegramSignal for Signal Integrity
@@ -102,12 +108,14 @@ class TelegramTranslator:
                 chat_id=chat_id,
                 message_text=text,
             )
-            signal.metadata.from_dict({
-                "chat_id": str(chat_id),
-                "user_id": str(user_id),
-                "source": "telegram",
-                "item_id": item_id,
-            })
+            signal.metadata.from_dict(
+                {
+                    "chat_id": str(chat_id),
+                    "user_id": str(user_id),
+                    "source": "telegram",
+                    "item_id": item_id,
+                }
+            )
             return signal
 
         if isinstance(event, CallbackQuery):
@@ -120,11 +128,13 @@ class TelegramTranslator:
                 chat_id=chat_id,
                 callback_data=event.data or "",
             )
-            signal.metadata.from_dict({
-                "chat_id": str(chat_id),
-                "user_id": str(user_id),
-                "source": "telegram",
-            })
+            signal.metadata.from_dict(
+                {
+                    "chat_id": str(chat_id),
+                    "user_id": str(user_id),
+                    "source": "telegram",
+                }
+            )
             return signal
 
         signal.signal_type = cast(SignalType, SignalType.SIGNAL_TYPE_UNSPECIFIED)
@@ -136,12 +146,12 @@ class TelegramTranslator:
         """
         metadata = getattr(event, "metadata", {})
         if hasattr(metadata, "to_dict"):
-             metadata = metadata.to_dict()
+            metadata = metadata.to_dict()
 
         chat_id = int(metadata.get("chat_id", "0"))
 
         if not chat_id:
-             return 0, "", None
+            return 0, "", None
 
         message = ""
         keyboard = None
@@ -157,20 +167,32 @@ class TelegramTranslator:
             if hasattr(neg, "action"):
                 action_name = str(ActionType(int(neg.action)).name)
 
-            if action_name == "ACTION_TYPE_ACCEPT" or event_type == "negotiation_accept":
+            if (
+                action_name == "ACTION_TYPE_ACCEPT"
+                or event_type == "negotiation_accept"
+            ):
                 # NegotiationEvent uses .price, NegotiationObservation uses .accepted.final_price
                 price = getattr(neg, "price", 0.0)
                 if hasattr(neg, "accepted") and neg.accepted:
                     price = neg.accepted.final_price
                 message = f"✅ *Deal Accepted!*\nItem: `{item_id}`\nFinal Price: `${price:.2f}`"
-            elif action_name == "ACTION_TYPE_COUNTER" or event_type == "negotiation_counter":
+            elif (
+                action_name == "ACTION_TYPE_COUNTER"
+                or event_type == "negotiation_counter"
+            ):
                 price = getattr(neg, "price", 0.0)
                 if hasattr(neg, "countered") and neg.countered:
                     price = neg.countered.proposed_price
                 message = f"🔄 *Counter-offer Received*\nItem: `{item_id}`\nProposed Price: `${price:.2f}`\n\nWhat is your response?"
-            elif action_name == "ACTION_TYPE_REJECT" or event_type == "negotiation_reject":
+            elif (
+                action_name == "ACTION_TYPE_REJECT"
+                or event_type == "negotiation_reject"
+            ):
                 message = f"❌ *Offer Rejected*\nItem: `{item_id}`\nThe agent was not interested in your bid."
-            elif action_name == "ACTION_TYPE_EVALUATE" or event_type == "negotiation_ui_required":
+            elif (
+                action_name == "ACTION_TYPE_EVALUATE"
+                or event_type == "negotiation_ui_required"
+            ):
                 # Handle Vision Report Card
                 price = 0.0
                 v = metadata.get("vision_result")
@@ -180,32 +202,38 @@ class TelegramTranslator:
                         if isinstance(v, str):
                             v = json.loads(v)
                         name = sanitize_markdown(v.get("name", "Unknown Asset"))
-                        color = sanitize_markdown(v.get("meta", {}).get("color", "Unknown"))
+                        color = sanitize_markdown(
+                            v.get("meta", {}).get("color", "Unknown")
+                        )
                         confidence = v.get("meta", {}).get("confidence", "0.0")
 
                         message = (
                             f"👁️ *AURA VISION REPORT*\n\n"
                             f"*Asset:* `{name}`\n"
                             f"*Color:* `{color}`\n"
-                            f"*Confidence:* `{float(confidence)*100:.1f}%`\n"
+                            f"*Confidence:* `{float(confidence) * 100:.1f}%`\n"
                             f"*Proposed Rent Price:* `${price:.2f}/day`\n\n"
                             f"Is this correct? Would you like to list it now?"
                         )
                         safe_item_id = sanitize_callback(item_id)
-                        keyboard = InlineKeyboardMarkup(inline_keyboard=[
-                            [
-                                InlineKeyboardButton(
-                                    text="✅ List Now",
-                                    callback_data=f"list_now:{safe_item_id}:{price}",
-                                ),
-                                InlineKeyboardButton(
-                                    text="❌ Wrong Specs",
-                                    callback_data=f"wrong_specs:{safe_item_id}",
-                                ),
+                        keyboard = InlineKeyboardMarkup(
+                            inline_keyboard=[
+                                [
+                                    InlineKeyboardButton(
+                                        text="✅ List Now",
+                                        callback_data=f"list_now:{safe_item_id}:{price}",
+                                    ),
+                                    InlineKeyboardButton(
+                                        text="❌ Wrong Specs",
+                                        callback_data=f"wrong_specs:{safe_item_id}",
+                                    ),
+                                ]
                             ]
-                        ])
+                        )
                     except Exception as e:
-                        message = f"⚠️ *Vision Processing Error*\nCould not parse report: {e}"
+                        message = (
+                            f"⚠️ *Vision Processing Error*\nCould not parse report: {e}"
+                        )
                 else:
                     message = f"👤 *Human Required*\nAgent needs manual intervention for Item `{item_id}`."
 

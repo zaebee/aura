@@ -106,13 +106,18 @@ class NegotiationService:
                 res_name, res_val = betterproto.which_one_of(neg, "result")
                 if res_name == "accepted" and res_val:
                     from aura_core_gen.aura.negotiation.v1 import OfferAccepted
+
                     response.accepted = OfferAccepted(final_price=res_val.final_price)
-                    if hasattr(res_val, "reservation_code") and res_val.reservation_code:
+                    if (
+                        hasattr(res_val, "reservation_code")
+                        and res_val.reservation_code
+                    ):
                         response.accepted.reservation_code = res_val.reservation_code
                     if hasattr(res_val, "crypto_payment") and res_val.crypto_payment:
                         from aura_core_gen.aura.negotiation.v1 import (
                             CryptoPaymentInstructions,
                         )
+
                         cp = res_val.crypto_payment
                         response.accepted.crypto_payment = CryptoPaymentInstructions(
                             deal_id=cp.deal_id,
@@ -125,6 +130,7 @@ class NegotiationService:
                         )
                 elif res_name == "countered" and res_val:
                     from aura_core_gen.aura.negotiation.v1 import OfferCountered
+
                     response.countered = OfferCountered(
                         proposed_price=res_val.proposed_price,
                         human_message=res_val.human_message,
@@ -132,6 +138,7 @@ class NegotiationService:
                     )
                 elif res_name == "rejected" and res_val:
                     from aura_core_gen.aura.negotiation.v1 import OfferRejected
+
                     response.rejected = OfferRejected(reason_code=res_val.reason_code)
 
             return response
@@ -160,9 +167,7 @@ class NegotiationService:
             if not reasoning or not persistence:
                 raise Exception("Required proteins not available")
 
-            embed_obs = await reasoning.execute(
-                "generate_embedding", {"text": query}
-            )
+            embed_obs = await reasoning.execute("generate_embedding", {"text": query})
             if not embed_obs.success:
                 raise Exception(f"Failed to generate embedding: {embed_obs.error}")
 
@@ -312,9 +317,11 @@ async def serve() -> None:
                             from aura_core_gen.aura.negotiation.v1 import (
                                 AgentIdentity as NegotiationAgentIdentity,
                             )
+
                             mock_signal = NegotiateRequest(
                                 item_id=item["id"],
-                                bid_amount=item["base_price"] * settings.heartbeat.bid_multiplier,
+                                bid_amount=item["base_price"]
+                                * settings.heartbeat.bid_multiplier,
                                 currency_code="USD",
                                 agent=NegotiationAgentIdentity(
                                     did=settings.heartbeat.agent_did,

@@ -32,7 +32,7 @@ async def main():
             item_identifier="item_1",
             action=ActionType.ACTION_TYPE_ACCEPT,
             price=100.0,
-        )
+        ),
     )
 
     logger.info("connecting_to_nats", url=nats_url)

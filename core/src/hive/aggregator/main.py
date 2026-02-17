@@ -56,9 +56,7 @@ class HiveAggregator(Aggregator[Any, Context]):
         self.brain_path = resolve_brain_path(compiled_path or "")
 
         # Signal Enzymes: Dispatching based on Signal payload oneof
-        self._SIGNAL_ENZYMES: dict[
-            str, Callable[[Any, Signal, Context], Any]
-        ] = {
+        self._SIGNAL_ENZYMES: dict[str, Callable[[Any, Signal, Context], Any]] = {
             "negotiation": self._perceive_negotiation,
             "perception": self._perceive_perception,
             "telegram": self._perceive_telegram,
@@ -69,11 +67,14 @@ class HiveAggregator(Aggregator[Any, Context]):
     async def get_vitals(self) -> SystemVitals:
         """Standardized proprioception (self-healing metrics) via Telemetry Protein."""
         from datetime import UTC, datetime
+
         try:
             # Call Telemetry Protein via SkillRegistry
             obs = await self.registry.execute("telemetry", "fetch_metrics", {})
             if obs.success:
-                return cast(SystemVitals, SystemVitals().from_dict(_get_metadata_dict(obs)))
+                return cast(
+                    SystemVitals, SystemVitals().from_dict(_get_metadata_dict(obs))
+                )
             return SystemVitals(status="unstable", timestamp=datetime.now(UTC))
         except Exception as e:
             logger.error("aggregator_vitals_unexpected_error", error=str(e))
@@ -103,10 +104,12 @@ class HiveAggregator(Aggregator[Any, Context]):
         # 2. Initialize Base Context
         context = Context(
             system_health=system_status,
-            metadata=protobuf.Struct().from_dict({
-                "brain_path": self.brain_path,
-                "vitals": vitals.to_dict(),
-            }),
+            metadata=protobuf.Struct().from_dict(
+                {
+                    "brain_path": self.brain_path,
+                    "vitals": vitals.to_dict(),
+                }
+            ),
         )
 
         # 3. Extract or Parse Signal
@@ -131,7 +134,9 @@ class HiveAggregator(Aggregator[Any, Context]):
         if proto_signal:
             context.identifier = proto_signal.identifier
             context.trace = proto_signal.trace
-            payload_name, payload_value = betterproto.which_one_of(proto_signal, "payload")
+            payload_name, payload_value = betterproto.which_one_of(
+                proto_signal, "payload"
+            )
 
             if payload_name in self._SIGNAL_ENZYMES:
                 enzyme = self._SIGNAL_ENZYMES[payload_name]
@@ -141,15 +146,21 @@ class HiveAggregator(Aggregator[Any, Context]):
                 logger.warning("unsupported_signal_payload", payload=payload_name)
         else:
             # Fallback for legacy objects (if any)
-            context.identifier = str(getattr(signal, "item_id", getattr(signal, "identifier", "unknown")))
+            context.identifier = str(
+                getattr(signal, "item_id", getattr(signal, "identifier", "unknown"))
+            )
             if hasattr(signal, "bid_amount"):
                 context.context_type = cast(ContextType, ContextType.CONTEXT_TYPE_HIVE)
                 context.hive = HiveContextData(
                     item_identifier=context.identifier,
                     offer=NegotiationOffer(
                         bid_amount=float(getattr(signal, "bid_amount", 0.0)),
-                        reputation=float(getattr(signal.agent, "reputation_score", 1.0)) if hasattr(signal, "agent") else 1.0,
-                        agent_did=str(getattr(signal.agent, "did", "unknown")) if hasattr(signal, "agent") else "unknown",
+                        reputation=float(getattr(signal.agent, "reputation_score", 1.0))
+                        if hasattr(signal, "agent")
+                        else 1.0,
+                        agent_did=str(getattr(signal.agent, "did", "unknown"))
+                        if hasattr(signal, "agent")
+                        else "unknown",
                     ),
                     request_id=str(getattr(signal, "request_id", "")),
                 )
@@ -157,11 +168,13 @@ class HiveAggregator(Aggregator[Any, Context]):
         # 5. Post-Perception: Enrichment from Persistence if needed
         if context.context_type == ContextType.CONTEXT_TYPE_HIVE and context.hive:
             if not _get_metadata_dict(context).get("item_name"):
-                 await self._enrich_context_from_persistence(context)
+                await self._enrich_context_from_persistence(context)
 
         return context
 
-    async def _perceive_negotiation(self, payload: Any, signal: Signal, context: Context) -> Context:
+    async def _perceive_negotiation(
+        self, payload: Any, signal: Signal, context: Context
+    ) -> Context:
         """Enzyme for Negotiation signals."""
         context.context_type = cast(ContextType, ContextType.CONTEXT_TYPE_HIVE)
         context.hive = HiveContextData(
@@ -177,7 +190,9 @@ class HiveAggregator(Aggregator[Any, Context]):
         self._update_metadata(context, {"source": "negotiation"})
         return context
 
-    async def _perceive_perception(self, payload: Any, signal: Signal, context: Context) -> Context:
+    async def _perceive_perception(
+        self, payload: Any, signal: Signal, context: Context
+    ) -> Context:
         """Enzyme for Vision Perception signals."""
         obs = await self.registry.execute(
             "perception",
@@ -198,7 +213,9 @@ class HiveAggregator(Aggregator[Any, Context]):
                 agent_did = payload.agent.did
                 ttl = 3600
                 if self.settings and hasattr(self.settings, "perception"):
-                    ttl = int(getattr(self.settings.perception, "ephemeral_asset_ttl", 3600))
+                    ttl = int(
+                        getattr(self.settings.perception, "ephemeral_asset_ttl", 3600)
+                    )
 
                 await self.registry.execute(
                     "persistence",
@@ -224,14 +241,19 @@ class HiveAggregator(Aggregator[Any, Context]):
             ),
             request_id=signal.identifier,
         )
-        self._update_metadata(context, {
-            "source": "vision",
-            "vision_error": str(vision_error or ""),
-            "item_name": str(item_data.get("name", "")),
-        })
+        self._update_metadata(
+            context,
+            {
+                "source": "vision",
+                "vision_error": str(vision_error or ""),
+                "item_name": str(item_data.get("name", "")),
+            },
+        )
         return context
 
-    async def _perceive_telegram(self, payload: Any, signal: Signal, context: Context) -> Context:
+    async def _perceive_telegram(
+        self, payload: Any, signal: Signal, context: Context
+    ) -> Context:
         """Enzyme for Telegram signals."""
         user_id = int(payload.user_id)
         callback_data = str(payload.callback_data)
@@ -283,38 +305,51 @@ class HiveAggregator(Aggregator[Any, Context]):
             ),
             request_id=signal.identifier,
         )
-        self._update_metadata(context, {
-            "source": "telegram",
-            "callback_data": callback_data,
-            "item_name": str(item_data.get("name", "")),
-        })
+        self._update_metadata(
+            context,
+            {
+                "source": "telegram",
+                "callback_data": callback_data,
+                "item_name": str(item_data.get("name", "")),
+            },
+        )
         return context
 
-    async def _perceive_asset(self, payload: Any, signal: Signal, context: Context) -> Context:
+    async def _perceive_asset(
+        self, payload: Any, signal: Signal, context: Context
+    ) -> Context:
         """Enzyme for Generic Asset signals."""
         context.context_type = cast(ContextType, ContextType.CONTEXT_TYPE_ASSET)
         context.asset = AssetContextData(
             asset_identifier=payload.asset_identifier,
             asset_domain=payload.asset_domain,
         )
-        self._update_metadata(context, {
-            "source": "asset",
-            "subtype": str(payload.signal_subtype),
-        })
+        self._update_metadata(
+            context,
+            {
+                "source": "asset",
+                "subtype": str(payload.signal_subtype),
+            },
+        )
         return context
 
-    async def _perceive_search(self, payload: Any, signal: Signal, context: Context) -> Context:
+    async def _perceive_search(
+        self, payload: Any, signal: Signal, context: Context
+    ) -> Context:
         """Enzyme for Search signals."""
         context.context_type = cast(ContextType, ContextType.CONTEXT_TYPE_ASSET)
         context.asset = AssetContextData(
             search_query=payload.query,
             asset_domain=payload.domain,
         )
-        self._update_metadata(context, {
-            "source": "search",
-            "limit": str(payload.limit),
-            "min_similarity": str(payload.min_similarity),
-        })
+        self._update_metadata(
+            context,
+            {
+                "source": "search",
+                "limit": str(payload.limit),
+                "min_similarity": str(payload.min_similarity),
+            },
+        )
         return context
 
     async def _enrich_context_from_persistence(self, context: Context) -> None:
@@ -324,9 +359,7 @@ class HiveAggregator(Aggregator[Any, Context]):
 
         try:
             obs = await self.registry.execute(
-                "persistence",
-                "read_item",
-                {"item_id": context.hive.item_identifier}
+                "persistence", "read_item", {"item_id": context.hive.item_identifier}
             )
             if obs.success:
                 self._update_metadata(context, _get_metadata_dict(obs))

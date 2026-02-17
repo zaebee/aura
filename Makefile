@@ -1,4 +1,4 @@
-.PHONY: lint test test-cov test-verbose build generate push install-dev format test-health \
+.PHONY: lint mypy test test-cov test-verbose build generate push install-dev format test-health \
        run-core run-gateway run-frontend prepare-bun
 
 # Makefile for Aura Project
@@ -35,6 +35,14 @@ lint: $(PROTO_SENTINEL)
 	uv run bandit -r . -c pyproject.toml
 	# Frontend Lint
 	# cd frontend && bun run lint
+
+mypy:
+	MYPYPATH=$(CORE_PATH) uv run mypy --explicit-package-bases core/src
+	MYPYPATH=$(GATEWAY_PATH) uv run mypy --explicit-package-bases api-gateway/src
+	MYPYPATH=$(TG_PATH) uv run mypy --explicit-package-bases synapses/telegram-bot/src
+	MYPYPATH=$(MCP_PATH) uv run mypy --explicit-package-bases synapses/mcp-server/src
+	MYPYPATH=$(KEEPER_PATH) uv run mypy --explicit-package-bases agents/bee-keeper/src
+	MYPYPATH=$(DNA_PATH) uv run mypy packages/aura-core/src
 
 setup-hooks:
 	# Install pre-commit hooks

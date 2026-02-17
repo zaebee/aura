@@ -61,8 +61,8 @@ async def test_vision_to_listing_flow(mocker: "MockerFixture"):
         identifier="sig-1",
         perception=PerceptionSignal(
             image_data=[image_data],
-            agent=AgentIdentity(did=agent_did, reputation_score=1.0)
-        )
+            agent=AgentIdentity(did=agent_did, reputation_score=1.0),
+        ),
     )
 
     # Mock Perception result
@@ -71,30 +71,38 @@ async def test_vision_to_listing_flow(mocker: "MockerFixture"):
         "name": "2024 Honda Forza",
         "base_price": 5000.0,
         "floor_price": 4500.0,
-        "meta": {"color": "Black", "confidence": "0.95"}
+        "meta": {"color": "Black", "confidence": "0.95"},
     }
     from datetime import UTC, datetime
 
     # Need to return Observation objects or compatible mocks
-    perception.execute.return_value = Observation(success=True, metadata=protobuf.Struct().from_dict(perception_result))
+    perception.execute.return_value = Observation(
+        success=True, metadata=protobuf.Struct().from_dict(perception_result)
+    )
     guard.execute.return_value = Observation(success=True)
-    telemetry.execute.return_value = Observation(success=True, metadata=protobuf.Struct().from_dict({
-        "cpuUsagePercent": 10.0,
-        "memoryUsageMb": 100.0,
-        "status": "ok",
-        "timestamp": datetime.now(UTC).isoformat()
-    }))
+    telemetry.execute.return_value = Observation(
+        success=True,
+        metadata=protobuf.Struct().from_dict(
+            {
+                "cpuUsagePercent": 10.0,
+                "memoryUsageMb": 100.0,
+                "status": "ok",
+                "timestamp": datetime.now(UTC).isoformat(),
+            }
+        ),
+    )
 
     # Perceive
     context = await aggregator.perceive(signal)
 
     # Verify Persistence was called to set cache
     persistence.execute.assert_any_call(
-        "set_cache", {
+        "set_cache",
+        {
             "key": f"ephemeral:asset:{agent_did}",
             "value": perception_result,
-            "expire": 3600
-        }
+            "expire": 3600,
+        },
     )
 
     assert context.metadata.to_dict()["item_name"] == "2024 Honda Forza"
@@ -104,16 +112,19 @@ async def test_vision_to_listing_flow(mocker: "MockerFixture"):
     callback_signal = Signal(
         identifier="sig-2",
         telegram=TelegramSignal(
-            user_id=12345,
-            callback_data="list_now:perceived-honda:5400.0"
-        )
+            user_id=12345, callback_data="list_now:perceived-honda:5400.0"
+        ),
     )
 
     # Mock Persistence to return cached asset
     persistence.execute.reset_mock()
     persistence.execute.side_effect = [
-        Observation(success=True, metadata=protobuf.Struct().from_dict(perception_result)), # For get_cache
-        Observation(success=True, metadata=protobuf.Struct().from_dict({})), # For read_item (fallback)
+        Observation(
+            success=True, metadata=protobuf.Struct().from_dict(perception_result)
+        ),  # For get_cache
+        Observation(
+            success=True, metadata=protobuf.Struct().from_dict({})
+        ),  # For read_item (fallback)
     ]
 
     # Re-perceive with callback
@@ -131,12 +142,17 @@ async def test_vision_to_listing_flow(mocker: "MockerFixture"):
     registry.register("reasoning", reasoning)
 
     # Mock reasoning to accept
-    reasoning.execute.return_value = Observation(success=True, metadata=protobuf.Struct().from_dict({
-        "action": "accept",
-        "price": 5400.0,
-        "message": "Listed!",
-        "thought": "User accepted appraisal.",
-    }))
+    reasoning.execute.return_value = Observation(
+        success=True,
+        metadata=protobuf.Struct().from_dict(
+            {
+                "action": "accept",
+                "price": 5400.0,
+                "message": "Listed!",
+                "thought": "User accepted appraisal.",
+            }
+        ),
+    )
 
     decision = await transformer.think(context_cb)
 

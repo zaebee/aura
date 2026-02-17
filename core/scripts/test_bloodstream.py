@@ -36,6 +36,7 @@ async def test_basic_nats(nats_url: str) -> bool:
     try:
         # Import proto
         from aura_core_gen.aura.core.v1 import Event
+
         print("  ✓ Proto module imported")
     except ImportError as e:
         print(f"  ✗ Failed to import proto: {e}")
@@ -63,7 +64,7 @@ async def test_basic_nats(nats_url: str) -> bool:
             service="test_bloodstream",
             instance_id="test-001",
             status=Status.STATUS_OK,
-        )
+        ),
     )
 
     # Serialize to binary
@@ -151,7 +152,7 @@ async def test_jetstream(nats_url: str) -> bool:
             service="test_bloodstream",
             instance_id="test-001",
             status=Status.STATUS_OK,
-        )
+        ),
     )
 
     binary_data = bytes(event)

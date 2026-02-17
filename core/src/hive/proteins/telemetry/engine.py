@@ -118,7 +118,9 @@ async def fetch_vitals(metrics_cache: MetricsCache, settings: Any) -> SystemVita
                 if cached_dict:
                     return SystemVitals(
                         status="unstable",
-                        cpu_usage_percent=float(cached_dict.get("cpu_usage_percent", 0.0)),
+                        cpu_usage_percent=float(
+                            cached_dict.get("cpu_usage_percent", 0.0)
+                        ),
                         memory_usage_mb=float(cached_dict.get("memory_usage_mb", 0.0)),
                         timestamp=datetime.now(UTC),
                         cached=True,
@@ -156,9 +158,7 @@ async def fetch_vitals(metrics_cache: MetricsCache, settings: Any) -> SystemVita
                 timestamp=datetime.now(UTC),
                 cached=True,
             )
-        return SystemVitals(
-            status="unstable", timestamp=datetime.now(UTC)
-        )
+        return SystemVitals(status="unstable", timestamp=datetime.now(UTC))
 
 
 def process_resp(resp: Any, name: str, errs: list[str]) -> tuple[float, bool]:

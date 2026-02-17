@@ -93,8 +93,8 @@ class ReasoningSkill(
         result = await asyncio.to_thread(call)
         metadata = result.copy()
         if "action" in metadata:
-             # Ensure action fields are serializable if they are complex
-             pass
+            # Ensure action fields are serializable if they are complex
+            pass
 
         return Observation(success=True, metadata=protobuf.Struct().from_dict(metadata))
 

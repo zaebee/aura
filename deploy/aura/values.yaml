@@ -178,7 +178,7 @@ monitoring:
     resources:
       limits:
         cpu: 500m
-        memory: 512Mi
+        memory: 768Mi
   loki:
     url: "http://loki.monitoring.svc.cluster.local:3100"
 

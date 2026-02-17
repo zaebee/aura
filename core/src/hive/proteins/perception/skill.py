@@ -59,6 +59,15 @@ class PerceptionSkill(
         item = await self.provider.perceive_image(p.image_bytes)
 
         if "error" in item:
-            return Observation(success=False, error=item["error"], metadata=protobuf.Struct().from_dict(item))
+            return Observation(
+                success=False,
+                error=item["error"],
+                metadata=protobuf.Struct().from_dict(item),
+            )
 
-        return Observation(success=True, metadata=protobuf.Struct().from_dict(PerceiveImageResult(**item).model_dump()))
+        return Observation(
+            success=True,
+            metadata=protobuf.Struct().from_dict(
+                PerceiveImageResult(**item).model_dump()
+            ),
+        )

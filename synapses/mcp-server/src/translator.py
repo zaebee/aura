@@ -40,11 +40,13 @@ class MCPTranslator:
                 signal_type=cast(SignalType, SignalType.SIGNAL_TYPE_UNSPECIFIED),
                 timestamp=datetime.now(UTC),
             )
-            sig.metadata.from_dict({
-                "query": str(kwargs.get("query", "")),
-                "limit": str(kwargs.get("limit", 3)),
-                "intent": "search",
-            })
+            sig.metadata.from_dict(
+                {
+                    "query": str(kwargs.get("query", "")),
+                    "limit": str(kwargs.get("limit", 3)),
+                    "intent": "search",
+                }
+            )
             return sig
 
         return Signal(
