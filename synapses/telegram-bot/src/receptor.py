@@ -175,7 +175,9 @@ class TelegramReceptor:
         # but since we are using await self.adapter.execute(signal), we get the observation back.
         # NatsAdapter.execute usually returns the observation from the request-reply pattern.
 
-    async def process_list_now(self, callback: CallbackQuery, state: FSMContext) -> None:
+    async def process_list_now(
+        self, callback: CallbackQuery, state: FSMContext
+    ) -> None:
         """Handle 'List Now' confirmation from Vision Report Card."""
         if not callback.data:
             return

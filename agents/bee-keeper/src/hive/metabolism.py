@@ -30,9 +30,7 @@ class BeeMetabolism:
         start_time = time.time()
 
         # 1. Aggregator (A) - Senses the environment
-        context = await self.aggregator.perceive(
-            None, event_name=event_name
-        )
+        context = await self.aggregator.perceive(None, event_name=event_name)
 
         # 2. Transformer (T) - Reasons and audits
         if event_name == "schedule":

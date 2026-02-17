@@ -23,9 +23,7 @@ logger = structlog.get_logger(__name__)
 tracer = trace.get_tracer(__name__)
 
 
-class MetabolicLoop(
-    BaseMetabolicLoop[Any, Context, Intent, Observation, Any]
-):
+class MetabolicLoop(BaseMetabolicLoop[Any, Context, Intent, Observation, Any]):
     """
     Orchestrates the ATCG flow with core-specific monitoring via Telemetry Protein.
     Pure Pipe: Signal -> A -> T -> M -> C -> G.

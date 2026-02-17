@@ -49,7 +49,9 @@ class HiveMembrane(Membrane[Any, Intent, Context]):
         if isinstance(signal, Signal):
             payload_name, payload_value = betterproto.which_one_of(signal, "payload")
             if payload_name == "negotiation" and payload_value:
-                fields_to_scan.append(("item_identifier", getattr(payload_value, "item_identifier", "")))
+                fields_to_scan.append(
+                    ("item_identifier", getattr(payload_value, "item_identifier", ""))
+                )
                 agent = getattr(payload_value, "agent", None)
                 if agent:
                     fields_to_scan.append(("agent.did", getattr(agent, "did", "")))
@@ -78,18 +80,29 @@ class HiveMembrane(Membrane[Any, Intent, Context]):
                         )
                         if field_name in ["item_id", "item_identifier"]:
                             if isinstance(signal, Signal):
-                                payload_name, payload_value = betterproto.which_one_of(signal, "payload")
+                                payload_name, payload_value = betterproto.which_one_of(
+                                    signal, "payload"
+                                )
                                 if payload_name == "negotiation" and payload_value:
-                                    payload_value.item_identifier = "INVALID_ID_POTENTIAL_INJECTION"
+                                    payload_value.item_identifier = (
+                                        "INVALID_ID_POTENTIAL_INJECTION"
+                                    )
                             else:
                                 if hasattr(signal, "item_identifier"):
-                                    signal.item_identifier = "INVALID_ID_POTENTIAL_INJECTION"
+                                    signal.item_identifier = (
+                                        "INVALID_ID_POTENTIAL_INJECTION"
+                                    )
                                 elif hasattr(signal, "item_id"):
                                     signal.item_id = "INVALID_ID_POTENTIAL_INJECTION"
                         elif field_name == "agent.did":
                             if isinstance(signal, Signal):
-                                payload_name, payload_value = betterproto.which_one_of(signal, "payload")
-                                if payload_name in ["negotiation", "perception"] and payload_value:
+                                payload_name, payload_value = betterproto.which_one_of(
+                                    signal, "payload"
+                                )
+                                if (
+                                    payload_name in ["negotiation", "perception"]
+                                    and payload_value
+                                ):
                                     agent = getattr(payload_value, "agent", None)
                                     if agent:
                                         agent.did = "REDACTED"
@@ -97,9 +110,7 @@ class HiveMembrane(Membrane[Any, Intent, Context]):
                                 signal.agent.did = "REDACTED"
         return signal
 
-    async def inspect_outbound(
-        self, decision: Intent, context: Context
-    ) -> Intent:
+    async def inspect_outbound(self, decision: Intent, context: Context) -> Intent:
         ctx_meta = context.metadata.to_dict()
         floor_price = float(str(ctx_meta.get("floor_price", 0.0)))
 
@@ -116,7 +127,9 @@ class HiveMembrane(Membrane[Any, Intent, Context]):
                     },
                 )
                 if obs_safe.success:
-                    safe_price = float(str(obs_safe.metadata.to_dict().get("safe_price", safe_price)))
+                    safe_price = float(
+                        str(obs_safe.metadata.to_dict().get("safe_price", safe_price))
+                    )
 
             return self._override_with_safe_offer(
                 decision, safe_price, "FAILURE_RECOVERY"
@@ -126,10 +139,15 @@ class HiveMembrane(Membrane[Any, Intent, Context]):
         message = decision.negotiation.message if decision.negotiation else ""
         if "floor_price" in message.lower():
             if decision.negotiation:
-                decision.negotiation.message = "I cannot disclose internal pricing details."
+                decision.negotiation.message = (
+                    "I cannot disclose internal pricing details."
+                )
             decision.reasoning += " [MEMBRANE: DLP block]"
 
-        if decision.action not in [ActionType.ACTION_TYPE_ACCEPT, ActionType.ACTION_TYPE_COUNTER]:
+        if decision.action not in [
+            ActionType.ACTION_TYPE_ACCEPT,
+            ActionType.ACTION_TYPE_COUNTER,
+        ]:
             return decision
 
         # 3. Call Guard Protein for validation
@@ -180,13 +198,15 @@ class HiveMembrane(Membrane[Any, Intent, Context]):
         return Intent(
             action=cast(ActionType, ActionType.ACTION_TYPE_COUNTER),
             reasoning=new_thought,
-            metadata=protobuf.Struct().from_dict({
-                "original_decision": str(original.action.name),
-                "original_price": str(orig_price),
-                "override_reason": str(reason),
-            }),
+            metadata=protobuf.Struct().from_dict(
+                {
+                    "original_decision": str(original.action.name),
+                    "original_price": str(orig_price),
+                    "override_reason": str(reason),
+                }
+            ),
             negotiation=NegotiationIntent(
                 price=rounded_price,
                 message=f"I've reached my final limit for this item. My best offer is ${rounded_price:.2f}.",
-            )
+            ),
         )

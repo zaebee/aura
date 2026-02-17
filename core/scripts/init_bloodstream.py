@@ -226,7 +226,7 @@ async def publish_test_event(nats_url: str) -> bool:
                     service="init_bloodstream",
                     instance_id="test",
                     status=Status.STATUS_OK,
-                )
+                ),
             )
 
             # Serialize to binary

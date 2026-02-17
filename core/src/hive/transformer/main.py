@@ -55,9 +55,13 @@ class RuleBasedStrategy:
         # Rule: High-value bids require UI confirmation
         if bid > self.trigger_price:
             return Intent(
-                action=cast(ActionType, ActionType.ACTION_TYPE_EVALUATE), # UI REQUIRED Surrogate
+                action=cast(
+                    ActionType, ActionType.ACTION_TYPE_EVALUATE
+                ),  # UI REQUIRED Surrogate
                 reasoning="<think>Bid exceeds security threshold. UI confirmation required.</think>",
-                metadata=protobuf.Struct().from_dict({"template_id": "high_value_confirm"}),
+                metadata=protobuf.Struct().from_dict(
+                    {"template_id": "high_value_confirm"}
+                ),
                 negotiation=NegotiationIntent(
                     price=bid,
                     message=f"Bid of ${bid} exceeds security threshold",
@@ -81,7 +85,9 @@ class RuleBasedStrategy:
         return Intent(
             action=cast(ActionType, ActionType.ACTION_TYPE_ACCEPT),
             reasoning="<think>Bid at or above floor price. Accepting.</think>",
-            metadata=protobuf.Struct().from_dict({"reservation_code": f"RULE-{int(time.time())}"}),
+            metadata=protobuf.Struct().from_dict(
+                {"reservation_code": f"RULE-{int(time.time())}"}
+            ),
             negotiation=NegotiationIntent(
                 price=bid,
                 message="Offer accepted.",
@@ -136,9 +142,7 @@ class AuraTransformer(Transformer[Context, Intent]):
             "reputation": reputation,
             "system_constraints": constraints,
             "meta": metadata,
-            "vision_result": metadata
-            if metadata.get("source") == "vision"
-            else None,
+            "vision_result": metadata if metadata.get("source") == "vision" else None,
             "vision_error": metadata.get("vision_error"),
             "vision_confidence_threshold": vision_confidence_threshold,
         }
@@ -179,7 +183,7 @@ class AuraTransformer(Transformer[Context, Intent]):
                 return Intent(
                     action=cast(ActionType, ActionType.ACTION_TYPE_ERROR),
                     reasoning=f"<think>Reasoning failed: {obs.error}</think>",
-                    negotiation=NegotiationIntent(message="Internal processing error.")
+                    negotiation=NegotiationIntent(message="Internal processing error."),
                 )
 
             # reasoning protein returns data in metadata
@@ -195,7 +199,11 @@ class AuraTransformer(Transformer[Context, Intent]):
             wrapped_thought = f"<think>\n{raw_thought}\n</think>" if raw_thought else ""
 
             action_metadata = {
-                **{k: str(v) for k, v in result.items() if k not in ["action", "price", "message", "thought"]},
+                **{
+                    k: str(v)
+                    for k, v in result.items()
+                    if k not in ["action", "price", "message", "thought"]
+                },
                 "brain_path": self.brain_path,
             }
 
@@ -207,7 +215,7 @@ class AuraTransformer(Transformer[Context, Intent]):
                     price=float(result.get("price", 0.0)),
                     message=str(result.get("message", "")),
                     thought=str(result.get("thought", "")),
-                )
+                ),
             )
 
         except Exception as e:
@@ -215,5 +223,5 @@ class AuraTransformer(Transformer[Context, Intent]):
             return Intent(
                 action=cast(ActionType, ActionType.ACTION_TYPE_ERROR),
                 reasoning=f"<think>Transformer exception: {str(e)}</think>",
-                negotiation=NegotiationIntent(message="Internal transformer error.")
+                negotiation=NegotiationIntent(message="Internal transformer error."),
             )

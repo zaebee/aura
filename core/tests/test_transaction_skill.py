@@ -20,28 +20,35 @@ async def test_transaction_skill_execute_not_initialized():
     assert obs.success is False
     assert "not_initialized" in obs.error
 
+
 @pytest.mark.asyncio
 async def test_transaction_skill_calculate_tax_and_margin():
     skill = TransactionSkill()
     keypair = Keypair()
-    settings = CryptoSettings(enabled=True, solana_private_key=str(keypair), secret_encryption_key="k" * 44)
+    settings = CryptoSettings(
+        enabled=True, solana_private_key=str(keypair), secret_encryption_key="k" * 44
+    )
 
     # Mock provider and encryption since we don't need real ones for this test
     mock_provider = MagicMock()
     mock_encryption = MagicMock()
     converter = PriceConverter()
 
-    skill.bind(settings, {
-        "provider": mock_provider,
-        "encryption": mock_encryption,
-        "converter": converter
-    })
+    skill.bind(
+        settings,
+        {
+            "provider": mock_provider,
+            "encryption": mock_encryption,
+            "converter": converter,
+        },
+    )
 
     obs = await skill.execute("calculate_tax_and_margin", {"price": 100.0})
     assert obs.success is True
     meta = obs.metadata.to_dict()
     assert meta["margin"] == 10.0
     assert meta["total"] == 110.0
+
 
 @pytest.mark.asyncio
 @patch("hive.proteins.transaction.engine.Pubkey.from_string")
@@ -63,7 +70,9 @@ async def test_transaction_skill_generate_payment_request(mock_from_string):
 
     skill = TransactionSkill()
     keypair = Keypair()
-    settings = CryptoSettings(enabled=True, solana_private_key=str(keypair), secret_encryption_key="k" * 44)
+    settings = CryptoSettings(
+        enabled=True, solana_private_key=str(keypair), secret_encryption_key="k" * 44
+    )
 
     # Use real objects for simple logic testing
     converter = PriceConverter()
@@ -71,20 +80,18 @@ async def test_transaction_skill_generate_payment_request(mock_from_string):
     provider = SolanaProvider(
         private_key_base58=str(keypair),
         rpc_url="https://api.devnet.solana.com",
-        usdc_mint="Gh9ZwEmdLJ8DscKNTkTqPbNwLNNBjuSzaG9Vp2KGtKJr"
+        usdc_mint="Gh9ZwEmdLJ8DscKNTkTqPbNwLNNBjuSzaG9Vp2KGtKJr",
     )
 
-    skill.bind(settings, {
-        "provider": provider,
-        "encryption": encryption,
-        "converter": converter
-    })
+    skill.bind(
+        settings,
+        {"provider": provider, "encryption": encryption, "converter": converter},
+    )
 
-    obs = await skill.execute("generate_payment_request", {
-        "amount": 1.5,
-        "memo": "test-memo",
-        "currency": "SOL"
-    })
+    obs = await skill.execute(
+        "generate_payment_request",
+        {"amount": 1.5, "memo": "test-memo", "currency": "SOL"},
+    )
     assert obs.success is True
     uri = obs.metadata.to_dict()["uri"]
     assert "solana:" in uri

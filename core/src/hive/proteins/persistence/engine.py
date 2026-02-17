@@ -87,6 +87,18 @@ class LockedDeal(Base):
     )
 
 
+class SanctifiedWallet(Base):
+    """Immune Registry: wallets approved for on-chain transactions."""
+
+    __tablename__ = "sanctified_wallets"
+
+    wallet_address: Mapped[str] = mapped_column(String, primary_key=True)
+    asset_domain: Mapped[str] = mapped_column(String, nullable=False, default="")
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime, nullable=False, default=lambda: datetime.now(UTC)
+    )
+
+
 class RedisCache:
     """Redis-based caching and excited state storage."""
 

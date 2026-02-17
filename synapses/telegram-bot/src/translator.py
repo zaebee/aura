@@ -61,13 +61,15 @@ class TelegramTranslator:
                     chat_id=chat_id,
                     message_text=text,
                 )
-                signal.metadata.from_dict({
-                    "chat_id": str(chat_id),
-                    "user_id": str(user_id),
-                    "source": "telegram",
-                    "intent": "search",
-                    "query": str(command.args or ""),
-                })
+                signal.metadata.from_dict(
+                    {
+                        "chat_id": str(chat_id),
+                        "user_id": str(user_id),
+                        "source": "telegram",
+                        "intent": "search",
+                        "query": str(command.args or ""),
+                    }
+                )
                 return signal
 
             # Handle photo message (Perception)
@@ -85,12 +87,14 @@ class TelegramTranslator:
                         reputation_score=1.0,
                     ),
                 )
-                signal.metadata.from_dict({
-                    "chat_id": str(chat_id),
-                    "user_id": str(user_id),
-                    "source": "telegram",
-                    "item_id": item_id,
-                })
+                signal.metadata.from_dict(
+                    {
+                        "chat_id": str(chat_id),
+                        "user_id": str(user_id),
+                        "source": "telegram",
+                        "item_id": item_id,
+                    }
+                )
                 return signal
 
             # Standard message or bid - Use TelegramSignal for Signal Integrity
@@ -100,12 +104,14 @@ class TelegramTranslator:
                 chat_id=chat_id,
                 message_text=text,
             )
-            signal.metadata.from_dict({
-                "chat_id": str(chat_id),
-                "user_id": str(user_id),
-                "source": "telegram",
-                "item_id": item_id,
-            })
+            signal.metadata.from_dict(
+                {
+                    "chat_id": str(chat_id),
+                    "user_id": str(user_id),
+                    "source": "telegram",
+                    "item_id": item_id,
+                }
+            )
             return signal
 
         if isinstance(event, CallbackQuery):
@@ -118,11 +124,13 @@ class TelegramTranslator:
                 chat_id=chat_id,
                 callback_data=event.data or "",
             )
-            signal.metadata.from_dict({
-                "chat_id": str(chat_id),
-                "user_id": str(user_id),
-                "source": "telegram",
-            })
+            signal.metadata.from_dict(
+                {
+                    "chat_id": str(chat_id),
+                    "user_id": str(user_id),
+                    "source": "telegram",
+                }
+            )
             return signal
 
         signal.signal_type = cast(SignalType, SignalType.SIGNAL_TYPE_UNSPECIFIED)
@@ -134,12 +142,12 @@ class TelegramTranslator:
         """
         metadata = getattr(event, "metadata", {})
         if hasattr(metadata, "to_dict"):
-             metadata = metadata.to_dict()
+            metadata = metadata.to_dict()
 
         chat_id = int(metadata.get("chat_id", "0"))
 
         if not chat_id:
-             return 0, "", None
+            return 0, "", None
 
         message = ""
         keyboard = None
@@ -170,32 +178,38 @@ class TelegramTranslator:
                         if isinstance(v, str):
                             v = json.loads(v)
                         name = sanitize_markdown(v.get("name", "Unknown Asset"))
-                        color = sanitize_markdown(v.get("meta", {}).get("color", "Unknown"))
+                        color = sanitize_markdown(
+                            v.get("meta", {}).get("color", "Unknown")
+                        )
                         confidence = v.get("meta", {}).get("confidence", "0.0")
 
                         message = (
                             f"👁️ *AURA VISION REPORT*\n\n"
                             f"*Asset:* `{name}`\n"
                             f"*Color:* `{color}`\n"
-                            f"*Confidence:* `{float(confidence)*100:.1f}%`\n"
+                            f"*Confidence:* `{float(confidence) * 100:.1f}%`\n"
                             f"*Proposed Rent Price:* `${price:.2f}/day`\n\n"
                             f"Is this correct? Would you like to list it now?"
                         )
                         safe_item_id = sanitize_callback(item_id)
-                        keyboard = InlineKeyboardMarkup(inline_keyboard=[
-                            [
-                                InlineKeyboardButton(
-                                    text="✅ List Now",
-                                    callback_data=f"list_now:{safe_item_id}:{price}",
-                                ),
-                                InlineKeyboardButton(
-                                    text="❌ Wrong Specs",
-                                    callback_data=f"wrong_specs:{safe_item_id}",
-                                ),
+                        keyboard = InlineKeyboardMarkup(
+                            inline_keyboard=[
+                                [
+                                    InlineKeyboardButton(
+                                        text="✅ List Now",
+                                        callback_data=f"list_now:{safe_item_id}:{price}",
+                                    ),
+                                    InlineKeyboardButton(
+                                        text="❌ Wrong Specs",
+                                        callback_data=f"wrong_specs:{safe_item_id}",
+                                    ),
+                                ]
                             ]
-                        ])
+                        )
                     except Exception as e:
-                        message = f"⚠️ *Vision Processing Error*\nCould not parse report: {e}"
+                        message = (
+                            f"⚠️ *Vision Processing Error*\nCould not parse report: {e}"
+                        )
                 else:
                     message = f"👤 *Human Required*\nAgent needs manual intervention for Item `{item_id}`."
 

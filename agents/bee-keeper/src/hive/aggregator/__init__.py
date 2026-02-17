@@ -57,12 +57,14 @@ class BeeAggregator(Aggregator[Any, Context]):
                 git_diff=git_diff,
                 filesystem_map=filesystem_map,
             ),
-            metadata=protobuf.Struct().from_dict({
-                "event_name": str(event_name),
-                "brain_status": self.brain_status,
-                "hive_metrics": hive_metrics,
-                "event_data": event_data,
-            }),
+            metadata=protobuf.Struct().from_dict(
+                {
+                    "event_name": str(event_name),
+                    "brain_status": self.brain_status,
+                    "hive_metrics": hive_metrics,
+                    "event_data": event_data,
+                }
+            ),
         )
         return context
 

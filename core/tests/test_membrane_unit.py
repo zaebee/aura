@@ -16,7 +16,9 @@ def test_output_guard_validate_decision_below_floor():
     guard = OutputGuard(safety_settings=MagicMock(min_profit_margin=0.1))
     decision = {"action": "accept", "price": 90.0}
     context = {"floor_price": 100.0, "internal_cost": 80.0}
-    with pytest.raises(SafetyViolation, match="Metabolic Leakage: Amount below floor price"):
+    with pytest.raises(
+        SafetyViolation, match="Metabolic Leakage: Amount below floor price"
+    ):
         guard.validate_decision(decision, context)
 
 

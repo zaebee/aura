@@ -56,9 +56,7 @@ class BeeConnector(Connector[AuditObservation, BeeObservation, Context]):
         """Cleanup resources."""
         await self._http_client.aclose()
 
-    async def act(
-        self, action: AuditObservation, context: Context
-    ) -> BeeObservation:
+    async def act(self, action: AuditObservation, context: Context) -> BeeObservation:
         # Context here is expected to be Context with BeeData
         return await self.interact(action, context)
 
@@ -71,7 +69,9 @@ class BeeConnector(Connector[AuditObservation, BeeObservation, Context]):
         comment_url = ""
         injuries = []
 
-        ctx_meta = context.metadata.to_dict() if hasattr(context.metadata, "to_dict") else {}
+        ctx_meta = (
+            context.metadata.to_dict() if hasattr(context.metadata, "to_dict") else {}
+        )
         event_name = ctx_meta.get("event_name", "manual")
         if event_name != "schedule":
             comment_url = await self._post_to_github(report, context)
@@ -133,15 +133,15 @@ class BeeConnector(Connector[AuditObservation, BeeObservation, Context]):
 
         await asyncio.to_thread(git_commit)
 
-    async def _post_to_github(
-        self, report: AuditObservation, context: Context
-    ) -> str:
+    async def _post_to_github(self, report: AuditObservation, context: Context) -> str:
         if not self.gh or not self.repo_name:
             logger.warning("github_client_not_initialized_skipping_post")
             return ""
 
         message = self._format_github_message(report)
-        meta = context.metadata.to_dict() if hasattr(context.metadata, "to_dict") else {}
+        meta = (
+            context.metadata.to_dict() if hasattr(context.metadata, "to_dict") else {}
+        )
         event_data = cast(dict[str, Any], meta.get("event_data", {}))
 
         pr_num = None
@@ -180,7 +180,9 @@ class BeeConnector(Connector[AuditObservation, BeeObservation, Context]):
             msg += "**The Hive's structure is sanctified.**\n"
 
         meta = report.metadata.to_dict() if hasattr(report.metadata, "to_dict") else {}
-        reflective_heresies_list: list[str] = cast(list[str], meta.get("reflective_heresies", []))
+        reflective_heresies_list: list[str] = cast(
+            list[str], meta.get("reflective_heresies", [])
+        )
         if reflective_heresies_list:
             msg += "\n**Reflective Insights (The Inquisitor's Eye):**\n"
             for rh in reflective_heresies_list:

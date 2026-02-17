@@ -30,8 +30,10 @@ class AuditSigner:
             raise ValueError("AuditSigner: signing_key must not be empty.")
         self._key: bytes = signing_key.encode()
 
-    def sign(self, subject: str, payload_bytes: bytes, timestamp_iso: str) -> str:
+    def sign(self, subject: str, payload_bytes: bytes | str, timestamp_iso: str) -> str:
         """Produce base64-encoded HMAC-SHA256 signature."""
+        if isinstance(payload_bytes, str):
+            payload_bytes = payload_bytes.encode()
         message = subject.encode() + payload_bytes + timestamp_iso.encode()
         digest = hmac.new(self._key, message, hashlib.sha256).digest()
         return base64.b64encode(digest).decode()
