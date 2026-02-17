@@ -3,6 +3,7 @@ from typing import Any
 import nats
 import structlog
 from aiogram import Bot
+from aura_core_gen.aura.core.v1 import ActionType
 from aura_core_gen.aura.core.v1 import Event as ProtoEvent
 from opentelemetry import trace
 from translator import TelegramTranslator
@@ -43,11 +44,17 @@ class TelegramEffector:
         """Process a single NATS message."""
         try:
             # 1. Parse binary proto event
-            proto_event = ProtoEvent().parse(msg.data)
-            logger.debug("effector_received_event", topic=proto_event.topic)
+            event = ProtoEvent().parse(msg.data)
+
+            # Use betterproto Enum mapping for logging (Task 1)
+            log_meta = {"topic": event.topic}
+            if hasattr(event, "negotiation") and event.negotiation:
+                log_meta["action"] = str(ActionType(int(event.negotiation.action)).name)
+
+            logger.debug("effector_received_event", **log_meta)
 
             # 2. Translate internal event to user-friendly message
-            chat_id, markdown, keyboard = self.translator.from_event(proto_event)
+            chat_id, markdown, keyboard = self.translator.from_event(event)
 
             # 3. Deliver to External World
             if chat_id and markdown:
@@ -60,7 +67,7 @@ class TelegramEffector:
                 logger.info(
                     "effector_notification_sent",
                     chat_id=chat_id,
-                    topic=proto_event.topic,
+                    topic=event.topic,
                 )
 
         except Exception as e:

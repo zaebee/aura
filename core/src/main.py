@@ -15,6 +15,7 @@ from aura_core_gen.aura.negotiation.v1 import (
     SearchResponse,
     SearchResultItem,
 )
+from grpclib.health.service import Health
 from grpclib.server import Server
 from hive.cortex import HiveCell
 from hive.metabolism import MetabolicLoop
@@ -287,32 +288,18 @@ class NegotiationService:
 async def serve() -> None:
     # 1. Initialize the "Cell" (The HiveCell)
     cell = HiveCell(settings)
-    metabolism = await cell.build_organism()
 
-    # 2. Initialize Negotiation Service
+    # 2. Initialize Negotiation Service (metabolism set later)
     negotiation_service = NegotiationService(
-        metabolism=metabolism, market_service=cell.market_service
+        metabolism=None, market_service=cell.market_service
     )
 
-    # 3. Start NATS Signal Gateway
-    gateway = NatsSignalGateway(
-        nats_url=settings.server.nats_url,
-        metabolism=metabolism,
-    )
-    await gateway.start()
+    # 3. Start grpclib Server early with Health Service
+    health_service = Health()
+    server = Server([negotiation_service, health_service])
 
-    # 4. Start grpclib Server
-    # Note: We need to register the service.
-    # With betterproto, we usually use the generated base class if it exists.
-    # Since it didn't, we can use a custom Dispatcher or just grpclib directly if we had the service class.
-
-    # Wait, I'll check if I can generate the base class with betterproto.
-    # Usually it's there. Let me check the file content again VERY carefully.
-
-    server = Server([negotiation_service]) # grpclib handles this if negotiation_service has __mapping__
-
-    # Heartbeat Deal loop
-    async def heartbeat_deal_loop() -> None:
+    # Heartbeat Deal loop (needs metabolism)
+    async def heartbeat_deal_loop(metabolism: MetabolicLoop) -> None:
         await asyncio.sleep(60)
         while True:
             try:
@@ -340,11 +327,25 @@ async def serve() -> None:
                 logger.error("heartbeat_deal_error", error=str(e))
             await asyncio.sleep(settings.heartbeat.interval_seconds)
 
-    asyncio.create_task(heartbeat_deal_loop())
-
     with tracer.start_as_current_span("core_server_start"):
+        # Start server first so liveness probes pass during metabolism initialization
         await server.start(host="0.0.0.0", port=settings.server.port)  # nosec
         logger.info("server_started", port=settings.server.port)
+
+        # 4. Complex protein initialization (The organism builds itself)
+        metabolism = await cell.build_organism()
+        negotiation_service.metabolism = metabolism
+
+        # 5. Start NATS Signal Gateway
+        gateway = NatsSignalGateway(
+            nats_url=settings.server.nats_url,
+            metabolism=metabolism,
+        )
+        await gateway.start()
+        logger.info("metabolism_ready")
+
+        asyncio.create_task(heartbeat_deal_loop(metabolism))
+
         await server.wait_closed()
 
 
