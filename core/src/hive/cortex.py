@@ -210,6 +210,9 @@ class HiveCell:
         if transaction:
             self.registry.register("transaction", transaction)
 
+        # Inject fully-populated registry into skills that cross-call peers
+        guard.inject_registry(self.registry)
+
         # Initialize all proteins
         for name in self.registry.list_skills():
             skill = self.registry.get(name)

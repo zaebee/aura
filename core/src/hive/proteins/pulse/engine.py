@@ -138,8 +138,8 @@ class JetStreamProvider:
                 try:
                     ts = datetime.now(UTC).isoformat()
                     headers = self._signer.make_headers(event.topic, binary_data, ts)
-                except Exception as e:
-                    logger.warning(f"aromatic_seal_failed: {e}")
+                except Exception:
+                    logger.warning("aromatic_seal_failed", exc_info=True)
             ack = await self.js.publish(event.topic, binary_data, headers=headers)
             logger.debug(f"Published heartbeat: seq={ack.seq}")
             return True
@@ -243,7 +243,14 @@ class JetStreamProvider:
             )
 
             binary_data = bytes(event)
-            ack = await self.js.publish(event.topic, binary_data)
+            headers: dict[str, str] | None = None
+            if self._signer:
+                try:
+                    ts = datetime.now(UTC).isoformat()
+                    headers = self._signer.make_headers(event.topic, binary_data, ts)
+                except Exception:
+                    logger.warning("aromatic_seal_failed", exc_info=True)
+            ack = await self.js.publish(event.topic, binary_data, headers=headers)
             logger.debug(f"Published audit: seq={ack.seq}")
             return True
         except Exception as e:

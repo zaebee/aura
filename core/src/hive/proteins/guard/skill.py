@@ -1,7 +1,7 @@
 import logging
 from typing import Any
 
-from aura_core import SkillProtocol
+from aura_core import SkillProtocol, SkillRegistry
 from aura_core_gen.aura.core.google import protobuf
 from aura_core_gen.aura.core.v1 import Observation
 
@@ -23,7 +23,7 @@ class GuardSkill(
     def __init__(self) -> None:
         self.settings: SafetySettings | None = None
         self.provider: OutputGuard | None = None
-        self._registry: Any = None
+        self._registry: SkillRegistry | None = None
         self._capabilities = {
             "validate_decision": self._validate_decision,
             "validate_margin": self._validate_decision,
@@ -43,7 +43,7 @@ class GuardSkill(
         self.settings = settings
         self.provider = provider
 
-    def inject_registry(self, registry: Any) -> None:
+    def inject_registry(self, registry: SkillRegistry) -> None:
         self._registry = registry
 
     async def initialize(self) -> bool:
@@ -103,11 +103,14 @@ class GuardSkill(
 
     async def _validate_transaction(self, params: dict[str, Any]) -> Observation:
         assert self.provider is not None
+        assert (
+            self._registry is not None
+        ), "registry not injected — call inject_registry() first"
         wallet_address = params.get("wallet_address", "")
         sanct_obs = await self._registry.execute(
             "persistence", "is_wallet_sanctified", {"wallet_address": wallet_address}
         )
-        is_sanctified = sanct_obs.metadata.to_dict().get("sanctified", False)
+        is_sanctified = bool(sanct_obs.metadata.to_dict().get("sanctified", False))
         safe_price = self.provider.validate_transaction(
             wallet_address=wallet_address,
             llm_price=params.get("llm_price", 0.0),
