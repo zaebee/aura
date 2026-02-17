@@ -3,6 +3,7 @@ from typing import Any
 import nats
 import structlog
 from aiogram import Bot
+from aura_core_gen.aura.core.v1 import ActionType
 from aura_core_gen.aura.core.v1 import Event as ProtoEvent
 from opentelemetry import trace
 from translator import TelegramTranslator
@@ -48,7 +49,6 @@ class TelegramEffector:
             # Use betterproto Enum mapping for logging (Task 1)
             log_meta = {"topic": event.topic}
             if hasattr(event, "negotiation") and event.negotiation:
-                from aura_core_gen.aura.core.v1 import ActionType
                 log_meta["action"] = str(ActionType(int(event.negotiation.action)).name)
 
             logger.debug("effector_received_event", **log_meta)
