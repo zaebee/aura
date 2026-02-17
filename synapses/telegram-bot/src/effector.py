@@ -43,11 +43,18 @@ class TelegramEffector:
         """Process a single NATS message."""
         try:
             # 1. Parse binary proto event
-            proto_event = ProtoEvent().parse(msg.data)
-            logger.debug("effector_received_event", topic=proto_event.topic)
+            event = ProtoEvent().parse(msg.data)
+
+            # Use betterproto Enum mapping for logging (Task 1)
+            log_meta = {"topic": event.topic}
+            if hasattr(event, "negotiation") and event.negotiation:
+                from aura_core_gen.aura.core.v1 import ActionType
+                log_meta["action"] = ActionType(int(event.negotiation.action)).name
+
+            logger.debug("effector_received_event", **log_meta)
 
             # 2. Translate internal event to user-friendly message
-            chat_id, markdown, keyboard = self.translator.from_event(proto_event)
+            chat_id, markdown, keyboard = self.translator.from_event(event)
 
             # 3. Deliver to External World
             if chat_id and markdown:
