@@ -65,6 +65,8 @@ message NegotiationSignal {
   double bid_amount = 3;
   string currency_code = 4;
   AgentIdentity agent = 5;
+  repeated bytes image_data = 6;
+  string mime_type = 7;
 }
 
 message AgentIdentity {

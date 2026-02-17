@@ -11,8 +11,9 @@ from aiogram.types import (
     Message,
 )
 from aura_core_gen.aura.core.v1 import (
+    ActionType,
     AgentIdentity,
-    PerceptionSignal,
+    NegotiationSignal,
     Signal,
     SignalType,
     TelegramSignal,
@@ -72,14 +73,17 @@ class TelegramTranslator:
                 )
                 return signal
 
-            # Handle photo message (Perception)
+            # Handle photo message (Hybrid Negotiation Signal)
             if kwargs.get("image_bytes"):
                 image_data = kwargs["image_bytes"]
                 if isinstance(image_data, bytes):
                     image_data = [image_data]
 
-                signal.signal_type = cast(SignalType, SignalType.SIGNAL_TYPE_PERCEPTION)
-                signal.perception = PerceptionSignal(
+                signal.signal_type = cast(
+                    SignalType, SignalType.SIGNAL_TYPE_NEGOTIATION
+                )
+                signal.negotiation = NegotiationSignal(
+                    item_identifier=item_id,
                     image_data=image_data,
                     mime_type="image/jpeg",
                     agent=AgentIdentity(
@@ -152,23 +156,43 @@ class TelegramTranslator:
         message = ""
         keyboard = None
 
-        # Observation has negotiation field
+        # Observation or Event has negotiation field
         if hasattr(event, "negotiation") and event.negotiation:
             neg = event.negotiation
-            item_id = neg.item_identifier
+            item_id = getattr(neg, "item_identifier", "")
 
-            # Determine action from event_type
+            # Determine action from Enum or legacy event_type
             event_type = str(getattr(event, "event_type", ""))
+            action_name = ""
+            if hasattr(neg, "action"):
+                action_name = str(ActionType(int(neg.action)).name)
 
-            if event_type == "negotiation_accept":
-                price = neg.accepted.final_price if neg.accepted else 0.0
+            if (
+                action_name == "ACTION_TYPE_ACCEPT"
+                or event_type == "negotiation_accept"
+            ):
+                # NegotiationEvent uses .price, NegotiationObservation uses .accepted.final_price
+                price = getattr(neg, "price", 0.0)
+                if hasattr(neg, "accepted") and neg.accepted:
+                    price = neg.accepted.final_price
                 message = f"✅ *Deal Accepted!*\nItem: `{item_id}`\nFinal Price: `${price:.2f}`"
-            elif event_type == "negotiation_counter":
-                price = neg.countered.proposed_price if neg.countered else 0.0
+            elif (
+                action_name == "ACTION_TYPE_COUNTER"
+                or event_type == "negotiation_counter"
+            ):
+                price = getattr(neg, "price", 0.0)
+                if hasattr(neg, "countered") and neg.countered:
+                    price = neg.countered.proposed_price
                 message = f"🔄 *Counter-offer Received*\nItem: `{item_id}`\nProposed Price: `${price:.2f}`\n\nWhat is your response?"
-            elif event_type == "negotiation_reject":
+            elif (
+                action_name == "ACTION_TYPE_REJECT"
+                or event_type == "negotiation_reject"
+            ):
                 message = f"❌ *Offer Rejected*\nItem: `{item_id}`\nThe agent was not interested in your bid."
-            elif event_type == "negotiation_ui_required":
+            elif (
+                action_name == "ACTION_TYPE_EVALUATE"
+                or event_type == "negotiation_ui_required"
+            ):
                 # Handle Vision Report Card
                 price = 0.0
                 v = metadata.get("vision_result")
