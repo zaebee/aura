@@ -33,7 +33,7 @@ from logging_config import (
 )
 from opentelemetry.instrumentation.fastapi import FastAPIInstrumentor
 from pydantic import BaseModel
-from security import verify_public_membrane, verify_signature
+from security import verify_public_membrane
 from starlette.middleware.cors import CORSMiddleware
 from telemetry import init_telemetry
 
@@ -281,7 +281,7 @@ async def system_status() -> dict[str, Any]:
 async def analyze_vision(
     request: Annotated[Request, Any],
     files: Annotated[list[UploadFile], File(...)],
-    agent_did: Annotated[str, Depends(verify_signature)],
+    agent_did: Annotated[str, Depends(verify_public_membrane)],
     focus: Annotated[str | None, Form()] = None,
 ) -> dict[str, Any]:
     request_id = get_current_request_id() or str(uuid.uuid4())
@@ -335,7 +335,7 @@ async def analyze_vision(
 
 @app.post("/v1/deals/{deal_id}/status")
 async def check_deal_status_endpoint(
-    deal_id: str, agent_did: str = Depends(verify_signature)
+    deal_id: str, agent_did: str = Depends(verify_public_membrane)
 ) -> dict[str, Any]:
     try:
         response = await stub.check_deal_status(deal_id=deal_id)

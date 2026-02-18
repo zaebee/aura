@@ -172,7 +172,8 @@ async def verify_public_membrane(
     origin: str = Header(None),
 ) -> str:
     """
-    Public Membrane: dual-path authentication for /v1/search and /v1/negotiate.
+    Public Membrane: dual-path authentication for /v1/search, /v1/negotiate,
+    /v1/vision/analyze, and /v1/deals/{deal_id}/status.
 
     Path A — Agent (HMAC): any DID header present → full Ed25519 verification.
     Path B — Frontend (API key): trusted Origin + matching X-Api-Key header →
