@@ -26,6 +26,9 @@ COPY frontend/public ./frontend/public
 COPY frontend/src ./frontend/src
 COPY frontend/index.html ./frontend/
 
+# Copy production env for build-time injection
+COPY frontend/.env.production ./frontend/
+
 # Generate protos (writes to frontend/src/lib)
 RUN buf generate
 
