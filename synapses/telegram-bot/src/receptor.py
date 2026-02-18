@@ -175,11 +175,12 @@ class TelegramReceptor:
                 # Manual conversion of NegotiateResponse to UI message for simplicity here
                 # In a full implementation, the effector would handle this,
                 # but gRPC is synchronous-unary here.
-                if response.countered:
-                    await message.answer(response.countered.human_message)
-                elif response.accepted:
+                res_name, res_val = betterproto.which_one_of(response, "result")
+                if res_name == "countered" and res_val:
+                    await message.answer(res_val.human_message)
+                elif res_name == "accepted":
                     await message.answer("✅ Deal Accepted!")
-                elif response.rejected:
+                elif res_name == "rejected":
                     await message.answer("❌ Offer Rejected.")
                 return
             except Exception as e:
