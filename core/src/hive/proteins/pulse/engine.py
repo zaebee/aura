@@ -265,7 +265,7 @@ class JetStreamProvider:
         try:
             import json
 
-            data = json.dumps(payload).encode()
+            data = json.dumps(payload, sort_keys=True).encode("utf-8")
             await self.js.publish(topic, data)
             logger.warning(f"Published raw JSON (deprecated): {topic}")
             return True
