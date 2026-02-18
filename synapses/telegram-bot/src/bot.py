@@ -4,6 +4,8 @@ The primary handler is now receptor.py which uses NatsAdapter
 to communicate with core via NATS instead of in-process MetabolicLoop.
 """
 
+import betterproto
+import structlog
 from aiogram import F, Router
 from aiogram.filters import Command, CommandObject
 from aiogram.fsm.context import FSMContext
@@ -35,7 +37,16 @@ async def cmd_start(message: Message) -> None:
 async def cmd_search(
     message: Message, command: CommandObject, adapter: NatsAdapter
 ) -> None:
-    signal = TelegramTranslator().to_signal(message, command=command)
+    query = str(command.args or "")
+    payload = query.encode("utf-8")  # Strict Encoding (Task 2)
+    signal = TelegramTranslator().to_signal(
+        message, command=command, query_payload=payload
+    )
+
+    # Betterproto Safety (Task 3)
+    name, _ = betterproto.which_one_of(signal, "payload")
+    structlog.get_logger(__name__).debug("bot_sending_signal", payload=name)
+
     await adapter.execute(signal)
 
 

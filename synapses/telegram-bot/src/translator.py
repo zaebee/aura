@@ -15,10 +15,12 @@ from aura_core_gen.aura.core.v1 import (
     ActionType,
     AgentIdentity,
     NegotiationSignal,
+    SearchSignal,
     Signal,
     SignalType,
     TelegramSignal,
 )
+from synapse_settings import settings
 
 logger = structlog.get_logger(__name__)
 
@@ -57,11 +59,18 @@ class TelegramTranslator:
             command = kwargs.get("command")
 
             if command and command.command == "search":
-                signal.signal_type = cast(SignalType, SignalType.SIGNAL_TYPE_TELEGRAM)
-                signal.telegram = TelegramSignal(
-                    user_id=user_id,
-                    chat_id=chat_id,
-                    message_text=text,
+                # Ensure query is handled as bytes first if passed (Task 2)
+                query_payload = kwargs.get("query_payload")
+                query_str = (
+                    query_payload.decode("utf-8")
+                    if isinstance(query_payload, bytes)
+                    else str(command.args or "")
+                )
+
+                signal.signal_type = cast(SignalType, SignalType.SIGNAL_TYPE_SEARCH)
+                signal.search = SearchSignal(
+                    query=query_str,
+                    limit=settings.search_limit,
                 )
                 signal.metadata.from_dict(
                     {
@@ -69,7 +78,7 @@ class TelegramTranslator:
                         "user_id": str(user_id),
                         "source": "telegram",
                         "intent": "search",
-                        "query": str(command.args or ""),
+                        "query": query_str,
                     }
                 )
                 return signal
@@ -83,8 +92,10 @@ class TelegramTranslator:
                 signal.signal_type = cast(
                     SignalType, SignalType.SIGNAL_TYPE_NEGOTIATION
                 )
+                item_domain = str(state_data.get("item_domain", settings.default_item_domain))
                 signal.negotiation = NegotiationSignal(
                     item_identifier=item_id,
+                    item_domain=item_domain,
                     image_data=image_data,
                     mime_type="image/jpeg",
                     agent=AgentIdentity(

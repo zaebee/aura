@@ -33,6 +33,8 @@ async def test_cmd_start(message, receptor):
 
 @pytest.mark.asyncio
 async def test_cmd_search(message, receptor, mock_adapter):
+    from aura_core_gen.aura.core.v1 import SignalType
+
     command = MagicMock(spec=CommandObject)
     command.command = "search"
     command.args = "Paris"
@@ -42,6 +44,9 @@ async def test_cmd_search(message, receptor, mock_adapter):
     await receptor.cmd_search(message, command)
 
     mock_adapter.execute.assert_called_once()
+    signal = mock_adapter.execute.call_args[0][0]
+    assert signal.signal_type == SignalType.SIGNAL_TYPE_SEARCH
+    assert signal.search.query == "Paris"
 
 
 @pytest.mark.asyncio
