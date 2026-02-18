@@ -7,8 +7,8 @@ import structlog
 from aura_core import (
     BaseConnector,
     SkillRegistry,
+    make_struct,
 )
-from aura_core_gen.aura.core.google import protobuf
 from aura_core_gen.aura.core.v1 import (
     ActionType,
     Context,
@@ -123,7 +123,7 @@ class HiveConnector(BaseConnector):
             negotiation=neg_obs,
             event_type=event_type,
             trace=context.trace,
-            metadata=protobuf.Struct().from_dict(obs_meta),
+            metadata=make_struct(obs_meta),
         )
 
     async def _handle_crypto_lock(

@@ -23,6 +23,7 @@ from .metabolism import (
     get_raw_key,
     map_action,
 )
+from .struct_utils import make_struct
 
 __all__ = [
     # Manifest (Geography)
@@ -48,4 +49,5 @@ __all__ = [
     # Utilities
     "get_raw_key",
     "map_action",
+    "make_struct",
 ]

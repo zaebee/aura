@@ -11,7 +11,7 @@ from typing import Any, cast
 
 import nats
 import nats.errors
-from aura_core_gen.aura.core.google import protobuf
+from aura_core import make_struct
 from aura_core_gen.aura.core.v1 import (
     ActionType,
     AlertEvent,
@@ -91,7 +91,7 @@ class JetStreamProvider:
                     action=self._action_to_enum(action),
                     price=price,
                 ),
-                metadata=protobuf.Struct().from_dict(
+                metadata=make_struct(
                     {
                         "session_token": session_token,
                         "agent_did": agent_did,

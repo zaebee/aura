@@ -1,8 +1,7 @@
 from typing import Any
 
 import structlog
-from aura_core import SkillProtocol
-from aura_core_gen.aura.core.google import protobuf
+from aura_core import SkillProtocol, make_struct
 from aura_core_gen.aura.core.v1 import Observation
 
 from config.crypto import CryptoSettings
@@ -92,9 +91,7 @@ class TransactionSkill(
         if proof:
             return Observation(
                 success=True,
-                metadata=protobuf.Struct().from_dict(
-                    PaymentProof(**proof).model_dump()
-                ),
+                metadata=make_struct(PaymentProof(**proof).model_dump()),
             )
         return Observation(success=False, error="payment_not_found")
 
@@ -104,9 +101,7 @@ class TransactionSkill(
         uri = self.provider.generate_payment_request(
             p.amount, p.memo, p.currency, p.label, p.message
         )
-        return Observation(
-            success=True, metadata=protobuf.Struct().from_dict({"uri": str(uri)})
-        )
+        return Observation(success=True, metadata=make_struct({"uri": str(uri)}))
 
     async def _calculate_tax_and_margin(self, params: dict[str, Any]) -> Observation:
         assert self.converter is not None
@@ -115,14 +110,14 @@ class TransactionSkill(
         result = self.converter.calculate_tax_and_margin(
             p.price, margin_rate=self.settings.hive_margin
         )
-        return Observation(success=True, metadata=protobuf.Struct().from_dict(result))
+        return Observation(success=True, metadata=make_struct(result))
 
     async def _encrypt_secret(self, params: dict[str, Any]) -> Observation:
         assert self.encryption is not None
         encrypted = self.encryption.encrypt(params["secret"])
         return Observation(
             success=True,
-            metadata=protobuf.Struct().from_dict({"encrypted_secret": str(encrypted)}),
+            metadata=make_struct({"encrypted_secret": str(encrypted)}),
         )
 
     async def _decrypt_secret(self, params: dict[str, Any]) -> Observation:
@@ -130,7 +125,7 @@ class TransactionSkill(
         decrypted = self.encryption.decrypt(params["encrypted_secret"])
         return Observation(
             success=True,
-            metadata=protobuf.Struct().from_dict({"decrypted_secret": str(decrypted)}),
+            metadata=make_struct({"decrypted_secret": str(decrypted)}),
         )
 
     async def _convert_price(self, params: dict[str, Any]) -> Observation:
@@ -140,17 +135,13 @@ class TransactionSkill(
             params["usd_amount"],
             params.get("currency", self.settings.currency),
         )
-        return Observation(
-            success=True, metadata=protobuf.Struct().from_dict({"amount": str(amount)})
-        )
+        return Observation(success=True, metadata=make_struct({"amount": str(amount)}))
 
     async def _get_address(self, params: dict[str, Any]) -> Observation:
         assert self.provider is not None
         return Observation(
             success=True,
-            metadata=protobuf.Struct().from_dict(
-                {"address": str(self.provider.keypair.pubkey())}
-            ),
+            metadata=make_struct({"address": str(self.provider.keypair.pubkey())}),
         )
 
     async def _get_network_name(self, params: dict[str, Any]) -> Observation:
@@ -158,7 +149,7 @@ class TransactionSkill(
         # Return network name from settings (e.g., "solana-mainnet")
         return Observation(
             success=True,
-            metadata=protobuf.Struct().from_dict(
+            metadata=make_struct(
                 {"network": str(self.settings.solana_network or "solana")}
             ),
         )

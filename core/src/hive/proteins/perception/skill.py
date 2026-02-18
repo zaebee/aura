@@ -1,8 +1,7 @@
 from typing import Any
 
 import structlog
-from aura_core import SkillProtocol
-from aura_core_gen.aura.core.google import protobuf
+from aura_core import SkillProtocol, make_struct
 from aura_core_gen.aura.core.v1 import Observation
 
 from config.perception import PerceptionSettings
@@ -62,12 +61,10 @@ class PerceptionSkill(
             return Observation(
                 success=False,
                 error=item["error"],
-                metadata=protobuf.Struct().from_dict(item),
+                metadata=make_struct(item),
             )
 
         return Observation(
             success=True,
-            metadata=protobuf.Struct().from_dict(
-                PerceiveImageResult(**item).model_dump()
-            ),
+            metadata=make_struct(PerceiveImageResult(**item).model_dump()),
         )

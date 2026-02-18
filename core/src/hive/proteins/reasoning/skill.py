@@ -3,8 +3,7 @@ import logging
 from typing import Any
 
 import dspy
-from aura_core import SkillProtocol
-from aura_core_gen.aura.core.google import protobuf
+from aura_core import SkillProtocol, make_struct
 from aura_core_gen.aura.core.v1 import Observation
 
 from config.llm import LLMSettings
@@ -96,7 +95,7 @@ class ReasoningSkill(
             # Ensure action fields are serializable if they are complex
             pass
 
-        return Observation(success=True, metadata=protobuf.Struct().from_dict(metadata))
+        return Observation(success=True, metadata=make_struct(metadata))
 
     async def _generate_embedding(self, params: dict[str, Any]) -> Observation:
         if not self._embed_model:

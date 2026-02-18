@@ -24,16 +24,11 @@ async def test_aura_transformer_nested_action_fix():
     # Mock reasoning result with NESTED action (The way DSPy AuraNegotiator returns it)
     nested_result = {
         "thought": "I should accept this bid.",
-        "action": {
-            "action": "accept",
-            "price": 100.0,
-            "message": "Offer accepted."
-        }
+        "action": {"action": "accept", "price": 100.0, "message": "Offer accepted."},
     }
 
     mock_observation = Observation(
-        success=True,
-        metadata=protobuf.Struct().from_dict(nested_result)
+        success=True, metadata=protobuf.Struct().from_dict(nested_result)
     )
     reasoning_skill.execute.return_value = mock_observation
 
@@ -41,11 +36,7 @@ async def test_aura_transformer_nested_action_fix():
     transformer = AuraTransformer(registry=registry)
 
     # Create context
-    context = Context(
-        hive=HiveContextData(
-            offer=NegotiationOffer(bid_amount=100.0)
-        )
-    )
+    context = Context(hive=HiveContextData(offer=NegotiationOffer(bid_amount=100.0)))
 
     # Execute think
     intent = await transformer.think(context)
@@ -56,6 +47,7 @@ async def test_aura_transformer_nested_action_fix():
     assert intent.negotiation.message == "Offer accepted."
     assert "<think>" in intent.reasoning
     assert "I should accept this bid." in intent.reasoning
+
 
 @pytest.mark.asyncio
 async def test_aura_transformer_flat_action_fallback():
@@ -70,12 +62,11 @@ async def test_aura_transformer_flat_action_fallback():
         "thought": "I should counter this bid.",
         "action": "counter",
         "price": 150.0,
-        "message": "Too low."
+        "message": "Too low.",
     }
 
     mock_observation = Observation(
-        success=True,
-        metadata=protobuf.Struct().from_dict(flat_result)
+        success=True, metadata=protobuf.Struct().from_dict(flat_result)
     )
     reasoning_skill.execute.return_value = mock_observation
 
@@ -83,11 +74,7 @@ async def test_aura_transformer_flat_action_fallback():
     transformer = AuraTransformer(registry=registry)
 
     # Create context
-    context = Context(
-        hive=HiveContextData(
-            offer=NegotiationOffer(bid_amount=100.0)
-        )
-    )
+    context = Context(hive=HiveContextData(offer=NegotiationOffer(bid_amount=100.0)))
 
     # Execute think
     intent = await transformer.think(context)

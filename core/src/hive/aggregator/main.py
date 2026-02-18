@@ -6,9 +6,9 @@ import structlog
 from aura_core import (
     Aggregator,
     SkillRegistry,
+    make_struct,
     resolve_brain_path,
 )
-from aura_core_gen.aura.core.google import protobuf
 from aura_core_gen.aura.core.v1 import (
     AssetContextData,
     Context,
@@ -36,11 +36,7 @@ class HiveAggregator(Aggregator[Any, Context]):
     def _update_metadata(self, obj: Any, updates: dict[str, Any]) -> None:
         meta = _get_metadata_dict(obj)
         meta.update(updates)
-        # Betterproto Struct handles from_dict, or just assign if it's a dict
-        if hasattr(obj.metadata, "from_dict"):
-            obj.metadata.from_dict(meta)
-        else:
-            obj.metadata = meta
+        obj.metadata = make_struct(meta)
 
     def __init__(self, registry: SkillRegistry, settings: Any = None) -> None:
         self.settings = settings
@@ -103,7 +99,7 @@ class HiveAggregator(Aggregator[Any, Context]):
         # 2. Initialize Base Context
         context = Context(
             system_health=system_status,
-            metadata=protobuf.Struct().from_dict(
+            metadata=make_struct(
                 {
                     "brain_path": self.brain_path,
                     "vitals": vitals.to_dict(),

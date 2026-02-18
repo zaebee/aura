@@ -1,8 +1,7 @@
 import logging
 from typing import Any
 
-from aura_core import SkillProtocol
-from aura_core_gen.aura.core.google import protobuf
+from aura_core import SkillProtocol, make_struct
 from aura_core_gen.aura.core.v1 import Observation
 
 from config.server import ServerSettings
@@ -66,12 +65,10 @@ class TelemetrySkill(SkillProtocol[ServerSettings, Any, dict[str, Any], Observat
         # Ensure timestamp is string for Struct compatibility
         if "timestamp" in data and isinstance(data["timestamp"], datetime):
             data["timestamp"] = data["timestamp"].isoformat()
-        return Observation(success=True, metadata=protobuf.Struct().from_dict(data))
+        return Observation(success=True, metadata=make_struct(data))
 
     async def _health_check(self, params: dict[str, Any]) -> Observation:
-        return Observation(
-            success=True, metadata=protobuf.Struct().from_dict({"status": "healthy"})
-        )
+        return Observation(success=True, metadata=make_struct({"status": "healthy"}))
 
     async def _increment_counter(self, params: dict[str, Any]) -> Observation:
         p = MetricIncrementParams(**params)

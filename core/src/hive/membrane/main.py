@@ -2,8 +2,7 @@ from typing import Any, cast
 
 import betterproto
 import structlog
-from aura_core import Membrane, SkillRegistry
-from aura_core_gen.aura.core.google import protobuf
+from aura_core import Membrane, SkillRegistry, make_struct
 from aura_core_gen.aura.core.v1 import (
     ActionType,
     Context,
@@ -14,6 +13,15 @@ from aura_core_gen.aura.core.v1 import (
 from config import get_settings
 
 logger = structlog.get_logger(__name__)
+
+
+def _action_label(action: Any) -> str:
+    """Safely convert ActionType or raw int to a lowercase name string."""
+    try:
+        name = ActionType(int(action)).name
+        return name.lower() if name else f"action_{int(action)}"
+    except (ValueError, AttributeError):
+        return f"action_{int(action)}"
 
 
 class HiveMembrane(Membrane[Any, Intent, Context]):
@@ -164,9 +172,7 @@ class HiveMembrane(Membrane[Any, Intent, Context]):
             ActionType.ACTION_TYPE_ACCEPT: "accept",
             ActionType.ACTION_TYPE_COUNTER: "counter",
         }
-        action_name = action_map.get(
-            decision.action, (ActionType(decision.action).name or "unknown").lower()
-        )
+        action_name = action_map.get(decision.action, _action_label(decision.action))
 
         obs = await self.registry.execute(
             "guard",
@@ -196,16 +202,16 @@ class HiveMembrane(Membrane[Any, Intent, Context]):
         params_name, params_value = betterproto.which_one_of(original, "params")
         neg_intent = params_value if params_name == "negotiation" else None
         orig_price = neg_intent.price if neg_intent else 0.0
-        new_thought = f"Membrane Override: {reason}. LLM suggested {ActionType(original.action).name} at {orig_price}."
+        new_thought = f"Membrane Override: {reason}. LLM suggested {_action_label(original.action)} at {orig_price}."
         if original.reasoning:
             new_thought = f"{original.reasoning} | {new_thought}"
 
         return Intent(
             action=cast(ActionType, ActionType.ACTION_TYPE_COUNTER),
             reasoning=new_thought,
-            metadata=protobuf.Struct().from_dict(
+            metadata=make_struct(
                 {
-                    "original_decision": str(ActionType(original.action).name),
+                    "original_decision": _action_label(original.action),
                     "original_price": str(orig_price),
                     "override_reason": str(reason),
                 }

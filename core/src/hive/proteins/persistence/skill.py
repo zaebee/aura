@@ -5,9 +5,8 @@ from typing import Any, cast
 
 import redis.asyncio as redis
 import structlog
-from aura_core import SkillProtocol
+from aura_core import SkillProtocol, make_struct
 from aura_core_gen.aura.assets.v1 import Asset, AssetDomain
-from aura_core_gen.aura.core.google import protobuf
 from aura_core_gen.aura.core.v1 import Observation
 from sqlalchemy import Engine, text
 from sqlalchemy.orm import Session, sessionmaker
@@ -167,9 +166,7 @@ class PersistenceSkill(
 
         result = await asyncio.to_thread(fetch)
         if result:
-            return Observation(
-                success=True, metadata=protobuf.Struct().from_dict(result)
-            )
+            return Observation(success=True, metadata=make_struct(result))
         return Observation(success=False, error="item_not_found")
 
     async def _get_first_item(self, params: dict[str, Any]) -> Observation:
@@ -182,9 +179,7 @@ class PersistenceSkill(
 
         result = await asyncio.to_thread(fetch)
         if result:
-            return Observation(
-                success=True, metadata=protobuf.Struct().from_dict(result)
-            )
+            return Observation(success=True, metadata=make_struct(result))
         return Observation(success=False, error="no_items_found")
 
     async def _set_excited_state(self, params: dict[str, Any]) -> Observation:
@@ -279,9 +274,7 @@ class PersistenceSkill(
 
         result = await asyncio.to_thread(fetch)
         if result:
-            return Observation(
-                success=True, metadata=protobuf.Struct().from_dict(result)
-            )
+            return Observation(success=True, metadata=make_struct(result))
         return Observation(success=False, error="deal_not_found")
 
     async def _get_deal_by_memo_handler(self, params: dict[str, Any]) -> Observation:
@@ -298,9 +291,7 @@ class PersistenceSkill(
 
         result = await asyncio.to_thread(fetch)
         if result:
-            return Observation(
-                success=True, metadata=protobuf.Struct().from_dict(result)
-            )
+            return Observation(success=True, metadata=make_struct(result))
         return Observation(success=False, error="deal_not_found")
 
     async def _update_deal_status(self, params: dict[str, Any]) -> Observation:
@@ -483,7 +474,7 @@ class PersistenceSkill(
         sanctified = await asyncio.to_thread(check)
         return Observation(
             success=True,
-            metadata=protobuf.Struct().from_dict({"sanctified": sanctified}),
+            metadata=make_struct({"sanctified": sanctified}),
         )
 
     async def _vector_search(self, params: dict[str, Any]) -> Observation:
@@ -520,6 +511,4 @@ class PersistenceSkill(
         results = await asyncio.to_thread(search)
         # Struct.from_dict expects a dict with standard JSON types.
         # results is a list of dicts, which should be fine.
-        return Observation(
-            success=True, metadata=protobuf.Struct().from_dict({"results": results})
-        )
+        return Observation(success=True, metadata=make_struct({"results": results}))
