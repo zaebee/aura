@@ -7,6 +7,7 @@ Public Membrane provides an API-key shortcut for trusted browser origins.
 
 import hashlib
 import json
+import secrets
 import time
 
 import nacl.encoding
@@ -16,6 +17,24 @@ from fastapi import Header, HTTPException, Request
 
 # Configuration constants
 TIMESTAMP_TOLERANCE_SECONDS = 60  # Allow ±60 seconds for clock skew
+
+
+async def _parse_request_body(request: Request) -> bytes:
+    """Read body bytes, parse JSON if applicable, and cache in request.state.parsed_body.
+
+    Returns raw body bytes for callers that need them (e.g. for signature hashing).
+    Raises HTTPException 400 on malformed JSON.
+    """
+    body_bytes = await request.body()
+    content_type = request.headers.get("content-type", "")
+    if body_bytes and "application/json" in content_type:
+        try:
+            request.state.parsed_body = json.loads(body_bytes.decode("utf-8"))
+        except json.JSONDecodeError:
+            raise HTTPException(status_code=400, detail="Invalid JSON body") from None
+    else:
+        request.state.parsed_body = {}
+    return body_bytes
 
 
 async def verify_signature(
@@ -99,25 +118,21 @@ async def verify_signature(
 
     # 5. Reconstruct the signed message
     try:
-        # Read and hash request body
-        body_bytes = await request.body()
+        body_bytes = await _parse_request_body(request)
         content_type = request.headers.get("content-type", "")
 
         if body_bytes:
             if "application/json" in content_type:
-                body_json = json.loads(body_bytes.decode("utf-8"))
+                # Canonical JSON form for deterministic hashing
                 body_canonical = json.dumps(
-                    body_json, sort_keys=True, separators=(",", ":")
+                    request.state.parsed_body, sort_keys=True, separators=(",", ":")
                 )
                 body_hash = hashlib.sha256(body_canonical.encode("utf-8")).hexdigest()
-                request.state.parsed_body = body_json
             else:
                 # For multipart/form-data or other types, hash the raw bytes
                 body_hash = hashlib.sha256(body_bytes).hexdigest()
-                request.state.parsed_body = {}
         else:
             body_hash = hashlib.sha256(b"").hexdigest()
-            request.state.parsed_body = {}
 
         # Reconstruct message: METHOD + PATH + TIMESTAMP + BODY_HASH
         message = f"{request.method}{request.url.path}{x_timestamp}{body_hash}"
@@ -126,8 +141,6 @@ async def verify_signature(
         signature_bytes = bytes.fromhex(x_signature)
         verify_key.verify(message.encode("utf-8"), signature_bytes)
 
-    except json.JSONDecodeError:
-        raise HTTPException(status_code=400, detail="Invalid JSON body") from None
     except nacl.exceptions.BadSignatureError:
         raise HTTPException(
             status_code=401,
@@ -138,6 +151,8 @@ async def verify_signature(
             status_code=401,
             detail="Invalid signature format. Expected a hex-encoded string.",
         ) from None
+    except HTTPException:
+        raise
     except Exception:
         raise HTTPException(
             status_code=500,
@@ -159,7 +174,7 @@ async def verify_public_membrane(
     """
     Public Membrane: dual-path authentication for /v1/search and /v1/negotiate.
 
-    Path A — Agent (HMAC): all three DID headers present → full Ed25519 verification.
+    Path A — Agent (HMAC): any DID header present → full Ed25519 verification.
     Path B — Frontend (API key): trusted Origin + matching X-Api-Key header →
         gateway acts as Ribosome-Proxy, forwarding with its own DID.
 
@@ -169,7 +184,7 @@ async def verify_public_membrane(
 
     settings = get_settings()
 
-    # Path A: agent supplies all HMAC headers → delegate to full verification
+    # Path A: agent supplies DID headers → delegate to full HMAC verification
     if x_agent_id or x_timestamp or x_signature:
         return await verify_signature(request, x_agent_id, x_timestamp, x_signature)
 
@@ -191,18 +206,11 @@ async def verify_public_membrane(
             detail="Untrusted origin. Provide agent headers or use a trusted frontend origin.",
         )
 
-    if x_api_key != frontend_api_key:
+    if not secrets.compare_digest(x_api_key or "", frontend_api_key):
         raise HTTPException(status_code=401, detail="Invalid API key.")
 
     # Parse and cache the request body for downstream handlers
-    body_bytes = await request.body()
-    if body_bytes:
-        try:
-            request.state.parsed_body = json.loads(body_bytes.decode("utf-8"))
-        except json.JSONDecodeError:
-            raise HTTPException(status_code=400, detail="Invalid JSON body") from None
-    else:
-        request.state.parsed_body = {}
+    await _parse_request_body(request)
 
     # Ribosome-Proxy: gateway asserts its own DID on behalf of the browser
     return settings.gateway_did
@@ -236,7 +244,3 @@ def _validate_did_format(did: str) -> bool:
         return True
     except ValueError:
         return False
-
-
-# Remove the async helper function since it's not needed
-# The body reading is done directly in the verify_signature function
