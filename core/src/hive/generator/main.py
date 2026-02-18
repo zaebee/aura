@@ -37,8 +37,9 @@ class HiveGenerator(Generator[Observation, Any]):
             agent_did = ""
             payment_uri = ""
 
-            if observation.negotiation:
-                neg = observation.negotiation
+            obs_name, obs_val = betterproto.which_one_of(observation, "data")
+            if obs_name == "negotiation" and obs_val:
+                neg = obs_val
                 item_id = neg.item_identifier
                 payment_uri = neg.payment_uri
 

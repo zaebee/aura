@@ -2,6 +2,7 @@ import time
 import uuid
 from typing import Any, cast
 
+import betterproto
 import structlog
 from aura_core import (
     BaseConnector,
@@ -20,6 +21,13 @@ from aura_core_gen.aura.core.v1 import (
 )
 
 logger = structlog.get_logger(__name__)
+
+
+def _get_metadata_dict(obj: Any) -> dict[str, Any]:
+    meta = getattr(obj, "metadata", {})
+    if hasattr(meta, "to_dict"):
+        return cast(dict[str, Any], meta.to_dict())
+    return meta if isinstance(meta, dict) else {}
 
 
 class HiveConnector(BaseConnector):
@@ -49,10 +57,13 @@ class HiveConnector(BaseConnector):
         action_type = action.action
         event_type = "negotiation_unknown"
 
+        params_name, params_value = betterproto.which_one_of(action, "params")
+        neg_intent = params_value if params_name == "negotiation" else None
+
         if action_type == ActionType.ACTION_TYPE_ACCEPT:
             event_type = "negotiation_accept"
             reservation_code = f"HIVE-{uuid.uuid4()}"
-            price = action.negotiation.price if action.negotiation else 0.0
+            price = neg_intent.price if neg_intent else 0.0
             neg_obs.accepted = OfferAccepted(
                 final_price=price,
                 reservation_code=reservation_code,
@@ -68,8 +79,8 @@ class HiveConnector(BaseConnector):
 
         elif action_type == ActionType.ACTION_TYPE_COUNTER:
             event_type = "negotiation_counter"
-            price = action.negotiation.price if action.negotiation else 0.0
-            message = action.negotiation.message if action.negotiation else ""
+            price = neg_intent.price if neg_intent else 0.0
+            message = neg_intent.message if neg_intent else ""
             neg_obs.countered = OfferCountered(
                 proposed_price=price,
                 human_message=message,
@@ -92,26 +103,27 @@ class HiveConnector(BaseConnector):
             logger.error("unknown_action_type", action=action_type)
             neg_obs.rejected = OfferRejected(reason_code="INTERNAL_ERROR")
 
+        obs_meta = _get_metadata_dict(context)
+        obs_meta.update(
+            {
+                "item_id": str(
+                    context.hive.item_identifier if context.hive else context.identifier
+                ),
+                "agent_did": str(
+                    context.hive.offer.agent_did
+                    if context.hive and context.hive.offer
+                    else "unknown"
+                ),
+                "payment_uri": str(neg_obs.payment_uri or ""),
+            }
+        )
+
         return Observation(
             success=True,
             negotiation=neg_obs,
             event_type=event_type,
             trace=context.trace,
-            metadata=protobuf.Struct().from_dict(
-                {
-                    "item_id": str(
-                        context.hive.item_identifier
-                        if context.hive
-                        else context.identifier
-                    ),
-                    "agent_did": str(
-                        context.hive.offer.agent_did
-                        if context.hive and context.hive.offer
-                        else "unknown"
-                    ),
-                    "payment_uri": str(neg_obs.payment_uri or ""),
-                }
-            ),
+            metadata=protobuf.Struct().from_dict(obs_meta),
         )
 
     async def _handle_crypto_lock(
@@ -126,7 +138,9 @@ class HiveConnector(BaseConnector):
                 context.hive.item_identifier if context.hive else context.identifier
             )
             item_name = str(context.metadata.to_dict().get("item_name", "Aura Item"))
-            price = action.negotiation.price if action.negotiation else 0.0
+            params_name, params_value = betterproto.which_one_of(action, "params")
+            neg_intent = params_value if params_name == "negotiation" else None
+            price = neg_intent.price if neg_intent else 0.0
             agent_did = (
                 context.hive.offer.agent_did
                 if context.hive and context.hive.offer
