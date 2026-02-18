@@ -16,14 +16,14 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from enum import Enum
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING
 
 from fastapi import FastAPI, HTTPException
 from logging_config import get_logger
 from pydantic import BaseModel, Field
 
 if TYPE_CHECKING:
-    pass
+    from grpc_health.v1 import health_pb2_grpc
 
 logger = get_logger("health")
 
@@ -72,7 +72,7 @@ class ReadinessResponse(BaseModel):
 
 
 async def check_core_service_health(
-    health_stub: Any | None, timeout: float
+    health_stub: health_pb2_grpc.HealthStub | None, timeout: float
 ) -> HealthCheckResult:
     """Check Core Service health using gRPC Health Checking Protocol.
 
@@ -187,7 +187,7 @@ async def check_core_service_health(
 
 def register_health_endpoints(
     app: FastAPI,
-    get_stub: Callable[[], Any | None],
+    get_stub: Callable[[], health_pb2_grpc.HealthStub | None],
     health_check_timeout: float,
     slow_threshold_ms: float = 100.0,
 ) -> None:

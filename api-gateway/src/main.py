@@ -3,7 +3,12 @@ import uuid
 from collections.abc import AsyncGenerator, Awaitable, Callable
 from contextlib import asynccontextmanager
 from datetime import UTC, datetime
-from typing import Annotated, Any, cast
+from typing import TYPE_CHECKING, Annotated, Any, cast
+
+if TYPE_CHECKING:
+    import grpc.aio
+    from aura_core_gen.aura.negotiation.v1 import NegotiationServiceStub
+    from grpc_health.v1 import health_pb2_grpc
 
 import betterproto
 import grpclib.client
@@ -51,9 +56,9 @@ origins = [
 
 # Declare globals
 channel: grpclib.client.Channel
-stub: Any  # NegotiationServiceStub — lazily imported in lifespan
-_health_stub: Any | None = None
-_health_channel: Any | None = None  # grpc.aio.Channel
+stub: "NegotiationServiceStub"
+_health_stub: "health_pb2_grpc.HealthStub | None" = None
+_health_channel: "grpc.aio.Channel | None" = None
 
 
 @asynccontextmanager
