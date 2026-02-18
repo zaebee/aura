@@ -18,7 +18,6 @@ from aura_core_gen.aura.core.v1 import (
     Signal,
     Status,
     SystemVitals,
-    TelegramContextData,
 )
 
 logger = structlog.get_logger(__name__)
