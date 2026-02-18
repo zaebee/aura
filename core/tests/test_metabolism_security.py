@@ -69,3 +69,31 @@ def test_compare_digest_used(monkeypatch: pytest.MonkeyPatch) -> None:
     signer.verify(SUBJECT, PAYLOAD, TIMESTAMP, sig)
 
     assert len(calls) == 1, "hmac.compare_digest should be called exactly once"
+
+
+def test_sign_accepts_non_string_subject() -> None:
+    signer = AuditSigner(KEY)
+    sig = signer.sign(42, PAYLOAD, TIMESTAMP)
+    assert isinstance(sig, str) and len(sig) > 0
+
+
+def test_sign_accepts_bytes_subject() -> None:
+    signer = AuditSigner(KEY)
+    sig = signer.sign(b"aura.wallet.sanctify", PAYLOAD, TIMESTAMP)
+    expected = signer.sign("aura.wallet.sanctify", PAYLOAD, TIMESTAMP)
+    assert sig == expected
+
+
+def test_sign_accepts_non_string_payload() -> None:
+    signer = AuditSigner(KEY)
+    sig = signer.sign(SUBJECT, {"wallet": "0xDEAD"}, TIMESTAMP)
+    assert isinstance(sig, str) and len(sig) > 0
+
+
+def test_sign_accepts_non_string_timestamp() -> None:
+    import datetime
+
+    signer = AuditSigner(KEY)
+    ts = datetime.datetime(2026, 2, 12, tzinfo=datetime.UTC)
+    sig = signer.sign(SUBJECT, PAYLOAD, ts)
+    assert isinstance(sig, str) and len(sig) > 0

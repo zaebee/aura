@@ -12,6 +12,7 @@ Header key:       X-Aura-Sig
 import base64
 import hashlib
 import hmac
+from typing import Any
 
 
 class AuditSigner:
@@ -30,12 +31,22 @@ class AuditSigner:
             raise ValueError("AuditSigner: signing_key must not be empty.")
         self._key: bytes = signing_key.encode("utf-8")
 
-    def sign(self, subject: str, payload_bytes: bytes | str, timestamp_iso: str) -> str:
-        """Produce base64-encoded HMAC-SHA256 signature."""
-        if isinstance(payload_bytes, str):
-            payload_bytes = payload_bytes.encode("utf-8")
+    @staticmethod
+    def _to_bytes(value: Any) -> bytes:
+        if isinstance(value, bytes):
+            return value
+        return str(value).encode("utf-8")
+
+    def sign(self, subject: Any, payload_bytes: Any, timestamp_iso: Any) -> str:
+        """Produce base64-encoded HMAC-SHA256 signature.
+
+        Defensively coerces all arguments to bytes, healing TypeError from
+        callers that forget .encode() or pass non-string/non-bytes values.
+        """
         message = (
-            subject.encode("utf-8") + payload_bytes + timestamp_iso.encode("utf-8")
+            self._to_bytes(subject)
+            + self._to_bytes(payload_bytes)
+            + self._to_bytes(timestamp_iso)
         )
         digest = hmac.new(self._key, message, hashlib.sha256).digest()
         return base64.b64encode(digest).decode()

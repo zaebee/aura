@@ -26,13 +26,13 @@ tunnel:
 gateway:
   livenessProbe:
     path: /healthz
-    initialDelaySeconds: 5
+    initialDelaySeconds: 15
     periodSeconds: 10
     timeoutSeconds: 2
     failureThreshold: 3
   readinessProbe:
     path: /readyz
-    initialDelaySeconds: 5
+    initialDelaySeconds: 15
     periodSeconds: 10
     timeoutSeconds: 2
     failureThreshold: 3
@@ -132,12 +132,12 @@ frontend:
 telegram:
   healthPort: 8080
   livenessProbe:
-    initialDelaySeconds: 5
+    initialDelaySeconds: 15
     periodSeconds: 10
     timeoutSeconds: 2
     failureThreshold: 3
   readinessProbe:
-    initialDelaySeconds: 10
+    initialDelaySeconds: 15
     periodSeconds: 10
     timeoutSeconds: 2
     failureThreshold: 3
