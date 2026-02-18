@@ -71,6 +71,7 @@ class TelegramTranslator:
                 signal.search = SearchSignal(
                     query=query_str,
                     limit=settings.search_limit,
+                    domain=settings.default_item_domain,
                 )
                 signal.metadata.from_dict(
                     {

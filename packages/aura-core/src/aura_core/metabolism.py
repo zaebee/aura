@@ -33,14 +33,25 @@ def map_action(action_str: str | None) -> ActionType:
 
     mapping = {
         "accept": ActionType.ACTION_TYPE_ACCEPT,
+        "accept-deal": ActionType.ACTION_TYPE_ACCEPT,
+        "action_type_accept": ActionType.ACTION_TYPE_ACCEPT,
         "counter": ActionType.ACTION_TYPE_COUNTER,
         "counteroffer": ActionType.ACTION_TYPE_COUNTER,
+        "counter-offer": ActionType.ACTION_TYPE_COUNTER,
+        "action_type_counter": ActionType.ACTION_TYPE_COUNTER,
         "reject": ActionType.ACTION_TYPE_REJECT,
+        "reject-offer": ActionType.ACTION_TYPE_REJECT,
+        "action_type_reject": ActionType.ACTION_TYPE_REJECT,
         "approve": ActionType.ACTION_TYPE_APPROVE,
+        "action_type_approve": ActionType.ACTION_TYPE_APPROVE,
         "cancel": ActionType.ACTION_TYPE_CANCEL,
+        "action_type_cancel": ActionType.ACTION_TYPE_CANCEL,
         "update": ActionType.ACTION_TYPE_UPDATE,
+        "action_type_update": ActionType.ACTION_TYPE_UPDATE,
         "evaluate": ActionType.ACTION_TYPE_EVALUATE,
+        "action_type_evaluate": ActionType.ACTION_TYPE_EVALUATE,
         "error": ActionType.ACTION_TYPE_ERROR,
+        "action_type_error": ActionType.ACTION_TYPE_ERROR,
     }
     res = mapping.get(action_str.lower(), ActionType.ACTION_TYPE_UNSPECIFIED)
     return cast(ActionType, int(res))
