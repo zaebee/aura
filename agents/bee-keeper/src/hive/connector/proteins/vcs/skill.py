@@ -1,7 +1,7 @@
 from typing import Any
 
 import httpx
-from aura_core import SkillProtocol
+from aura_core import SkillProtocol, make_struct
 from aura_core_gen.aura.core.v1 import Observation
 
 from .engine import GitHubProvider
@@ -54,8 +54,6 @@ class VCS_Skill(SkillProtocol[Any, httpx.AsyncClient, dict[str, Any], Observatio
             return Observation(success=False, error=str(e))
 
     async def _post_comment(self, params: dict[str, Any]) -> Observation:
-        from aura_core_gen.aura.core.google import protobuf
-
         assert self.provider is not None
         p = CommentParams(**params)
         url = await self.provider.post_comment(
@@ -64,13 +62,9 @@ class VCS_Skill(SkillProtocol[Any, httpx.AsyncClient, dict[str, Any], Observatio
             commit_sha=p.commit_sha,
             body=p.body,
         )
-        return Observation(
-            success=bool(url), metadata=protobuf.Struct().from_dict({"url": str(url)})
-        )
+        return Observation(success=bool(url), metadata=make_struct({"url": str(url)}))
 
     async def _reply_to_comment(self, params: dict[str, Any]) -> Observation:
-        from aura_core_gen.aura.core.google import protobuf
-
         assert self.provider is not None
         p = ReplyParams(**params)
         url = await self.provider.reply_to_comment(
@@ -79,6 +73,4 @@ class VCS_Skill(SkillProtocol[Any, httpx.AsyncClient, dict[str, Any], Observatio
             comment_id=p.comment_id,
             body=p.body,
         )
-        return Observation(
-            success=bool(url), metadata=protobuf.Struct().from_dict({"url": str(url)})
-        )
+        return Observation(success=bool(url), metadata=make_struct({"url": str(url)}))

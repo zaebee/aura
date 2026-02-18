@@ -1,8 +1,7 @@
 import logging
 from typing import Any
 
-from aura_core import SkillProtocol, SkillRegistry
-from aura_core_gen.aura.core.google import protobuf
+from aura_core import SkillProtocol, SkillRegistry, make_struct
 from aura_core_gen.aura.core.v1 import Observation
 
 from config.policy import SafetySettings
@@ -72,9 +71,7 @@ class GuardSkill(
             return Observation(
                 success=False,
                 error=err_msg,
-                metadata=protobuf.Struct().from_dict(
-                    {"error_code": code, "safe_price": str(safe_p)}
-                ),
+                metadata=make_struct({"error_code": code, "safe_price": str(safe_p)}),
             )
         except Exception as e:
             logger.error(f"Guard skill error: {e}")
@@ -92,7 +89,7 @@ class GuardSkill(
         price = self.provider.calculate_safe_price(p_safe.context, p_safe.reason)
         return Observation(
             success=True,
-            metadata=protobuf.Struct().from_dict({"safe_price": str(price)}),
+            metadata=make_struct({"safe_price": str(price)}),
         )
 
     async def _validate_vision(self, params: dict[str, Any]) -> Observation:
@@ -120,5 +117,5 @@ class GuardSkill(
         )
         return Observation(
             success=True,
-            metadata=protobuf.Struct().from_dict({"safe_price": safe_price}),
+            metadata=make_struct({"safe_price": safe_price}),
         )

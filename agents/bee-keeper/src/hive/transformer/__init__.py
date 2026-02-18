@@ -13,6 +13,7 @@ from aura_core import (
     MACRO_ATCG_FOLDERS,
     Transformer,
     find_hive_root,
+    make_struct,
 )
 from aura_core_gen.aura.core.v1 import (
     AuditObservation,
@@ -67,8 +68,6 @@ class BeeTransformer(Transformer[Context, AuditObservation]):
         # ATCG Purity: Transformer returns a single AuditObservation.
         is_pure = len(structural_findings) == 0 and purity_analysis.get("is_pure", True)
 
-        from aura_core_gen.aura.core.google import protobuf
-
         metadata = {
             "structural_findings": structural_findings,
             "reflective_heresies": purity_analysis.get("heresies", []),
@@ -82,7 +81,7 @@ class BeeTransformer(Transformer[Context, AuditObservation]):
             reasoning=str(purity_analysis.get("reasoning", "")),
             token_usage=int(purity_analysis.get("token_usage", 0)),
             execution_time=0.0,
-            metadata=protobuf.Struct().from_dict(metadata),
+            metadata=make_struct(metadata),
         )
 
     def _deterministic_audit(self, context: Context) -> list[str]:

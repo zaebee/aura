@@ -5,10 +5,10 @@ import structlog
 from aura_core import (
     SkillRegistry,
     Transformer,
+    make_struct,
     map_action,
     resolve_brain_path,
 )
-from aura_core_gen.aura.core.google import protobuf
 from aura_core_gen.aura.core.v1 import (
     ActionType,
     Context,
@@ -45,7 +45,7 @@ class RuleBasedStrategy:
             return Intent(
                 action=cast(ActionType, ActionType.ACTION_TYPE_REJECT),
                 reasoning="<think>Item not found. Rejecting.</think>",
-                metadata=protobuf.Struct().from_dict({"reason_code": "ITEM_NOT_FOUND"}),
+                metadata=make_struct({"reason_code": "ITEM_NOT_FOUND"}),
                 negotiation=NegotiationIntent(
                     price=0.0,
                     message="Item not found",
@@ -59,9 +59,7 @@ class RuleBasedStrategy:
                     ActionType, ActionType.ACTION_TYPE_EVALUATE
                 ),  # UI REQUIRED Surrogate
                 reasoning="<think>Bid exceeds security threshold. UI confirmation required.</think>",
-                metadata=protobuf.Struct().from_dict(
-                    {"template_id": "high_value_confirm"}
-                ),
+                metadata=make_struct({"template_id": "high_value_confirm"}),
                 negotiation=NegotiationIntent(
                     price=bid,
                     message=f"Bid of ${bid} exceeds security threshold",
@@ -74,7 +72,7 @@ class RuleBasedStrategy:
             return Intent(
                 action=cast(ActionType, ActionType.ACTION_TYPE_COUNTER),
                 reasoning=f"<think>Bid {bid} below floor {floor_price}. Countering.</think>",
-                metadata=protobuf.Struct().from_dict({"reason_code": "BELOW_FLOOR"}),
+                metadata=make_struct({"reason_code": "BELOW_FLOOR"}),
                 negotiation=NegotiationIntent(
                     price=floor_price,
                     message=f"We cannot accept less than ${floor_price}.",
@@ -85,9 +83,7 @@ class RuleBasedStrategy:
         return Intent(
             action=cast(ActionType, ActionType.ACTION_TYPE_ACCEPT),
             reasoning="<think>Bid at or above floor price. Accepting.</think>",
-            metadata=protobuf.Struct().from_dict(
-                {"reservation_code": f"RULE-{int(time.time())}"}
-            ),
+            metadata=make_struct({"reservation_code": f"RULE-{int(time.time())}"}),
             negotiation=NegotiationIntent(
                 price=bid,
                 message="Offer accepted.",
@@ -217,7 +213,7 @@ class AuraTransformer(Transformer[Context, Intent]):
             return Intent(
                 action=cast(ActionType, map_action(str(action_data.get("action", "")))),
                 reasoning=wrapped_thought,
-                metadata=protobuf.Struct().from_dict(action_metadata),
+                metadata=make_struct(action_metadata),
                 negotiation=NegotiationIntent(
                     price=float(action_data.get("price", 0.0)),
                     message=str(action_data.get("message", "")),

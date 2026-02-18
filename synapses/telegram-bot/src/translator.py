@@ -11,6 +11,7 @@ from aiogram.types import (
     InlineKeyboardMarkup,
     Message,
 )
+from aura_core import make_struct
 from aura_core_gen.aura.core.v1 import (
     ActionType,
     AgentIdentity,
@@ -73,7 +74,7 @@ class TelegramTranslator:
                     limit=settings.search_limit,
                     domain=settings.default_item_domain,
                 )
-                signal.metadata.from_dict(
+                signal.metadata = make_struct(
                     {
                         "chat_id": str(chat_id),
                         "user_id": str(user_id),
@@ -93,7 +94,9 @@ class TelegramTranslator:
                 signal.signal_type = cast(
                     SignalType, SignalType.SIGNAL_TYPE_NEGOTIATION
                 )
-                item_domain = str(state_data.get("item_domain", settings.default_item_domain))
+                item_domain = str(
+                    state_data.get("item_domain", settings.default_item_domain)
+                )
                 signal.negotiation = NegotiationSignal(
                     item_identifier=item_id,
                     item_domain=item_domain,
@@ -104,7 +107,7 @@ class TelegramTranslator:
                         reputation_score=1.0,
                     ),
                 )
-                signal.metadata.from_dict(
+                signal.metadata = make_struct(
                     {
                         "chat_id": str(chat_id),
                         "user_id": str(user_id),
@@ -121,7 +124,7 @@ class TelegramTranslator:
                 chat_id=chat_id,
                 message_text=text,
             )
-            signal.metadata.from_dict(
+            signal.metadata = make_struct(
                 {
                     "chat_id": str(chat_id),
                     "user_id": str(user_id),
@@ -141,7 +144,7 @@ class TelegramTranslator:
                 chat_id=chat_id,
                 callback_data=event.data or "",
             )
-            signal.metadata.from_dict(
+            signal.metadata = make_struct(
                 {
                     "chat_id": str(chat_id),
                     "user_id": str(user_id),

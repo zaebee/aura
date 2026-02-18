@@ -3,6 +3,7 @@ from datetime import UTC, datetime
 from typing import Any, cast
 
 import betterproto
+from aura_core import make_struct
 from aura_core_gen.aura.core.v1 import (
     AgentIdentity,
     NegotiationSignal,
@@ -40,7 +41,7 @@ class MCPTranslator:
                 signal_type=cast(SignalType, SignalType.SIGNAL_TYPE_UNSPECIFIED),
                 timestamp=datetime.now(UTC),
             )
-            sig.metadata.from_dict(
+            sig.metadata = make_struct(
                 {
                     "query": str(kwargs.get("query", "")),
                     "limit": str(kwargs.get("limit", 3)),
