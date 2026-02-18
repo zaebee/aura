@@ -23,12 +23,6 @@ from aura_core_gen.aura.core.v1 import (
 logger = structlog.get_logger(__name__)
 
 
-def _get_hive(context: Context) -> Any:
-    """Safely extract HiveContextData from Context.data oneof — returns None for non-hive contexts."""
-    name, value = betterproto.which_one_of(context, "data")
-    return value if name == "hive" else None
-
-
 def _get_metadata_dict(obj: Any) -> dict[str, Any]:
     meta = getattr(obj, "metadata", {})
     if hasattr(meta, "to_dict"):
@@ -53,9 +47,10 @@ class HiveConnector(BaseConnector):
         """
         logger.debug("connector_act_started", action=action.action)
 
-        hive = _get_hive(context)
         neg_obs = NegotiationObservation(
-            item_identifier=hive.item_identifier if hive else context.identifier,
+            item_identifier=context.hive.item_identifier
+            if context.hive
+            else context.identifier,
             valid_until_timestamp=int(time.time() + 600),
         )
 
@@ -111,9 +106,13 @@ class HiveConnector(BaseConnector):
         obs_meta = _get_metadata_dict(context)
         obs_meta.update(
             {
-                "item_id": str(hive.item_identifier if hive else context.identifier),
+                "item_id": str(
+                    context.hive.item_identifier if context.hive else context.identifier
+                ),
                 "agent_did": str(
-                    hive.offer.agent_did if hive and hive.offer else "unknown"
+                    context.hive.offer.agent_did
+                    if context.hive and context.hive.offer
+                    else "unknown"
                 ),
                 "payment_uri": str(neg_obs.payment_uri or ""),
             }
@@ -135,13 +134,18 @@ class HiveConnector(BaseConnector):
     ) -> None:
         """Encrypts the reservation code and creates a locked deal via Skills/MarketService."""
         try:
-            hive = _get_hive(context)
-            item_id = hive.item_identifier if hive else context.identifier
+            item_id = (
+                context.hive.item_identifier if context.hive else context.identifier
+            )
             item_name = str(context.metadata.to_dict().get("item_name", "Aura Item"))
             params_name, params_value = betterproto.which_one_of(action, "params")
             neg_intent = params_value if params_name == "negotiation" else None
             price = neg_intent.price if neg_intent else 0.0
-            agent_did = hive.offer.agent_did if hive and hive.offer else "unknown"
+            agent_did = (
+                context.hive.offer.agent_did
+                if context.hive and context.hive.offer
+                else "unknown"
+            )
 
             # Use Transaction Skill for price conversion
             obs = await self.registry.execute(
