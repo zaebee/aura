@@ -174,10 +174,62 @@ class HiveAggregator(Aggregator[Any, Context]):
     async def _perceive_negotiation(
         self, payload: Any, signal: Signal, context: Context
     ) -> Context:
-        """Enzyme for Negotiation signals."""
+        """Enzyme for Negotiation signals. Now supports Hybrid Signal v0.3.1 (Photos)."""
+        # If hybrid signal contains image data, trigger visual perception reflex
+        item_data: dict[str, Any] = {}
+        vision_error = None
+
+        if hasattr(payload, "image_data") and payload.image_data:
+            # 1. Perception
+            obs = await self.registry.execute(
+                "perception",
+                "perceive_image",
+                {"image_bytes": payload.image_data},
+            )
+
+            if not obs.success:
+                vision_error = getattr(obs, "error", "Perception failed")
+
+            if not vision_error:
+                # 2. Validation
+                item_data = _get_metadata_dict(obs)
+                v_obs = await self.registry.execute(
+                    "guard",
+                    "validate_vision",
+                    {"vision_result": item_data},
+                )
+
+                if not v_obs.success:
+                    vision_error = getattr(v_obs, "error", "Validation failed")
+
+            if not vision_error:
+                # 3. Success path: Cache ephemeral asset
+                agent_did = payload.agent.did if payload.agent else "unknown"
+                ttl = 3600
+                if self.settings and hasattr(self.settings, "perception"):
+                    ttl = int(
+                        getattr(self.settings.perception, "ephemeral_asset_ttl", 3600)
+                    )
+
+                await self.registry.execute(
+                    "persistence",
+                    "set_cache",
+                    {
+                        "key": f"ephemeral:asset:{agent_did}",
+                        "value": item_data,
+                        "expire": ttl,
+                    },
+                )
+
         context.context_type = cast(ContextType, ContextType.CONTEXT_TYPE_HIVE)
+
+        # Use perceived item_id if it's a vision discovery
+        item_id = payload.item_identifier
+        if (not item_id or item_id == "unknown") and item_data.get("id"):
+            item_id = str(item_data.get("id"))
+
         context.hive = HiveContextData(
-            item_identifier=payload.item_identifier,
+            item_identifier=item_id or "unknown",
             item_domain=payload.item_domain,
             offer=NegotiationOffer(
                 bid_amount=payload.bid_amount,
@@ -186,7 +238,18 @@ class HiveAggregator(Aggregator[Any, Context]):
             ),
             request_id=signal.identifier,
         )
-        self._update_metadata(context, {"source": "negotiation"})
+
+        metadata_updates = {"source": "negotiation"}
+        if item_data:
+            metadata_updates.update(
+                {
+                    "source": "vision",  # Upgrade source to vision for hybrid signals
+                    "vision_error": str(vision_error or ""),
+                    "item_name": str(item_data.get("name", "")),
+                }
+            )
+
+        self._update_metadata(context, metadata_updates)
         return context
 
     async def _perceive_perception(

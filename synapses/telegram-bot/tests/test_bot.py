@@ -46,7 +46,11 @@ async def test_cmd_search(message, receptor, mock_adapter):
     mock_adapter.execute.assert_called_once()
     signal = mock_adapter.execute.call_args[0][0]
     assert signal.signal_type == SignalType.SIGNAL_TYPE_SEARCH
-    assert signal.search.query == "Paris"
+    import betterproto
+
+    name, payload = betterproto.which_one_of(signal, "payload")
+    assert name == "search"
+    assert payload.query == "Paris"
 
 
 @pytest.mark.asyncio

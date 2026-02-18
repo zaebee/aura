@@ -188,33 +188,40 @@ class AuraTransformer(Transformer[Context, Intent]):
 
             # reasoning protein returns data in metadata
             result_struct = getattr(obs, "metadata", None)
-            result = (
+            raw_result = (
                 result_struct.to_dict()
                 if result_struct and hasattr(result_struct, "to_dict")
                 else {}
             )
 
+            # DSPy AuraNegotiator returns { "thought": ..., "action": { "action": ..., "price": ..., "message": ... } }
+            # Extract nested action data correctly (Fixes Action 0 paralysis)
+            action_data = raw_result.get("action")
+            if not isinstance(action_data, dict):
+                # Fallback if it's already flat or in another format
+                action_data = raw_result
+
             # Implement <think> tag logic for transparency
-            raw_thought = result.get("thought", "")
+            raw_thought = raw_result.get("thought", action_data.get("thought", ""))
             wrapped_thought = f"<think>\n{raw_thought}\n</think>" if raw_thought else ""
 
             action_metadata = {
                 **{
                     k: str(v)
-                    for k, v in result.items()
+                    for k, v in raw_result.items()
                     if k not in ["action", "price", "message", "thought"]
                 },
                 "brain_path": self.brain_path,
             }
 
             return Intent(
-                action=cast(ActionType, map_action(str(result.get("action", "")))),
+                action=cast(ActionType, map_action(str(action_data.get("action", "")))),
                 reasoning=wrapped_thought,
                 metadata=protobuf.Struct().from_dict(action_metadata),
                 negotiation=NegotiationIntent(
-                    price=float(result.get("price", 0.0)),
-                    message=str(result.get("message", "")),
-                    thought=str(result.get("thought", "")),
+                    price=float(action_data.get("price", 0.0)),
+                    message=str(action_data.get("message", "")),
+                    thought=str(raw_thought),
                 ),
             )
 
