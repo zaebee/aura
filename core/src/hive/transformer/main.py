@@ -1,6 +1,7 @@
 import time
 from typing import Any, cast
 
+import betterproto
 import structlog
 from aura_core import (
     SkillRegistry,
@@ -17,6 +18,12 @@ from aura_core_gen.aura.core.v1 import (
 )
 
 logger = structlog.get_logger(__name__)
+
+
+def _get_hive(context: Context) -> Any:
+    """Safely extract HiveContextData from Context.data oneof — returns None for non-hive contexts."""
+    name, value = betterproto.which_one_of(context, "data")
+    return value if name == "hive" else None
 
 
 class RuleBasedStrategy:
@@ -38,8 +45,9 @@ class RuleBasedStrategy:
     ) -> Intent:
         item_data = context.metadata.to_dict()
         bid = 0.0
-        if context.hive and context.hive.offer:
-            bid = context.hive.offer.bid_amount
+        hive = _get_hive(context)
+        if hive and hive.offer:
+            bid = hive.offer.bid_amount
 
         if not item_data.get("item_name"):
             return Intent(
@@ -129,8 +137,9 @@ class AuraTransformer(Transformer[Context, Intent]):
             vision_confidence_threshold = self.settings.perception.confidence_threshold
 
         reputation = 1.0
-        if context.hive and context.hive.offer:
-            reputation = context.hive.offer.reputation
+        hive = _get_hive(context)
+        if hive and hive.offer:
+            reputation = hive.offer.reputation
 
         return {
             "base_price": float(str(metadata.get("base_price", 0.0))),
@@ -160,8 +169,9 @@ class AuraTransformer(Transformer[Context, Intent]):
 
         try:
             bid = 0.0
-            if context.hive and context.hive.offer:
-                bid = context.hive.offer.bid_amount
+            hive = _get_hive(context)
+            if hive and hive.offer:
+                bid = hive.offer.bid_amount
 
             # Call Reasoning Protein
             obs = await self.registry.execute(
