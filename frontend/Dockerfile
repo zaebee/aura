@@ -26,6 +26,10 @@ COPY frontend/public ./frontend/public
 COPY frontend/src ./frontend/src
 COPY frontend/index.html ./frontend/
 
+# Inject API URL at build time (override with --build-arg VITE_API_GATEWAY_URL=...)
+ARG VITE_API_GATEWAY_URL=https://api.aura.zae.life/v1
+RUN echo "VITE_API_GATEWAY_URL=${VITE_API_GATEWAY_URL}" > ./frontend/.env.production
+
 # Generate protos (writes to frontend/src/lib)
 RUN buf generate
 

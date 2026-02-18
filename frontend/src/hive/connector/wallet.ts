@@ -16,7 +16,7 @@ export class AgentWallet implements Connector {
   constructor(gatewayUrl?: string) {
     this.GATEWAY_URL = gatewayUrl ||
       (import.meta.env.VITE_API_GATEWAY_URL) ||
-      'http://localhost:8000/v1'
+      '/api/v1'
 
     this.keyPair = nacl.sign.keyPair()
     this.agentId = `did:key:${Array.from(this.keyPair.publicKey).map(b => b.toString(16).padStart(2, '0')).join('')}`
