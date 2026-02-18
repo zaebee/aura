@@ -20,6 +20,7 @@ from aura_core_gen.aura.core.v1 import (
     SignalType,
     TelegramSignal,
 )
+from synapse_settings import settings
 
 logger = structlog.get_logger(__name__)
 
@@ -69,7 +70,7 @@ class TelegramTranslator:
                 signal.signal_type = cast(SignalType, SignalType.SIGNAL_TYPE_SEARCH)
                 signal.search = SearchSignal(
                     query=query_str,
-                    limit=10,
+                    limit=settings.search_limit,
                 )
                 signal.metadata.from_dict(
                     {
@@ -91,9 +92,10 @@ class TelegramTranslator:
                 signal.signal_type = cast(
                     SignalType, SignalType.SIGNAL_TYPE_NEGOTIATION
                 )
+                item_domain = str(state_data.get("item_domain", settings.default_item_domain))
                 signal.negotiation = NegotiationSignal(
                     item_identifier=item_id,
-                    item_domain="hotel",
+                    item_domain=item_domain,
                     image_data=image_data,
                     mime_type="image/jpeg",
                     agent=AgentIdentity(
