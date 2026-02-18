@@ -8,17 +8,22 @@ This module provides Kubernetes-compatible health check endpoints:
 All health checks are designed to be fast (<100ms) and lightweight.
 """
 
+from __future__ import annotations
+
 import asyncio
 import time
+from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from enum import Enum
+from typing import TYPE_CHECKING, Any
 
-import grpc
 from fastapi import FastAPI, HTTPException
-from grpc_health.v1 import health_pb2, health_pb2_grpc
 from logging_config import get_logger
 from pydantic import BaseModel, Field
+
+if TYPE_CHECKING:
+    pass
 
 logger = get_logger("health")
 
@@ -27,6 +32,7 @@ class HealthStatus(str, Enum):
     """Health check status values."""
 
     OK = "ok"
+    STARTING = "starting"
     TIMEOUT = "timeout"
     ERROR = "error"
 
@@ -36,7 +42,7 @@ class HealthCheckResult:
     """Result of a health check operation.
 
     Attributes:
-        status: Health status (OK, TIMEOUT, or ERROR)
+        status: Health status (OK, STARTING, TIMEOUT, or ERROR)
         message: Optional human-readable message
         latency_ms: Response time in milliseconds
     """
@@ -66,7 +72,7 @@ class ReadinessResponse(BaseModel):
 
 
 async def check_core_service_health(
-    health_stub: health_pb2_grpc.HealthStub, timeout: float
+    health_stub: Any | None, timeout: float
 ) -> HealthCheckResult:
     """Check Core Service health using gRPC Health Checking Protocol.
 
@@ -75,7 +81,7 @@ async def check_core_service_health(
     database connectivity.
 
     Args:
-        health_stub: gRPC Health service stub for Core Service
+        health_stub: gRPC Health service stub for Core Service, or None if not yet initialized
         timeout: Maximum time to wait for response in seconds
 
     Returns:
@@ -86,6 +92,15 @@ async def check_core_service_health(
         Uses the official gRPC Health Checking Protocol (grpc.health.v1.Health)
         which verifies database connectivity on the Core Service side.
     """
+    if health_stub is None:
+        return HealthCheckResult(
+            status=HealthStatus.STARTING,
+            message="Core service stub not yet initialized",
+        )
+
+    import grpc
+    from grpc_health.v1 import health_pb2
+
     start_time = time.perf_counter()
 
     try:
@@ -172,7 +187,7 @@ async def check_core_service_health(
 
 def register_health_endpoints(
     app: FastAPI,
-    health_stub: health_pb2_grpc.HealthStub,
+    get_stub: Callable[[], Any | None],
     health_check_timeout: float,
     slow_threshold_ms: float = 100.0,
 ) -> None:
@@ -180,7 +195,7 @@ def register_health_endpoints(
 
     Args:
         app: FastAPI application instance
-        health_stub: gRPC Health service stub for checking Core Service
+        get_stub: Callable returning the current gRPC Health service stub (or None)
         health_check_timeout: Timeout for health checks in seconds
         slow_threshold_ms: Log warning if health check exceeds this duration
     """
@@ -218,7 +233,7 @@ def register_health_endpoints(
             HTTPException: 503 if not ready to handle traffic
         """
         start_time = time.perf_counter()
-        core_status = await check_core_service_health(health_stub, health_check_timeout)
+        core_status = await check_core_service_health(get_stub(), health_check_timeout)
 
         check_duration_ms = (time.perf_counter() - start_time) * 1000
         if check_duration_ms > slow_threshold_ms:
@@ -226,6 +241,12 @@ def register_health_endpoints(
                 "readiness_check_slow",
                 duration_ms=round(check_duration_ms, 2),
                 threshold_ms=slow_threshold_ms,
+            )
+
+        if core_status.status == HealthStatus.STARTING:
+            raise HTTPException(
+                status_code=503,
+                detail={"status": "starting"},
             )
 
         if core_status.status != HealthStatus.OK:
@@ -264,7 +285,7 @@ def register_health_endpoints(
             HealthResponse: Detailed health information
         """
         start_time = time.perf_counter()
-        core_status = await check_core_service_health(health_stub, health_check_timeout)
+        core_status = await check_core_service_health(get_stub(), health_check_timeout)
 
         check_duration_ms = (time.perf_counter() - start_time) * 1000
         if check_duration_ms > slow_threshold_ms:
