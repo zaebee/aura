@@ -44,6 +44,14 @@ class Settings(BaseSettings):
     # Defaults to production URL, can be overridden for development
     cors_origins: str = "https://aura.zae.life"
 
+    # Public Membrane — Frontend Authentication
+    # API key for trusted browser clients (empty = frontend auth disabled)
+    frontend_api_key: str = ""
+    # Comma-separated origins allowed to use the API key shortcut
+    trusted_frontend_origins: str = "https://aura.zae.life"
+    # DID the gateway uses when proxying frontend requests to Core (Ribosome-Proxy)
+    gateway_did: str = "did:web:aura.zae.life"
+
     # Health Check Configuration
     health_check_timeout: float = (
         2.0  # Timeout for core service health checks (seconds)

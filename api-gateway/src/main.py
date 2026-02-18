@@ -33,7 +33,7 @@ from logging_config import (
 )
 from opentelemetry.instrumentation.fastapi import FastAPIInstrumentor
 from pydantic import BaseModel
-from security import verify_signature
+from security import verify_public_membrane, verify_signature
 from starlette.middleware.cors import CORSMiddleware
 from telemetry import init_telemetry
 
@@ -157,7 +157,7 @@ class NegotiationRequestHTTP(BaseModel):
 @app.post("/v1/negotiate")
 async def negotiate(
     request: Request,
-    agent_did: str = Depends(verify_signature),
+    agent_did: str = Depends(verify_public_membrane),
 ) -> dict[str, Any]:
     request_id = get_current_request_id() or str(uuid.uuid4())
     payload_dict = getattr(request.state, "parsed_body", {})
@@ -238,7 +238,7 @@ class SearchRequestHTTP(BaseModel):
 
 @app.post("/v1/search")
 async def search_items(
-    request: Request, agent_did: str = Depends(verify_signature)
+    request: Request, agent_did: str = Depends(verify_public_membrane)
 ) -> dict[str, Any]:
     payload_dict = getattr(request.state, "parsed_body", {})
     payload = SearchRequestHTTP(**payload_dict)
