@@ -1,5 +1,6 @@
 from typing import Any, cast
 
+import betterproto
 import structlog
 from aura_core import Membrane, SkillRegistry
 from aura_core_gen.aura.core.google import protobuf
@@ -23,7 +24,6 @@ class HiveMembrane(Membrane[Any, Intent, Context]):
         self.registry = registry
 
     async def inspect_inbound(self, signal: Any) -> Any:
-        import betterproto
         from aura_core_gen.aura.core.v1 import Signal
 
         # Robust extraction for both legacy objects and Protos
@@ -114,6 +114,9 @@ class HiveMembrane(Membrane[Any, Intent, Context]):
         ctx_meta = context.metadata.to_dict()
         floor_price = float(str(ctx_meta.get("floor_price", 0.0)))
 
+        params_name, params_value = betterproto.which_one_of(decision, "params")
+        neg_intent = params_value if params_name == "negotiation" else None
+
         # 1. Handle explicit failures
         if decision.action == ActionType.ACTION_TYPE_ERROR:
             safe_price = floor_price * 1.05
@@ -136,10 +139,10 @@ class HiveMembrane(Membrane[Any, Intent, Context]):
             )
 
         # 2. DLP Check
-        message = decision.negotiation.message if decision.negotiation else ""
+        message = neg_intent.message if neg_intent else ""
         if "floor_price" in message.lower():
-            if decision.negotiation:
-                decision.negotiation.message = (
+            if neg_intent:
+                neg_intent.message = (
                     "I cannot disclose internal pricing details."
                 )
             decision.reasoning += " [MEMBRANE: DLP block]"
@@ -157,7 +160,7 @@ class HiveMembrane(Membrane[Any, Intent, Context]):
         internal_cost = float(str(ctx_meta.get("internal_cost", floor_price)))
         guard_context = {"floor_price": floor_price, "internal_cost": internal_cost}
 
-        price = decision.negotiation.price if decision.negotiation else 0.0
+        price = neg_intent.price if neg_intent else 0.0
         # Map ActionType to strings expected by OutputGuard
         action_map = {
             ActionType.ACTION_TYPE_ACCEPT: "accept",
@@ -190,7 +193,9 @@ class HiveMembrane(Membrane[Any, Intent, Context]):
         self, original: Intent, safe_price: float, reason: str
     ) -> Intent:
         rounded_price = round(safe_price, 2)
-        orig_price = original.negotiation.price if original.negotiation else 0.0
+        params_name, params_value = betterproto.which_one_of(original, "params")
+        neg_intent = params_value if params_name == "negotiation" else None
+        orig_price = neg_intent.price if neg_intent else 0.0
         new_thought = f"Membrane Override: {reason}. LLM suggested {original.action.name} at {orig_price}."
         if original.reasoning:
             new_thought = f"{original.reasoning} | {new_thought}"

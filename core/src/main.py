@@ -99,8 +99,9 @@ class NegotiationService:
             response = NegotiateResponse()
             response.session_token = "sess_" + rid
 
-            if observation.negotiation:
-                neg = observation.negotiation
+            obs_name, obs_val = betterproto.which_one_of(observation, "data")
+            if obs_name == "negotiation" and obs_val:
+                neg = obs_val
                 response.valid_until_timestamp = neg.valid_until_timestamp
 
                 res_name, res_val = betterproto.which_one_of(neg, "result")
@@ -108,17 +109,18 @@ class NegotiationService:
                     from aura_core_gen.aura.negotiation.v1 import OfferAccepted
 
                     response.accepted = OfferAccepted(final_price=res_val.final_price)
-                    if (
-                        hasattr(res_val, "reservation_code")
-                        and res_val.reservation_code
-                    ):
-                        response.accepted.reservation_code = res_val.reservation_code
-                    if hasattr(res_val, "crypto_payment") and res_val.crypto_payment:
+
+                    reveal_name, reveal_val = betterproto.which_one_of(
+                        res_val, "reveal_method"
+                    )
+                    if reveal_name == "reservation_code" and reveal_val:
+                        response.accepted.reservation_code = reveal_val
+                    elif reveal_name == "crypto_payment" and reveal_val:
                         from aura_core_gen.aura.negotiation.v1 import (
                             CryptoPaymentInstructions,
                         )
 
-                        cp = res_val.crypto_payment
+                        cp = reveal_val
                         response.accepted.crypto_payment = CryptoPaymentInstructions(
                             deal_id=cp.deal_id,
                             wallet_address=cp.wallet_address,

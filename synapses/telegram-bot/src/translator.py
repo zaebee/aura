@@ -3,6 +3,7 @@ import uuid
 from datetime import UTC, datetime
 from typing import Any, cast
 
+import betterproto
 import structlog
 from aiogram.types import (
     CallbackQuery,
@@ -156,9 +157,19 @@ class TelegramTranslator:
         message = ""
         keyboard = None
 
-        # Observation or Event has negotiation field
-        if hasattr(event, "negotiation") and event.negotiation:
-            neg = event.negotiation
+        # Determine if it's an Observation or an Event and get the negotiation payload safely
+        neg = None
+        # Betterproto objects have which_one_of. Event has 'payload', Observation has 'data'.
+        if hasattr(event, "payload"):  # Event
+            name, val = betterproto.which_one_of(event, "payload")
+            if name == "negotiation":
+                neg = val
+        elif hasattr(event, "data"):  # Observation
+            name, val = betterproto.which_one_of(event, "data")
+            if name == "negotiation":
+                neg = val
+
+        if neg:
             item_id = getattr(neg, "item_identifier", "")
 
             # Determine action from Enum or legacy event_type
@@ -173,16 +184,18 @@ class TelegramTranslator:
             ):
                 # NegotiationEvent uses .price, NegotiationObservation uses .accepted.final_price
                 price = getattr(neg, "price", 0.0)
-                if hasattr(neg, "accepted") and neg.accepted:
-                    price = neg.accepted.final_price
+                res_name, res_val = betterproto.which_one_of(neg, "result")
+                if res_name == "accepted" and res_val:
+                    price = res_val.final_price
                 message = f"✅ *Deal Accepted!*\nItem: `{item_id}`\nFinal Price: `${price:.2f}`"
             elif (
                 action_name == "ACTION_TYPE_COUNTER"
                 or event_type == "negotiation_counter"
             ):
                 price = getattr(neg, "price", 0.0)
-                if hasattr(neg, "countered") and neg.countered:
-                    price = neg.countered.proposed_price
+                res_name, res_val = betterproto.which_one_of(neg, "result")
+                if res_name == "countered" and res_val:
+                    price = res_val.proposed_price
                 message = f"🔄 *Counter-offer Received*\nItem: `{item_id}`\nProposed Price: `${price:.2f}`\n\nWhat is your response?"
             elif (
                 action_name == "ACTION_TYPE_REJECT"

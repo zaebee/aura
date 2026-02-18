@@ -289,13 +289,21 @@ class HiveAggregator(Aggregator[Any, Context]):
             if item_id == "perceived-vehicle" or item_id == "unknown":
                 item_id = str(item_data.get("id", item_id))
 
-        context.context_type = cast(ContextType, ContextType.CONTEXT_TYPE_TELEGRAM)
-        context.telegram = TelegramContextData(
-            user_id=user_id,
-            chat_id=int(payload.chat_id),
-            message_text=message_text,
+        # Store Telegram-specific info in metadata to avoid 'oneof' collision in Context
+        self._update_metadata(
+            context,
+            {
+                "source": "telegram",
+                "chat_id": str(payload.chat_id),
+                "user_id": str(user_id),
+                "message_text": message_text,
+                "callback_data": callback_data,
+                "item_name": str(item_data.get("name", "")),
+            },
         )
-        # For Telegram, we also populate hive context if it's a negotiation
+
+        context.context_type = cast(ContextType, ContextType.CONTEXT_TYPE_TELEGRAM)
+        # For Telegram, we populate hive context for the Transformer/Reasoning loop
         context.hive = HiveContextData(
             item_identifier=item_id,
             offer=NegotiationOffer(
@@ -304,14 +312,6 @@ class HiveAggregator(Aggregator[Any, Context]):
                 agent_did=agent_did,
             ),
             request_id=signal.identifier,
-        )
-        self._update_metadata(
-            context,
-            {
-                "source": "telegram",
-                "callback_data": callback_data,
-                "item_name": str(item_data.get("name", "")),
-            },
         )
         return context
 

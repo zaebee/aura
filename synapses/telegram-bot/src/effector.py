@@ -1,5 +1,6 @@
 from typing import Any
 
+import betterproto
 import nats
 import structlog
 from aiogram import Bot
@@ -48,8 +49,9 @@ class TelegramEffector:
 
             # Use betterproto Enum mapping for logging (Task 1)
             log_meta = {"topic": event.topic}
-            if hasattr(event, "negotiation") and event.negotiation:
-                log_meta["action"] = str(ActionType(int(event.negotiation.action)).name)
+            payload_name, payload_value = betterproto.which_one_of(event, "payload")
+            if payload_name == "negotiation" and payload_value:
+                log_meta["action"] = str(ActionType(int(payload_value.action)).name)
 
             logger.debug("effector_received_event", **log_meta)
 
