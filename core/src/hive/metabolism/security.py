@@ -13,7 +13,10 @@ import base64
 import hashlib
 import hmac
 import json
+import logging
 from typing import Any
+
+_log = logging.getLogger(__name__)
 
 
 class AuditSigner:
@@ -49,6 +52,15 @@ class AuditSigner:
         callers that forget .encode() or pass non-string/non-bytes values.
         Dicts are serialized as canonical JSON (sort_keys=True) for a stable signature.
         """
+        _log.debug(
+            "AuditSigner.sign called",
+            extra={
+                "subject_type": type(subject).__name__,
+                "payload_type": type(payload).__name__,
+                "payload_sample": str(payload)[:20],
+                "timestamp_type": type(timestamp).__name__,
+            },
+        )
         message = (
             self._to_bytes(subject)
             + self._to_bytes(payload)
