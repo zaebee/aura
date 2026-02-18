@@ -3,20 +3,16 @@ import uuid
 from collections.abc import AsyncGenerator, Awaitable, Callable
 from contextlib import asynccontextmanager
 from datetime import UTC, datetime
-from typing import Annotated, Any, cast
+from typing import TYPE_CHECKING, Annotated, Any, cast
+
+if TYPE_CHECKING:
+    import grpc.aio
+    from aura_core_gen.aura.negotiation.v1 import NegotiationServiceStub
+    from grpc_health.v1 import health_pb2_grpc
 
 import betterproto
 import grpclib.client
 import nats
-from aura_core_gen.aura.core.v1 import (
-    AgentIdentity,
-    PerceptionSignal,
-    Signal,
-    SignalType,
-)
-from aura_core_gen.aura.negotiation.v1 import (
-    NegotiationServiceStub,
-)
 from fastapi import (
     Depends,
     FastAPI,
@@ -27,6 +23,7 @@ from fastapi import (
     Response,
     UploadFile,
 )
+from health import register_health_endpoints
 from logging_config import (
     bind_request_id,
     clear_request_context,
@@ -59,21 +56,33 @@ origins = [
 
 # Declare globals
 channel: grpclib.client.Channel
-stub: NegotiationServiceStub
+stub: "NegotiationServiceStub"
+_health_stub: "health_pb2_grpc.HealthStub | None" = None
+_health_channel: "grpc.aio.Channel | None" = None
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncGenerator[None]:
     """Manage grpclib and NATS lifecycle."""
-    global channel, stub
+    global channel, stub, _health_stub, _health_channel
 
     # --- Startup ---
     logger.info("startup_begin", service="api-gateway")
 
-    # grpclib Channel
+    # grpclib Channel for negotiation
+    from aura_core_gen.aura.negotiation.v1 import NegotiationServiceStub
+
     host, port = settings.core_service_host.split(":")
     channel = grpclib.client.Channel(host, int(port))
     stub = NegotiationServiceStub(channel)
+
+    # gRPC health stub (grpc.aio, separate channel)
+    import grpc.aio
+    from grpc_health.v1 import health_pb2_grpc as _health_pb2_grpc
+
+    _health_channel = grpc.aio.insecure_channel(settings.core_service_host)
+    _health_stub = _health_pb2_grpc.HealthStub(_health_channel)
+    logger.info("health_stub_initialized", grpc_target=settings.core_service_host)
 
     # NATS Connection for Vision RPC
     app.state.nc = await nats.connect(settings.nats_url)
@@ -93,12 +102,26 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None]:
             await app.state.nc.close()
 
         channel.close()  # Synchronous in grpclib
+
+        if _health_channel is not None:
+            await _health_channel.close()
+
         logger.info(
             "shutdown_complete", grpc_channel_closed=True, nats_connection_closed=True
         )
 
 
 app = FastAPI(title="Aura Agent Gateway", version="1.0", lifespan=lifespan)
+
+# Register health endpoints FIRST — before middleware and other routes
+# so Kubernetes liveness probes respond immediately on process start.
+register_health_endpoints(
+    app,
+    get_stub=lambda: _health_stub,
+    health_check_timeout=settings.health_check_timeout,
+    slow_threshold_ms=settings.health_check_slow_threshold_ms,
+)
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=origins,
@@ -129,11 +152,6 @@ class NegotiationRequestHTTP(BaseModel):
     bid_amount: float
     currency: str = "USD"
     agent_did: str
-
-
-@app.get("/healthz")
-async def healthz() -> dict[str, str]:
-    return {"status": "ok"}
 
 
 @app.post("/v1/negotiate")
@@ -268,6 +286,13 @@ async def analyze_vision(
 ) -> dict[str, Any]:
     request_id = get_current_request_id() or str(uuid.uuid4())
     try:
+        from aura_core_gen.aura.core.v1 import (
+            AgentIdentity,
+            PerceptionSignal,
+            Signal,
+            SignalType,
+        )
+
         images_bytes = [await f.read() for f in files]
         signal = Signal(
             identifier=request_id,
