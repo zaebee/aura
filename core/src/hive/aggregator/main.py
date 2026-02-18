@@ -178,40 +178,48 @@ class HiveAggregator(Aggregator[Any, Context]):
         # If hybrid signal contains image data, trigger visual perception reflex
         item_data: dict[str, Any] = {}
         vision_error = None
+
         if hasattr(payload, "image_data") and payload.image_data:
+            # 1. Perception
             obs = await self.registry.execute(
                 "perception",
                 "perceive_image",
                 {"image_bytes": payload.image_data},
             )
-            if obs.success:
+
+            if not obs.success:
+                vision_error = getattr(obs, "error", "Perception failed")
+
+            if not vision_error:
+                # 2. Validation
                 item_data = _get_metadata_dict(obs)
                 v_obs = await self.registry.execute(
                     "guard",
                     "validate_vision",
                     {"vision_result": item_data},
                 )
-                if v_obs.success:
-                    agent_did = payload.agent.did if payload.agent else "unknown"
-                    ttl = 3600
-                    if self.settings and hasattr(self.settings, "perception"):
-                        ttl = int(
-                            getattr(self.settings.perception, "ephemeral_asset_ttl", 3600)
-                        )
 
-                    await self.registry.execute(
-                        "persistence",
-                        "set_cache",
-                        {
-                            "key": f"ephemeral:asset:{agent_did}",
-                            "value": item_data,
-                            "expire": ttl,
-                        },
-                    )
-                else:
+                if not v_obs.success:
                     vision_error = getattr(v_obs, "error", "Validation failed")
-            else:
-                vision_error = getattr(obs, "error", "Perception failed")
+
+            if not vision_error:
+                # 3. Success path: Cache ephemeral asset
+                agent_did = payload.agent.did if payload.agent else "unknown"
+                ttl = 3600
+                if self.settings and hasattr(self.settings, "perception"):
+                    ttl = int(
+                        getattr(self.settings.perception, "ephemeral_asset_ttl", 3600)
+                    )
+
+                await self.registry.execute(
+                    "persistence",
+                    "set_cache",
+                    {
+                        "key": f"ephemeral:asset:{agent_did}",
+                        "value": item_data,
+                        "expire": ttl,
+                    },
+                )
 
         context.context_type = cast(ContextType, ContextType.CONTEXT_TYPE_HIVE)
 

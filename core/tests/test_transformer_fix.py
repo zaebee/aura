@@ -1,14 +1,16 @@
+from unittest.mock import AsyncMock, MagicMock
+
 import pytest
-from unittest.mock import MagicMock, AsyncMock
 from aura_core import SkillRegistry
+from aura_core_gen.aura.core.google import protobuf
 from aura_core_gen.aura.core.v1 import (
+    ActionType,
     Context,
     HiveContextData,
     NegotiationOffer,
     Observation,
-    ActionType
 )
-from aura_core_gen.aura.core.google import protobuf
+
 from hive.transformer import AuraTransformer
 
 @pytest.mark.asyncio

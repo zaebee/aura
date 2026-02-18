@@ -129,7 +129,7 @@ class TelegramReceptor:
         await callback.answer("Payment functionality coming soon!", show_alert=True)
 
     async def process_photo(self, message: Message, state: FSMContext) -> None:
-        """Handle incoming photos for Perception Chamber."""
+        """Handle incoming photos for Negotiation via Visual Discovery."""
         if not message.photo:
             return
 
@@ -191,7 +191,7 @@ class TelegramReceptor:
         observation = await self.adapter.execute(signal)
 
         if not observation.success:
-            await message.answer(f"Perception failed: {observation.error}")
+            await message.answer(f"Visual Discovery failed: {observation.error}")
             return
 
         # If it was successful, the effector will handle the outgoing event if it's sent via NATS,
@@ -207,6 +207,10 @@ class TelegramReceptor:
 
         # Translate callback to Signal
         signal = self.translator.to_signal(callback)
+
+        # Betterproto Safety (Task 3)
+        name, _ = betterproto.which_one_of(signal, "payload")
+        logger.debug("receptor_sending_callback_signal", payload=name)
 
         # Execute via NATS
         await self.adapter.execute(signal)
@@ -225,6 +229,10 @@ class TelegramReceptor:
 
         # Translate callback to Signal
         signal = self.translator.to_signal(callback)
+
+        # Betterproto Safety (Task 3)
+        name, _ = betterproto.which_one_of(signal, "payload")
+        logger.debug("receptor_sending_correction_signal", payload=name)
 
         # Execute via NATS
         await self.adapter.execute(signal)
