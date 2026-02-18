@@ -74,7 +74,8 @@ def test_compare_digest_used(monkeypatch: pytest.MonkeyPatch) -> None:
 def test_sign_accepts_non_string_subject() -> None:
     signer = AuditSigner(KEY)
     sig = signer.sign(42, PAYLOAD, TIMESTAMP)
-    assert isinstance(sig, str) and len(sig) > 0
+    expected_sig = signer.sign("42", PAYLOAD, TIMESTAMP)
+    assert sig == expected_sig
 
 
 def test_sign_accepts_bytes_subject() -> None:
@@ -85,9 +86,17 @@ def test_sign_accepts_bytes_subject() -> None:
 
 
 def test_sign_accepts_non_string_payload() -> None:
+    import json
+
     signer = AuditSigner(KEY)
-    sig = signer.sign(SUBJECT, {"wallet": "0xDEAD"}, TIMESTAMP)
-    assert isinstance(sig, str) and len(sig) > 0
+    payload_dict = {"wallet": "0xDEAD"}
+    sig = signer.sign(SUBJECT, payload_dict, TIMESTAMP)
+    # Dict must be serialized as canonical JSON — same as passing the bytes directly
+    canonical = json.dumps(payload_dict, sort_keys=True, separators=(",", ":")).encode(
+        "utf-8"
+    )
+    expected = signer.sign(SUBJECT, canonical, TIMESTAMP)
+    assert sig == expected
 
 
 def test_sign_accepts_non_string_timestamp() -> None:
@@ -96,4 +105,5 @@ def test_sign_accepts_non_string_timestamp() -> None:
     signer = AuditSigner(KEY)
     ts = datetime.datetime(2026, 2, 12, tzinfo=datetime.UTC)
     sig = signer.sign(SUBJECT, PAYLOAD, ts)
-    assert isinstance(sig, str) and len(sig) > 0
+    expected_sig = signer.sign(SUBJECT, PAYLOAD, str(ts))
+    assert sig == expected_sig
