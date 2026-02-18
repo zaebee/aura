@@ -1,5 +1,6 @@
 from io import BytesIO
 
+import betterproto
 import structlog
 from aiogram import F, Router
 from aiogram.filters import Command, CommandObject
@@ -66,8 +67,19 @@ class TelegramReceptor:
             "receptor_cmd_search",
             user_id=message.from_user.id if message.from_user else 0,
         )
+        query = str(command.args or "")
+        payload = query.encode("utf-8")  # Strict Encoding (Task 2)
+
         # 1. Translate external event to Internal Signal
-        signal = self.translator.to_signal(message, command=command)
+        signal = self.translator.to_signal(
+            message, command=command, query_payload=payload
+        )
+
+        # Betterproto Safety: Verify what is being sent (Task 3)
+        name, _ = betterproto.which_one_of(signal, "payload")
+        logger.debug(
+            "receptor_sending_signal", signal_id=signal.identifier, payload=name
+        )
 
         # 2. Send Signal to Core via NATS and wait for Observation
         await self.adapter.execute(signal)
@@ -94,10 +106,13 @@ class TelegramReceptor:
         # 1. Translate external event to Internal Signal
         signal = self.translator.to_signal(message, state_data=data)
 
+        # Betterproto Safety: Verify what is being sent (Task 3)
+        name, _ = betterproto.which_one_of(signal, "payload")
         logger.info(
             "receptor_processing_bid",
             user_id=message.from_user.id if message.from_user else 0,
             item_id=data.get("item_id"),
+            payload=name,
         )
 
         # 2. Send Signal to Core via NATS and wait for Observation
@@ -137,9 +152,17 @@ class TelegramReceptor:
         await message.answer("Analyzing image... 👁️")
 
         data = await state.get_data()
-        # 1. Translate photo to Perception Signal
+        # 1. Translate photo to Hybrid Negotiation Signal (v0.3.1)
         signal = self.translator.to_signal(
             message, image_bytes=image_bytes, state_data=data
+        )
+
+        # Betterproto Safety: Verify what is being sent (Task 3)
+        name, _ = betterproto.which_one_of(signal, "payload")
+        logger.debug(
+            "receptor_sending_photo_signal",
+            signal_id=signal.identifier,
+            payload=name,
         )
 
         # 2. Send via gRPC Negotiate if available, else fallback to NATS

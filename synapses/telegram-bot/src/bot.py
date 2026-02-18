@@ -12,6 +12,8 @@ from aiogram.types import (
     CallbackQuery,
     Message,
 )
+import betterproto
+import structlog
 from nats_adapter import NatsAdapter
 from translator import TelegramTranslator
 
@@ -35,7 +37,16 @@ async def cmd_start(message: Message) -> None:
 async def cmd_search(
     message: Message, command: CommandObject, adapter: NatsAdapter
 ) -> None:
-    signal = TelegramTranslator().to_signal(message, command=command)
+    query = str(command.args or "")
+    payload = query.encode("utf-8")  # Strict Encoding (Task 2)
+    signal = TelegramTranslator().to_signal(
+        message, command=command, query_payload=payload
+    )
+
+    # Betterproto Safety (Task 3)
+    name, _ = betterproto.which_one_of(signal, "payload")
+    structlog.get_logger(__name__).debug("bot_sending_signal", payload=name)
+
     await adapter.execute(signal)
 
 
