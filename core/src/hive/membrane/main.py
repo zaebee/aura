@@ -142,9 +142,7 @@ class HiveMembrane(Membrane[Any, Intent, Context]):
         message = neg_intent.message if neg_intent else ""
         if "floor_price" in message.lower():
             if neg_intent:
-                neg_intent.message = (
-                    "I cannot disclose internal pricing details."
-                )
+                neg_intent.message = "I cannot disclose internal pricing details."
             decision.reasoning += " [MEMBRANE: DLP block]"
 
         if decision.action not in [
@@ -166,7 +164,9 @@ class HiveMembrane(Membrane[Any, Intent, Context]):
             ActionType.ACTION_TYPE_ACCEPT: "accept",
             ActionType.ACTION_TYPE_COUNTER: "counter",
         }
-        action_name = action_map.get(decision.action, str(decision.action.name).lower())
+        action_name = action_map.get(
+            decision.action, (ActionType(decision.action).name or "unknown").lower()
+        )
 
         obs = await self.registry.execute(
             "guard",
@@ -196,7 +196,7 @@ class HiveMembrane(Membrane[Any, Intent, Context]):
         params_name, params_value = betterproto.which_one_of(original, "params")
         neg_intent = params_value if params_name == "negotiation" else None
         orig_price = neg_intent.price if neg_intent else 0.0
-        new_thought = f"Membrane Override: {reason}. LLM suggested {original.action.name} at {orig_price}."
+        new_thought = f"Membrane Override: {reason}. LLM suggested {ActionType(original.action).name} at {orig_price}."
         if original.reasoning:
             new_thought = f"{original.reasoning} | {new_thought}"
 
@@ -205,7 +205,7 @@ class HiveMembrane(Membrane[Any, Intent, Context]):
             reasoning=new_thought,
             metadata=protobuf.Struct().from_dict(
                 {
-                    "original_decision": str(original.action.name),
+                    "original_decision": str(ActionType(original.action).name),
                     "original_price": str(orig_price),
                     "override_reason": str(reason),
                 }

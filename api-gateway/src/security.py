@@ -2,6 +2,7 @@
 Security Module for Aura Platform API Gateway
 
 Implements cryptographic signature verification for incoming requests.
+Public Membrane provides an API-key shortcut for trusted browser origins.
 """
 
 import hashlib
@@ -145,6 +146,66 @@ async def verify_signature(
 
     # Return the verified agent DID for use in the endpoint
     return x_agent_id
+
+
+async def verify_public_membrane(
+    request: Request,
+    x_agent_id: str = Header(None),
+    x_timestamp: str = Header(None),
+    x_signature: str = Header(None),
+    x_api_key: str = Header(None),
+    origin: str = Header(None),
+) -> str:
+    """
+    Public Membrane: dual-path authentication for /v1/search and /v1/negotiate.
+
+    Path A — Agent (HMAC): all three DID headers present → full Ed25519 verification.
+    Path B — Frontend (API key): trusted Origin + matching X-Api-Key header →
+        gateway acts as Ribosome-Proxy, forwarding with its own DID.
+
+    Returns the verified agent DID (or gateway DID for frontend requests).
+    """
+    from config import get_settings
+
+    settings = get_settings()
+
+    # Path A: agent supplies all HMAC headers → delegate to full verification
+    if x_agent_id or x_timestamp or x_signature:
+        return await verify_signature(request, x_agent_id, x_timestamp, x_signature)
+
+    # Path B: check for trusted-origin + API key
+    frontend_api_key = settings.frontend_api_key
+    if not frontend_api_key:
+        raise HTTPException(
+            status_code=401,
+            detail="Missing required security headers: X-Agent-ID, X-Timestamp, X-Signature",
+        )
+
+    trusted_origins = {
+        o.strip() for o in settings.trusted_frontend_origins.split(",") if o.strip()
+    }
+
+    if origin not in trusted_origins:
+        raise HTTPException(
+            status_code=401,
+            detail="Untrusted origin. Provide agent headers or use a trusted frontend origin.",
+        )
+
+    if x_api_key != frontend_api_key:
+        raise HTTPException(status_code=401, detail="Invalid API key.")
+
+    # Parse and cache the request body for downstream handlers
+    body_bytes = await request.body()
+    if body_bytes:
+        try:
+            request.state.parsed_body = json.loads(body_bytes.decode("utf-8"))
+        except json.JSONDecodeError:
+            raise HTTPException(status_code=400, detail="Invalid JSON body") from None
+    else:
+        request.state.parsed_body = {}
+
+    # Ribosome-Proxy: gateway asserts its own DID on behalf of the browser
+    return settings.gateway_did
 
 
 def _validate_did_format(did: str) -> bool:
