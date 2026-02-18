@@ -178,13 +178,14 @@ class TelegramTranslator:
             if hasattr(neg, "action"):
                 action_name = str(ActionType(int(neg.action)).name)
 
+            res_name, res_val = betterproto.which_one_of(neg, "result")
+
             if (
                 action_name == "ACTION_TYPE_ACCEPT"
                 or event_type == "negotiation_accept"
             ):
                 # NegotiationEvent uses .price, NegotiationObservation uses .accepted.final_price
                 price = getattr(neg, "price", 0.0)
-                res_name, res_val = betterproto.which_one_of(neg, "result")
                 if res_name == "accepted" and res_val:
                     price = res_val.final_price
                 message = f"✅ *Deal Accepted!*\nItem: `{item_id}`\nFinal Price: `${price:.2f}`"
@@ -193,7 +194,6 @@ class TelegramTranslator:
                 or event_type == "negotiation_counter"
             ):
                 price = getattr(neg, "price", 0.0)
-                res_name, res_val = betterproto.which_one_of(neg, "result")
                 if res_name == "countered" and res_val:
                     price = res_val.proposed_price
                 message = f"🔄 *Counter-offer Received*\nItem: `{item_id}`\nProposed Price: `${price:.2f}`\n\nWhat is your response?"
