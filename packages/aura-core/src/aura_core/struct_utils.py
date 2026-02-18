@@ -38,7 +38,10 @@ def _to_value(v: Any) -> protobuf.Value:
         return protobuf.Value(
             list_value=protobuf.ListValue(values=[_to_value(item) for item in v])
         )
-    return protobuf.Value(string_value=str(v))
+    raise TypeError(
+        f"Unsupported type for protobuf.Value: {type(v).__name__}. "
+        "Convert to a supported type (dict, list, str, int, float, bool, None)."
+    )
 
 
 def _from_value(v: Any) -> Any:
