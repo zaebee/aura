@@ -1,8 +1,7 @@
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
-from aura_core import SkillRegistry
-from aura_core_gen.aura.core.google import protobuf
+from aura_core import SkillRegistry, make_struct
 from aura_core_gen.aura.core.v1 import (
     ActionType,
     Context,
@@ -27,9 +26,7 @@ async def test_aura_transformer_nested_action_fix():
         "action": {"action": "accept", "price": 100.0, "message": "Offer accepted."},
     }
 
-    mock_observation = Observation(
-        success=True, metadata=protobuf.Struct().from_dict(nested_result)
-    )
+    mock_observation = Observation(success=True, metadata=make_struct(nested_result))
     reasoning_skill.execute.return_value = mock_observation
 
     # Initialize transformer
@@ -65,9 +62,7 @@ async def test_aura_transformer_flat_action_fallback():
         "message": "Too low.",
     }
 
-    mock_observation = Observation(
-        success=True, metadata=protobuf.Struct().from_dict(flat_result)
-    )
+    mock_observation = Observation(success=True, metadata=make_struct(flat_result))
     reasoning_skill.execute.return_value = mock_observation
 
     # Initialize transformer
