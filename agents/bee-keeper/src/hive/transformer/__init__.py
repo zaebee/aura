@@ -95,8 +95,8 @@ class BeeTransformer(Transformer[Context, AuditObservation]):
                 result = predictor(error_log=error_log, system_context=system_context)
                 # Attempt to get usage from dspy (if available in this version)
                 tokens = 0
-                if hasattr(lm, "history") and lm.history:
-                    last_query = lm.history[-1]
+                if hasattr(self.lm, "history") and self.lm.history:
+                    last_query = self.lm.history[-1]
                     if "response" in last_query and hasattr(last_query["response"], "usage"):
                         tokens = last_query["response"].usage.total_tokens
 

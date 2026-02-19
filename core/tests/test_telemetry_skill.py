@@ -1,8 +1,10 @@
-import pytest
-import httpx
 from unittest.mock import AsyncMock, patch
-from hive.proteins.telemetry.skill import TelemetrySkill
+
+import httpx
+import pytest
+
 from config.server import ServerSettings
+from hive.proteins.telemetry.skill import TelemetrySkill
 
 @pytest.mark.asyncio
 async def test_telemetry_skill_initialize():

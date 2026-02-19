@@ -1,6 +1,8 @@
 import asyncio
 import sys
 
+import nats
+import nats.errors
 import structlog
 
 from config import KeeperSettings
@@ -16,9 +18,6 @@ structlog.configure(
 )
 logger = structlog.get_logger(__name__)
 
-
-import nats
-import nats.errors
 
 async def main() -> None:
     logger.info("bee_keeper_agent_starting")
