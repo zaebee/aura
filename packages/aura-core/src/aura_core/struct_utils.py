@@ -1,15 +1,25 @@
 """
 Utilities for safely building serializable protobuf.Struct objects.
 
-betterproto v2.0b7 bug: Struct.from_dict() stores raw Python values in the
-`fields` dict instead of proper protobuf.Value wrappers. This causes
-`TypeError: string argument without an encoding` when bytes(struct) is called
+betterproto v2.0b7 bugs fixed by this module:
+
+Bug 1 — Struct.from_dict() stores raw Python values instead of Value wrappers,
+causing `TypeError: string argument without an encoding` when bytes(msg) is called
 during NATS/gRPC serialization.
+
+Bug 2 — Message.__getattribute__() raises AttributeError when accessing an
+inactive oneof member (e.g. `context.hive` when `data=asset`). This also
+breaks betterproto's own dump() → __eq__ path: the dataclass-generated __eq__
+for a nested message (e.g. NegotiationObservation) accesses all oneof fields
+during comparison, crashing bytes(observation) with
+`AttributeError: 'result' is set to 'rejected', not 'accepted'`.
 
 This module:
 1. Provides make_struct() — builds Struct with correct Value wrappers.
-2. Patches Struct.to_dict() globally so it unwraps Values back to plain Python,
-   preserving backward-compatible flat-dict reads across the entire codebase.
+2. Patches Struct.to_dict() globally so it unwraps Values back to plain Python.
+3. Patches Message.__getattribute__() to return None (instead of raising) for
+   inactive oneof members, making oneof access safe everywhere — including
+   betterproto's internal dump/equality path.
 """
 
 from typing import Any
@@ -86,6 +96,43 @@ def _struct_to_dict_fixed(
 
 # Apply the patch at import time so all Struct instances benefit.
 protobuf.Struct.to_dict = _struct_to_dict_fixed  # type: ignore[method-assign]
+
+
+# ---------------------------------------------------------------------------
+# Global patch: Message.__getattribute__() → None for inactive oneof members
+# ---------------------------------------------------------------------------
+
+_orig_message_getattribute = betterproto.Message.__getattribute__
+
+
+def _safe_message_getattribute(self: betterproto.Message, name: str) -> Any:
+    """
+    Return None instead of raising AttributeError for inactive oneof members.
+
+    betterproto intentionally raises AttributeError when code accesses a oneof
+    field that is not the currently-active member.  This is correct for user
+    code but breaks betterproto's own serialization path: dump() compares a
+    nested message with its default using `==`, which calls the dataclass-
+    generated __eq__.  That __eq__ accesses every field in the tuple, including
+    inactive oneof members, causing an unhandled AttributeError inside dump().
+
+    Returning None is safe because:
+    - dump() already has `if value is None: continue` immediately after getattr,
+      so None-valued fields are silently skipped during serialization.
+    - User-level guards (`if context.hive:`) evaluate None as falsy — correct.
+    - which_one_of() is unaffected (it uses a different code path).
+    """
+    try:
+        return _orig_message_getattribute(self, name)
+    except AttributeError as exc:
+        # Only intercept betterproto's own "wrong oneof member" error.
+        # Its message format is: "'<group>' is set to '<active>', not '<name>'"
+        if "' is set to '" in str(exc) and "', not '" in str(exc):
+            return None
+        raise
+
+
+betterproto.Message.__getattribute__ = _safe_message_getattribute  # type: ignore[assignment]
 
 
 # ---------------------------------------------------------------------------
