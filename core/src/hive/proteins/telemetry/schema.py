@@ -11,3 +11,16 @@ class MetricIncrementParams(BaseModel):
 class HealthResponse(BaseModel):
     status: str
     details: dict[str, Any] = {}
+
+
+class LokiQueryParams(BaseModel):
+    query: str
+    limit: int = 100
+
+
+class PrometheusQueryParams(BaseModel):
+    query: str
+
+
+class K8sHealthParams(BaseModel):
+    namespace: str = "default"

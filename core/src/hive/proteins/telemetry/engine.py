@@ -161,6 +161,52 @@ async def fetch_vitals(metrics_cache: MetricsCache, settings: Any) -> SystemVita
         return SystemVitals(status="unstable", timestamp=datetime.now(UTC))
 
 
+async def query_loki(query: str, limit: int, settings: Any) -> list[dict[str, Any]]:
+    """Fetch raw logs from Loki."""
+    if not settings or not hasattr(settings, "loki_url"):
+        raise ValueError("Loki URL not configured in settings")
+
+    base_url = str(settings.loki_url).rstrip("/")
+    async with httpx.AsyncClient(timeout=10.0) as client:
+        resp = await client.get(
+            f"{base_url}/loki/api/v1/query_range",
+            params={"query": query, "limit": limit},
+        )
+        resp.raise_for_status()
+        data = resp.json()
+        # Loki query_range returns { "status": "success", "data": { "resultType": "streams", "result": [...] } }
+        return cast(list[dict[str, Any]], data.get("data", {}).get("result", []))
+
+
+async def query_prometheus(query: str, settings: Any) -> dict[str, Any]:
+    """Execute a generic Prometheus query."""
+    if not settings or not hasattr(settings, "prometheus_url"):
+        raise ValueError("Prometheus URL not configured in settings")
+
+    base_url = str(settings.prometheus_url).rstrip("/")
+    async with httpx.AsyncClient(timeout=10.0) as client:
+        resp = await client.get(f"{base_url}/api/v1/query", params={"query": query})
+        resp.raise_for_status()
+        return cast(dict[str, Any], resp.json())
+
+
+async def check_k8s_health(namespace: str, settings: Any) -> dict[str, Any]:
+    """Check K8s pod health via Prometheus metrics."""
+    # Query for pods that are NOT in Running phase
+    query = f'count(kube_pod_status_phase{{namespace="{namespace}", phase!="Running"}} > 0) or vector(0)'
+    data = await query_prometheus(query, settings)
+
+    unhealthy_count = 0
+    if data["status"] == "success" and data["data"]["result"]:
+        unhealthy_count = int(float(data["data"]["result"][0]["value"][1]))
+
+    return {
+        "status": "healthy" if unhealthy_count == 0 else "degraded",
+        "unhealthy_pods_count": unhealthy_count,
+        "namespace": namespace,
+    }
+
+
 def process_resp(resp: Any, name: str, errs: list[str]) -> tuple[float, bool]:
     if isinstance(resp, httpx.Response) and resp.status_code == 200:
         try:

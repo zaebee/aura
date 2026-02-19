@@ -1,5 +1,6 @@
 import asyncio
 import json
+import uuid
 from dataclasses import dataclass, field
 from typing import Any, cast
 
@@ -12,11 +13,16 @@ from aura_core import (
     Connector,
     SkillRegistry,
     find_hive_root,
+    make_struct,
 )
 from aura_core_gen.aura.core.v1 import (
+    ActionType,
     AuditObservation,
     Context,
+    Event,
+    NegotiationEvent,
 )
+from datetime import UTC, datetime
 import httpx
 from .proteins.vcs import VCS_Skill
 
@@ -65,31 +71,58 @@ class BeeConnector(Connector[AuditObservation, BeeObservation, Context]):
     ) -> BeeObservation:
         logger.info("bee_connector_interact_started")
 
-        # 1. Post to GitHub (if not a heartbeat)
+        # 1. Post to Telegram (via NATS Event)
+        nats_sent = await self._notify_admin(report, context)
+
+        # 2. Post to GitHub (Legacy, but we keep it if configured)
         comment_url = ""
         injuries = []
-
-        ctx_meta = (
-            context.metadata.to_dict() if hasattr(context.metadata, "to_dict") else {}
-        )
-        event_name = ctx_meta.get("event_name", "manual")
-        if event_name != "schedule":
+        if self.gh and self.settings.github_token != "mock":
             comment_url = await self._post_to_github(report, context)
-            if not comment_url and self.gh:
-                injuries.append("GitHub: Failed to post purity report comment.")
-
-        # 2. Commit Hive State (idempotency handled by Generator writing the file)
-        await self._commit_changes()
-
-        # 3. Emit NATS Event
-        nats_sent = await self._emit_nats_event(report, context, injuries)
 
         return BeeObservation(
-            success=len(injuries) == 0,
+            success=nats_sent,
             github_comment_url=comment_url,
             nats_event_sent=nats_sent,
             injuries=injuries,
         )
+
+    async def _notify_admin(self, report: AuditObservation, context: Context) -> bool:
+        """Emit a NegotiationEvent that the Telegram synapse will pick up."""
+        if not self.settings.admin_chat_id:
+            logger.warning("admin_chat_id_not_set_skipping_notification")
+            return False
+
+        try:
+            nc = await nats.connect(self.nats_url, connect_timeout=5.0)
+            js = nc.jetstream()
+
+            # We use NegotiationEvent to satisfy the "via NegotiationSignal" (conceptually)
+            # but using Event proto so the Effector can pick it up.
+            event = Event(
+                identifier=f"diag-{uuid.uuid4().hex[:8]}",
+                topic="aura.hive.events.negotiation_update",
+                timestamp=datetime.now(UTC),
+                negotiation=NegotiationEvent(
+                    item_identifier="SYSTEM_DIAGNOSIS",
+                    action=cast(ActionType, ActionType.ACTION_TYPE_UPDATE),
+                    price=0.0,
+                ),
+                metadata=make_struct({
+                    "chat_id": str(self.settings.admin_chat_id),
+                    "diagnosis": report.narrative,
+                    "fix_suggestion": report.reasoning,
+                    "source": "bee-keeper",
+                })
+            )
+
+            await js.publish(event.topic, bytes(event))
+            await nc.close()
+            logger.info("admin_notification_sent", chat_id=self.settings.admin_chat_id)
+            return True
+        except Exception as e:
+            logger.error("nats_notification_failed", error=str(e))
+            return False
 
     async def _commit_changes(self) -> None:
         import subprocess  # nosec

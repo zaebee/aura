@@ -17,6 +17,9 @@ structlog.configure(
 logger = structlog.get_logger(__name__)
 
 
+import nats
+import nats.errors
+
 async def main() -> None:
     logger.info("bee_keeper_agent_starting")
 
@@ -31,15 +34,29 @@ async def main() -> None:
         # 1.5 Sanity Check: Test Brain Connectivity
         if not await metabolism.aggregator.test_brain_connectivity():
             logger.error(
-                "Brain connectivity test failed for both primary and fallback models. Exiting."
+                "Brain connectivity test failed. Check AURA_LLM__API_KEY."
             )
-            sys.exit(1)
+            # We don't exit here to allow for intermittent connectivity
+            # sys.exit(1)
 
-        # 2. Execute Metabolic Pulse
-        # KeeperSettings already maps GITHUB_EVENT_NAME
-        event_name = settings.github_event_name
-        await metabolism.execute(event_name=event_name)
-        logger.info("bee_keeper_agent_finished_successfully")
+        # 2. Connect to NATS Bloodstream
+        nc = await nats.connect(settings.nats_url)
+        logger.info("connected_to_nats", url=settings.nats_url)
+
+        # 3. Subscribe to Error Events
+        error_subject = "aura.hive.events.error"
+        sub = await nc.subscribe(error_subject)
+        logger.info("subscribed_to_errors", subject=error_subject)
+
+        # 4. Metabolic Loop (Continuous)
+        async for msg in sub.messages:
+            try:
+                logger.info("error_signal_detected", subject=msg.subject)
+                # Execute one complete metabolic cycle for each error
+                await metabolism.execute(signal=msg.data, event_name="error_diagnosis")
+            except Exception as e:
+                logger.error("cycle_failure", error=str(e))
+
     except Exception as e:
         logger.error("bee_keeper_agent_critical_error", error=str(e), exc_info=True)
         sys.exit(1)

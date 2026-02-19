@@ -19,6 +19,8 @@ from aura_core_gen.aura.core.v1 import (
     AuditObservation,
     Context,
 )
+import dspy
+from .signatures import DiagnoseError
 
 logger = structlog.get_logger(__name__)
 
@@ -30,6 +32,11 @@ class BeeTransformer(Transformer[Context, AuditObservation]):
         self.settings = settings
         self.model = settings.llm__model
         litellm.api_key = settings.llm__api_key
+        self.lm = dspy.LM(
+            f"openai/{self.model}",
+            api_key=self.settings.llm__api_key,
+            cache=False
+        )
         root = find_hive_root()
 
         prompt_path = root / "agents/bee-keeper/prompts/bee_keeper.md"
@@ -48,41 +55,55 @@ class BeeTransformer(Transformer[Context, AuditObservation]):
             self.manifest = {}
 
     async def think(self, context: Context, **kwargs: Any) -> AuditObservation:
-        return await self.reflect(context)
+        """Main entry point for BeeKeeper reasoning."""
+        logger.info("bee_transformer_think_started")
 
-    async def reflect(self, context: Context) -> AuditObservation:
-        logger.info("bee_transformer_reflect_started")
+        # 1. Gather context from metadata
+        meta = context.metadata.to_dict()
+        vitals = meta.get("vitals", {})
+        logs = meta.get("recent_logs", "")
+        error_log = context.bee.git_diff  # We repurposed git_diff for error in aggregator
 
-        # 1. Structural Check (Deterministic)
+        system_context = f"Vitals: {json.dumps(vitals)}\nRecent Logs:\n{logs}"
+
+        # 2. Diagnose via DSPy
+        diagnosis, fix, tokens = await self._diagnose(error_log, system_context)
+
+        # 3. Structural check (still useful for success rate check etc)
         structural_findings = self._deterministic_audit(context)
 
-        git_diff = context.bee.git_diff
-        # 2. LLM Audit (Reflective)
-        if len(git_diff) > 4000:
-            logger.info("large_diff_detected_summarizing_first")
-            summary = await self._summarize_diff(git_diff)
-            git_diff = f"SUMMARY OF CHANGES:\n{summary}"
-
-        purity_analysis = await self._llm_audit(context, git_diff)
-
-        # ATCG Purity: Transformer returns a single AuditObservation.
-        is_pure = len(structural_findings) == 0 and purity_analysis.get("is_pure", True)
-
         metadata = {
+            "diagnosis": diagnosis,
+            "fix_suggestion": fix,
             "structural_findings": structural_findings,
-            "reflective_heresies": purity_analysis.get("heresies", []),
-            "llm_unavailable": purity_analysis.get("llm_unavailable", False),
         }
 
         return AuditObservation(
-            is_pure=is_pure,
+            is_pure=len(structural_findings) == 0,
             heresies=structural_findings,
-            narrative=str(purity_analysis.get("narrative", "The Hive remains silent.")),
-            reasoning=str(purity_analysis.get("reasoning", "")),
-            token_usage=int(purity_analysis.get("token_usage", 0)),
-            execution_time=0.0,
+            narrative=diagnosis,
+            reasoning=fix,
+            token_usage=tokens,
             metadata=make_struct(metadata),
         )
+
+    async def _diagnose(self, error_log: str, system_context: str) -> tuple[str, str, int]:
+        """Use DSPy to diagnose the error."""
+        with dspy.context(lm=self.lm):
+            predictor = dspy.Predict(DiagnoseError)
+            try:
+                result = predictor(error_log=error_log, system_context=system_context)
+                # Attempt to get usage from dspy (if available in this version)
+                tokens = 0
+                if hasattr(lm, "history") and lm.history:
+                    last_query = lm.history[-1]
+                    if "response" in last_query and hasattr(last_query["response"], "usage"):
+                        tokens = last_query["response"].usage.total_tokens
+
+                return result.diagnosis, result.fix_suggestion, tokens
+            except Exception as e:
+                logger.error("dspy_diagnosis_failed", error=str(e))
+                return f"Diagnosis failed: {e}", "Manual intervention required.", 0
 
     def _deterministic_audit(self, context: Context) -> list[str]:
         heresies = []

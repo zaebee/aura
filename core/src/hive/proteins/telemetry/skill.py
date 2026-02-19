@@ -8,11 +8,19 @@ from config.server import ServerSettings
 
 from .engine import (
     MetricsCache,
+    check_k8s_health,
     fetch_vitals,
     negotiation_accepted_total,
     negotiation_total,
+    query_loki,
+    query_prometheus,
 )
-from .schema import MetricIncrementParams
+from .schema import (
+    K8sHealthParams,
+    LokiQueryParams,
+    MetricIncrementParams,
+    PrometheusQueryParams,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -31,6 +39,9 @@ class TelemetrySkill(SkillProtocol[ServerSettings, Any, dict[str, Any], Observat
             "get_vitals": self._fetch_metrics,
             "health_check": self._health_check,
             "increment_counter": self._increment_counter,
+            "query_loki": self._query_loki,
+            "query_prometheus": self._query_prometheus,
+            "health_check_k8s": self._health_check_k8s,
         }
 
     def get_name(self) -> str:
@@ -79,3 +90,18 @@ class TelemetrySkill(SkillProtocol[ServerSettings, Any, dict[str, Any], Observat
         else:
             return Observation(success=False, error=f"Unknown counter: {p.name}")
         return Observation(success=True)
+
+    async def _query_loki(self, params: dict[str, Any]) -> Observation:
+        p = LokiQueryParams(**params)
+        results = await query_loki(p.query, p.limit, self.settings)
+        return Observation(success=True, metadata=make_struct({"results": results}))
+
+    async def _query_prometheus(self, params: dict[str, Any]) -> Observation:
+        p = PrometheusQueryParams(**params)
+        result = await query_prometheus(p.query, self.settings)
+        return Observation(success=True, metadata=make_struct(result))
+
+    async def _health_check_k8s(self, params: dict[str, Any]) -> Observation:
+        p = K8sHealthParams(**params)
+        result = await check_k8s_health(p.namespace, self.settings)
+        return Observation(success=True, metadata=make_struct(result))
