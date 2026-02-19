@@ -1,0 +1,36 @@
+# Internal Metadata (For Cortex)
+skill_name: "discovery"
+version: "1.0.0"
+description: "GitHub scanning and compatibility analysis protein"
+capabilities:
+  - "scan_github"
+  - "sequence_genome"
+  - "analyze_compatibility"
+  - "first_contact"
+dependencies:
+  settings_class: "DiscoverySettings"
+  external_services:
+    - "GitHub API"
+    - "Mistral API (via Reasoning LM)"
+
+# External Tool Definitions
+llm_tools:
+  - name: "discovery__scan_github"
+    description: "Searches for external repositories on GitHub based on a query."
+    input_schema:
+      type: "object"
+      properties:
+        query:
+          type: "string"
+          description: "Search query for repositories"
+      required: ["query"]
+
+  - name: "discovery__first_contact"
+    description: "Scans, analyzes, and generates symbiotic proposals for compatible organisms on GitHub."
+    input_schema:
+      type: "object"
+      properties:
+        query:
+          type: "string"
+          description: "Search query for potential partner repositories"
+      required: ["query"]

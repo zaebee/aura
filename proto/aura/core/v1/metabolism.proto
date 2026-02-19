@@ -256,7 +256,19 @@ message Observation {
     PerceptionObservation perception = 13;
     AssetObservation asset = 14;  // Generic asset observation (decoupled)
     SearchObservation search = 15;
+    DiscoveryObservation discovery = 16;
   }
+}
+
+message XenoEntity {
+  string repo_url = 1;
+  string architecture_type = 2; // "Monolith", "Microservices", "Agentic"
+  repeated string detected_interfaces = 3; // ["gRPC", "REST", "NATS"]
+  double compatibility_score = 4; // 0.0 to 1.0 (Hill Equation based)
+}
+
+message DiscoveryObservation {
+  repeated XenoEntity entities = 1;
 }
 
 // Generic Asset Observation - returns only asset identifiers
