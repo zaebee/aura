@@ -5,6 +5,7 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 from .crypto import CryptoSettings
 from .database import DatabaseSettings
+from .discovery import DiscoverySettings
 from .heartbeat import HeartbeatSettings
 from .llm import LLMSettings
 from .logic import LogicSettings
@@ -30,6 +31,7 @@ class Settings(BaseSettings):
     server: ServerSettings = Field(default_factory=lambda: ServerSettings())  # type: ignore
     heartbeat: HeartbeatSettings = Field(default_factory=lambda: HeartbeatSettings())  # type: ignore
     perception: PerceptionSettings = Field(default_factory=lambda: PerceptionSettings())  # type: ignore
+    discovery: DiscoverySettings = Field(default_factory=lambda: DiscoverySettings())  # type: ignore
 
 
 @lru_cache

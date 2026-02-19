@@ -14,6 +14,7 @@ from hive.proteins.guard import GuardSkill
 from hive.proteins.guard.engine import OutputGuard
 from hive.proteins.perception import PerceptionSkill
 from hive.proteins.perception.engine import PerceptionEngine
+from hive.proteins.discovery import DiscoverySkill
 from hive.proteins.persistence import PersistenceSkill
 from hive.proteins.pulse import PulseSkill
 from hive.proteins.pulse.engine import NatsProvider
@@ -181,7 +182,11 @@ class HiveCell:
             ),
         )
 
-        # 7. Transaction (Optional)
+        # 7. Discovery
+        discovery = DiscoverySkill()
+        discovery.bind(self.settings.discovery, {"lm": lm})
+
+        # 8. Transaction (Optional)
         transaction = None
         if self.settings.crypto.enabled:
             bundle = {
@@ -207,6 +212,7 @@ class HiveCell:
         self.registry.register("telemetry", telemetry)
         self.registry.register("guard", guard)
         self.registry.register("perception", perception)
+        self.registry.register("discovery", discovery)
         if transaction:
             self.registry.register("transaction", transaction)
 
