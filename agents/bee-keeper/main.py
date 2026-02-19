@@ -67,14 +67,14 @@ async def main() -> None:
             try:
                 await sub.unsubscribe()
                 logger.info("nats_unsubscribed")
-            except Exception:
-                pass
+            except Exception as e:
+                logger.warning("nats_unsubscribe_failed", error=str(e))
         if nc:
             try:
                 await nc.close()
                 logger.info("nats_connection_closed")
-            except Exception:
-                pass
+            except Exception as e:
+                logger.warning("nats_close_failed", error=str(e))
         if metabolism and metabolism.connector:
             await metabolism.connector.close()
 

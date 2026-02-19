@@ -77,7 +77,7 @@ class BeeConnector(Connector[AuditObservation, BeeObservation, Context]):
         # 2. Post to GitHub (Legacy, but we keep it if configured)
         comment_url = ""
         injuries: list[str] = []
-        if self.gh and self.settings.github_token != "mock":
+        if self.gh and self.settings.github_token != "mock":  # nosec
             comment_url = await self._post_to_github(report, context)
 
         return BeeObservation(
