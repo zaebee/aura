@@ -52,6 +52,7 @@ class BeeConnector(Connector[AuditObservation, BeeObservation, Context]):
         self.repo_name = settings.github_repository
         self.nats_url = settings.nats_url
         self._http_client = httpx.AsyncClient(timeout=30.0)
+        self._nc: nats.NATS | None = None
 
         self.gh = None
         if self.github_token and self.github_token != "mock":  # nosec B105
@@ -60,6 +61,8 @@ class BeeConnector(Connector[AuditObservation, BeeObservation, Context]):
 
     async def close(self) -> None:
         """Cleanup resources."""
+        if self._nc:
+            await self._nc.close()
         await self._http_client.aclose()
 
     async def act(self, action: AuditObservation, context: Context) -> BeeObservation:
@@ -87,6 +90,12 @@ class BeeConnector(Connector[AuditObservation, BeeObservation, Context]):
             injuries=injuries,
         )
 
+    async def _get_nats(self) -> nats.NATS:
+        """Get or create persistent NATS connection."""
+        if self._nc is None or not self._nc.is_connected:
+            self._nc = await nats.connect(self.nats_url, connect_timeout=5.0)
+        return self._nc
+
     async def _notify_admin(self, report: AuditObservation, context: Context) -> bool:
         """Emit a NegotiationEvent that the Telegram synapse will pick up."""
         if not self.settings.admin_chat_id:
@@ -94,7 +103,7 @@ class BeeConnector(Connector[AuditObservation, BeeObservation, Context]):
             return False
 
         try:
-            nc = await nats.connect(self.nats_url, connect_timeout=5.0)
+            nc = await self._get_nats()
             js = nc.jetstream()
 
             # We use NegotiationEvent to satisfy the "via NegotiationSignal" (conceptually)
@@ -119,7 +128,6 @@ class BeeConnector(Connector[AuditObservation, BeeObservation, Context]):
             )
 
             await js.publish(event.topic, bytes(event))
-            await nc.close()
             logger.info("admin_notification_sent", chat_id=self.settings.admin_chat_id)
             return True
         except Exception as e:

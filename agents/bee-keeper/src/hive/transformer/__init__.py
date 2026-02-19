@@ -60,11 +60,12 @@ class BeeTransformer(Transformer[Context, AuditObservation]):
         meta = context.metadata.to_dict()
         vitals = cast(dict[str, Any], meta.get("vitals", {}))
         logs = meta.get("recent_logs", "")
-        error_log = (
-            context.bee.git_diff
-        )  # We repurposed git_diff for error in aggregator
+        error_log = context.bee.error_message
+        source = context.bee.error_source
 
-        system_context = f"Vitals: {json.dumps(vitals)}\nRecent Logs:\n{logs}"
+        system_context = (
+            f"Source: {source}\nVitals: {json.dumps(vitals)}\nRecent Logs:\n{logs}"
+        )
 
         # 2. Diagnose via DSPy
         diagnosis, fix, tokens = await self._diagnose(error_log, system_context)

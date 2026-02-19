@@ -74,7 +74,10 @@ class BeeAggregator(Aggregator[Any, Context]):
             context_type=cast(ContextType, ContextType.CONTEXT_TYPE_BEE),
             bee=BeeContextData(
                 repo_name=self.repo_name or "hive",
-                git_diff=error_msg,  # Repurpose git_diff for error log in this agent
+                error_message=error_msg,
+                error_source=source,
+                # Keep legacy fields for backward compatibility if needed, but error_message/source are preferred
+                git_diff=error_msg,
                 filesystem_map=[source],
             ),
             metadata=make_struct(
@@ -90,43 +93,47 @@ class BeeAggregator(Aggregator[Any, Context]):
 
     async def _get_vitals_summary(self) -> dict[str, Any]:
         """Fetch current CPU/Mem and Pod health."""
-        cpu_q = 'avg(rate(container_cpu_usage_seconds_total{namespace="default"}[5m])) * 100'
-        mem_q = (
-            'avg(container_memory_working_set_bytes{namespace="default"}) / 1024 / 1024'
-        )
-        pod_q = 'count(kube_pod_status_phase{namespace="default", phase!="Running"} > 0) or vector(0)'
+        queries = {
+            "cpu": 'avg(rate(container_cpu_usage_seconds_total{namespace="default"}[5m])) * 100',
+            "memory": 'avg(container_memory_working_set_bytes{namespace="default"}) / 1024 / 1024',
+            "unhealthy_pods": 'count(kube_pod_status_phase{namespace="default", phase!="Running"} > 0) or vector(0)',
+        }
 
         vitals = {"cpu": 0.0, "memory": 0.0, "unhealthy_pods": 0}
+        keys = list(queries.keys())
+
         try:
             async with httpx.AsyncClient(timeout=5.0) as client:
                 resps = await asyncio.gather(
-                    client.get(
-                        f"{self.settings.prometheus_url}/api/v1/query",
-                        params={"query": cpu_q},
-                    ),
-                    client.get(
-                        f"{self.settings.prometheus_url}/api/v1/query",
-                        params={"query": mem_q},
-                    ),
-                    client.get(
-                        f"{self.settings.prometheus_url}/api/v1/query",
-                        params={"query": pod_q},
-                    ),
+                    *[
+                        client.get(
+                            f"{self.settings.prometheus_url}/api/v1/query",
+                            params={"query": q},
+                        )
+                        for q in queries.values()
+                    ],
                     return_exceptions=True,
                 )
-                if isinstance(resps[0], httpx.Response) and resps[0].status_code == 200:
-                    r = resps[0].json()
-                    if r["data"]["result"]:
-                        vitals["cpu"] = float(r["data"]["result"][0]["value"][1])
-                if isinstance(resps[1], httpx.Response) and resps[1].status_code == 200:
-                    r = resps[1].json()
-                    if r["data"]["result"]:
-                        vitals["memory"] = float(r["data"]["result"][0]["value"][1])
-                if isinstance(resps[2], httpx.Response) and resps[2].status_code == 200:
-                    r = resps[2].json()
-                    if r["data"]["result"]:
-                        vitals["unhealthy_pods"] = int(
-                            float(r["data"]["result"][0]["value"][1])
+
+                for i, key in enumerate(keys):
+                    resp = resps[i]
+                    if isinstance(resp, httpx.Response) and resp.status_code == 200:
+                        try:
+                            r = resp.json()
+                            if r.get("data", {}).get("result"):
+                                value_str = r["data"]["result"][0]["value"][1]
+                                vitals[key] = (
+                                    int(float(value_str))
+                                    if key == "unhealthy_pods"
+                                    else float(value_str)
+                                )
+                        except (KeyError, IndexError, ValueError) as e:
+                            logger.warning(
+                                "prometheus_parse_failed", key=key, error=str(e)
+                            )
+                    elif isinstance(resp, Exception):
+                        logger.warning(
+                            "prometheus_query_failed", key=key, error=str(resp)
                         )
         except Exception as e:
             logger.warning("vitals_gathering_failed", error=str(e))
