@@ -10,6 +10,6 @@ class DiscoverySettings(BaseSettings):
     )
 
     github_token: SecretStr = Field(
-        "",
+        SecretStr(""),
         validation_alias=AliasChoices("AURA_DISCOVERY__GITHUB_TOKEN", "GITHUB_TOKEN"),
     )

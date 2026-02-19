@@ -1,9 +1,11 @@
 import re
-from typing import Any
+from typing import Any, cast
 
 import dspy
 import structlog
 from github import Github
+from github.ContentFile import ContentFile
+from github.Repository import Repository
 
 logger = structlog.get_logger(__name__)
 
@@ -62,8 +64,9 @@ async def scan_github(query: str, github_client: Github) -> list[dict[str, Any]]
     """Search for repositories on GitHub."""
     logger.info("scanning_github", query=query)
     repos = github_client.search_repositories(query=query)
-    results = []
+    results: list[dict[str, Any]] = []
     # Limit to top 5 for efficiency
+    repo: Repository
     for repo in repos[:5]:
         results.append(
             {
@@ -80,9 +83,9 @@ async def sequence_genome(repo_url: str, github_client: Github) -> str:
     """Read README.md, proto files, and API definitions from a repository."""
     repo_name = repo_url.replace("https://github.com/", "")
     logger.info("sequencing_genome", repo=repo_name)
-    repo = github_client.get_repo(repo_name)
+    repo: Repository = github_client.get_repo(repo_name)
 
-    context_parts = []
+    context_parts: list[str] = []
 
     # 1. Try to get README
     try:
@@ -111,6 +114,7 @@ async def sequence_genome(repo_url: str, github_client: Github) -> str:
         protos = github_client.search_code(query=f"extension:proto repo:{repo_name}")
         if protos.totalCount > 0:
             context_parts.append("--- NERVOUS SYSTEM (PROTO FILES) ---")
+            p: ContentFile
             for p in protos[:3]:
                 context_parts.append(
                     f"File: {p.path}\n{p.decoded_content.decode('utf-8')[:1000]}"
@@ -125,6 +129,7 @@ async def sequence_genome(repo_url: str, github_client: Github) -> str:
         )
         if api_defs.totalCount > 0:
             context_parts.append("--- NERVOUS SYSTEM (API DEFINITIONS) ---")
+            ad: ContentFile
             for ad in api_defs[:2]:
                 context_parts.append(
                     f"File: {ad.path}\n{ad.decoded_content.decode('utf-8')[:1000]}"
@@ -152,7 +157,7 @@ async def analyze_compatibility(repo_context: str) -> dict[str, Any]:
     result = predictor(repo_context=repo_context)
 
     # Parse detected_interfaces string to list
-    interfaces = []
+    interfaces: list[str] = []
     if result.detected_interfaces:
         interfaces = [
             i.strip()
@@ -178,4 +183,4 @@ async def generate_proposal(repo_context: str, analysis: dict[str, Any]) -> str:
     logger.info("generating_proposal")
     predictor = dspy.Predict(GenerateSymbioticProposal)
     result = predictor(repo_context=repo_context, compatibility_analysis=str(analysis))
-    return result.proposal
+    return cast(str, result.proposal)
