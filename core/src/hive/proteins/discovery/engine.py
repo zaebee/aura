@@ -105,7 +105,7 @@ async def sequence_genome(repo_url: str, github_client: Github) -> str:
             context_parts.append(
                 f"--- METABOLIC REQUIREMENTS ({dep_file}) ---\n{content.decoded_content.decode('utf-8')[:1000]}"
             )
-        except Exception:
+        except Exception:  # nosec B110
             pass
 
     # 3. Scan Nervous System (Interfaces)
@@ -144,7 +144,7 @@ async def sequence_genome(repo_url: str, github_client: Github) -> str:
             context_parts.append(
                 f"--- ORGANISM STRUCTURE (docker-compose.yml) ---\n{docker_compose.decoded_content.decode('utf-8')[:1000]}"
             )
-    except Exception:
+    except Exception:  # nosec B110
         pass
 
     return "\n\n".join(context_parts)

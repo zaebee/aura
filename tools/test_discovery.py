@@ -8,7 +8,7 @@ from config.discovery import DiscoverySettings
 
 class TestDiscoverySkill(unittest.IsolatedAsyncioTestCase):
     def setUp(self):
-        self.settings = DiscoverySettings(github_token="fake_token")
+        self.settings = DiscoverySettings(github_token="fake_token")  # nosec B106
         self.provider = {"lm": MagicMock()}
         self.skill = DiscoverySkill()
         self.skill.bind(self.settings, self.provider)
