@@ -210,6 +210,16 @@ class JetStreamProvider:
             binary_data = bytes(event)
             ack = await self.js.publish(event.topic, binary_data)
             logger.debug(f"Published alert: seq={ack.seq}")
+
+            # Duplicate to error topic if severity is high
+            if event.alert.severity in [
+                Severity.SEVERITY_ERROR,
+                Severity.SEVERITY_CRITICAL,
+            ]:
+                error_topic = "aura.hive.events.error"
+                await self.js.publish(error_topic, binary_data)
+                logger.debug(f"Duplicated error alert to {error_topic}")
+
             return True
         except Exception as e:
             logger.error(f"Failed to publish alert: {e}")

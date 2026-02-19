@@ -34,6 +34,10 @@ class ServerSettings(BaseModel):
         "http://monitoring-kube-prometheus-prometheus.monitoring.svc.cluster.local:9090",  # type: ignore
         validation_alias=AliasChoices("AURA_SERVER__PROMETHEUS_URL", "PROMETHEUS_URL"),
     )
+    loki_url: HttpUrl = Field(
+        "http://loki.monitoring.svc.cluster.local:3100",  # type: ignore
+        validation_alias=AliasChoices("AURA_SERVER__LOKI_URL", "LOKI_URL"),
+    )
     metrics_port: int = Field(
         9091,
         validation_alias=AliasChoices("AURA_SERVER__METRICS_PORT", "METRICS_PORT"),

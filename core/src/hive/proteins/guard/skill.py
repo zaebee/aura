@@ -100,9 +100,9 @@ class GuardSkill(
 
     async def _validate_transaction(self, params: dict[str, Any]) -> Observation:
         assert self.provider is not None
-        assert (
-            self._registry is not None
-        ), "registry not injected — call inject_registry() first"
+        assert self._registry is not None, (
+            "registry not injected — call inject_registry() first"
+        )
         wallet_address = params.get("wallet_address", "")
         sanct_obs = await self._registry.execute(
             "persistence", "is_wallet_sanctified", {"wallet_address": wallet_address}

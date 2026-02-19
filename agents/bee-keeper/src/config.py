@@ -21,6 +21,10 @@ class KeeperSettings(BaseSettings):  # type: ignore
         "http://monitoring-kube-prometheus-prometheus.monitoring.svc.cluster.local:9090",
         alias="AURA_PROMETHEUS_URL",
     )
+    loki_url: str = Field(
+        "http://loki.monitoring.svc.cluster.local:3100",
+        alias="AURA_LOKI_URL",
+    )
     nats_url: str = Field(
         "nats://nats:4222",
         validation_alias=AliasChoices(
@@ -28,7 +32,9 @@ class KeeperSettings(BaseSettings):  # type: ignore
         ),
     )
 
-    github_token: str = Field(..., alias="GITHUB_TOKEN")
+    admin_chat_id: int = Field(0, alias="AURA_BEE_KEEPER__ADMIN_CHAT_ID")
+
+    github_token: str = Field("mock", alias="GITHUB_TOKEN")
     github_repository: str = Field(..., alias="GITHUB_REPOSITORY")
     github_event_path: str | None = Field(None, alias="GITHUB_EVENT_PATH")
     github_event_name: str = Field("manual", alias="GITHUB_EVENT_NAME")

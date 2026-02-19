@@ -187,6 +187,18 @@ class TelegramTranslator:
         if neg:
             item_id = getattr(neg, "item_identifier", "")
 
+            # Handle System Diagnosis from BeeKeeper
+            if item_id == "SYSTEM_DIAGNOSIS":
+                diag = metadata.get("diagnosis", "Unknown failure.")
+                fix = metadata.get("fix_suggestion", "Please check logs.")
+                source = metadata.get("source", "hive")
+                message = (
+                    f"🐝 *BEEKEEPER DIAGNOSIS* ({source})\n\n"
+                    f"🚨 *Issue:* {diag}\n\n"
+                    f"🛠️ *Fix Suggestion:* {fix}"
+                )
+                return chat_id, message, None
+
             # Determine action from Enum or legacy event_type
             event_type = str(getattr(event, "event_type", ""))
             action_name = ""

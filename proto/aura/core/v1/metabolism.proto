@@ -167,6 +167,8 @@ message BeeContextData {
   string git_diff = 2;
   repeated string filesystem_map = 3;
   map<string, double> hive_metrics = 4;
+  string error_message = 5;
+  string error_source = 6;
 }
 
 message TelegramContextData {
