@@ -1,9 +1,10 @@
-import asyncio
 import unittest
 from unittest.mock import MagicMock, patch
+
 from hive.proteins.discovery.skill import DiscoverySkill
+
 from config.discovery import DiscoverySettings
-from aura_core_gen.aura.core.v1 import Observation, DiscoveryObservation, XenoEntity
+
 
 class TestDiscoverySkill(unittest.IsolatedAsyncioTestCase):
     def setUp(self):
@@ -26,9 +27,19 @@ class TestDiscoverySkill(unittest.IsolatedAsyncioTestCase):
     @patch("hive.proteins.discovery.skill.scan_github")
     @patch("dspy.configure")
     @patch("hive.proteins.discovery.skill.Github")
-    async def test_first_contact_intent_rhizomatic(self, mock_github, mock_dspy_config, mock_scan, mock_sequence, mock_analyze, mock_proposal):
+    async def test_first_contact_intent_rhizomatic(
+        self,
+        mock_github,
+        mock_dspy_config,
+        mock_scan,
+        mock_sequence,
+        mock_analyze,
+        mock_proposal,
+    ):
         await self.skill.initialize()
-        mock_scan.return_value = [{"name": "test-repo", "url": "https://github.com/test-repo"}]
+        mock_scan.return_value = [
+            {"name": "test-repo", "url": "https://github.com/test-repo"}
+        ]
         mock_sequence.return_value = "repo DNA content"
         mock_analyze.return_value = {
             "substrate": "Python",
@@ -37,7 +48,7 @@ class TestDiscoverySkill(unittest.IsolatedAsyncioTestCase):
             "architecture_type": "Microservices",
             "detected_interfaces": ["gRPC", "REST"],
             "compatibility_score": 0.9,
-            "reasoning": "High compatibility"
+            "reasoning": "High compatibility",
         }
         mock_proposal.return_value = "Symbiotic Proposal"
 
@@ -54,6 +65,7 @@ class TestDiscoverySkill(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(entity.architecture_type, "Microservices")
         self.assertIn("gRPC", entity.detected_interfaces)
         self.assertEqual(entity.compatibility_score, 0.9)
+
 
 if __name__ == "__main__":
     unittest.main()

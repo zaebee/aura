@@ -1,18 +1,12 @@
-import asyncio
 import logging
-from typing import Any, cast
+from typing import Any
 
 import dspy
-from aura_core import SkillProtocol, make_struct, get_raw_key
-from aura_core_gen.aura.core.v1 import (
-    Observation,
-    DiscoveryObservation,
-    XenoEntity
-)
+from aura_core import SkillProtocol, get_raw_key, make_struct
+from aura_core_gen.aura.core.v1 import DiscoveryObservation, Observation, XenoEntity
 from github import Github
 
 from config.discovery import DiscoverySettings
-from config.llm import LLMSettings
 
 from .engine import (
     analyze_compatibility,
@@ -86,7 +80,9 @@ class DiscoverySkill(
 
         p = ScanParams(**params)
         results = await scan_github(p.query, self.github_client)
-        return Observation(success=True, metadata=make_struct({"repositories": results}))
+        return Observation(
+            success=True, metadata=make_struct({"repositories": results})
+        )
 
     async def _sequence_genome(self, params: dict[str, Any]) -> Observation:
         if not self.github_client:
@@ -94,7 +90,9 @@ class DiscoverySkill(
 
         p = SequenceParams(**params)
         context = await sequence_genome(p.repo_url, self.github_client)
-        return Observation(success=True, metadata=make_struct({"repo_context": context}))
+        return Observation(
+            success=True, metadata=make_struct({"repo_context": context})
+        )
 
     async def _analyze_compatibility(self, params: dict[str, Any]) -> Observation:
         p = AnalysisParams(**params)
@@ -115,7 +113,7 @@ class DiscoverySkill(
         repos = await scan_github(p.query, self.github_client)
 
         entities = []
-        contact_meta = [] # For backward compatibility in metadata if needed
+        contact_meta = []  # For backward compatibility in metadata if needed
 
         for r in repos:
             repo_url = r["url"]
@@ -129,7 +127,7 @@ class DiscoverySkill(
                 repo_url=repo_url,
                 architecture_type=analysis.get("architecture_type", "Unknown"),
                 detected_interfaces=analysis.get("detected_interfaces", []),
-                compatibility_score=analysis.get("compatibility_score", 0.0)
+                compatibility_score=analysis.get("compatibility_score", 0.0),
             )
             entities.append(entity)
 
@@ -138,12 +136,12 @@ class DiscoverySkill(
             if analysis.get("compatibility_score", 0) > 0.7:
                 proposal = await generate_proposal(context, analysis)
 
-            contact_meta.append({
-                "repo": r["name"],
-                "analysis": analysis,
-                "proposal": proposal
-            })
+            contact_meta.append(
+                {"repo": r["name"], "analysis": analysis, "proposal": proposal}
+            )
 
-        obs = Observation(success=True, metadata=make_struct({"contacts": contact_meta}))
+        obs = Observation(
+            success=True, metadata=make_struct({"contacts": contact_meta})
+        )
         obs.discovery = DiscoveryObservation(entities=entities)
         return obs

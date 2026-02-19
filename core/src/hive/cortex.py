@@ -10,11 +10,11 @@ from hive.generator import HiveGenerator
 from hive.membrane import HiveMembrane
 from hive.metabolism import MetabolicLoop
 from hive.metabolism.security import AuditSigner
+from hive.proteins.discovery import DiscoverySkill
 from hive.proteins.guard import GuardSkill
 from hive.proteins.guard.engine import OutputGuard
 from hive.proteins.perception import PerceptionSkill
 from hive.proteins.perception.engine import PerceptionEngine
-from hive.proteins.discovery import DiscoverySkill
 from hive.proteins.persistence import PersistenceSkill
 from hive.proteins.pulse import PulseSkill
 from hive.proteins.pulse.engine import NatsProvider
