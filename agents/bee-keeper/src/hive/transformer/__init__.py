@@ -60,7 +60,7 @@ class BeeTransformer(Transformer[Context, AuditObservation]):
 
         # 1. Gather context from metadata
         meta = context.metadata.to_dict()
-        vitals = meta.get("vitals", {})
+        vitals: dict[str, Any] = meta.get("vitals", {})
         logs = meta.get("recent_logs", "")
         error_log = context.bee.git_diff  # We repurposed git_diff for error in aggregator
 

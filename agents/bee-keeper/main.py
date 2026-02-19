@@ -26,6 +26,8 @@ async def main() -> None:
     settings = KeeperSettings()
 
     metabolism = None
+    nc = None
+    sub = None
     try:
         # 1. Initialize Metabolism
         metabolism = BeeMetabolism(settings)
@@ -61,6 +63,18 @@ async def main() -> None:
         sys.exit(1)
     finally:
         # Cleanup
+        if sub:
+            try:
+                await sub.unsubscribe()
+                logger.info("nats_unsubscribed")
+            except Exception:
+                pass
+        if nc:
+            try:
+                await nc.close()
+                logger.info("nats_connection_closed")
+            except Exception:
+                pass
         if metabolism and metabolism.connector:
             await metabolism.connector.close()
 
