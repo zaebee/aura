@@ -128,6 +128,10 @@ run-gateway: $(PROTO_SENTINEL)
 	# Run API Gateway
 	PYTHONPATH=$(GATEWAY_PATH):$(DNA_PATH) uv run uvicorn main:app --host 0.0.0.0 --port 8000 --app-dir api-gateway/src
 
+run-keeper: $(PROTO_SENTINEL)
+	# Run Bee keepeer
+	PYTHONPATH=$(KEEPER_PATH):$(DNA_PATH) uv run python agents/bee-keeper/main.py
+
 prepare-bun:
 	# Install frontend dependencies via bun
 	cd frontend && bun install

@@ -177,8 +177,8 @@ class BeeAggregator(Aggregator[Any, Context]):
                 kwargs: dict[str, Any] = {
                     "model": model,
                     "messages": [{"role": "user", "content": "ping"}],
-                    "max_tokens": 5,
-                    "timeout": 10.0,
+                    "max_tokens": 50,
+                    "timeout": 30.0,
                     "api_key": self.settings.llm__api_key,
                 }
 
