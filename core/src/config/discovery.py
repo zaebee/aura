@@ -13,3 +13,9 @@ class DiscoverySettings(BaseSettings):
         SecretStr(""),
         validation_alias=AliasChoices("AURA_DISCOVERY__GITHUB_TOKEN", "GITHUB_TOKEN"),
     )
+    scan_repo_limit: int = Field(
+        5, description="Maximum number of repositories to scan."
+    )
+    proposal_compatibility_threshold: float = Field(
+        0.7, description="Minimum compatibility score to generate a symbiotic proposal."
+    )

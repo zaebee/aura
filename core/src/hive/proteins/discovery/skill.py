@@ -1,7 +1,7 @@
-import logging
 from typing import Any
 
 import dspy
+import structlog
 from aura_core import SkillProtocol, get_raw_key, make_struct
 from aura_core_gen.aura.core.v1 import DiscoveryObservation, Observation, XenoEntity
 from github import Github
@@ -16,7 +16,7 @@ from .engine import (
 )
 from .schema import AnalysisParams, FirstContactParams, ScanParams, SequenceParams
 
-logger = logging.getLogger(__name__)
+logger = structlog.get_logger(__name__)
 
 
 class DiscoverySkill(
@@ -75,11 +75,13 @@ class DiscoverySkill(
             return Observation(success=False, error=str(e))
 
     async def _scan_github(self, params: dict[str, Any]) -> Observation:
-        if not self.github_client:
-            return Observation(success=False, error="github_client_not_ready")
+        if not self.github_client or not self.settings:
+            return Observation(success=False, error="discovery_not_ready")
 
         p = ScanParams(**params)
-        results = await scan_github(p.query, self.github_client)
+        results = await scan_github(
+            p.query, self.github_client, limit=self.settings.scan_repo_limit
+        )
         return Observation(
             success=True, metadata=make_struct({"repositories": results})
         )
@@ -104,13 +106,15 @@ class DiscoverySkill(
         Full Loop: Scan -> Sequence -> Analyze -> Propose (Optional)
         Returns a DiscoveryObservation with XenoEntity objects.
         """
-        if not self.github_client:
-            return Observation(success=False, error="github_client_not_ready")
+        if not self.github_client or not self.settings:
+            return Observation(success=False, error="discovery_not_ready")
 
         p = FirstContactParams(**params)
 
         # 1. Scan
-        repos = await scan_github(p.query, self.github_client)
+        repos = await scan_github(
+            p.query, self.github_client, limit=self.settings.scan_repo_limit
+        )
 
         entities = []
         contact_meta = []  # For backward compatibility in metadata if needed
@@ -133,7 +137,10 @@ class DiscoverySkill(
 
             # 5. Generate proposal if highly compatible
             proposal = ""
-            if analysis.get("compatibility_score", 0) > 0.7:
+            if (
+                analysis.get("compatibility_score", 0.0)
+                > self.settings.proposal_compatibility_threshold
+            ):
                 proposal = await generate_proposal(context, analysis)
 
             contact_meta.append(

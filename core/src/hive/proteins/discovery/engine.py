@@ -1,9 +1,10 @@
+import asyncio
 import re
 from typing import Any, cast
 
 import dspy
 import structlog
-from github import Github
+from github import Github, UnknownObjectException
 from github.ContentFile import ContentFile
 from github.Repository import Repository
 
@@ -60,14 +61,19 @@ class GenerateSymbioticProposal(dspy.Signature):
 # --- Engine Logic ---
 
 
-async def scan_github(query: str, github_client: Github) -> list[dict[str, Any]]:
+async def scan_github(
+    query: str, github_client: Github, limit: int = 5
+) -> list[dict[str, Any]]:
     """Search for repositories on GitHub."""
-    logger.info("scanning_github", query=query)
-    repos = github_client.search_repositories(query=query)
+    logger.info("scanning_github", query=query, limit=limit)
+    # search_repositories is a synchronous I/O call, offload to a thread
+    repos = await asyncio.to_thread(github_client.search_repositories, query=query)
     results: list[dict[str, Any]] = []
-    # Limit to top 5 for efficiency
+
     repo: Repository
-    for repo in repos[:5]:
+    for i, repo in enumerate(repos):
+        if i >= limit:
+            break
         results.append(
             {
                 "name": repo.full_name,
@@ -93,8 +99,10 @@ async def sequence_genome(repo_url: str, github_client: Github) -> str:
         context_parts.append(
             f"--- README ---\n{readme.decoded_content.decode('utf-8')[:2000]}"
         )
-    except Exception:
+    except UnknownObjectException:
         logger.warning("readme_not_found", repo=repo_name)
+    except Exception as e:
+        logger.error("readme_fetch_failed", repo=repo_name, error=str(e))
 
     # 2. Scan Metabolic Requirements (Dependencies)
     for dep_file in ["pyproject.toml", "go.mod", "package.json", "requirements.txt"]:
@@ -105,7 +113,7 @@ async def sequence_genome(repo_url: str, github_client: Github) -> str:
             context_parts.append(
                 f"--- METABOLIC REQUIREMENTS ({dep_file}) ---\n{content.decoded_content.decode('utf-8')[:1000]}"
             )
-        except Exception:  # nosec B110
+        except (UnknownObjectException, Exception):  # nosec B110
             pass
 
     # 3. Scan Nervous System (Interfaces)
@@ -144,7 +152,7 @@ async def sequence_genome(repo_url: str, github_client: Github) -> str:
             context_parts.append(
                 f"--- ORGANISM STRUCTURE (docker-compose.yml) ---\n{docker_compose.decoded_content.decode('utf-8')[:1000]}"
             )
-    except Exception:  # nosec B110
+    except (UnknownObjectException, Exception):  # nosec B110
         pass
 
     return "\n\n".join(context_parts)
