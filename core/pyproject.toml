@@ -37,6 +37,8 @@ dependencies = [
     "redis>=5.0.0",
     "aura-core",
     "betterproto>=2.0.0b7",
+    "fuzzywuzzy>=0.18.0",
+    "python-levenshtein>=0.27.3",
 ]
 
 [tool.uv.sources]

@@ -16,8 +16,12 @@ from aura_core_gen.aura.core.v1 import (
     Intent,
     NegotiationIntent,
 )
+from fuzzywuzzy import fuzz  # type: ignore
 
 logger = structlog.get_logger(__name__)
+
+# Golden Ratio constant for decision threshold
+GOLDEN_RATIO = 0.618
 
 
 def _get_hive(context: Context) -> Any:
@@ -120,6 +124,52 @@ class AuraTransformer(Transformer[Context, Intent]):
             return float(vitals.get("cpu_usage_percent", 0.0))
         return 0.0
 
+    def _calculate_confidence_vector(
+        self, action_str: str
+    ) -> tuple[dict[str, float], float]:
+        """Calculate confidence vector using fuzzy string matching"""
+        # Define all possible actions and their variants
+        action_variants = {
+            "accept": ["accept", "accept-deal", "action_type_accept"],
+            "counter": [
+                "counter",
+                "counteroffer",
+                "counter-offer",
+                "action_type_counter",
+            ],
+            "reject": ["reject", "reject-offer", "action_type_reject"],
+            "approve": ["approve", "action_type_approve"],
+            "cancel": ["cancel", "action_type_cancel"],
+            "update": ["update", "action_type_update"],
+            "evaluate": ["evaluate", "action_type_evaluate"],
+            "error": ["error", "action_type_error"],
+            "ui_required": ["ui_required", "ui-required", "ui_required"],
+        }
+
+        # Calculate confidence scores for each action category
+        confidence_scores = {}
+        for action, variants in action_variants.items():
+            max_score = max(
+                fuzz.ratio(action_str.lower(), variant.lower()) for variant in variants
+            )
+            confidence_scores[action] = max_score / 100.0  # Normalize to 0-1 range
+
+        max_confidence = max(confidence_scores.values()) if confidence_scores else 0.0
+        return confidence_scores, max_confidence
+
+    def _map_confident_action(self, action_str: str) -> ActionType:
+        """Map action string to ActionType with confidence-based fallback"""
+        # Use the existing map_action function but with better error handling
+        try:
+            return map_action(action_str)
+        except Exception:
+            # Fallback mapping for our extended actions
+            if action_str.lower() in ["ui_required", "ui-required"]:
+                # ACTION_TYPE_UI_REQUIRED is in dna.proto, need to handle this
+                # For now, use EVALUATE as surrogate since UI_REQUIRED isn't in core ActionType
+                return cast(ActionType, ActionType.ACTION_TYPE_EVALUATE)
+            return cast(ActionType, ActionType.ACTION_TYPE_UNSPECIFIED)
+
     def _build_economic_context(self, context: Context) -> dict[str, Any]:
         metadata = context.metadata.to_dict()
         cpu_load = self._get_cpu_load(metadata)
@@ -211,17 +261,67 @@ class AuraTransformer(Transformer[Context, Intent]):
             raw_thought = raw_result.get("thought", action_data.get("thought", ""))
             wrapped_thought = f"<think>\n{raw_thought}\n</think>" if raw_thought else ""
 
+            # φ-Decider: Calculate confidence vector for action mapping
+            raw_action = str(action_data.get("action", ""))
+            confidence_vector, max_confidence = self._calculate_confidence_vector(
+                raw_action
+            )
+
+            # Golden Ratio decision threshold
+            if max_confidence < GOLDEN_RATIO:
+                # Fallback to UI_REQUIRED with confidence information
+                logger.warning(
+                    "action_confidence_below_golden_ratio",
+                    action=raw_action,
+                    max_confidence=max_confidence,
+                    confidence_vector=confidence_vector,
+                )
+
+                # Find the most likely action for the UI prompt
+                most_likely_action = max(confidence_vector.items(), key=lambda x: x[1])[
+                    0
+                ]
+
+                # Use EVALUATE as surrogate for UI_REQUIRED (since UI_REQUIRED is in dna.proto)
+                return Intent(
+                    action=cast(ActionType, ActionType.ACTION_TYPE_EVALUATE),
+                    reasoning=f"<think>Uncertain action '{raw_action}'. Did you mean '{most_likely_action}'?</think>",
+                    metadata=make_struct(
+                        {
+                            "confidence_vector": confidence_vector,
+                            "suggested_action": most_likely_action,
+                            "raw_action": raw_action,
+                            "max_confidence": max_confidence,
+                            "brain_path": self.brain_path,
+                        }
+                    ),
+                    negotiation=NegotiationIntent(
+                        price=float(action_data.get("price", 0.0)),
+                        message=f"I sense uncertainty about '{raw_action}'. Did you mean '{most_likely_action}'?",
+                        thought=str(raw_thought),
+                    ),
+                )
+
+            # Use the most confident action
+            most_confident_action = max(confidence_vector.items(), key=lambda x: x[1])[
+                0
+            ]
+            mapped_action = self._map_confident_action(most_confident_action)
+
             action_metadata = {
                 **{
                     k: str(v)
                     for k, v in raw_result.items()
                     if k not in ["action", "price", "message", "thought"]
                 },
+                "confidence_vector": confidence_vector,
+                "max_confidence": max_confidence,
+                "resolved_action": most_confident_action,
                 "brain_path": self.brain_path,
             }
 
             return Intent(
-                action=cast(ActionType, map_action(str(action_data.get("action", "")))),
+                action=mapped_action,
                 reasoning=wrapped_thought,
                 metadata=make_struct(action_metadata),
                 negotiation=NegotiationIntent(

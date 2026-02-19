@@ -10,17 +10,40 @@ Channels:
 - Outbound: NATS reply inbox        (observation back to synapse)
 """
 
-from typing import TYPE_CHECKING, Any
+import json
+from datetime import datetime
+from typing import TYPE_CHECKING, Any, cast
 
 import nats
 import nats.errors
 import structlog
-from aura_core_gen.aura.core.v1 import Observation
+from aura_core_gen.aura.core.v1 import Observation, Signal
 
 if TYPE_CHECKING:
     from nats.aio.msg import Msg
 
 logger = structlog.get_logger("nats_gateway")
+
+
+class EvolutionaryEvent:
+    """Track mutation attempts for BeeKeeper analysis"""
+
+    def __init__(
+        self, original_error: str, mutation_attempts: list[str], success: bool
+    ):
+        self.original_error = original_error
+        self.mutation_attempts = mutation_attempts
+        self.success = success
+        self.timestamp = datetime.now().isoformat()
+
+    def to_dict(self) -> dict:
+        return {
+            "original_error": self.original_error,
+            "mutation_attempts": self.mutation_attempts,
+            "success": self.success,
+            "timestamp": self.timestamp,
+        }
+
 
 # Queue group for load balancing across core instances
 QUEUE_GROUP = "core-signal-processor"
@@ -74,7 +97,9 @@ class NatsSignalGateway:
             return False
 
     async def _on_signal(self, msg: "Msg") -> None:
-        """Handle an incoming signal from a synapse."""
+        """Handle an incoming signal from a synapse with somatic hypermutation."""
+        evolutionary_event = None
+
         try:
             logger.debug(
                 "gateway_received_signal",
@@ -83,8 +108,21 @@ class NatsSignalGateway:
             )
 
             # 1. Feed raw signal bytes into MetabolicLoop
-            #    The aggregator detects bytes and parses them as a proto Signal.
-            observation = await self.metabolism.execute(msg.data, is_nats=True)
+            try:
+                observation = await self.metabolism.execute(msg.data, is_nats=True)
+            except Exception as e:
+                # Somatic Hypermutation: Attempt to heal the signal
+                logger.warning(
+                    "signal_parse_error_triggering_mutation",
+                    error=str(e),
+                    subject=msg.subject,
+                )
+                observation = await self._attempt_signal_mutation(msg.data, str(e))
+                evolutionary_event = EvolutionaryEvent(
+                    str(e),
+                    ["initial_parse_failed", "mutation_attempted"],
+                    observation.success,
+                )
 
             # 2. Reply with serialized proto Observation
             if msg.reply:
@@ -120,6 +158,182 @@ class NatsSignalGateway:
                         "failed_to_send_error_reply",
                         error=str(reply_err),
                     )
+
+        # Log evolutionary event for BeeKeeper analysis
+        if evolutionary_event:
+            logger.info(
+                "evolutionary_event_recorded", event=evolutionary_event.to_dict()
+            )
+            # In a real implementation, this would be sent to BeeKeeper for analysis
+
+    async def _attempt_signal_mutation(
+        self, signal_data: bytes, original_error: str
+    ) -> Observation:
+        """Attempt to heal malformed signals through mutation strategies"""
+        mutation_attempts = []
+
+        strategies = [
+            self._try_utf8_fallback,
+            self._try_json_parsing,
+            self._try_raw_text_wrapping,
+            self._try_proto_field_stripping,
+        ]
+
+        for strategy in strategies:
+            try:
+                mutation_attempts.append(strategy.__name__)
+                result = await strategy(signal_data, original_error)
+                if result.success:
+                    logger.debug(
+                        "mutation_strategy_succeeded",
+                        strategy=strategy.__name__,
+                        attempts=len(mutation_attempts),
+                    )
+                    return result
+            except Exception as e:
+                mutation_attempts.append(f"{strategy.__name__}_failed: {str(e)}")
+                continue
+
+        # All strategies failed
+        return Observation(
+            success=False,
+            error=f"All mutation strategies failed. Original: {original_error}",
+            event_type="mutation_failure",
+        )
+
+    async def _try_utf8_fallback(
+        self, signal_data: bytes, original_error: str
+    ) -> Observation:
+        """Try to decode as UTF-8 and re-encode"""
+        try:
+            text = signal_data.decode("utf-8")
+            # Try to parse as JSON first
+            try:
+                json_data = json.loads(text)
+                if "signal" in json_data:
+                    # Wrap in proper Signal structure
+                    signal = Signal()
+                    signal.signal_id = json_data.get("signal_id", "json_signal")
+                    if "negotiation" in json_data:
+                        from aura_core_gen.aura.core.v1 import NegotiationSignal
+
+                        negotiation_data = json_data["negotiation"]
+                        signal.negotiation = NegotiationSignal(
+                            item_identifier=negotiation_data.get(
+                                "item_identifier", "unknown"
+                            ),
+                            item_domain=negotiation_data.get("item_domain", "unknown"),
+                            bid_amount=float(negotiation_data.get("bid_amount", 0.0)),
+                        )
+                    return cast(
+                        Observation,
+                        await self.metabolism.execute(signal, is_nats=False),
+                    )
+            except json.JSONDecodeError:
+                pass
+
+            # Fallback: treat as raw text signal
+            signal = Signal()
+            signal.signal_id = "mutated_" + str(hash(text))
+            # Create a minimal negotiation signal
+            from aura_core_gen.aura.core.v1 import NegotiationSignal
+
+            signal.negotiation = NegotiationSignal(
+                item_identifier=text[:100]
+            )  # Truncate if too long
+            return cast(
+                Observation, await self.metabolism.execute(signal, is_nats=False)
+            )
+
+        except Exception as e:
+            raise ValueError(f"UTF-8 mutation failed: {e}") from e
+
+    async def _try_json_parsing(
+        self, signal_data: bytes, original_error: str
+    ) -> Observation:
+        """Try to parse as JSON and convert to proto"""
+        try:
+            text = signal_data.decode("utf-8", errors="replace")
+            json_data = json.loads(text)
+
+            # Convert JSON to Signal proto
+            signal = Signal()
+            signal.signal_id = json_data.get("signal_id", "mutated_json")
+
+            # Handle different signal types
+            if "negotiation" in json_data:
+                from aura_core_gen.aura.core.v1 import NegotiationSignal
+
+                negotiation_data = json_data["negotiation"]
+                signal.negotiation = NegotiationSignal(
+                    item_identifier=negotiation_data.get("item_identifier", "unknown"),
+                    item_domain=negotiation_data.get("item_domain", "unknown"),
+                    bid_amount=float(negotiation_data.get("bid_amount", 0.0)),
+                )
+
+            return cast(
+                Observation, await self.metabolism.execute(signal, is_nats=False)
+            )
+
+        except Exception as e:
+            raise ValueError(f"JSON mutation failed: {e}") from e
+
+    async def _try_raw_text_wrapping(
+        self, signal_data: bytes, original_error: str
+    ) -> Observation:
+        """Wrap raw text in a minimal signal structure"""
+        try:
+            text = signal_data.decode("utf-8", errors="replace")
+
+            # Create minimal signal with text as item identifier
+            from aura_core_gen.aura.core.v1 import NegotiationSignal
+
+            signal = Signal()
+            signal.signal_id = f"text_wrapped_{hash(text)}"
+            signal.negotiation = NegotiationSignal(
+                item_identifier=text[:255],  # Limit length
+                item_domain="raw_text",
+                bid_amount=0.0,
+            )
+
+            return cast(
+                Observation, await self.metabolism.execute(signal, is_nats=False)
+            )
+
+        except Exception as e:
+            raise ValueError(f"Raw text wrapping failed: {e}") from e
+
+    async def _try_proto_field_stripping(
+        self, signal_data: bytes, original_error: str
+    ) -> Observation:
+        """Try to parse proto but strip problematic fields"""
+        try:
+            # Try to parse the original signal but catch field errors
+            signal = Signal()
+
+            # Try partial parsing by reading raw bytes
+            try:
+                # betterproto uses parse() instead of ParseFromString
+                signal.parse(signal_data)
+                return cast(
+                    Observation, await self.metabolism.execute(signal, is_nats=False)
+                )
+            except Exception:
+                # If parsing fails, try to create minimal signal
+                signal.signal_id = f"stripped_{hash(signal_data)}"
+                from aura_core_gen.aura.core.v1 import NegotiationSignal
+
+                signal.negotiation = NegotiationSignal(
+                    item_identifier=f"recovered_{hash(signal_data)}",
+                    item_domain="recovered",
+                    bid_amount=0.0,
+                )
+                return cast(
+                    Observation, await self.metabolism.execute(signal, is_nats=False)
+                )
+
+        except Exception as e:
+            raise ValueError(f"Proto field stripping failed: {e}") from e
 
     async def stop(self) -> None:
         """Unsubscribe and close NATS connection."""
