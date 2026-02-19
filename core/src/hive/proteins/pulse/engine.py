@@ -212,7 +212,10 @@ class JetStreamProvider:
             logger.debug(f"Published alert: seq={ack.seq}")
 
             # Duplicate to error topic if severity is high
-            if event.alert.severity in [Severity.SEVERITY_ERROR, Severity.SEVERITY_CRITICAL]:
+            if event.alert.severity in [
+                Severity.SEVERITY_ERROR,
+                Severity.SEVERITY_CRITICAL,
+            ]:
                 error_topic = "aura.hive.events.error"
                 await self.js.publish(error_topic, binary_data)
                 logger.debug(f"Duplicated error alert to {error_topic}")

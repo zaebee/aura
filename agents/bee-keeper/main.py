@@ -34,9 +34,7 @@ async def main() -> None:
 
         # 1.5 Sanity Check: Test Brain Connectivity
         if not await metabolism.aggregator.test_brain_connectivity():
-            logger.error(
-                "Brain connectivity test failed. Check AURA_LLM__API_KEY."
-            )
+            logger.error("Brain connectivity test failed. Check AURA_LLM__API_KEY.")
             # We don't exit here to allow for intermittent connectivity
             # sys.exit(1)
 
@@ -67,13 +65,13 @@ async def main() -> None:
             try:
                 await sub.unsubscribe()
                 logger.info("nats_unsubscribed")
-            except Exception as e:
+            except Exception as e:  # nosec B110
                 logger.warning("nats_unsubscribe_failed", error=str(e))
         if nc:
             try:
                 await nc.close()
                 logger.info("nats_connection_closed")
-            except Exception as e:
+            except Exception as e:  # nosec B110
                 logger.warning("nats_close_failed", error=str(e))
         if metabolism and metabolism.connector:
             await metabolism.connector.close()

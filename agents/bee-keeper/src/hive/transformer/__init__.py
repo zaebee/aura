@@ -33,9 +33,7 @@ class BeeTransformer(Transformer[Context, AuditObservation]):
         self.model = settings.llm__model
         litellm.api_key = settings.llm__api_key
         self.lm = dspy.LM(
-            f"openai/{self.model}",
-            api_key=self.settings.llm__api_key,
-            cache=False
+            f"openai/{self.model}", api_key=self.settings.llm__api_key, cache=False
         )
         root = find_hive_root()
 
@@ -62,7 +60,9 @@ class BeeTransformer(Transformer[Context, AuditObservation]):
         meta = context.metadata.to_dict()
         vitals = cast(dict[str, Any], meta.get("vitals", {}))
         logs = meta.get("recent_logs", "")
-        error_log = context.bee.git_diff  # We repurposed git_diff for error in aggregator
+        error_log = (
+            context.bee.git_diff
+        )  # We repurposed git_diff for error in aggregator
 
         system_context = f"Vitals: {json.dumps(vitals)}\nRecent Logs:\n{logs}"
 
@@ -87,7 +87,9 @@ class BeeTransformer(Transformer[Context, AuditObservation]):
             metadata=make_struct(metadata),
         )
 
-    async def _diagnose(self, error_log: str, system_context: str) -> tuple[str, str, int]:
+    async def _diagnose(
+        self, error_log: str, system_context: str
+    ) -> tuple[str, str, int]:
         """Use DSPy to diagnose the error."""
         with dspy.context(lm=self.lm):
             predictor = dspy.Predict(DiagnoseError)
@@ -97,7 +99,9 @@ class BeeTransformer(Transformer[Context, AuditObservation]):
                 tokens = 0
                 if hasattr(self.lm, "history") and self.lm.history:
                     last_query = self.lm.history[-1]
-                    if "response" in last_query and hasattr(last_query["response"], "usage"):
+                    if "response" in last_query and hasattr(
+                        last_query["response"], "usage"
+                    ):
                         tokens = last_query["response"].usage.total_tokens
 
                 return result.diagnosis, result.fix_suggestion, tokens

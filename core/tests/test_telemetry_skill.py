@@ -16,12 +16,14 @@ async def test_telemetry_skill_initialize():
     assert success is True
     assert skill.settings == settings
 
+
 @pytest.mark.asyncio
 async def test_telemetry_skill_health_check():
     skill = TelemetrySkill()
     obs = await skill.execute("health_check", {})
     assert obs.success is True
     assert obs.metadata.to_dict()["status"] == "healthy"
+
 
 @pytest.mark.asyncio
 async def test_telemetry_skill_increment_counter():
@@ -32,13 +34,20 @@ async def test_telemetry_skill_increment_counter():
     )
     assert obs.success is True
 
+
 @pytest.mark.asyncio
 @patch("hive.proteins.telemetry.engine.httpx.AsyncClient")
 async def test_telemetry_skill_query_loki(mock_client_class):
     mock_client = AsyncMock()
-    mock_response = httpx.Response(200, json={
-        "data": {"result": [{"stream": {"job": "test"}, "values": [["123", "log line"]]}]}
-    }, request=httpx.Request("GET", "http://loki"))
+    mock_response = httpx.Response(
+        200,
+        json={
+            "data": {
+                "result": [{"stream": {"job": "test"}, "values": [["123", "log line"]]}]
+            }
+        },
+        request=httpx.Request("GET", "http://loki"),
+    )
     mock_client.get.return_value = mock_response
     mock_client_class.return_value.__aenter__.return_value = mock_client
 
@@ -52,14 +61,16 @@ async def test_telemetry_skill_query_loki(mock_client_class):
     assert len(results) == 1
     assert results[0]["stream"]["job"] == "test"
 
+
 @pytest.mark.asyncio
 @patch("hive.proteins.telemetry.engine.httpx.AsyncClient")
 async def test_telemetry_skill_health_check_k8s(mock_client_class):
     mock_client = AsyncMock()
-    mock_response = httpx.Response(200, json={
-        "status": "success",
-        "data": {"result": [{"value": [0, "0"]}]}
-    }, request=httpx.Request("GET", "http://prometheus"))
+    mock_response = httpx.Response(
+        200,
+        json={"status": "success", "data": {"result": [{"value": [0, "0"]}]}},
+        request=httpx.Request("GET", "http://prometheus"),
+    )
     mock_client.get.return_value = mock_response
     mock_client_class.return_value.__aenter__.return_value = mock_client
 

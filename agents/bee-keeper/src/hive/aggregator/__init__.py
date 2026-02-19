@@ -91,7 +91,9 @@ class BeeAggregator(Aggregator[Any, Context]):
     async def _get_vitals_summary(self) -> dict[str, Any]:
         """Fetch current CPU/Mem and Pod health."""
         cpu_q = 'avg(rate(container_cpu_usage_seconds_total{namespace="default"}[5m])) * 100'
-        mem_q = 'avg(container_memory_working_set_bytes{namespace="default"}) / 1024 / 1024'
+        mem_q = (
+            'avg(container_memory_working_set_bytes{namespace="default"}) / 1024 / 1024'
+        )
         pod_q = 'count(kube_pod_status_phase{namespace="default", phase!="Running"} > 0) or vector(0)'
 
         vitals = {"cpu": 0.0, "memory": 0.0, "unhealthy_pods": 0}
@@ -99,13 +101,16 @@ class BeeAggregator(Aggregator[Any, Context]):
             async with httpx.AsyncClient(timeout=5.0) as client:
                 resps = await asyncio.gather(
                     client.get(
-                        f"{self.settings.prometheus_url}/api/v1/query", params={"query": cpu_q}
+                        f"{self.settings.prometheus_url}/api/v1/query",
+                        params={"query": cpu_q},
                     ),
                     client.get(
-                        f"{self.settings.prometheus_url}/api/v1/query", params={"query": mem_q}
+                        f"{self.settings.prometheus_url}/api/v1/query",
+                        params={"query": mem_q},
                     ),
                     client.get(
-                        f"{self.settings.prometheus_url}/api/v1/query", params={"query": pod_q}
+                        f"{self.settings.prometheus_url}/api/v1/query",
+                        params={"query": pod_q},
                     ),
                     return_exceptions=True,
                 )

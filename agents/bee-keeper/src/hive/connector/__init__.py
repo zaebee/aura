@@ -54,7 +54,7 @@ class BeeConnector(Connector[AuditObservation, BeeObservation, Context]):
         self._http_client = httpx.AsyncClient(timeout=30.0)
 
         self.gh = None
-        if self.github_token and self.github_token != "mock":  # nosec
+        if self.github_token and self.github_token != "mock":  # nosec B105
             self.gh = VCS_Skill()
             self.gh.bind(settings, self._http_client)
 
@@ -77,7 +77,7 @@ class BeeConnector(Connector[AuditObservation, BeeObservation, Context]):
         # 2. Post to GitHub (Legacy, but we keep it if configured)
         comment_url = ""
         injuries: list[str] = []
-        if self.gh and self.settings.github_token != "mock":  # nosec
+        if self.gh and self.settings.github_token != "mock":  # nosec B105
             comment_url = await self._post_to_github(report, context)
 
         return BeeObservation(
@@ -108,12 +108,14 @@ class BeeConnector(Connector[AuditObservation, BeeObservation, Context]):
                     action=cast(ActionType, ActionType.ACTION_TYPE_UPDATE),
                     price=0.0,
                 ),
-                metadata=make_struct({
-                    "chat_id": str(self.settings.admin_chat_id),
-                    "diagnosis": report.narrative,
-                    "fix_suggestion": report.reasoning,
-                    "source": "bee-keeper",
-                })
+                metadata=make_struct(
+                    {
+                        "chat_id": str(self.settings.admin_chat_id),
+                        "diagnosis": report.narrative,
+                        "fix_suggestion": report.reasoning,
+                        "source": "bee-keeper",
+                    }
+                ),
             )
 
             await js.publish(event.topic, bytes(event))
