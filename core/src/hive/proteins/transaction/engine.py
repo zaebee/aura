@@ -6,8 +6,10 @@ from urllib.parse import quote
 
 import httpx
 from cryptography.fernet import Fernet, InvalidToken
+from eth_account import Account
 from solders.keypair import Keypair  # type: ignore
 from solders.pubkey import Pubkey  # type: ignore
+from web3 import AsyncWeb3
 
 logger = logging.getLogger(__name__)
 
@@ -219,3 +221,57 @@ class SolanaProvider:
 
     async def close(self) -> None:
         await self.client.aclose()
+
+
+# --- EVM Provider Logic ---
+
+
+class EVMProvider:
+    def __init__(self, private_key_hex: str, rpc_url: str, usdc_address: str):
+        self.account = Account.from_key(private_key_hex)
+        self.w3 = AsyncWeb3(AsyncWeb3.AsyncHTTPProvider(rpc_url))
+        self.usdc_address = self.w3.to_checksum_address(usdc_address)
+        # Minimal ERC20 ABI for transfer
+        self.usdc_abi = [
+            {
+                "constant": False,
+                "inputs": [
+                    {"name": "_to", "type": "address"},
+                    {"name": "_value", "type": "uint256"},
+                ],
+                "name": "transfer",
+                "outputs": [{"name": "", "type": "bool"}],
+                "type": "function",
+            }
+        ]
+
+    async def transfer_usdc(self, to_address: str, amount: float) -> str:
+        """Transfer USDC on EVM (Base Sepolia)."""
+        to_address = self.w3.to_checksum_address(to_address)
+        contract = self.w3.eth.contract(address=self.usdc_address, abi=self.usdc_abi)
+
+        # USDC usually has 6 decimals
+        value = int(Decimal(str(amount)) * Decimal("1e6"))
+
+        nonce = await self.w3.eth.get_transaction_count(self.account.address)
+        gas_price = await self.w3.eth.gas_price
+        chain_id = await self.w3.eth.chain_id
+
+        # Build transaction
+        tx = await contract.functions.transfer(to_address, value).build_transaction(
+            {
+                "chainId": chain_id,
+                "gas": 100000,  # Approximate for ERC20 transfer
+                "gasPrice": gas_price,
+                "nonce": nonce,
+            }
+        )
+
+        # Sign and send
+        signed_tx = self.account.sign_transaction(tx)
+        tx_hash = await self.w3.eth.send_raw_transaction(signed_tx.raw_transaction)
+        return tx_hash.hex()
+
+    async def close(self) -> None:
+        # AsyncWeb3 doesn't strictly need close for HTTP provider, but good practice
+        pass

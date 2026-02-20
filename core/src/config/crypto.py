@@ -19,6 +19,11 @@ class CryptoSettings(BaseModel):
         "Gh9ZwEmdLJ8DscKNTkTqPbNwLNNBjuSzaG9Vp2KGtKJr"  # Devnet USDC
     )
 
+    # EVM Configuration (Base Sepolia)
+    evm_private_key: SecretStr = SecretStr("")  # Hex-encoded private key
+    evm_rpc_url: HttpUrl = "https://sepolia.base.org"  # type: ignore
+    evm_usdc_address: str = "0x036CbD53842c5426634e7929541eC2318f3dCF7e"
+
     wallet_address: str = ""
 
     # Deal Expiration
@@ -48,8 +53,6 @@ class CryptoSettings(BaseModel):
                 )
             if self.currency not in ["SOL", "USDC"]:
                 raise ValueError("AURA_CRYPTO__CURRENCY must be 'SOL' or 'USDC'")
-            if self.provider not in ["solana"]:
-                raise ValueError(
-                    "AURA_CRYPTO__PROVIDER must be 'solana' (ethereum support coming soon)"
-                )
+            if self.provider not in ["solana", "evm"]:
+                raise ValueError("AURA_CRYPTO__PROVIDER must be 'solana' or 'evm'")
         return self

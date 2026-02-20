@@ -12,6 +12,7 @@ syntax = "proto3";
 package aura.core.v1;
 
 import "aura/core/v1/base.proto";
+import "aura/core/v1/external_data.proto";
 import "google/protobuf/timestamp.proto";
 import "google/protobuf/any.proto";
 import "google/protobuf/struct.proto";
@@ -257,6 +258,7 @@ message Observation {
     AssetObservation asset = 14;  // Generic asset observation (decoupled)
     SearchObservation search = 15;
     DiscoveryObservation discovery = 16;
+    BlockchainDiscoveryResult blockchain_discovery = 17;
   }
 }
 
