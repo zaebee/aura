@@ -14,10 +14,9 @@ class GoldRushSkill(SkillProtocol[Any, dict[str, Any], dict[str, Any], Observati
     """
 
     def __init__(self) -> None:
-        self.settings = None
+        self.settings: Any = None
         self.registry: Any = None
         self.endpoints: dict[str, str] = {}  # Map operationId to path
-        self.base_url = "https://x402.goldrush.dev/v1"
         self._capabilities = {
             "fetch": self._fetch,
             "discover_endpoints": self._discover_endpoints,
@@ -51,26 +50,27 @@ class GoldRushSkill(SkillProtocol[Any, dict[str, Any], dict[str, Any], Observati
             return Observation(success=False, error=str(e))
 
     async def _discover_endpoints(self, params: dict[str, Any]) -> Observation:
-        """Parses https://goldrush.dev/llms.txt for automatic mapping."""
+        """Parses GoldRush llms.txt for automatic mapping."""
+        discovery_url = str(
+            getattr(self.settings, "discovery_url", "https://goldrush.dev/llms.txt")
+        )
         try:
             async with httpx.AsyncClient() as client:
-                resp = await client.get("https://goldrush.dev/llms.txt")
-                if resp.status_code == 200:
-                    lines = resp.text.split("\n")
-                    current_op = None
-                    for line in lines:
-                        if "Operation ID:" in line:
-                            current_op = line.split("Operation ID:")[1].strip()
-                        elif "Endpoint Path:" in line and current_op:
-                            path = line.split("Endpoint Path:")[1].strip()
-                            # Clean up path (remove leading /v1 if it starts with it)
-                            if path.startswith("/v1"):
-                                path = path[3:]
-                            self.endpoints[current_op] = path
-                            current_op = None
-                    logger.info(
-                        "goldrush_discovery_complete", count=len(self.endpoints)
-                    )
+                resp = await client.get(discovery_url)
+                resp.raise_for_status()
+                lines = resp.text.split("\n")
+                current_op = None
+                for line in lines:
+                    if "Operation ID:" in line:
+                        current_op = line.split("Operation ID:")[1].strip()
+                    elif "Endpoint Path:" in line and current_op:
+                        path = line.split("Endpoint Path:")[1].strip()
+                        # Clean up path (remove leading /v1 if it starts with it)
+                        if path.startswith("/v1"):
+                            path = path[3:]
+                        self.endpoints[current_op] = path
+                        current_op = None
+                logger.info("goldrush_discovery_complete", count=len(self.endpoints))
             return Observation(success=True)
         except Exception as e:
             logger.error(f"GoldRush discovery failed: {e}")
@@ -89,7 +89,10 @@ class GoldRushSkill(SkillProtocol[Any, dict[str, Any], dict[str, Any], Observati
             )
 
         # Format path (e.g. /v1/{chainName}/address/{walletAddress}/balances_v2/)
-        url = f"{self.base_url}{path.format(**path_params)}"
+        base_url = str(
+            getattr(self.settings, "base_url", "https://x402.goldrush.dev/v1")
+        )
+        url = f"{base_url}{path.format(**path_params)}"
 
         async with httpx.AsyncClient() as client:
             # 1. Initial attempt
@@ -115,8 +118,22 @@ class GoldRushSkill(SkillProtocol[Any, dict[str, Any], dict[str, Any], Observati
                         instr[k.strip()] = v.strip()
 
                 recipient = instr.get("recipient")
-                amount = float(instr.get("amount", 0.05))
-                network = instr.get("network", "base-sepolia")
+                amount_str = instr.get("amount")
+                network = instr.get("network")
+
+                if not all((recipient, amount_str, network)):
+                    return Observation(
+                        success=False,
+                        error="Incomplete payment instructions in X-Payment-Instructions header.",
+                    )
+
+                try:
+                    amount = float(amount_str)  # type: ignore
+                except (ValueError, TypeError):
+                    return Observation(
+                        success=False,
+                        error=f"Invalid amount in X-Payment-Instructions header: {amount_str}",
+                    )
 
                 # 3. Pay via TransactionSkill
                 if not self.registry:
@@ -146,6 +163,11 @@ class GoldRushSkill(SkillProtocol[Any, dict[str, Any], dict[str, Any], Observati
                     )
 
                 tx_hash = pay_obs.metadata.to_dict().get("transaction_hash")
+                if not tx_hash:
+                    return Observation(
+                        success=False,
+                        error=f"Payment observation missing transaction_hash: {pay_obs.error}",
+                    )
                 logger.info("goldrush_payment_confirmed", tx_hash=tx_hash)
 
                 # Accounting: Log MetabolicCost

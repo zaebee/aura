@@ -257,11 +257,16 @@ class EVMProvider:
         gas_price = await self.w3.eth.gas_price
         chain_id = await self.w3.eth.chain_id
 
+        # Estimate gas before building the transaction
+        gas_estimate = await contract.functions.transfer(
+            to_address, value
+        ).estimate_gas({"from": self.account.address})
+
         # Build transaction
         tx = await contract.functions.transfer(to_address, value).build_transaction(
             {
                 "chainId": chain_id,
-                "gas": 100000,  # Approximate for ERC20 transfer
+                "gas": gas_estimate,
                 "gasPrice": gas_price,
                 "nonce": nonce,
             }

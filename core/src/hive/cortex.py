@@ -217,7 +217,7 @@ class HiveCell:
 
         # 9. GoldRush (The Foraging Organ)
         blockchain_data = GoldRushSkill()
-        blockchain_data.bind(None, {"registry": self.registry})
+        blockchain_data.bind(self.settings.blockchain_data, {"registry": self.registry})
 
         # Register all in the SkillRegistry
         self.registry.register("persistence", persistence)
