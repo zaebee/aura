@@ -99,6 +99,33 @@ class OutputGuard:
         ceiling = HillDampener.hill_cap(bid, base_price)
         return min(llm_price, ceiling)
 
+    def validate_x402_payment(
+        self,
+        wallet_address: str,
+        amount: float,
+        is_sanctified: bool,
+    ) -> None:
+        """Validate an autonomous x402 payment: require sanctified wallet and spending cap."""
+        if not self.settings:
+            logger.error("guard_settings_missing_fail_closed")
+            raise SafetyViolation(
+                "Cannot validate x402 payment: safety settings not provided."
+            )
+        if not is_sanctified:
+            raise SafetyViolation(
+                f"x402 recipient {wallet_address!r} is not sanctified"
+            )
+        max_payment_config = getattr(self.settings, "max_x402_payment", None)
+        if max_payment_config is None:
+            logger.warning("max_x402_payment_not_configured", fallback=5.0)
+            max_payment = 5.0
+        else:
+            max_payment = float(max_payment_config)
+        if amount > max_payment:
+            raise SafetyViolation(
+                f"x402 amount {amount} exceeds spending cap {max_payment}"
+            )
+
     def validate_vision(self, vision_result: dict) -> bool:
         """
         Validate VisionSkill output.

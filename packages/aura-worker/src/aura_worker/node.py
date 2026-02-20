@@ -155,7 +155,7 @@ class AuraNode:
                 line: bytes = await pull_proc.stdout.readline()
                 if not line:
                     break
-                log_callback(line.decode().strip())
+                log_callback(line.decode("utf-8", errors="replace").strip())
 
         await pull_proc.wait()
 
@@ -171,7 +171,7 @@ class AuraNode:
             line: bytes = await process.stdout.readline()
             if not line:
                 break
-            text: str = line.decode().strip()
+            text: str = line.decode("utf-8", errors="replace").strip()
             log_callback(text)
             # Increment stats on successful inference requests
             async with self.lock:

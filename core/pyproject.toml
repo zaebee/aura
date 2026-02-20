@@ -37,6 +37,7 @@ dependencies = [
     "redis>=5.0.0",
     "aura-core",
     "betterproto>=2.0.0b7",
+    "pygithub>=2.1.1",
 ]
 
 [tool.uv.sources]

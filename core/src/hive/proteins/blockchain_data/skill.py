@@ -135,12 +135,30 @@ class GoldRushSkill(SkillProtocol[Any, dict[str, Any], dict[str, Any], Observati
                         error=f"Invalid amount in X-Payment-Instructions header: {amount_str}",
                     )
 
-                # 3. Pay via TransactionSkill
+                # 3. Guard: validate recipient is sanctified and within x402 cap
                 if not self.registry:
                     return Observation(
                         success=False, error="Skill registry not available"
                     )
 
+                guard_obs = await self.registry.execute(
+                    "guard",
+                    "validate_x402_payment",
+                    {"wallet_address": recipient, "amount": amount},
+                )
+                if not guard_obs.success:
+                    logger.warning(
+                        "goldrush_x402_blocked",
+                        recipient=recipient,
+                        amount=amount,
+                        reason=guard_obs.error,
+                    )
+                    return Observation(
+                        success=False,
+                        error=f"x402_payment_blocked: {guard_obs.error}",
+                    )
+
+                # 4. Pay via TransactionSkill
                 transaction = self.registry.get("transaction")
                 if not transaction:
                     return Observation(
@@ -184,7 +202,7 @@ class GoldRushSkill(SkillProtocol[Any, dict[str, Any], dict[str, Any], Observati
                         },
                     )
 
-                # 4. Retry with X-Payment-Proof
+                # 5. Retry with X-Payment-Proof
                 retry_resp = await client.get(
                     url, params=query_params, headers={"X-Payment-Proof": tx_hash}
                 )

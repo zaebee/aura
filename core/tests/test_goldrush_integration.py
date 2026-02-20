@@ -35,6 +35,9 @@ async def test_goldrush_fetch_402_loop():
             return persistence
         return None
 
+    # Guard check returns success (sanctified + within cap)
+    guard_obs = MagicMock(success=True, error=None)
+    registry.execute = AsyncMock(return_value=guard_obs)
     registry.get.side_effect = get_skill
     skill.inject_registry(registry)
 
