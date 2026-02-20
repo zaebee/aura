@@ -1,0 +1,12 @@
+name: kinetic
+version: 0.1.0
+description: Visual synthesis protein for generating metabolic video reports.
+capabilities:
+  - synthesize_vision_report
+  - render_heartbeat
+  - export_artifact
+dependencies:
+  - npx
+  - remotion
+  - ffmpeg
+  - chromium

@@ -8,6 +8,7 @@ from .crypto import CryptoSettings
 from .database import DatabaseSettings
 from .discovery import DiscoverySettings
 from .heartbeat import HeartbeatSettings
+from .kinetic import KineticSettings
 from .llm import LLMSettings
 from .logic import LogicSettings
 from .perception import PerceptionSettings
@@ -32,6 +33,7 @@ class Settings(BaseSettings):
     server: ServerSettings = Field(default_factory=lambda: ServerSettings())  # type: ignore
     heartbeat: HeartbeatSettings = Field(default_factory=lambda: HeartbeatSettings())  # type: ignore
     perception: PerceptionSettings = Field(default_factory=lambda: PerceptionSettings())  # type: ignore
+    kinetic: KineticSettings = Field(default_factory=lambda: KineticSettings())  # type: ignore
     discovery: DiscoverySettings = Field(default_factory=lambda: DiscoverySettings())  # type: ignore
     blockchain_data: BlockchainDataSettings = Field(
         default_factory=lambda: BlockchainDataSettings()
