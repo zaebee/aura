@@ -12,6 +12,7 @@ Channels:
 
 from typing import TYPE_CHECKING, Any
 
+import betterproto
 import nats
 import nats.errors
 import structlog
@@ -89,10 +90,12 @@ class NatsSignalGateway:
             # 2. Reply with serialized proto Observation
             if msg.reply:
                 await msg.respond(bytes(observation))
+                data_name, _ = betterproto.which_one_of(observation, "data")
                 logger.debug(
                     "gateway_replied",
                     success=observation.success,
                     event_type=observation.event_type,
+                    data_type=data_name or "empty",
                 )
             else:
                 logger.debug(

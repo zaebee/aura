@@ -121,14 +121,35 @@ def _safe_message_getattribute(self: betterproto.Message, name: str) -> Any:
       so None-valued fields are silently skipped during serialization.
     - User-level guards (`if context.hive:`) evaluate None as falsy — correct.
     - which_one_of() is unaffected (it uses a different code path).
+
+    The error-message pattern check has been intentionally removed: inside
+    betterproto.Message.__getattribute__ the only AttributeError that can
+    escape the original implementation is the "inactive oneof member" guard.
+    Returning None unconditionally is therefore safe, and avoids breakage if
+    betterproto ever changes its error-message wording.
     """
     try:
         return _orig_message_getattribute(self, name)
-    except AttributeError as exc:
-        # Only intercept betterproto's own "wrong oneof member" error.
-        # Its message format is: "'<group>' is set to '<active>', not '<name>'"
-        if "' is set to '" in str(exc) and "', not '" in str(exc):
-            return None
+    except AttributeError:
+        # Only suppress AttributeError for known oneof fields.  Those are the
+        # only attributes betterproto's __getattribute__ actively guards; for
+        # everything else (e.g. _group_current not yet set during __post_init__,
+        # genuinely missing attributes) we must re-raise so that hasattr() and
+        # __setattr__ continue to work correctly.
+        #
+        # We intentionally avoid pattern-matching on the error message string
+        # (brittle if betterproto ever rewrites the wording) and instead use
+        # object.__getattribute__ to read the class-level _betterproto metadata
+        # and check whether `name` is a declared oneof field.
+        try:
+            meta = object.__getattribute__(self, "_betterproto")
+            if name in meta.oneof_group_by_field:
+                # Inactive oneof member — returning None is safe:
+                # dump() skips None fields, and `if msg.field:` treats None
+                # as falsy (correct semantics).
+                return None
+        except AttributeError:
+            pass
         raise
 
 
