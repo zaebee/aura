@@ -6,7 +6,7 @@ from aura_core_gen.aura.core.v1 import Observation
 
 from config.crypto import CryptoSettings
 
-from .engine import PriceConverter, SecretEncryption, SolanaProvider
+from .engine import PriceConverter, SecretEncryption
 from .schema import (
     PaymentProof,
     PaymentRequestParams,
@@ -26,7 +26,9 @@ class TransactionSkill(
 
     def __init__(self) -> None:
         self.settings: CryptoSettings | None = None
-        self.provider: SolanaProvider | None = None
+        self.provider: Any = None
+        self.solana_provider: Any = None
+        self.evm_provider: Any = None
         self.encryption: SecretEncryption | None = None
         self.converter: PriceConverter | None = None
         self._capabilities = {
@@ -39,6 +41,7 @@ class TransactionSkill(
             "get_address": self._get_address,
             "convert_price": self._convert_price,
             "get_network_name": self._get_network_name,
+            "transfer": self._transfer,
         }
 
     def get_name(self) -> str:
@@ -50,6 +53,8 @@ class TransactionSkill(
     def bind(self, settings: CryptoSettings, provider: dict[str, Any]) -> None:
         self.settings = settings
         self.provider = provider.get("provider")
+        self.solana_provider = provider.get("solana_provider")
+        self.evm_provider = provider.get("evm_provider")
         self.encryption = provider.get("encryption")
         self.converter = provider.get("converter")
 
@@ -153,6 +158,30 @@ class TransactionSkill(
                 {"network": str(self.settings.solana_network or "solana")}
             ),
         )
+
+    async def _transfer(self, params: dict[str, Any]) -> Observation:
+        network = params.get("network", "base-sepolia")
+        amount = float(params["amount"])
+        recipient = params["recipient"]
+
+        try:
+            if network in ["base-sepolia", "evm"]:
+                if not self.evm_provider:
+                    return Observation(
+                        success=False, error="evm_provider_not_initialized"
+                    )
+                tx_hash = await self.evm_provider.transfer_usdc(recipient, amount)
+                return Observation(
+                    success=True,
+                    metadata=make_struct({"transaction_hash": tx_hash}),
+                )
+            else:
+                return Observation(
+                    success=False, error=f"Transfer not implemented for {network}"
+                )
+        except Exception as e:
+            logger.error(f"Transfer failed: {e}")
+            return Observation(success=False, error=str(e))
 
     async def close(self) -> None:
         if self.provider:

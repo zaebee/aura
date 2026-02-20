@@ -10,6 +10,7 @@ from hive.generator import HiveGenerator
 from hive.membrane import HiveMembrane
 from hive.metabolism import MetabolicLoop
 from hive.metabolism.security import AuditSigner
+from hive.proteins.blockchain_data.skill import GoldRushSkill
 from hive.proteins.discovery import DiscoverySkill
 from hive.proteins.guard import GuardSkill
 from hive.proteins.guard.engine import OutputGuard
@@ -24,6 +25,7 @@ from hive.proteins.telemetry import TelemetrySkill
 from hive.proteins.telemetry.engine import init_telemetry
 from hive.proteins.transaction import TransactionSkill
 from hive.proteins.transaction.engine import (
+    EVMProvider,
     PriceConverter,
     SecretEncryption,
     SolanaProvider,
@@ -190,20 +192,32 @@ class HiveCell:
         transaction = None
         if self.settings.crypto.enabled:
             bundle = {
-                "provider": SolanaProvider(
+                "solana_provider": SolanaProvider(
                     private_key_base58=get_raw_key(
                         self.settings.crypto.solana_private_key
                     ),
                     rpc_url=str(self.settings.crypto.solana_rpc_url),
                     usdc_mint=self.settings.crypto.solana_usdc_mint,
                 ),
+                "evm_provider": EVMProvider(
+                    private_key_hex=get_raw_key(self.settings.crypto.evm_private_key),
+                    rpc_url=str(self.settings.crypto.evm_rpc_url),
+                    usdc_address=self.settings.crypto.evm_usdc_address,
+                ),
                 "encryption": SecretEncryption(
                     get_raw_key(self.settings.crypto.secret_encryption_key)
                 ),
                 "converter": PriceConverter(),
             }
+            # Set 'provider' for backward compatibility (Solana as default)
+            bundle["provider"] = bundle["solana_provider"]
+
             transaction = TransactionSkill()
             transaction.bind(self.settings.crypto, bundle)
+
+        # 9. GoldRush (The Foraging Organ)
+        blockchain_data = GoldRushSkill()
+        blockchain_data.bind(self.settings.blockchain_data, {"registry": self.registry})
 
         # Register all in the SkillRegistry
         self.registry.register("persistence", persistence)
@@ -213,11 +227,13 @@ class HiveCell:
         self.registry.register("guard", guard)
         self.registry.register("perception", perception)
         self.registry.register("discovery", discovery)
+        self.registry.register("blockchain_data", blockchain_data)
         if transaction:
             self.registry.register("transaction", transaction)
 
         # Inject fully-populated registry into skills that cross-call peers
         guard.inject_registry(self.registry)
+        blockchain_data.inject_registry(self.registry)
 
         # Initialize all proteins
         for name in self.registry.list_skills():

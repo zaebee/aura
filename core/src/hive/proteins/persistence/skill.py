@@ -18,6 +18,7 @@ from .engine import (
     DealStatus,
     InventoryItem,
     LockedDeal,
+    MetabolicCost,
     RedisCache,
     SanctifiedWallet,
 )
@@ -60,6 +61,7 @@ class PersistenceSkill(
             "upsert_item": self._upsert_item,
             "sanctify_wallet": self._sanctify_wallet,
             "is_wallet_sanctified": self._is_wallet_sanctified,
+            "log_metabolic_cost": self._log_metabolic_cost,
         }
 
         # Asset Enzymes: Domain-to-method mapping for "Tissue Specificity"
@@ -476,6 +478,26 @@ class PersistenceSkill(
             success=True,
             metadata=make_struct({"sanctified": sanctified}),
         )
+
+    async def _log_metabolic_cost(self, params: dict[str, Any]) -> Observation:
+        try:
+
+            def log() -> None:
+                with self._get_session() as session:
+                    cost = MetabolicCost(
+                        amount=params["amount"],
+                        currency=params["currency"],
+                        network=params["network"],
+                        endpoint=params["endpoint"],
+                        transaction_hash=params.get("tx_hash"),
+                    )
+                    session.add(cost)
+                    session.commit()
+
+            await asyncio.to_thread(log)
+            return Observation(success=True)
+        except Exception as e:
+            return Observation(success=False, error=str(e))
 
     async def _vector_search(self, params: dict[str, Any]) -> Observation:
         query_vector = params.get("query_vector")

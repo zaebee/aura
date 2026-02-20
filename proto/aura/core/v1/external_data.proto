@@ -1,0 +1,15 @@
+// proto/aura/core/v1/external_data.proto
+syntax = "proto3";
+
+package aura.core.v1;
+
+message DataPurchaseIntent {
+  string endpoint = 1;
+  double cost_usdc = 2;
+  string network = 3; // "base-sepolia"
+}
+
+message BlockchainDiscoveryResult {
+  string raw_json = 1;
+  string transaction_hash = 2; // Proof of payment
+}

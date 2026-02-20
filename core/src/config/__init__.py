@@ -3,6 +3,7 @@ from functools import lru_cache
 from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
+from .blockchain_data import BlockchainDataSettings
 from .crypto import CryptoSettings
 from .database import DatabaseSettings
 from .discovery import DiscoverySettings
@@ -32,6 +33,9 @@ class Settings(BaseSettings):
     heartbeat: HeartbeatSettings = Field(default_factory=lambda: HeartbeatSettings())  # type: ignore
     perception: PerceptionSettings = Field(default_factory=lambda: PerceptionSettings())  # type: ignore
     discovery: DiscoverySettings = Field(default_factory=lambda: DiscoverySettings())  # type: ignore
+    blockchain_data: BlockchainDataSettings = Field(
+        default_factory=lambda: BlockchainDataSettings()
+    )  # type: ignore
 
 
 @lru_cache

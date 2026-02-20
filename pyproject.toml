@@ -48,6 +48,8 @@ dependencies = [
     "aura-worker",
     "types-aiofiles>=25.1.0.20251011",
     "types-toml>=0.10.8.20240310",
+    "eth-account>=0.13.7",
+    "web3>=7.14.1",
 ]
 
 [tool.uv.workspace]
