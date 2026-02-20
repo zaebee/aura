@@ -131,6 +131,16 @@ class GuardSkill(
         sanct_obs = await self._registry.execute(
             "persistence", "is_wallet_sanctified", {"wallet_address": wallet_address}
         )
+        if not sanct_obs.success:
+            logger.error(
+                "x402_wallet_verification_failed wallet=%s error=%s",
+                wallet_address,
+                sanct_obs.error,
+            )
+            return Observation(
+                success=False,
+                error=f"Wallet verification failed: {sanct_obs.error}",
+            )
         is_sanctified = bool(sanct_obs.metadata.to_dict().get("sanctified", False))
         self.provider.validate_x402_payment(
             wallet_address=wallet_address,
