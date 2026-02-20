@@ -14,6 +14,8 @@ from hive.proteins.blockchain_data.skill import GoldRushSkill
 from hive.proteins.discovery import DiscoverySkill
 from hive.proteins.guard import GuardSkill
 from hive.proteins.guard.engine import OutputGuard
+from hive.proteins.kinetic.engine import KineticEngine
+from hive.proteins.kinetic.skill import KineticSkill
 from hive.proteins.perception import PerceptionSkill
 from hive.proteins.perception.engine import PerceptionEngine
 from hive.proteins.persistence import PersistenceSkill
@@ -188,6 +190,16 @@ class HiveCell:
         discovery = DiscoverySkill()
         discovery.bind(self.settings.discovery, {"lm": lm})
 
+        # 8. Kinetic
+        kinetic = KineticSkill()
+        kinetic.bind(
+            self.settings.kinetic,
+            KineticEngine(
+                remotion_project_path=self.settings.kinetic.remotion_project_path,
+                output_dir=self.settings.kinetic.output_dir,
+            ),
+        )
+
         # 8. Transaction (Optional)
         transaction = None
         if self.settings.crypto.enabled:
@@ -227,6 +239,7 @@ class HiveCell:
         self.registry.register("guard", guard)
         self.registry.register("perception", perception)
         self.registry.register("discovery", discovery)
+        self.registry.register("kinetic", kinetic)
         self.registry.register("blockchain_data", blockchain_data)
         if transaction:
             self.registry.register("transaction", transaction)
