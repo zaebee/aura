@@ -38,6 +38,7 @@ dependencies = [
     "aura-core",
     "betterproto>=2.0.0b7",
     "pygithub>=2.1.1",
+    "web3>=7.0.0",
 ]
 
 [tool.uv.sources]
