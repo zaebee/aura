@@ -51,8 +51,15 @@ class KineticSkill(
         try:
             return await handler(params)
         except Exception as e:
-            logger.error(f"Kinetic skill error: {e}")
+            logger.error("kinetic_skill_execution_failed", error=str(e))
             return Observation(success=False, error=str(e))
+
+    def _sanitize_id(self, identifier: Any) -> str:
+        """Sanitizes an ID for use in filenames."""
+        import re
+
+        clean = re.sub(r"[^a-zA-Z0-9_\-]", "", str(identifier))
+        return clean or "unknown"
 
     async def _synthesize_vision_report(self, params: dict[str, Any]) -> Observation:
         """Enzyme: Turns a VehicleProductData (passed as dict) into a video report."""
@@ -61,9 +68,10 @@ class KineticSkill(
 
         make = params.get("make") or params.get("brand")
         identity = self.provider.synthesize_identity(make)
+        asset_id = self._sanitize_id(params.get("id"))
 
         props = VisionReportProps(
-            asset_id=str(params.get("id", "unknown")),
+            asset_id=asset_id,
             name=str(params.get("name", "Unknown Asset")),
             make=make,
             model=params.get("model"),
@@ -72,14 +80,27 @@ class KineticSkill(
             identity=identity,
         )
 
-        output_filename = f"vision_{props.asset_id}.mp4"
-        local_path = await self.provider.render_video(
-            "VisionReport", props.model_dump(), output_filename
-        )
+        output_filename = f"vision_{asset_id}.mp4"
+
+        # Background synthesis: offload to maintain metabolic loop throughput
+        async def _background_render() -> None:
+            try:
+                if self.provider:
+                    await self.provider.render_video(
+                        "VisionReport", props.model_dump(), output_filename
+                    )
+            except Exception as e:
+                logger.error("vision_report_synthesis_failed", error=str(e))
+
+        import asyncio
+
+        asyncio.create_task(_background_render())
 
         return Observation(
             success=True,
-            metadata=make_struct({"local_path": local_path}),
+            metadata=make_struct(
+                {"status": "queued", "output_filename": output_filename}
+            ),
         )
 
     async def _render_heartbeat(self, params: dict[str, Any]) -> Observation:
@@ -96,13 +117,23 @@ class KineticSkill(
             identity=identity,
         )
 
-        local_path = await self.provider.render_video(
-            "Heartbeat", props.model_dump(), "heartbeat.mp4"
-        )
+        # Background synthesis
+        async def _background_render() -> None:
+            try:
+                if self.provider:
+                    await self.provider.render_video(
+                        "Heartbeat", props.model_dump(), "heartbeat.mp4"
+                    )
+            except Exception as e:
+                logger.error("heartbeat_render_failed", error=str(e))
+
+        import asyncio
+
+        asyncio.create_task(_background_render())
 
         return Observation(
             success=True,
-            metadata=make_struct({"local_path": local_path}),
+            metadata=make_struct({"status": "queued"}),
         )
 
     async def _export_artifact(self, params: dict[str, Any]) -> Observation:
