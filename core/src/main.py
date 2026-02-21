@@ -273,12 +273,14 @@ class NegotiationService:
 
     async def __rpc_negotiate(self, stream: Any) -> None:
         request = await stream.recv_message()
-        response = await self.negotiate(**request.to_dict())
+        response = await self.negotiate(
+            **request.to_dict(casing=betterproto.Casing.SNAKE)
+        )
         await stream.send_message(response)
 
     async def __rpc_search(self, stream: Any) -> None:
         request = await stream.recv_message()
-        response = await self.search(**request.to_dict())
+        response = await self.search(**request.to_dict(casing=betterproto.Casing.SNAKE))
         await stream.send_message(response)
 
     async def __rpc_get_system_status(self, stream: Any) -> None:
@@ -288,7 +290,9 @@ class NegotiationService:
 
     async def __rpc_check_deal_status(self, stream: Any) -> None:
         request = await stream.recv_message()
-        response = await self.check_deal_status(**request.to_dict())
+        response = await self.check_deal_status(
+            **request.to_dict(casing=betterproto.Casing.SNAKE)
+        )
         await stream.send_message(response)
 
 

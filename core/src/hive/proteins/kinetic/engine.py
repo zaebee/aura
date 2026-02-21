@@ -71,7 +71,9 @@ class KineticEngine:
             # Entry point is usually src/index.ts or src/index.tsx in a Remotion project
             # We use a relative path here because we set cwd=self.remotion_project_path in subprocess
             entry_point = "src/index.ts"
-            if not os.path.exists(os.path.join(self.remotion_project_path, entry_point)):
+            if not os.path.exists(
+                os.path.join(self.remotion_project_path, entry_point)
+            ):
                 # Try .tsx
                 entry_point += "x"
 

@@ -38,10 +38,11 @@ async def test_kinetic_engine_render_command():
         )
 
         # Mock os.path.exists and os.remove to avoid real file system side effects
-        with patch("os.path.exists", return_value=True), \
-             patch("os.remove"), \
-             patch("os.makedirs"):
-
+        with (
+            patch("os.path.exists", return_value=True),
+            patch("os.remove"),
+            patch("os.makedirs"),
+        ):
             props = {"asset_id": "123", "name": "Test Car"}
             await engine.render_video("VisionReport", props, "test.mp4")
 
@@ -52,5 +53,7 @@ async def test_kinetic_engine_render_command():
             assert "render" in args
             assert "VisionReport" in args
             # Using os.path.abspath(os.path.join(...)) to match engine.py
-            expected_output = os.path.abspath(os.path.join("/tmp/artifacts", "test.mp4"))
+            expected_output = os.path.abspath(
+                os.path.join("/tmp/artifacts", "test.mp4")
+            )
             assert expected_output in args

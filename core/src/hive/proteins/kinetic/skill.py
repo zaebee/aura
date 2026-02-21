@@ -10,9 +10,7 @@ from .schema import HeartbeatProps, VisionReportProps
 logger = structlog.get_logger(__name__)
 
 
-class KineticSkill(
-    SkillProtocol[Any, KineticEngine, dict[str, Any], Observation]
-):
+class KineticSkill(SkillProtocol[Any, KineticEngine, dict[str, Any], Observation]):
     """
     Kinetic Protein: Responsible for visual artifact synthesis.
     Turns metabolic signals into high-engagement videos for the Hive's Memory.
