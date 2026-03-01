@@ -49,7 +49,6 @@ export default function CourierPage() {
   }
 
   const canSubmit = !!imageB64 && walletValid && pageState === 'idle'
-  const canSubmit = !!imageB64 && walletValid && pageState === 'idle'
 
   async function handleSubmit() {
     if (!canSubmit || !imageB64) return
