@@ -7,6 +7,7 @@ from urllib.parse import quote
 import httpx
 from cryptography.fernet import Fernet, InvalidToken
 from eth_account import Account
+from eth_account.messages import encode_typed_data
 from solders.keypair import Keypair  # type: ignore
 from solders.pubkey import Pubkey  # type: ignore
 from web3 import AsyncWeb3
@@ -227,10 +228,23 @@ class SolanaProvider:
 
 
 class EVMProvider:
-    def __init__(self, private_key_hex: str, rpc_url: str, usdc_address: str):
+    def __init__(
+        self,
+        private_key_hex: str,
+        rpc_url: str,
+        usdc_address: str,
+        chain_id: int = 84532,
+        risk_router_address: str = "",
+    ):
         self.account = Account.from_key(private_key_hex)
         self.w3 = AsyncWeb3(AsyncWeb3.AsyncHTTPProvider(rpc_url))
         self.usdc_address = self.w3.to_checksum_address(usdc_address)
+        self.chain_id = chain_id
+        self.risk_router_address = (
+            self.w3.to_checksum_address(risk_router_address)
+            if risk_router_address
+            else ""
+        )
         # Minimal ERC20 ABI for transfer
         self.usdc_abi = [
             {
@@ -276,6 +290,68 @@ class EVMProvider:
         signed_tx = self.account.sign_transaction(tx)
         tx_hash = await self.w3.eth.send_raw_transaction(signed_tx.raw_transaction)
         return tx_hash.hex()
+
+    async def sign_eip712_trade_intent(self, trade_intent: dict[str, Any]) -> dict:
+        """
+        Signs a TradeIntent using EIP-712.
+        Follows ERC-8004 genomic sequencing standard.
+        """
+        if not self.risk_router_address:
+            raise ValueError("risk_router_address not configured")
+
+        domain = {
+            "name": "HackathonRiskRouter",
+            "version": "1",
+            "chainId": self.chain_id,
+            "verifyingContract": self.risk_router_address,
+        }
+
+        # Define EIP-712 types based on TradeIntent protobuf
+        types = {
+            "TradeIntent": [
+                {"name": "trade_id", "type": "string"},
+                {"name": "asset_identifier", "type": "string"},
+                {"name": "asset_domain", "type": "string"},
+                {"name": "proposed_price", "type": "uint256"},
+                {"name": "currency_code", "type": "string"},
+                {"name": "reasoning", "type": "string"},
+            ],
+            "EIP712Domain": [
+                {"name": "name", "type": "string"},
+                {"name": "version", "type": "string"},
+                {"name": "chainId", "type": "uint256"},
+                {"name": "verifyingContract", "type": "address"},
+            ],
+        }
+
+        # Convert float price to uint256 (assuming 6 decimals for simplicity if it's USDC)
+        # Note: In a production scenario, we should handle currency-specific decimals.
+        proposed_price_uint = int(Decimal(str(trade_intent["proposed_price"])) * Decimal("1e6"))
+
+        message = {
+            "trade_id": str(trade_intent.get("trade_id", "")),
+            "asset_identifier": str(trade_intent.get("asset_identifier", "")),
+            "asset_domain": str(trade_intent.get("asset_domain", "")),
+            "proposed_price": proposed_price_uint,
+            "currency_code": str(trade_intent.get("currency_code", "")),
+            "reasoning": str(trade_intent.get("reasoning", "")),
+        }
+
+        structured_data = {
+            "types": types,
+            "domain": domain,
+            "primaryType": "TradeIntent",
+            "message": message,
+        }
+
+        signed_msg = encode_typed_data(full_message=structured_data)
+        signature = self.account.sign_message(signed_msg)
+
+        return {
+            "signature": signature.signature.hex(),
+            "signed_by": self.account.address,
+            "structured_data": structured_data,
+        }
 
     async def close(self) -> None:
         # AsyncWeb3 doesn't strictly need close for HTTP provider, but good practice
