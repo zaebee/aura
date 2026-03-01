@@ -14,6 +14,10 @@ from web3 import AsyncWeb3
 
 logger = logging.getLogger(__name__)
 
+# EIP-712 constants for TradeIntent signing
+EIP712_DOMAIN_NAME = "HackathonRiskRouter"
+EIP712_DOMAIN_VERSION = "1"
+
 # --- Encryption Logic ---
 
 
@@ -300,8 +304,8 @@ class EVMProvider:
             raise ValueError("risk_router_address not configured")
 
         domain = {
-            "name": "HackathonRiskRouter",
-            "version": "1",
+            "name": EIP712_DOMAIN_NAME,
+            "version": EIP712_DOMAIN_VERSION,
             "chainId": self.chain_id,
             "verifyingContract": self.risk_router_address,
         }
@@ -324,17 +328,24 @@ class EVMProvider:
             ],
         }
 
-        # Convert float price to uint256 (assuming 6 decimals for simplicity if it's USDC)
-        # Note: In a production scenario, we should handle currency-specific decimals.
-        proposed_price_uint = int(Decimal(str(trade_intent["proposed_price"])) * Decimal("1e6"))
+        # Enforce USDC requirement for simplified decimal conversion
+        if trade_intent["currency_code"] != "USDC":
+            raise ValueError(
+                f"EIP-712 signing currently only supports USDC, but got {trade_intent['currency_code']}"
+            )
+
+        # Convert float price to uint256 (assuming 6 decimals for USDC)
+        proposed_price_uint = int(
+            Decimal(str(trade_intent["proposed_price"])) * Decimal("1e6")
+        )
 
         message = {
-            "trade_id": str(trade_intent.get("trade_id", "")),
-            "asset_identifier": str(trade_intent.get("asset_identifier", "")),
-            "asset_domain": str(trade_intent.get("asset_domain", "")),
+            "trade_id": trade_intent["trade_id"],
+            "asset_identifier": trade_intent["asset_identifier"],
+            "asset_domain": trade_intent["asset_domain"],
             "proposed_price": proposed_price_uint,
-            "currency_code": str(trade_intent.get("currency_code", "")),
-            "reasoning": str(trade_intent.get("reasoning", "")),
+            "currency_code": trade_intent["currency_code"],
+            "reasoning": trade_intent["reasoning"],
         }
 
         structured_data = {
