@@ -24,6 +24,13 @@ export async function submitCourierProof(payload: CourierPayload): Promise<Couri
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(payload),
   })
-  if (!res.ok) throw new Error(`Submit failed: ${res.status}`)
+  if (!res.ok) {
+    let msg = `Submit failed: ${res.status}`
+    try {
+      const body = await res.json()
+      msg = body.message || body.detail || JSON.stringify(body)
+    } catch { /* ignore parse errors */ }
+    throw new Error(msg)
+  }
   return res.json()
 }

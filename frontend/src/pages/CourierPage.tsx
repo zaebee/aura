@@ -13,10 +13,17 @@ export default function CourierPage() {
   const [imageB64, setImageB64] = useState<string | null>(null)
   const [imageSrc, setImageSrc] = useState<string | null>(null)
   const [wallet, setWallet] = useState('')
-  const [walletError, setWalletError] = useState<string | null>(null)
+  const [walletTouched, setWalletTouched] = useState(false)
   const [pageState, setPageState] = useState<PageState>('idle')
   const [result, setResult] = useState<CourierResponse | null>(null)
   const [submitError, setSubmitError] = useState<string | null>(null)
+
+  // Derived — no separate state needed; computed each render
+  const walletValidation = wallet ? validateEVMAddress(wallet) : null
+  const walletError = walletTouched && walletValidation && !walletValidation.valid
+    ? (walletValidation.error ?? null)
+    : null
+  const walletValid = walletValidation?.valid ?? false
 
   function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0]
@@ -30,29 +37,18 @@ export default function CourierPage() {
     }
   }
 
-  function handleWalletChange(e: React.ChangeEvent<HTMLInputElement>) {
-    const val = e.target.value
-    setWallet(val)
-    if (val) {
-      const check = validateEVMAddress(val)
-      setWalletError(check.valid ? null : check.error ?? null)
-    } else {
-      setWalletError(null)
-    }
-  }
-
   async function handlePaste() {
     try {
       const text = await navigator.clipboard.readText()
       setWallet(text)
-      const check = validateEVMAddress(text)
-      setWalletError(check.valid ? null : check.error ?? null)
+      setWalletTouched(true)
     } catch {
-      setWalletError('Clipboard access denied')
+      // Clipboard denied — treat as touched with empty wallet so error shows on next interaction
+      setWalletTouched(true)
     }
   }
 
-  const walletValid = validateEVMAddress(wallet).valid
+  const canSubmit = !!imageB64 && walletValid && pageState === 'idle'
   const canSubmit = !!imageB64 && walletValid && pageState === 'idle'
 
   async function handleSubmit() {
@@ -105,6 +101,7 @@ export default function CourierPage() {
           </label>
 
           <input
+            id="photo-capture"
             ref={fileInputRef}
             type="file"
             accept="image/*"
@@ -115,7 +112,6 @@ export default function CourierPage() {
 
           <label
             htmlFor="photo-capture"
-            onClick={() => fileInputRef.current?.click()}
             className={`
               flex items-center justify-center gap-3
               min-h-[72px] w-full rounded-xl border-2 cursor-pointer
@@ -146,7 +142,7 @@ export default function CourierPage() {
             <input
               type="text"
               value={wallet}
-              onChange={handleWalletChange}
+              onChange={e => { setWallet(e.target.value); setWalletTouched(true) }}
               placeholder="0x..."
               className={`
                 flex-1 bg-[#111] border rounded-xl px-4 py-4 font-mono text-sm outline-none
