@@ -1,9 +1,16 @@
-import pytest
 from unittest.mock import MagicMock
-from hive.proteins.transaction.skill import TransactionSkill
-from hive.proteins.transaction.engine import EVMProvider, PriceConverter, SecretEncryption
-from config.crypto import CryptoSettings
+
+import pytest
 from eth_account import Account
+from hive.proteins.transaction.engine import (
+    EVMProvider,
+    PriceConverter,
+    SecretEncryption,
+)
+from hive.proteins.transaction.skill import TransactionSkill
+
+from config.crypto import CryptoSettings
+
 
 @pytest.mark.asyncio
 async def test_sign_trade_intent():
@@ -13,11 +20,11 @@ async def test_sign_trade_intent():
 
     settings = CryptoSettings(
         enabled=True,
-        solana_private_key="5" * 44, # Dummy base58
+        solana_private_key="5" * 44,  # Dummy base58
         evm_private_key=priv_key,
         risk_router_address="0x" + "2" * 40,
         evm_chain_id=84532,
-        secret_encryption_key="k" * 44
+        secret_encryption_key="k" * 44,
     )
 
     evm_provider = EVMProvider(
@@ -25,7 +32,7 @@ async def test_sign_trade_intent():
         rpc_url="https://sepolia.base.org",
         usdc_address="0x" + "3" * 40,
         chain_id=settings.evm_chain_id,
-        risk_router_address=settings.risk_router_address
+        risk_router_address=settings.risk_router_address,
     )
 
     skill = TransactionSkill()
@@ -33,7 +40,7 @@ async def test_sign_trade_intent():
         "evm_provider": evm_provider,
         "encryption": SecretEncryption("3fRk6F9g9V9f9V9f9V9f9V9f9V9f9V9f9V9f9V9f9V8="),
         "converter": PriceConverter(),
-        "provider": MagicMock() # Required by skill.py execute check
+        "provider": MagicMock(),  # Required by skill.py execute check
     }
     skill.bind(settings, bundle)
 
@@ -43,7 +50,7 @@ async def test_sign_trade_intent():
         "asset_domain": "VEHICLE",
         "proposed_price": 100.5,
         "currency_code": "USDC",
-        "reasoning": "High ROI detected"
+        "reasoning": "High ROI detected",
     }
 
     # Execute
@@ -65,6 +72,7 @@ async def test_sign_trade_intent():
     assert sd["message"]["proposed_price"] == 100500000  # 100.5 * 1e6
     assert sd["message"]["trade_id"] == "trade-123"
 
+
 @pytest.mark.asyncio
 async def test_sign_trade_intent_fails_non_usdc():
     # Setup
@@ -75,7 +83,7 @@ async def test_sign_trade_intent_fails_non_usdc():
         evm_private_key=priv_key,
         risk_router_address="0x" + "2" * 40,
         evm_chain_id=84532,
-        secret_encryption_key="k" * 44
+        secret_encryption_key="k" * 44,
     )
 
     evm_provider = EVMProvider(
@@ -83,7 +91,7 @@ async def test_sign_trade_intent_fails_non_usdc():
         rpc_url="https://sepolia.base.org",
         usdc_address="0x" + "3" * 40,
         chain_id=settings.evm_chain_id,
-        risk_router_address=settings.risk_router_address
+        risk_router_address=settings.risk_router_address,
     )
 
     skill = TransactionSkill()
@@ -91,7 +99,7 @@ async def test_sign_trade_intent_fails_non_usdc():
         "evm_provider": evm_provider,
         "encryption": MagicMock(),
         "converter": MagicMock(),
-        "provider": MagicMock()
+        "provider": MagicMock(),
     }
     skill.bind(settings, bundle)
 
@@ -100,8 +108,8 @@ async def test_sign_trade_intent_fails_non_usdc():
         "asset_identifier": "asset-456",
         "asset_domain": "VEHICLE",
         "proposed_price": 100.5,
-        "currency_code": "EUR", # Not USDC
-        "reasoning": "High ROI detected"
+        "currency_code": "EUR",  # Not USDC
+        "reasoning": "High ROI detected",
     }
 
     # Execute & Assert
