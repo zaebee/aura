@@ -29,7 +29,9 @@ export async function submitCourierProof(payload: CourierPayload): Promise<Couri
     try {
       const body = await res.json()
       msg = body.message || body.detail || JSON.stringify(body)
-    } catch { /* ignore parse errors */ }
+    } catch (err) {
+      console.error('Failed to parse error response body:', err)
+    }
     throw new Error(msg)
   }
   return res.json()

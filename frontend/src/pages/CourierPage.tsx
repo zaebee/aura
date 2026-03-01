@@ -31,9 +31,10 @@ export default function CourierPage() {
     const reader = new FileReader()
     reader.readAsDataURL(file)
     reader.onload = () => {
-      const dataUrl = reader.result as string
-      setImageSrc(dataUrl)
-      setImageB64(dataUrl.split(',')[1])
+      if (typeof reader.result === 'string') {
+        setImageSrc(reader.result)
+        setImageB64(reader.result.split(',')[1])
+      }
     }
   }
 
@@ -42,8 +43,8 @@ export default function CourierPage() {
       const text = await navigator.clipboard.readText()
       setWallet(text)
       setWalletTouched(true)
-    } catch {
-      // Clipboard denied — treat as touched with empty wallet so error shows on next interaction
+    } catch (err) {
+      console.warn('Failed to read from clipboard:', err)
       setWalletTouched(true)
     }
   }
@@ -51,7 +52,7 @@ export default function CourierPage() {
   const canSubmit = !!imageB64 && walletValid && pageState === 'idle'
 
   async function handleSubmit() {
-    if (!canSubmit || !imageB64) return
+    if (!canSubmit) return
     setPageState('scanning')
     setSubmitError(null)
     try {
