@@ -1,80 +1,4 @@
-// SIGNAL - Inbound stimulus to the Hive (A - Aggregator input)
-// =============================================================================
-
-message Signal {
-=======
-// =============================================================================
-// ERC-8004 GENOMIC SEQUENCING - Common Types
-// =============================================================================
-
-// Risk categories for validation scoring
-enum RiskCategory {
-  RISK_CATEGORY_UNSPECIFIED = 0;
-  RISK_CATEGORY_LOW = 1;
-  RISK_CATEGORY_MEDIUM = 2;
-  RISK_CATEGORY_HIGH = 3;
-  RISK_CATEGORY_CRITICAL = 4;
-}
-
-// Validation methods
-enum ValidationMethod {
-  VALIDATION_METHOD_UNSPECIFIED = 0;
-  VALIDATION_METHOD_EIP712 = 1;
-  VALIDATION_METHOD_ERC8004 = 2;
-  VALIDATION_METHOD_CUSTOM = 3;
-}
-
-// Trade result status
-enum TradeResult {
-  TRADE_RESULT_UNSPECIFIED = 0;
-  TRADE_RESULT_SUCCESS = 1;
-  TRADE_RESULT_FAILED = 2;
-  TRADE_RESULT_REJECTED = 3;
-  TRADE_RESULT_PENDING = 4;
-}
-
-// Payment status
-enum PaymentStatus {
-  PAYMENT_STATUS_UNSPECIFIED = 0;
-  PAYMENT_STATUS_PENDING = 1;
-  PAYMENT_STATUS_COMPLETED = 2;
-  PAYMENT_STATUS_FAILED = 3;
-}
-
-// Trade event types
-enum TradeEventType {
-  TRADE_EVENT_TYPE_UNSPECIFIED = 0;
-  TRADE_EVENT_TYPE_CREATED = 1;
-  TRADE_EVENT_TYPE_EXECUTED = 2;
-  TRADE_EVENT_TYPE_VALIDATED = 3;
-  TRADE_EVENT_TYPE_COMPLETED = 4;
-  TRADE_EVENT_TYPE_FAILED = 5;
-}
-
-// Money represents an amount of currency
-message Money {
-  double amount = 1;              // Numeric amount
-  string currency_code = 2;       // ISO 4217 currency code (e.g., "USDC", "SOL")
-  string network = 3;             // Blockchain network (e.g., "eip155:8453" for Base)
-}
-
-// ValidationScore represents risk assessment following ERC-8004 standards.
-// Lower risk_score values indicate lower risk (0.0 = no risk, 1.0 = maximum risk).
-message ValidationScore {
-  double risk_score = 1;                  // Risk assessment (0.0-1.0, lower is better)
-  RiskCategory risk_category = 2;         // Categorized risk level
-  ValidationMethod validation_method = 3; // Method used for validation
-  string validation_context = 4;         // Additional validation details
-  google.protobuf.Timestamp validated_at = 5; // When validation occurred
-  repeated string validation_rules = 6;  // Rules applied during validation
-  map<string, string> validation_metadata = 7; // Additional validation data
-}
-
-// =============================================================================
-// SIGNAL - Inbound stimulus to the Hive (A - Aggregator input)
-// =============================================================================
-
-message Signal {Metabolism Protocol Buffers - Nucleotide Signals for the Hive Core
+// Metabolism Protocol Buffers - Nucleotide Signals for the Hive Core
 //
 // This chromosome defines the ATCG-M metabolic pattern signals that form
 // the Hive's nervous system. It is completely decoupled from the Substrate
@@ -307,48 +231,6 @@ message UIIntent {
   string parse_mode = 3;
 }
 
-// =============================================================================
-// ERC-8004 GENOMIC SEQUENCING - Trade Intent and Validation
-// =============================================================================
-
-/**
- * TradeIntent represents a structured trade decision following ERC-8004
- * Genomic Sequencing standards. This enables the Transformer (LLM) to
- * generate trade intentions in a format compatible with Risk Router systems.
- *
- * Security Note: EIP-712 signing parameters are system-controlled to prevent
- * prompt injection attacks. The LLM provides trade intent but does not control
- * cryptographic signing parameters.
- */
-message TradeIntent {
-  string trade_id = 1;                    // Unique trade identifier
-  string asset_identifier = 2;           // Reference to the asset being traded
-  string asset_domain = 3;                // Asset domain (e.g., "VEHICLE", "PROPERTY")
-  Money proposed_price = 4;              // Proposed trade price with currency and network
-  ValidationScore validation_score = 5;  // Risk assessment score
-  string reasoning = 6;                   // LLM reasoning for the trade decision
-  map<string, string> metadata = 7;      // Additional trade context
-
-  // System-controlled EIP-712 signing parameters (not modifiable by LLM)
-  // These are set by the system to prevent prompt injection attacks
-  string eip712_domain_hash = 8;         // System-controlled domain separator hash
-  string eip712_message_hash = 9;        // System-controlled message hash
-}
-
-/**
- * ValidationScore represents risk assessment following ERC-8004 standards.
- * Lower risk_score values indicate lower risk (0.0 = no risk, 1.0 = maximum risk).
- */
-message ValidationScore {
-  double risk_score = 1;                  // Risk assessment (0.0-1.0, lower is better)
-  string risk_category = 2;              // "LOW", "MEDIUM", "HIGH", "CRITICAL"
-  string validation_method = 3;          // "EIP-712", "ERC-8004", "CUSTOM"
-  string validation_context = 4;         // Additional validation details
-  google.protobuf.Timestamp validated_at = 5; // When validation occurred
-  repeated string validation_rules = 6;  // Rules applied during validation
-  map<string, string> validation_metadata = 7; // Additional validation data
-}
-
 message IntentStep {
   string skill = 1;
   string intent = 2;
@@ -563,6 +445,43 @@ message AuditEvent {
 }
 
 // =============================================================================
+// ERC-8004 GENOMIC SEQUENCING - Trade Intent and Validation
+// =============================================================================
+
+/**
+ * TradeIntent represents a structured trade decision following ERC-8004
+ * Genomic Sequencing standards. This enables the Transformer (LLM) to
+ * generate trade intentions in a format compatible with Risk Router systems.
+ */
+message TradeIntent {
+  string trade_id = 1;                    // Unique trade identifier
+  string asset_identifier = 2;           // Reference to the asset being traded
+  string asset_domain = 3;                // Asset domain (e.g., "VEHICLE", "PROPERTY")
+  double proposed_price = 4;             // Proposed trade price
+  string currency_code = 5;               // ISO 4217 currency code
+  ValidationScore validation_score = 6;  // Risk assessment score
+  string reasoning = 7;                   // LLM reasoning for the trade decision
+  map<string, string> metadata = 8;      // Additional trade context
+  string eip712_domain = 9;               // EIP-712 domain separator
+  string eip712_types = 10;               // EIP-712 type definitions
+  google.protobuf.Struct eip712_message = 11; // EIP-712 structured message
+}
+
+/**
+ * ValidationScore represents risk assessment following ERC-8004 standards.
+ * Lower risk_score values indicate lower risk (0.0 = no risk, 1.0 = maximum risk).
+ */
+message ValidationScore {
+  double risk_score = 1;                  // Risk assessment (0.0-1.0, lower is better)
+  string risk_category = 2;              // "LOW", "MEDIUM", "HIGH", "CRITICAL"
+  string validation_method = 3;          // "EIP-712", "ERC-8004", "CUSTOM"
+  string validation_context = 4;         // Additional validation details
+  google.protobuf.Timestamp validated_at = 5; // When validation occurred
+  repeated string validation_rules = 6;  // Rules applied during validation
+  map<string, string> validation_metadata = 7; // Additional validation data
+}
+
+// =============================================================================
 // ERC-8004 GENOMIC SEQUENCING - Trade Observation
 // =============================================================================
 
@@ -579,11 +498,13 @@ message TradeObservation {
 
   // Payment information
   string payment_transaction_hash = 6;   // Blockchain transaction hash
-  Money payment_amount = 7;              // Amount paid with currency and network
-  PaymentStatus payment_status = 8;       // Payment status
+  string payment_network = 7;             // "eip155:8453" (Base), "solana", etc.
+  string payment_currency = 8;            // "USDC", "SOL", etc.
+  double payment_amount = 9;             // Amount paid
+  string payment_status = 10;             // "PENDING", "COMPLETED", "FAILED"
 
   // Trade execution results
-  TradeResult trade_result = 11;           // Trade result status
+  string trade_result = 11;               // "SUCCESS", "FAILED", "REJECTED", "PENDING"
   string failure_reason = 12;             // If failed, why
   map<string, string> execution_metadata = 13; // Additional execution details
 
@@ -611,7 +532,7 @@ message TradeEvent {
   string trade_id = 1;                    // Unique trade identifier
   string asset_identifier = 2;           // Asset being traded
   string asset_domain = 3;                // Asset domain
-  TradeEventType event_type = 4;         // Trade event type
+  string event_type = 4;                 // "TRADE_CREATED", "TRADE_EXECUTED", "TRADE_VALIDATED", "TRADE_COMPLETED", "TRADE_FAILED"
   google.protobuf.Timestamp event_time = 5;
   string initiated_by = 6;               // Agent or service that initiated the event
 
@@ -627,13 +548,16 @@ message TradeEvent {
 
 message TradeCreatedEvent {
   string trade_intent_id = 1;            // Reference to the original intent
-  Money proposed_price = 2;              // Proposed trade price with currency
-  ValidationScore initial_validation = 3; // Initial validation score
+  double proposed_price = 2;             // Proposed trade price
+  string currency_code = 3;               // ISO 4217 currency code
+  ValidationScore initial_validation = 4; // Initial validation score
 }
 
 message TradeExecutedEvent {
   string payment_transaction_hash = 1;   // Blockchain transaction hash
-  Money payment_amount = 2;              // Amount paid with currency
+  string payment_network = 2;             // "eip155:8453" (Base), "solana", etc.
+  double payment_amount = 3;             // Amount paid
+  string payment_currency = 4;            // "USDC", "SOL", etc.
 }
 
 message TradeValidatedEvent {
@@ -644,9 +568,10 @@ message TradeValidatedEvent {
 }
 
 message TradeCompletedEvent {
-  Money final_price = 1;                 // Final agreed price with currency
-  string reservation_code = 2;           // Reservation/reference code
-  string eip712_signature = 3;           // Cryptographic signature
+  string final_price = 1;                 // Final agreed price
+  string currency_code = 2;               // ISO 4217 currency code
+  string reservation_code = 3;           // Reservation/reference code
+  string eip712_signature = 4;           // Cryptographic signature
 }
 
 message TradeFailedEvent {
