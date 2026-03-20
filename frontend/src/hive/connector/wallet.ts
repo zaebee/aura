@@ -99,6 +99,18 @@ export class AgentWallet implements Connector {
     return this.GATEWAY_URL
   }
 
+  getSigningPath(relativePath: string): string {
+    let pathPrefix: string
+    try {
+      pathPrefix = new URL(this.GATEWAY_URL).pathname
+    } catch {
+      // GATEWAY_URL is relative (e.g., '/api/v1')
+      pathPrefix = this.GATEWAY_URL
+    }
+    const base = pathPrefix.replace(/\/$/, '')
+    return base + (relativePath.startsWith('/') ? relativePath : '/' + relativePath)
+  }
+
   async signRawHash(method: string, path: string, bodyHash: string): Promise<Record<string, string>> {
     const timestamp = Math.floor(Date.now() / 1000).toString()
     const canonicalRequest = `${method.toUpperCase()}${path}${timestamp}${bodyHash}`
@@ -114,7 +126,7 @@ export class AgentWallet implements Connector {
   }
 
   async fetchWithAuth(path: string, method: string = 'GET', body: unknown = null, signal?: AbortSignal): Promise<Response> {
-    const headers = await this.signRequest(method, path, body)
+    const headers = await this.signRequest(method, this.getSigningPath(path), body)
 
     const response = await fetch(`${this.GATEWAY_URL}${path}`, {
       method,
