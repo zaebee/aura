@@ -42,7 +42,6 @@ from datetime import datetime
 from enum import Enum
 from pathlib import Path
 from typing import Any
-from urllib.request import urlopen
 
 import httpx
 import nats
@@ -62,8 +61,8 @@ from spl.token.instructions import (
 )
 
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))
-from tools.simulators.agent_identity import AgentWallet
 
+from tools.simulators.agent_identity import AgentWallet
 
 # ============================================================================
 # Configuration
@@ -265,10 +264,13 @@ def load_solana_key() -> bytes | str:
 
 def download_image_as_base64(url: str) -> str:
     """Download an image and return as base64."""
+    if not url.startswith("https://"):
+        raise ValueError("Only HTTPS URLs are allowed for image downloads")
     try:
-        with urlopen(url, timeout=10) as response:
-            data = response.read()
-            return base64.b64encode(data).decode("utf-8")
+        with httpx.Client(timeout=10.0) as client:
+            response = client.get(url)
+            response.raise_for_status()
+            return base64.b64encode(response.content).decode("utf-8")
     except Exception as e:
         print(f"Failed to download image from {url}: {e}")
         placeholder = create_placeholder_image_base64()
@@ -306,7 +308,7 @@ async def create_ata_if_needed(
     try:
         await client.get_token_account_balance(ata)
         return ata
-    except Exception:
+    except Exception:  # nosec B110 - Gracefully handle missing ATA
         pass
 
     create_ix = create_associated_token_account(
@@ -929,7 +931,7 @@ async def run_quorum_sensing_simulation(
 
     print()
     print("  \033[36m[ Alpha -> Hive ]\033[0m Submitting RWA-backed loan request...")
-    print(f"  \033[36m[ Alpha -> Hive ]\033[0m Asset: Gold Bar (1kg)")
+    print("  \033[36m[ Alpha -> Hive ]\033[0m Asset: Gold Bar (1kg)")
     print(
         f"  \033[36m[ Alpha -> Hive ]\033[0m Requested Amount: {loan_amount:,.2f} USDC"
     )
@@ -1065,7 +1067,7 @@ async def run_quorum_sensing_simulation(
             print(f"  \033[32m✓\033[0m Transaction Signature: {tx_sig[:30]}...")
             print(f"  \033[32m✓\033[0m Loan Amount: {loan_amount:,.2f} USDC")
             print(f"  \033[32m✓\033[0m Borrower: {borrower_address[:20]}...")
-            print(f"  \033[32m✓\033[0m Network: Solana Devnet")
+            print("  \033[32m✓\033[0m Network: Solana Devnet")
             print(
                 f"  \033[32m✓\033[0m Explorer: https://solscan.io/tx/{tx_sig}?cluster=devnet"
             )
@@ -1080,7 +1082,7 @@ async def run_quorum_sensing_simulation(
         print()
         print("  \033[31m[ Beta REJECTED ]\033[0m" + "=" * 42)
         print(f"  \033[31m[ Beta REJECTED ]\033[0m Trade ID: {trade_intent.trade_id}")
-        print(f"  \033[31m[ Beta REJECTED ]\033[0m Reason: Risk threshold not met")
+        print("  \033[31m[ Beta REJECTED ]\033[0m Reason: Risk threshold not met")
         print("  \033[31m[ Beta REJECTED ]\033[0m" + "=" * 42)
         print()
 
@@ -1090,7 +1092,7 @@ async def run_quorum_sensing_simulation(
     print()
     print("  ATP (Liquidity) Exchange Summary:")
     print(f"    - Loan Amount: {loan_amount:,.2f} USDC")
-    print(f"    - Asset: Gold Bar (1kg)")
+    print("    - Asset: Gold Bar (1kg)")
     print(f"    - Borrower: {borrower_wallet.did[:32]}...")
     print(f"    - Lender: {lender_wallet.did[:32]}...")
     print(f"    - Risk Score: {trade_intent.validation_score.risk_score:.2f}")
