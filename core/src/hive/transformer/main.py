@@ -15,6 +15,8 @@ from aura_core_gen.aura.core.v1 import (
     Context,
     Intent,
     NegotiationIntent,
+    TradeIntent,
+    ValidationScore,
 )
 
 logger = structlog.get_logger(__name__)
@@ -152,6 +154,93 @@ class AuraTransformer(Transformer[Context, Intent]):
             "vision_confidence_threshold": vision_confidence_threshold,
         }
 
+    def _is_trade_context(self, metadata: dict[str, Any]) -> bool:
+        """Return True when the context carries a trade signal."""
+        if metadata.get("trade_mode") == "true":
+            return True
+        if metadata.get("asset_domain"):
+            return True
+        return False
+
+    def _build_trade_context(
+        self, metadata: dict[str, Any]
+    ) -> tuple[dict[str, Any], dict[str, Any], dict[str, Any]]:
+        """Extract market_context, system_vitals, current_treasury from metadata."""
+        market_context: dict[str, Any] = {
+            "prices": metadata.get("prices", {}),
+            "vision_result": metadata.get("vision_result"),
+            "asset_domain": metadata.get("asset_domain", ""),
+            "asset_identifier": metadata.get("asset_identifier", ""),
+        }
+        system_vitals: dict[str, Any] = dict(metadata.get("vitals") or {})
+        current_treasury: dict[str, Any] = dict(metadata.get("treasury") or {})
+        return market_context, system_vitals, current_treasury
+
+    async def _think_trade(self, context: Context, metadata: dict[str, Any]) -> Intent:
+        """Trade path: invoke GenerateTradeIntent via the reasoning protein."""
+        market_context, system_vitals, current_treasury = self._build_trade_context(
+            metadata
+        )
+
+        obs = await self.registry.execute(
+            "reasoning",
+            "trade",
+            {
+                "market_context": market_context,
+                "system_vitals": system_vitals,
+                "current_treasury": current_treasury,
+            },
+        )
+
+        if not obs.success:
+            logger.error("trade_reasoning_failed", error=obs.error)
+            return Intent(
+                action=cast(ActionType, ActionType.ACTION_TYPE_ERROR),
+                reasoning=f"<think>Trade reasoning failed: {obs.error}</think>",
+                trade=TradeIntent(reasoning=f"ERROR: {obs.error}"),
+            )
+
+        raw = obs.metadata.to_dict() if obs.metadata else {}
+        trade_data: dict[str, Any] = raw.get("trade") or {}
+        risk_score = float(str(raw.get("risk_score", "0.0")))
+        risk_category = str(raw.get("risk_category", "LOW"))
+        raw_think = str(raw.get("think", ""))
+        wrapped_think = f"<think>\n{raw_think}\n</think>" if raw_think else ""
+
+        validation_score = ValidationScore(
+            risk_score=risk_score,
+            risk_category=risk_category,
+        )
+
+        trade_intent = TradeIntent(
+            trade_id=str(trade_data.get("trade_id", "")),
+            asset_identifier=str(trade_data.get("asset_identifier", "")),
+            asset_domain=str(trade_data.get("asset_domain", "")),
+            proposed_price=float(trade_data.get("proposed_price", 0.0)),
+            currency_code=str(trade_data.get("currency_code", "USDC")),
+            reasoning=str(trade_data.get("reasoning", "")),
+            validation_score=validation_score,
+        )
+
+        is_high_risk = risk_score > 0.10 or "REJECTED_HIGH_RISK" in trade_intent.reasoning
+        action = (
+            ActionType.ACTION_TYPE_REJECT if is_high_risk else ActionType.ACTION_TYPE_ACCEPT
+        )
+
+        if is_high_risk:
+            logger.warning(
+                "trade_rejected_high_risk",
+                risk_score=risk_score,
+                risk_category=risk_category,
+            )
+
+        return Intent(
+            action=cast(ActionType, action),
+            reasoning=wrapped_think,
+            metadata=make_struct({"brain_path": self.brain_path}),
+            trade=trade_intent,
+        )
+
     async def think(self, context: Context, **kwargs: Any) -> Intent:
         """Reason about the negotiation by calling the Reasoning Protein."""
 
@@ -168,6 +257,12 @@ class AuraTransformer(Transformer[Context, Intent]):
             return strategy.evaluate(context)
 
         try:
+            metadata = context.metadata.to_dict()
+
+            # Trade path: ERC-8004 structured trade intent generation
+            if self._is_trade_context(metadata):
+                return await self._think_trade(context, metadata)
+
             bid = 0.0
             hive = _get_hive(context)
             if hive and hive.offer:

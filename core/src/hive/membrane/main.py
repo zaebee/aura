@@ -8,6 +8,7 @@ from aura_core_gen.aura.core.v1 import (
     Context,
     Intent,
     NegotiationIntent,
+    TradeIntent,
 )
 
 from config import get_settings
@@ -123,6 +124,24 @@ class HiveMembrane(Membrane[Any, Intent, Context]):
         floor_price = float(str(ctx_meta.get("floor_price", 0.0)))
 
         params_name, params_value = betterproto.which_one_of(decision, "params")
+
+        # Trade intent guard: backstop for high-risk trades that slipped through
+        if params_name == "trade" and params_value is not None:
+            trade_intent = cast(TradeIntent, params_value)
+            risk_score = trade_intent.validation_score.risk_score
+            if risk_score > 0.10:
+                logger.warning(
+                    "membrane_blocked_high_risk_trade",
+                    risk_score=risk_score,
+                    risk_category=trade_intent.validation_score.risk_category,
+                )
+                return Intent(
+                    action=cast(ActionType, ActionType.ACTION_TYPE_REJECT),
+                    reasoning=decision.reasoning + " [MEMBRANE: high-risk trade blocked]",
+                    trade=trade_intent,
+                )
+            return decision
+
         neg_intent = params_value if params_name == "negotiation" else None
 
         # 1. Handle explicit failures

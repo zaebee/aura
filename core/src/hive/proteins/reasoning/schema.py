@@ -19,3 +19,9 @@ class NegotiationResult(BaseModel):
     message: str
     thought: str = ""
     metadata: dict[str, Any] = {}
+
+
+class TradeParams(BaseModel):
+    market_context: dict[str, Any] = {}
+    system_vitals: dict[str, Any] = {}
+    current_treasury: dict[str, Any] = {}

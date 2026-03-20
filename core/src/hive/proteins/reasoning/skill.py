@@ -8,8 +8,8 @@ from aura_core_gen.aura.core.v1 import Observation
 
 from config.llm import LLMSettings
 
-from .engine import generate_embedding, load_brain
-from .schema import EmbeddingParams, NegotiationParams
+from .engine import AuraTradeNegotiator, generate_embedding, load_brain
+from .schema import EmbeddingParams, NegotiationParams, TradeParams
 
 logger = logging.getLogger(__name__)
 
@@ -25,9 +25,11 @@ class ReasoningSkill(
         self.settings: LLMSettings | None = None
         self.provider: dict[str, Any] | None = None
         self.negotiator: Any = None
+        self.trade_negotiator: AuraTradeNegotiator | None = None
         self._embed_model: Any = None
         self._capabilities = {
             "negotiate": self._negotiate,
+            "trade": self._trade,
             "generate_embedding": self._generate_embedding,
         }
 
@@ -54,6 +56,7 @@ class ReasoningSkill(
                 self.negotiator = load_brain(
                     getattr(self.settings, "compiled_program_path", None)
                 )
+                self.trade_negotiator = AuraTradeNegotiator()
                 self._embed_model = self.provider.get("embedder")
             except Exception as e:
                 logger.error(f"Failed to initialize Reasoning: {e}")
@@ -96,6 +99,24 @@ class ReasoningSkill(
             pass
 
         return Observation(success=True, metadata=make_struct(metadata))
+
+    async def _trade(self, params: dict[str, Any]) -> Observation:
+        if not self.trade_negotiator:
+            return Observation(success=False, error="trade_negotiator_not_ready")
+        p_trade = TradeParams(**params)
+
+        def call() -> dict[str, Any]:
+            from typing import cast
+
+            neg = cast(AuraTradeNegotiator, self.trade_negotiator)
+            return neg.forward(
+                market_context=p_trade.market_context,
+                system_vitals=p_trade.system_vitals,
+                current_treasury=p_trade.current_treasury,
+            )
+
+        result = await asyncio.to_thread(call)
+        return Observation(success=True, metadata=make_struct(result))
 
     async def _generate_embedding(self, params: dict[str, Any]) -> Observation:
         if not self._embed_model:

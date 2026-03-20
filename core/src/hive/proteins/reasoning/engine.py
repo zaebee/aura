@@ -7,6 +7,8 @@ import structlog
 from aura_core import resolve_brain_path
 from langchain_mistralai import MistralAIEmbeddings
 
+from hive.transformer.signatures import GenerateTradeIntent, GenerateTradeRisk
+
 logger = structlog.get_logger(__name__)
 
 # --- JSON Cleaning Implementation ---
@@ -80,6 +82,70 @@ class AuraNegotiator(dspy.Module):
             )
         except Exception as e:
             raise ValueError(f"Negotiator parsing failed: {e}") from e
+
+
+class AuraTradeNegotiator(dspy.Module):
+    """
+    Two-stage DSPy module for ERC-8004 trade intent generation.
+
+    Stage 1 (GenerateTradeRisk): calculates drawdown potential and assigns a
+    risk score before any trade decision is made.
+    Stage 2 (GenerateTradeIntent): produces a structured JSON trade intent,
+    automatically rejecting if risk_score > 0.10.
+    """
+
+    def __init__(self) -> None:
+        super().__init__()
+        self.assess_risk = dspy.Predict(GenerateTradeRisk)
+        self.generate_intent = dspy.Predict(GenerateTradeIntent)
+
+    def forward(
+        self,
+        market_context: dict[str, Any],
+        system_vitals: dict[str, Any],
+        current_treasury: dict[str, Any],
+    ) -> dict[str, Any]:
+        mc_json = json.dumps(market_context)
+        sv_json = json.dumps(system_vitals)
+        ct_json = json.dumps(current_treasury)
+
+        # Stage 1: risk assessment
+        risk_pred = self.assess_risk(
+            market_context=mc_json,
+            system_vitals=sv_json,
+            current_treasury=ct_json,
+        )
+        risk_assessment = {
+            "think": risk_pred.think,
+            "risk_score": risk_pred.risk_score,
+            "risk_category": risk_pred.risk_category,
+        }
+
+        # Stage 2: trade intent generation
+        intent_pred = self.generate_intent(
+            market_context=mc_json,
+            system_vitals=sv_json,
+            current_treasury=ct_json,
+            risk_assessment=json.dumps(risk_assessment),
+        )
+
+        try:
+            trade_data = clean_and_parse_json(intent_pred.trade_intent_json)
+        except Exception as e:
+            raise ValueError(
+                f"TradeNegotiator JSON parsing failed: {e}. "
+                f"Raw output: {intent_pred.trade_intent_json!r}"
+            ) from e
+
+        return cast(
+            dict[str, Any],
+            {
+                "think": risk_pred.think,
+                "risk_score": risk_pred.risk_score,
+                "risk_category": risk_pred.risk_category,
+                "trade": trade_data,
+            },
+        )
 
 
 # --- Embeddings Implementation ---
