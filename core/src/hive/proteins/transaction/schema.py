@@ -27,3 +27,12 @@ class PaymentProof(BaseModel):
     block_number: str
     from_address: str
     confirmed_at: datetime
+
+
+class TradeIntentParams(BaseModel):
+    trade_id: str
+    asset_identifier: str
+    asset_domain: str
+    proposed_price: float
+    currency_code: str
+    reasoning: str = ""
