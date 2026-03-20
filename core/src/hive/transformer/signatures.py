@@ -66,7 +66,7 @@ class AppraiseAndVerifyRWA(dspy.Signature):
 
     vision_report: str = dspy.InputField(
         desc="JSON string from Gemma 3 describing the physical asset: type, condition, "
-             "weight/size, estimated value, and any anomalies detected."
+        "weight/size, estimated value, and any anomalies detected."
     )
     wallet_address: str = dspy.InputField(
         desc="Solana wallet address of the counterparty submitting the asset."
@@ -76,11 +76,11 @@ class AppraiseAndVerifyRWA(dspy.Signature):
     )
     six_rates: str = dspy.InputField(
         desc="JSON string of SIX data partner FX and precious metals rates "
-             "(e.g. XAU/USD, XAG/USD, EUR/USD) used for asset valuation."
+        "(e.g. XAU/USD, XAG/USD, EUR/USD) used for asset valuation."
     )
     ltv_ratio: str = dspy.InputField(
         desc="Loan-to-value ratio as a plain float string (e.g. '0.60'). "
-             "collateral_value_usd = appraised_value_usd * ltv_ratio."
+        "collateral_value_usd = appraised_value_usd * ltv_ratio."
     )
     system_vitals: str = dspy.InputField(
         desc="JSON string with system health metrics (CPU, memory, latency)."
@@ -94,7 +94,7 @@ class AppraiseAndVerifyRWA(dspy.Signature):
     )
     violation_code: str = dspy.OutputField(
         desc='Empty string if approved. One of: "KYC_MISSING", "AML_SUSPICIOUS", '
-             '"ASSET_UNVERIFIED" if rejected.'
+        '"ASSET_UNVERIFIED" if rejected.'
     )
     appraised_value_usd: str = dspy.OutputField(
         desc='Appraised asset value in USD as a plain float string. "0.0" if rejected.'
@@ -104,9 +104,9 @@ class AppraiseAndVerifyRWA(dspy.Signature):
     )
     vault_intent_json: str = dspy.OutputField(
         desc="A single valid JSON object with fields: vault_id, asset_identifier, "
-             "asset_domain, appraised_value_usd (float), ltv_ratio (float), "
-             "collateral_value_usd (float), stablecoin_currency, wallet_address, reasoning. "
-             "No markdown fences, no extra text."
+        "asset_domain, appraised_value_usd (float), ltv_ratio (float), "
+        "collateral_value_usd (float), stablecoin_currency, wallet_address, reasoning. "
+        "No markdown fences, no extra text."
     )
 
 
@@ -141,7 +141,7 @@ class GenerateTradeRisk(dspy.Signature):
     )
     risk_threshold: str = dspy.InputField(
         desc="Maximum acceptable risk score as a plain float string (e.g. '0.10'). "
-             "Trades with risk_score above this value must be rejected."
+        "Trades with risk_score above this value must be rejected."
     )
 
     think: str = dspy.OutputField(
@@ -150,9 +150,7 @@ class GenerateTradeRisk(dspy.Signature):
     risk_score: str = dspy.OutputField(
         desc="Float 0.0–1.0 as a plain string (e.g. '0.07'). Lower is safer."
     )
-    risk_category: str = dspy.OutputField(
-        desc="One of: LOW, MEDIUM, HIGH, CRITICAL."
-    )
+    risk_category: str = dspy.OutputField(desc="One of: LOW, MEDIUM, HIGH, CRITICAL.")
 
 
 class GenerateTradeIntent(dspy.Signature):
@@ -209,7 +207,7 @@ class GenerateTradeIntent(dspy.Signature):
     )
     risk_threshold: str = dspy.InputField(
         desc="Maximum acceptable risk score as a plain float string (e.g. '0.10'). "
-             "Trades with risk_score above this value must be rejected."
+        "Trades with risk_score above this value must be rejected."
     )
 
     trade_intent_json: str = dspy.OutputField(

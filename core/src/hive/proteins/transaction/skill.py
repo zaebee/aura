@@ -227,7 +227,9 @@ class TransactionSkill(
         # 1. Access context metadata for security enforcement
         context = params.get("_context")
         if not context:
-            raise MetabolicSecurityError("Security context missing: HiveContext required")
+            raise MetabolicSecurityError(
+                "Security context missing: HiveContext required"
+            )
 
         # Extract metadata from Context (google.protobuf.Struct)
         metadata = (
@@ -237,7 +239,9 @@ class TransactionSkill(
         aml_risk = metadata.get("aml_risk")
 
         # 2. Strict C2C9 Enforcement logic
-        required_kyc = self.settings.required_kyc_status if self.settings else "APPROVED"
+        required_kyc = (
+            self.settings.required_kyc_status if self.settings else "APPROVED"
+        )
         required_aml = self.settings.required_aml_risk if self.settings else "LOW"
 
         if kyc_status != required_kyc or aml_risk != required_aml:

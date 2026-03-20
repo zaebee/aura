@@ -25,10 +25,17 @@ TIMESTAMP_TOLERANCE_SECONDS = 60  # Allow ±60 seconds for clock skew
 async def _parse_request_body(request: Request) -> bytes:
     """Read body bytes, parse JSON if applicable, and cache in request.state.parsed_body.
 
+    Reads from scope["body_cache"] set by BodyCachingMiddleware to avoid
+    RuntimeError("Stream consumed") when File(...) params consume the stream
+    before this dependency runs.
+
     Returns raw body bytes for callers that need them (e.g. for signature hashing).
     Raises HTTPException 400 on malformed JSON.
     """
-    body_bytes = await request.body()
+    # Use body cached by BodyCachingMiddleware (stored in ASGI scope).
+    # Falls back to b"" (safe: produces 401 not 500) if middleware not active.
+    body_bytes: bytes = request.scope.get("body_cache", b"")
+
     content_type = request.headers.get("content-type", "")
     if body_bytes and "application/json" in content_type:
         try:
@@ -37,6 +44,7 @@ async def _parse_request_body(request: Request) -> bytes:
             raise HTTPException(status_code=400, detail="Invalid JSON body") from None
     else:
         request.state.parsed_body = {}
+
     return body_bytes
 
 

@@ -137,7 +137,8 @@ class HiveMembrane(Membrane[Any, Intent, Context]):
                 )
                 return Intent(
                     action=cast(ActionType, ActionType.ACTION_TYPE_REJECT),
-                    reasoning=decision.reasoning + " [MEMBRANE: KYC compliance failure]",
+                    reasoning=decision.reasoning
+                    + " [MEMBRANE: KYC compliance failure]",
                     rwa_vault=rwa_intent,
                 )
             return decision
@@ -155,7 +156,8 @@ class HiveMembrane(Membrane[Any, Intent, Context]):
                 )
                 return Intent(
                     action=cast(ActionType, ActionType.ACTION_TYPE_REJECT),
-                    reasoning=decision.reasoning + " [MEMBRANE: high-risk trade blocked]",
+                    reasoning=decision.reasoning
+                    + " [MEMBRANE: high-risk trade blocked]",
                     trade=trade_intent,
                 )
             return decision
