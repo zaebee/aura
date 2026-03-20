@@ -117,9 +117,9 @@ def test_rwa_negotiator_kyc_rejected(mocker):
     result = negotiator.forward(
         vision_report={"asset_type": "GOLD", "weight_oz": 2.0},
         wallet_address="abc12345xyz",
-        kyc_status=False,
+        kyc_status="false",
         six_rates={"XAU_USD": 31000.0},
-        ltv_ratio=0.60,
+        ltv_ratio="0.60",
         system_vitals={},
     )
 
@@ -151,9 +151,9 @@ def test_rwa_negotiator_approved(mocker):
     result = negotiator.forward(
         vision_report={"asset_type": "GOLD", "weight_oz": 2.0, "condition": "excellent"},
         wallet_address="abc12345xyz",
-        kyc_status=True,
+        kyc_status="true",
         six_rates={"XAU_USD": 31000.0},
-        ltv_ratio=0.60,
+        ltv_ratio="0.60",
         system_vitals={},
     )
 
@@ -372,4 +372,4 @@ async def test_rwa_ltv_ratio_from_settings():
     call_args = mock_reasoning.execute.call_args
     # skill.execute(intent, params) — params is the second positional arg
     passed_params = call_args.args[1]
-    assert passed_params["ltv_ratio"] == pytest.approx(0.50, abs=1e-6)
+    assert passed_params["ltv_ratio"] == "0.5"

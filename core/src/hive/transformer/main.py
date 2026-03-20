@@ -177,21 +177,26 @@ class AuraTransformer(Transformer[Context, Intent]):
 
     def _build_rwa_context(
         self, metadata: dict[str, Any]
-    ) -> tuple[dict[str, Any], str, bool, dict[str, Any], dict[str, Any]]:
-        """Extract RWA fields from metadata."""
+    ) -> tuple[dict[str, Any], str, str, str, dict[str, Any], dict[str, Any]]:
+        """Extract RWA fields from metadata.
+
+        kyc_status is returned as "true"/"false" string and ltv_ratio as a
+        float string (e.g. "0.60") to match the AppraiseAndVerifyRWA DSPy
+        signature InputField types directly — no conversion needed downstream.
+        """
         vision_report: dict[str, Any] = _as_dict(metadata.get("vision_report"))  # type: ignore[assignment]
         wallet_address = str(metadata.get("wallet_address", ""))
-        kyc_status = metadata.get("kyc_status", "false") == "true"
+        kyc_status_str = "true" if metadata.get("kyc_status", "false") == "true" else "false"
+        ltv_ratio_str = str(self._rwa_ltv_ratio())
         six_rates: dict[str, Any] = _as_dict(metadata.get("six_rates"))  # type: ignore[assignment]
         system_vitals: dict[str, Any] = _as_dict(metadata.get("vitals"))  # type: ignore[assignment]
-        return vision_report, wallet_address, kyc_status, six_rates, system_vitals
+        return vision_report, wallet_address, kyc_status_str, ltv_ratio_str, six_rates, system_vitals
 
     async def _think_rwa(self, context: Context, metadata: dict[str, Any]) -> Intent:
         """RWA path: invoke AppraiseAndVerifyRWA via the reasoning protein."""
-        vision_report, wallet_address, kyc_status, six_rates, system_vitals = (
+        vision_report, wallet_address, kyc_status_str, ltv_ratio_str, six_rates, system_vitals = (
             self._build_rwa_context(metadata)
         )
-        ltv_ratio = self._rwa_ltv_ratio()
 
         obs = await self.registry.execute(
             "reasoning",
@@ -199,9 +204,9 @@ class AuraTransformer(Transformer[Context, Intent]):
             {
                 "vision_report": vision_report,
                 "wallet_address": wallet_address,
-                "kyc_status": kyc_status,
+                "kyc_status": kyc_status_str,
                 "six_rates": six_rates,
-                "ltv_ratio": ltv_ratio,
+                "ltv_ratio": ltv_ratio_str,
                 "system_vitals": system_vitals,
             },
         )
@@ -224,8 +229,9 @@ class AuraTransformer(Transformer[Context, Intent]):
         raw_think = str(raw.get("think", ""))
         wrapped_think = f"<think>\n{raw_think}\n</think>" if raw_think else ""
 
+        kyc_passed = kyc_status_str == "true" and compliance_status == "APPROVED"
         compliance = RWAComplianceScore(
-            kyc_passed=kyc_status and compliance_status == "APPROVED",
+            kyc_passed=kyc_passed,
             aml_passed=compliance_status == "APPROVED",
             compliance_status=compliance_status,
             violation_code=violation_code,
@@ -237,7 +243,7 @@ class AuraTransformer(Transformer[Context, Intent]):
             asset_identifier=str(vault_data.get("asset_identifier", "")),
             asset_domain=str(vault_data.get("asset_domain", "")),
             appraised_value_usd=float(vault_data.get("appraised_value_usd", 0.0)),
-            ltv_ratio=float(vault_data.get("ltv_ratio", ltv_ratio)),
+            ltv_ratio=float(vault_data.get("ltv_ratio", ltv_ratio_str)),
             collateral_value_usd=float(vault_data.get("collateral_value_usd", 0.0)),
             stablecoin_currency=str(vault_data.get("stablecoin_currency", "USDC")),
             wallet_address=wallet_address,

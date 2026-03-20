@@ -172,17 +172,18 @@ class AuraRWANegotiator(dspy.Module):
         self,
         vision_report: dict[str, Any],
         wallet_address: str,
-        kyc_status: bool,
+        kyc_status: str,
         six_rates: dict[str, Any],
-        ltv_ratio: float,
+        ltv_ratio: str,
         system_vitals: dict[str, Any],
     ) -> dict[str, Any]:
+        # kyc_status and ltv_ratio are already strings matching the DSPy signature
         pred = self.appraise(
             vision_report=json.dumps(vision_report),
             wallet_address=wallet_address,
-            kyc_status=str(kyc_status).lower(),
+            kyc_status=kyc_status,
             six_rates=json.dumps(six_rates),
-            ltv_ratio=str(ltv_ratio),
+            ltv_ratio=ltv_ratio,
             system_vitals=json.dumps(system_vitals),
         )
 

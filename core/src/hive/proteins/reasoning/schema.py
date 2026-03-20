@@ -31,7 +31,9 @@ class TradeParams(BaseModel):
 class RWAParams(BaseModel):
     vision_report: dict[str, Any] = {}
     wallet_address: str = ""
-    kyc_status: bool = False
+    # String form matching AppraiseAndVerifyRWA DSPy signature: "true" or "false"
+    kyc_status: str = "false"
     six_rates: dict[str, Any] = {}
-    ltv_ratio: float = 0.60
+    # String form matching AppraiseAndVerifyRWA DSPy signature: e.g. "0.60"
+    ltv_ratio: str = "0.60"
     system_vitals: dict[str, Any] = {}
