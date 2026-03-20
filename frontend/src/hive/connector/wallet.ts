@@ -100,14 +100,15 @@ export class AgentWallet implements Connector {
   }
 
   getSigningPath(relativePath: string): string {
+    let pathPrefix: string
     try {
-      const base = new URL(this.GATEWAY_URL).pathname.replace(/\/$/, '')
-      return base + (relativePath.startsWith('/') ? relativePath : '/' + relativePath)
+      pathPrefix = new URL(this.GATEWAY_URL).pathname
     } catch {
       // GATEWAY_URL is relative (e.g., '/api/v1')
-      const base = this.GATEWAY_URL.replace(/\/$/, '')
-      return base + (relativePath.startsWith('/') ? relativePath : '/' + relativePath)
+      pathPrefix = this.GATEWAY_URL
     }
+    const base = pathPrefix.replace(/\/$/, '')
+    return base + (relativePath.startsWith('/') ? relativePath : '/' + relativePath)
   }
 
   async signRawHash(method: string, path: string, bodyHash: string): Promise<Record<string, string>> {
