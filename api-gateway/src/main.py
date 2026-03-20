@@ -35,6 +35,7 @@ from opentelemetry.instrumentation.fastapi import FastAPIInstrumentor
 from pydantic import BaseModel
 from security import verify_public_membrane
 from starlette.middleware.cors import CORSMiddleware
+from starlette.types import ASGIApp, Message, Receive, Scope, Send
 from telemetry import init_telemetry
 
 from config import get_settings
@@ -130,6 +131,49 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+
+class BodyCachingMiddleware:
+    """Pure ASGI middleware that reads and replays the request body.
+
+    Stores raw bytes in scope["body_cache"] so that security dependencies
+    can read the body even after File(...) params have consumed the stream.
+    """
+
+    def __init__(self, app: ASGIApp) -> None:
+        self.app = app
+
+    async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
+        if scope["type"] != "http":
+            await self.app(scope, receive, send)
+            return
+
+        chunks: list[bytes] = []
+        more_body = True
+        while more_body:
+            message: Message = await receive()
+            chunks.append(message.get("body", b""))
+            more_body = message.get("more_body", False)
+
+        scope["body_cache"] = b"".join(chunks)
+
+        received = False
+
+        async def replayable_receive() -> Message:
+            nonlocal received
+            if not received:
+                received = True
+                return {
+                    "type": "http.request",
+                    "body": scope["body_cache"],
+                    "more_body": False,
+                }
+            return {"type": "http.disconnect"}
+
+        await self.app(scope, replayable_receive, send)
+
+
+app.add_middleware(BodyCachingMiddleware)
+
 FastAPIInstrumentor.instrument_app(app)
 
 REQUEST_ID_METADATA_KEY = "x-request-id"
@@ -141,11 +185,6 @@ async def request_id_middleware(
 ) -> Response:
     request_id = str(uuid.uuid4())
     bind_request_id(request_id)
-    # Pre-cache the raw body so that request.body() in the security dependency
-    # and request.form() for File(...) parameters both see the same bytes.
-    # Without this, File(...) consuming the ASGI stream first causes
-    # request.body() to raise RuntimeError("Stream consumed").
-    await request.body()
     try:
         return await call_next(request)
     finally:
