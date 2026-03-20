@@ -83,6 +83,7 @@ def test_aura_trade_negotiator_low_risk(mocker):
         market_context={"prices": {"USDC": 1.0}, "asset_domain": "VEHICLE"},
         system_vitals={"cpu_usage_percent": 20.0},
         current_treasury={"USDC": 1000.0},
+        risk_threshold=0.10,
     )
 
     assert result["risk_score"] == "0.04"
@@ -127,6 +128,7 @@ def test_aura_trade_negotiator_high_risk(mocker):
         market_context={"prices": {"USDC": 1.0}, "asset_domain": "VEHICLE"},
         system_vitals={"cpu_usage_percent": 90.0},
         current_treasury={"USDC": 100.0},
+        risk_threshold=0.10,
     )
 
     assert float(result["risk_score"]) > 0.10
@@ -140,7 +142,12 @@ def test_aura_trade_negotiator_high_risk(mocker):
 # ---------------------------------------------------------------------------
 
 
-def _make_trade_obs(risk_score: float, risk_category: str, proposed_price: float) -> Any:
+def _make_trade_obs(
+    risk_score: float,
+    risk_category: str,
+    proposed_price: float,
+    rejected: bool = False,
+) -> Any:
     """Build a mock Observation whose metadata matches the trade reasoning output."""
     raw: dict[str, Any] = {
         "think": f"<think>risk={risk_score}</think>",
@@ -153,9 +160,7 @@ def _make_trade_obs(risk_score: float, risk_category: str, proposed_price: float
             "proposed_price": proposed_price,
             "currency_code": "USDC",
             "reasoning": (
-                "REJECTED_HIGH_RISK: too risky."
-                if risk_score > 0.10
-                else "Market stable."
+                "REJECTED_HIGH_RISK: too risky." if rejected else "Market stable."
             ),
         },
     }
@@ -170,7 +175,7 @@ async def test_transformer_think_trade_path_low_risk():
     registry = SkillRegistry()
     mock_reasoning = MagicMock()
     mock_reasoning.execute = AsyncMock(
-        return_value=_make_trade_obs(0.04, "LOW", 250.0)
+        return_value=_make_trade_obs(0.04, "LOW", 250.0, rejected=False)
     )
     registry.register("reasoning", mock_reasoning)
 
@@ -204,7 +209,7 @@ async def test_transformer_think_trade_path_high_risk():
     registry = SkillRegistry()
     mock_reasoning = MagicMock()
     mock_reasoning.execute = AsyncMock(
-        return_value=_make_trade_obs(0.15, "HIGH", 0.0)
+        return_value=_make_trade_obs(0.15, "HIGH", 0.0, rejected=True)
     )
     registry.register("reasoning", mock_reasoning)
 
@@ -262,6 +267,37 @@ async def test_membrane_blocks_high_risk_trade():
 
     assert result.action == ActionType.ACTION_TYPE_REJECT
     assert "MEMBRANE: high-risk trade blocked" in result.reasoning
+
+
+@pytest.mark.asyncio
+async def test_transformer_respects_custom_risk_threshold():
+    """Threshold from SafetySettings overrides the 0.10 default."""
+    registry = SkillRegistry()
+    mock_reasoning = MagicMock()
+    # risk_score=0.12 — above default 0.10 but below custom threshold of 0.20
+    # rejected=False: LLM did not self-reject; threshold check must decide
+    mock_reasoning.execute = AsyncMock(
+        return_value=_make_trade_obs(0.12, "HIGH", 200.0, rejected=False)
+    )
+    registry.register("reasoning", mock_reasoning)
+
+    settings = MagicMock()
+    settings.llm.model = "mistral"
+    settings.safety.trade_risk_threshold = 0.20  # relaxed threshold
+
+    transformer = AuraTransformer(registry=registry, settings=settings)
+    context = Context(
+        metadata=make_struct({"trade_mode": "true", "asset_domain": "VEHICLE"}),
+    )
+
+    intent = await transformer.think(context)
+
+    import betterproto
+
+    params_name, _ = betterproto.which_one_of(intent, "params")
+    assert params_name == "trade"
+    # 0.12 < 0.20 threshold → should ACCEPT
+    assert intent.action == ActionType.ACTION_TYPE_ACCEPT
 
 
 @pytest.mark.asyncio

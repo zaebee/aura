@@ -103,16 +103,19 @@ class AuraTradeNegotiator(dspy.Module):
         market_context: dict[str, Any],
         system_vitals: dict[str, Any],
         current_treasury: dict[str, Any],
+        risk_threshold: float = 0.10,
     ) -> dict[str, Any]:
         mc_json = json.dumps(market_context)
         sv_json = json.dumps(system_vitals)
         ct_json = json.dumps(current_treasury)
+        rt_str = str(risk_threshold)
 
         # Stage 1: risk assessment
         risk_pred = self.assess_risk(
             market_context=mc_json,
             system_vitals=sv_json,
             current_treasury=ct_json,
+            risk_threshold=rt_str,
         )
         risk_assessment = {
             "think": risk_pred.think,
@@ -126,6 +129,7 @@ class AuraTradeNegotiator(dspy.Module):
             system_vitals=sv_json,
             current_treasury=ct_json,
             risk_assessment=json.dumps(risk_assessment),
+            risk_threshold=rt_str,
         )
 
         try:

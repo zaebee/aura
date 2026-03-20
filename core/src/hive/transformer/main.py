@@ -154,6 +154,16 @@ class AuraTransformer(Transformer[Context, Intent]):
             "vision_confidence_threshold": vision_confidence_threshold,
         }
 
+    def _trade_risk_threshold(self) -> float:
+        """Read trade_risk_threshold from SafetySettings, defaulting to 0.10."""
+        if (
+            self.settings
+            and hasattr(self.settings, "safety")
+            and hasattr(self.settings.safety, "trade_risk_threshold")
+        ):
+            return float(self.settings.safety.trade_risk_threshold)
+        return 0.10
+
     def _is_trade_context(self, metadata: dict[str, Any]) -> bool:
         """Return True when the context carries a trade signal."""
         if metadata.get("trade_mode") == "true":
@@ -185,6 +195,7 @@ class AuraTransformer(Transformer[Context, Intent]):
         market_context, system_vitals, current_treasury = self._build_trade_context(
             metadata
         )
+        risk_threshold = self._trade_risk_threshold()
 
         obs = await self.registry.execute(
             "reasoning",
@@ -193,6 +204,7 @@ class AuraTransformer(Transformer[Context, Intent]):
                 "market_context": market_context,
                 "system_vitals": system_vitals,
                 "current_treasury": current_treasury,
+                "risk_threshold": risk_threshold,
             },
         )
 
@@ -229,7 +241,8 @@ class AuraTransformer(Transformer[Context, Intent]):
             validation_score=validation_score,
         )
 
-        is_high_risk = risk_score > 0.10 or "REJECTED_HIGH_RISK" in trade_intent.reasoning
+        risk_threshold = self._trade_risk_threshold()
+        is_high_risk = risk_score > risk_threshold or "REJECTED_HIGH_RISK" in trade_intent.reasoning
         action = (
             ActionType.ACTION_TYPE_REJECT if is_high_risk else ActionType.ACTION_TYPE_ACCEPT
         )

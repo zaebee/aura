@@ -11,12 +11,13 @@ class GenerateTradeRisk(dspy.Signature):
 
     Rules:
     - risk_score is a float between 0.0 (no risk) and 1.0 (maximum risk).
-    - If drawdown potential exceeds 10% of treasury, risk_score MUST be > 0.10.
+    - If drawdown potential exceeds risk_threshold of treasury, risk_score MUST
+      be greater than risk_threshold.
     - risk_category must be one of: LOW, MEDIUM, HIGH, CRITICAL.
-      - LOW:      risk_score <= 0.05
-      - MEDIUM:   0.05 < risk_score <= 0.10
-      - HIGH:     0.10 < risk_score <= 0.30
-      - CRITICAL: risk_score > 0.30
+      - LOW:      risk_score <= (risk_threshold / 2)
+      - MEDIUM:   (risk_threshold / 2) < risk_score <= risk_threshold
+      - HIGH:     risk_threshold < risk_score <= (risk_threshold * 3)
+      - CRITICAL: risk_score > (risk_threshold * 3)
     - think must contain your step-by-step reasoning wrapped in <think>...</think> tags.
     """
 
@@ -28,6 +29,10 @@ class GenerateTradeRisk(dspy.Signature):
     )
     current_treasury: str = dspy.InputField(
         desc="JSON string with current token balances and available liquidity."
+    )
+    risk_threshold: str = dspy.InputField(
+        desc="Maximum acceptable risk score as a plain float string (e.g. '0.10'). "
+             "Trades with risk_score above this value must be rejected."
     )
 
     think: str = dspy.OutputField(
@@ -53,9 +58,9 @@ class GenerateTradeIntent(dspy.Signature):
     - Output MUST be a single valid JSON object. No markdown fences, no prose.
     - Required fields: trade_id, asset_identifier, asset_domain, proposed_price,
       currency_code, reasoning.
-    - If risk_assessment contains risk_score > 0.10 OR risk_category is HIGH or
-      CRITICAL, you MUST set proposed_price to 0.0 and include the string
-      "REJECTED_HIGH_RISK" in the reasoning field.
+    - If risk_assessment contains risk_score greater than risk_threshold OR
+      risk_category is HIGH or CRITICAL, you MUST set proposed_price to 0.0
+      and include the string "REJECTED_HIGH_RISK" in the reasoning field.
     - trade_id must be a UUID-style string (e.g. "trade-<timestamp>-<asset>").
     - currency_code must be "USDC" unless market_context specifies otherwise.
     - reasoning must summarise the key factors driving the decision.
@@ -77,7 +82,7 @@ class GenerateTradeIntent(dspy.Signature):
       "asset_domain": "VEHICLE",
       "proposed_price": 0.0,
       "currency_code": "USDC",
-      "reasoning": "REJECTED_HIGH_RISK: drawdown potential 15% exceeds threshold."
+      "reasoning": "REJECTED_HIGH_RISK: drawdown potential exceeds threshold."
     }
     """
 
@@ -92,6 +97,10 @@ class GenerateTradeIntent(dspy.Signature):
     )
     risk_assessment: str = dspy.InputField(
         desc="JSON string with risk_score, risk_category, and think from GenerateTradeRisk."
+    )
+    risk_threshold: str = dspy.InputField(
+        desc="Maximum acceptable risk score as a plain float string (e.g. '0.10'). "
+             "Trades with risk_score above this value must be rejected."
     )
 
     trade_intent_json: str = dspy.OutputField(

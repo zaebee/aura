@@ -25,3 +25,4 @@ class TradeParams(BaseModel):
     market_context: dict[str, Any] = {}
     system_vitals: dict[str, Any] = {}
     current_treasury: dict[str, Any] = {}
+    risk_threshold: float = 0.10

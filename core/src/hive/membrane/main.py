@@ -129,7 +129,8 @@ class HiveMembrane(Membrane[Any, Intent, Context]):
         if params_name == "trade" and params_value is not None:
             trade_intent = cast(TradeIntent, params_value)
             risk_score = trade_intent.validation_score.risk_score
-            if risk_score > 0.10:
+            risk_threshold = getattr(self.settings.safety, "trade_risk_threshold", 0.10)
+            if risk_score > risk_threshold:
                 logger.warning(
                     "membrane_blocked_high_risk_trade",
                     risk_score=risk_score,

@@ -113,6 +113,7 @@ class ReasoningSkill(
                 market_context=p_trade.market_context,
                 system_vitals=p_trade.system_vitals,
                 current_treasury=p_trade.current_treasury,
+                risk_threshold=p_trade.risk_threshold,
             )
 
         result = await asyncio.to_thread(call)
