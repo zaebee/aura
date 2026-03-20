@@ -1,9 +1,9 @@
-import AgentConsole from './components/AgentConsole'
+import RWACommandCenter from './components/RWACommandCenter'
 
 function App() {
   return (
-    <main className="min-h-screen p-4 bg-[#0a0a0a]">
-      <AgentConsole />
+    <main className="min-h-screen bg-[#0a0a0f]">
+      <RWACommandCenter />
     </main>
   )
 }

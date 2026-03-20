@@ -1,10 +1,17 @@
 @import "tailwindcss";
+@import url('https://fonts.googleapis.com/css2?family=Fira+Code:wght@300;400;500;600&display=swap');
 
 @theme {
   --color-cyberpunk-blue: #00f2ff;
   --color-cyberpunk-purple: #bc13fe;
   --color-card-bg: #1a1a1a;
   --color-error: #ff003c;
+
+  --color-void: #0a0a0f;
+  --color-cyan-membrane: #00f0ff;
+  --color-golden-energy: #ffd700;
+  --color-alert-magenta: #ff00aa;
+  --color-card-dark: #0d0d14;
 
   --background-image-cyberpunk-gradient: linear-gradient(90deg, #00f2ff 0%, #bc13fe 100%);
 
@@ -72,5 +79,68 @@
 
   .animate-fade-in {
     animation: fadeIn 0.3s ease-out forwards;
+  }
+
+  @keyframes scanline {
+    0% {
+      background-position: 0 -100%;
+    }
+    100% {
+      background-position: 0 200%;
+    }
+  }
+
+  @keyframes pulse-glow {
+    0%, 100% {
+      box-shadow: 0 0 8px 2px rgba(0, 240, 255, 0.4), inset 0 0 8px rgba(0, 240, 255, 0.05);
+    }
+    50% {
+      box-shadow: 0 0 20px 6px rgba(0, 240, 255, 0.8), inset 0 0 20px rgba(0, 240, 255, 0.15);
+    }
+  }
+
+  @keyframes led-on {
+    0% {
+      opacity: 0;
+      box-shadow: none;
+    }
+    100% {
+      opacity: 1;
+      box-shadow: 0 0 8px 2px rgba(0, 255, 100, 0.8);
+    }
+  }
+
+  @keyframes blink-cursor {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0; }
+  }
+
+  @keyframes mint-pulse {
+    0%, 100% {
+      box-shadow: 0 0 15px rgba(255, 215, 0, 0.5), 0 0 30px rgba(0, 240, 255, 0.3);
+    }
+    50% {
+      box-shadow: 0 0 30px rgba(255, 215, 0, 0.9), 0 0 60px rgba(0, 240, 255, 0.6);
+    }
+  }
+
+  .animate-scanline {
+    animation: scanline 2s linear infinite;
+  }
+
+  .animate-pulse-glow {
+    animation: pulse-glow 1.5s ease-in-out infinite;
+  }
+
+  .animate-led-on {
+    animation: led-on 0.4s ease-out forwards;
+  }
+
+  .animate-blink-cursor {
+    animation: blink-cursor 0.8s step-end infinite;
+  }
+
+  .animate-mint-pulse {
+    animation: mint-pulse 1.5s ease-in-out infinite;
   }
 }
