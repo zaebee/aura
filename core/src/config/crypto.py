@@ -23,6 +23,8 @@ class CryptoSettings(BaseModel):
     evm_private_key: SecretStr = SecretStr("")  # Hex-encoded private key
     evm_rpc_url: HttpUrl = "https://sepolia.base.org"  # type: ignore
     evm_usdc_address: str = "0x036CbD53842c5426634e7929541eC2318f3dCF7e"
+    evm_chain_id: int = 84532  # Base Sepolia
+    risk_router_address: str = ""
 
     wallet_address: str = ""
 
