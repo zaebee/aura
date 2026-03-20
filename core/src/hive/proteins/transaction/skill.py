@@ -7,7 +7,7 @@ from hive.metabolism import MetabolicSecurityError
 
 from config.crypto import CryptoSettings
 
-from .engine import PriceConverter, SecretEncryption
+from .engine import EVMProvider, PriceConverter, SecretEncryption
 from .schema import (
     PaymentProof,
     PaymentRequestParams,
@@ -16,6 +16,7 @@ from .schema import (
     TaxCalculationParams,
     TradeIntentParams,
 )
+from .solana_engine import SolanaProvider
 
 logger = structlog.get_logger(__name__)
 
@@ -29,9 +30,9 @@ class TransactionSkill(
 
     def __init__(self) -> None:
         self.settings: CryptoSettings | None = None
-        self.provider: Any = None
-        self.solana_provider: Any = None
-        self.evm_provider: Any = None
+        self.provider: SolanaProvider | None = None
+        self.solana_provider: SolanaProvider | None = None
+        self.evm_provider: EVMProvider | None = None
         self.encryption: SecretEncryption | None = None
         self.converter: PriceConverter | None = None
         self._capabilities = {

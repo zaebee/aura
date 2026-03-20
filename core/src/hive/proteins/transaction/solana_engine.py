@@ -19,7 +19,6 @@ from spl.token.instructions import (
 logger = logging.getLogger(__name__)
 
 FINALIZED_COMMITMENT = "finalized"
-TOKEN_PROGRAM_ID = "TokenkegQfeZyiNJbNbNbNbNbNbNbNbNbNbNbNbNbN"  # nosec
 ASSOCIATED_TOKEN_PROGRAM_ID = "ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL"  # nosec
 AMOUNT_TOLERANCE = 0.0001
 
