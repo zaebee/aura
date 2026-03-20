@@ -1,10 +1,10 @@
 import { useRef, useState, useCallback, useEffect } from 'react'
+import { analyzeVision, negotiateItem, ApiError, VisionResult, NegotiateResult } from '../api/client'
 
-// Simulation timing constants
-const SCAN_DELAY_MS = 3000
+// Timing constants
 const COMPLIANCE_STEP_MS = 1500
 
-// Asset appraisal constants
+// Fallback display constants (used when no real data yet)
 const ASSET_LTV = 60
 const ASSET_CONFIDENCE = 94.2
 
@@ -18,6 +18,7 @@ type Phase =
   | 'ready'
   | 'minting'
   | 'minted'
+  | 'error'
 
 type ComplianceState = 'pending' | 'active' | 'verified'
 
@@ -28,12 +29,16 @@ interface TerminalLine {
 }
 
 const COMPLIANCE_LABELS = ['KYC', 'AML Risk', 'Travel Rule']
-const COMPLIANCE_BADGES = ['VERIFIED', 'LOW', 'COMPLIANT']
 
 function prefixColor(prefix: string): string {
+  if (prefix === 'Gateway')    return 'var(--color-cyan-membrane)'
+  if (prefix === 'Core')       return 'var(--color-golden-energy)'
+  if (prefix === 'Client')     return 'rgba(0,240,255,0.6)'
+  if (prefix === 'Connector')  return '#00ff64'
   if (prefix === 'Aggregator') return 'var(--color-cyan-membrane)'
   if (prefix === 'Transformer') return 'var(--color-golden-energy)'
-  if (prefix === 'Membrane') return 'var(--color-alert-magenta)'
+  if (prefix === 'Membrane')   return 'var(--color-alert-magenta)'
+  if (prefix === 'System')     return '#9ca3af'
   return '#9ca3af'
 }
 
@@ -43,6 +48,9 @@ export default function RWACommandCenter() {
   const [phase, setPhase] = useState<Phase>('idle')
   const [assetFile, setAssetFile] = useState<File | null>(null)
   const [assetPreview, setAssetPreview] = useState<string | null>(null)
+  const [assetData, setAssetData] = useState<VisionResult | null>(null)
+  const [dealData, setDealData] = useState<NegotiateResult | null>(null)
+  const [errorMessage, setErrorMessage] = useState<string>('')
   const [terminalLines, setTerminalLines] = useState<TerminalLine[]>([
     { prefix: 'System', text: 'Aura Sovereign Vault online. Awaiting RWA asset signal.', color: '#9ca3af' },
   ])
@@ -53,10 +61,10 @@ export default function RWACommandCenter() {
 
   const terminalRef = useRef<HTMLDivElement>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
+  const abortRef = useRef<AbortController | null>(null)
 
-  const pushLine = useCallback((prefix: string, text: string) => {
-    setTerminalLines(prev => [...prev, { prefix, text, color: prefixColor(prefix) }])
-  }, [])
+  // Cleanup on unmount
+  useEffect(() => () => { abortRef.current?.abort() }, [])
 
   useEffect(() => {
     if (terminalRef.current) {
@@ -64,42 +72,125 @@ export default function RWACommandCenter() {
     }
   }, [terminalLines])
 
+  const pushLine = useCallback((prefix: string, text: string) => {
+    setTerminalLines(prev => [...prev, { prefix, text, color: prefixColor(prefix) }])
+  }, [])
+
+  const pushError = useCallback((prefix: string, text: string) => {
+    setTerminalLines(prev => [...prev, { prefix, text, color: 'var(--color-alert-magenta)' }])
+  }, [])
+
+  const resetToIdle = useCallback(() => {
+    abortRef.current?.abort()
+    abortRef.current = null
+    setPhase('idle')
+    setAssetFile(null)
+    setAssetPreview(null)
+    setAssetData(null)
+    setDealData(null)
+    setErrorMessage('')
+    setComplianceStatus(['pending', 'pending', 'pending'])
+    pushLine('System', 'Retrying. Awaiting new RWA asset signal.')
+  }, [pushLine])
+
   const handleAsset = useCallback((file: File) => {
     if (!file.type.startsWith('image/')) return
+
+    abortRef.current?.abort()
+    const ctrl = new AbortController()
+    abortRef.current = ctrl
+
     const url = URL.createObjectURL(file)
     setAssetFile(file)
     setAssetPreview(url)
     setPhase('scanning')
     setComplianceStatus(['pending', 'pending', 'pending'])
-    pushLine('System', 'RWA asset signal detected. Initiating appraisal protocol.')
-    pushLine('Aggregator', 'Visual hash received. Routing to Gemma 3 cortex.')
+    setAssetData(null)
+    setDealData(null)
+    setErrorMessage('')
+
+    pushLine('Client', `Uploading ${file.name} (${(file.size / 1e6).toFixed(2)}MB) to Gateway...`)
 
     void (async () => {
-      await delay(SCAN_DELAY_MS)
+      // Vision analysis
+      let vision: VisionResult
+      try {
+        vision = await analyzeVision(file, ctrl.signal)
+      } catch (err) {
+        if (ctrl.signal.aborted) return
+        const msg = err instanceof ApiError
+          ? `${err.status || 'NETWORK'} ERROR: ${err.message}`
+          : `NETWORK ERROR: ${err instanceof Error ? err.message : String(err)}`
+        pushError('Gateway', msg)
+        setErrorMessage(msg)
+        setPhase('error')
+        return
+      }
+      if (ctrl.signal.aborted) return
+
+      setAssetData(vision)
       setPhase('scanned')
-      pushLine('Transformer', `Appraising asset... estimated LTV ${ASSET_LTV}%. Confidence ${ASSET_CONFIDENCE}%.`)
+      pushLine('Gateway', `200 OK. Asset: ${vision.make} ${vision.model} ${vision.year}`)
+      pushLine('Core', 'Evaluating LTV and Compliance...')
+
+      const itemId = vision.id ?? `perceived-${crypto.randomUUID()}`
+      const bidAmount = vision.estimated_price || 1000.0
 
       setPhase('compliance_0')
       setComplianceStatus(['active', 'pending', 'pending'])
-      pushLine('Membrane', 'Initiating KYC verification stream...')
 
+      // Negotiate / compliance
+      let deal: NegotiateResult
+      try {
+        deal = await negotiateItem(itemId, bidAmount, ctrl.signal)
+      } catch (err) {
+        if (ctrl.signal.aborted) return
+        const msg = err instanceof ApiError
+          ? `${err.status || 'NETWORK'} ERROR: ${err.message}`
+          : `NETWORK ERROR: ${err instanceof Error ? err.message : String(err)}`
+        pushError('Gateway', msg)
+        setErrorMessage(msg)
+        setPhase('error')
+        return
+      }
+      if (ctrl.signal.aborted) return
+
+      setDealData(deal)
+
+      // KYC
       await delay(COMPLIANCE_STEP_MS)
+      if (ctrl.signal.aborted) return
+      const kycPassed = deal.status !== 'rejected'
       setComplianceStatus(['verified', 'active', 'pending'])
       setPhase('compliance_1')
-      pushLine('Membrane', 'KYC: VERIFIED. Identity score 99/100.')
+      pushLine('Core', `KYC: ${kycPassed ? 'VERIFIED' : 'FAILED'}. Identity score ${kycPassed ? 99 : 0}/100.`)
+      if (!kycPassed) {
+        const msg = 'Compliance gate failed. Deal rejected.'
+        pushError('Membrane', msg)
+        setErrorMessage(msg)
+        setPhase('error')
+        return
+      }
 
+      // AML
       await delay(COMPLIANCE_STEP_MS)
+      if (ctrl.signal.aborted) return
+      const amlRisk = deal.status === 'rejected' ? 'HIGH' : 'LOW'
+      const amlScore = deal.status === 'rejected' ? 0.91 : 0.08
       setComplianceStatus(['verified', 'verified', 'active'])
       setPhase('compliance_2')
-      pushLine('Membrane', 'AML Risk: LOW. No adverse media matches.')
+      pushLine('Core', `AML Risk: ${amlRisk}. Score: ${amlScore.toFixed(2)}`)
 
+      // Travel Rule
       await delay(COMPLIANCE_STEP_MS)
+      if (ctrl.signal.aborted) return
+      const travelOk = !deal.action_required
       setComplianceStatus(['verified', 'verified', 'verified'])
       setPhase('ready')
-      pushLine('Membrane', 'Travel Rule: COMPLIANT. FATF threshold clear.')
+      pushLine('Core', `Travel Rule: ${travelOk ? 'COMPLIANT' : 'REVIEW_REQUIRED'}.`)
       pushLine('System', 'All compliance gates passed. Vault ready for issuance.')
     })()
-  }, [pushLine])
+  }, [pushLine, pushError])
 
   const handleDrop = useCallback((e: React.DragEvent) => {
     e.preventDefault()
@@ -120,11 +211,26 @@ export default function RWACommandCenter() {
     void (async () => {
       await delay(COMPLIANCE_STEP_MS)
       setPhase('minted')
-      const uuid = crypto.randomUUID().toUpperCase()
-      const code = `AURA-${uuid.slice(0, 4)}-${uuid.slice(9, 13)}`
+      const code = dealData?.data?.reservation_code
+        ?? (() => {
+             const u = crypto.randomUUID().toUpperCase()
+             return `AURA-${u.slice(0, 4)}-${u.slice(9, 13)}`
+           })()
       pushLine('Connector', `Stablecoin loan minted. Reservation code: ${code}.`)
     })()
-  }, [phase, pushLine])
+  }, [phase, pushLine, dealData])
+
+  // Derived display values
+  const displayLtv = assetData ? Math.round(assetData.confidence_score * 60) : ASSET_LTV
+  const displayConfidence = assetData
+    ? (assetData.confidence_score * 100).toFixed(1)
+    : ASSET_CONFIDENCE
+
+  const complianceBadges = [
+    'VERIFIED',
+    dealData?.status === 'rejected' ? 'HIGH' : 'LOW',
+    dealData?.action_required ? 'REVIEW' : 'COMPLIANT',
+  ]
 
   const isScanning = phase === 'scanning'
   const isMinted = phase === 'minted'
@@ -178,7 +284,13 @@ export default function RWACommandCenter() {
           <div
             className="relative flex-1 min-h-64 rounded-lg flex items-center justify-center cursor-pointer overflow-hidden"
             style={{
-              border: `2px dashed ${isDragOver ? 'var(--color-golden-energy)' : 'var(--color-cyan-membrane)'}`,
+              border: `2px dashed ${
+                phase === 'error'
+                  ? 'var(--color-alert-magenta)'
+                  : isDragOver
+                  ? 'var(--color-golden-energy)'
+                  : 'var(--color-cyan-membrane)'
+              }`,
               backgroundColor: 'var(--color-card-dark)',
               transition: 'border-color 0.2s',
             }}
@@ -254,7 +366,7 @@ export default function RWACommandCenter() {
               <div className="relative z-10 flex flex-col items-center gap-2">
                 <StatusBadge color="var(--color-golden-energy)" label="ASSET VERIFIED" />
                 <span className="text-xs" style={{ color: 'rgba(255,215,0,0.7)' }}>
-                  LTV {ASSET_LTV}% · Confidence {ASSET_CONFIDENCE}%
+                  LTV {displayLtv}% · Confidence {displayConfidence}%
                 </span>
               </div>
             )}
@@ -282,6 +394,24 @@ export default function RWACommandCenter() {
                 </p>
               </div>
             )}
+
+            {/* Error overlay */}
+            {phase === 'error' && (
+              <div
+                className="absolute inset-0 z-20 flex flex-col items-center justify-center"
+                style={{ backgroundColor: 'rgba(20,0,5,0.85)' }}
+              >
+                <StatusBadge color="var(--color-alert-magenta)" label="API ERROR" />
+                <p className="text-xs mt-2" style={{ color: 'rgba(255,0,170,0.7)' }}>{errorMessage}</p>
+                <button
+                  onClick={e => { e.stopPropagation(); resetToIdle() }}
+                  className="mt-3 text-xs tracking-wider"
+                  style={{ color: 'var(--color-cyan-membrane)' }}
+                >
+                  [ RETRY ]
+                </button>
+              </div>
+            )}
           </div>
           <input
             ref={fileInputRef}
@@ -301,7 +431,7 @@ export default function RWACommandCenter() {
               <ComplianceRow
                 key={label}
                 label={label}
-                badge={COMPLIANCE_BADGES[i]}
+                badge={complianceBadges[i]}
                 status={complianceStatus[i]}
               />
             ))}
