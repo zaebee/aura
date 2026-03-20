@@ -44,10 +44,8 @@ from spl.token.instructions import (
 logger = structlog.get_logger("invivo_solana_test")
 
 RPC_URL = "https://api.devnet.solana.com"
-DEVNET_USDC_MINT = "Gh9ZwEmdLJ8DscKNTkTqPbNwLNNBjuSzaG9Vp2KGtKJr"
-FALLBACK_TOKEN_MINT = (
-    "4zMMC9srt5Ri5X14GAgXhaHii3GnPAEERYPJgZJDncDU"  # Available test token
-)
+DEVNET_USDC_MINT = "Gh9ZwEmdLJ8DscKNTkTqPbNwLNNBjuSzaG9Vp2KGtKJr"  # nosec B105
+FALLBACK_TOKEN_MINT = "4zMMC9srt5Ri5X14GAgXhaHii3GnPAEERYPJgZJDncDU"  # nosec B105
 SOL_DECIMALS = 9
 USDC_DECIMALS = 6
 TEST_AMOUNT_USDC = 10.0
@@ -129,7 +127,7 @@ async def create_ata_if_needed(
     try:
         await client.get_token_account_balance(ata)
         return ata  # Already exists
-    except Exception:
+    except Exception:  # nosec B110 - Gracefully handle missing account
         pass
 
     # Create ATA
@@ -162,7 +160,7 @@ async def request_usdc_faucet(
             )
             if resp.status_code == 200:
                 return True
-    except Exception:
+    except Exception:  # nosec B110 - Gracefully handle faucet failures
         pass
 
     # Alternative: Try via RPC
@@ -176,7 +174,7 @@ async def request_usdc_faucet(
         r = await client._provider.session.post(RPC_URL, json=payload)
         if r.status_code == 200:
             return True
-    except Exception:
+    except Exception:  # nosec B110 - Gracefully handle RPC failures
         pass
 
     return False
@@ -467,11 +465,11 @@ async def main() -> int:
 
         if treasury_usdc >= TEST_AMOUNT_USDC:
             token_mint = DEVNET_USDC_MINT
-            token_name = "USDC"
+            token_name = "USDC"  # nosec B105
             print(f"  Using USDC (balance: {treasury_usdc:.2f})")
         elif treasury_fallback >= TEST_AMOUNT_USDC:
             token_mint = FALLBACK_TOKEN_MINT
-            token_name = "TEST"
+            token_name = "TEST"  # nosec B105
             print(f"  Using TEST token (balance: {treasury_fallback:.2f})")
         else:
             print(f"  Treasury USDC: {treasury_usdc:.2f}")
