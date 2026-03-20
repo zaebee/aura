@@ -384,8 +384,6 @@ async def test_guard_validates_transaction(mock_guard_skill):
     2. Allows sanctified wallets to proceed
     3. Computes safe price for transaction
     """
-    mock_guard_skill._registry.register("persistence", MockPersistence())
-
     result = await mock_guard_skill.execute(
         "validate_transaction",
         {
@@ -441,39 +439,23 @@ async def test_rwa_kyc_rejected_path(mock_reasoning_skill, skill_registry):
 
 
 @pytest.mark.asyncio
-async def test_metabolic_loop_rejects_kyc_failure():
+async def test_metabolic_loop_rejects_kyc_failure(
+    metabolic_loop, mock_reasoning_skill, skill_registry
+):
     """
     Test Case: Full metabolic loop rejects KYC failure
 
     Verifies end-to-end rejection path through complete loop.
+    Reuses metabolic_loop fixture but overrides the reasoning skill to return rejected status.
     """
-    registry = SkillRegistry()
-
-    mock_reasoning = MagicMock()
-    mock_reasoning.execute = AsyncMock(
+    mock_reasoning_skill.execute = AsyncMock(
         return_value=_make_rejected_rwa_observation("AML_SUSPICIOUS")
-    )
-    mock_reasoning.get_name = MagicMock(return_value="reasoning")
-    mock_reasoning.get_capabilities = MagicMock(return_value=["rwa"])
-    mock_reasoning.initialize = AsyncMock(return_value=True)
-    registry.register("reasoning", mock_reasoning)
-
-    guard = GuardSkill()
-    guard.bind(SafetySettings(), OutputGuard(safety_settings=SafetySettings()))
-    registry.register("guard", guard)
-
-    loop = MetabolicLoop(
-        aggregator=MockAggregator(),
-        transformer=AuraTransformer(registry=registry),
-        connector=MockConnector(),
-        generator=MockGenerator(),
-        membrane=HiveMembrane(registry=registry),
     )
 
     mock_signal = MagicMock()
     mock_signal.bid_amount = 0.0
     mock_signal.signal_type = "SIGNAL_TYPE_NEGOTIATION"
-    observation = await loop.execute(mock_signal)
+    observation = await metabolic_loop.execute(mock_signal)
 
     meta = observation.metadata.to_dict()
     assert meta.get("transaction_chain") != "SOLANA" or not observation.success, (
