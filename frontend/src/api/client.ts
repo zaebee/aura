@@ -96,7 +96,9 @@ export async function analyzeVision(file: File, signal?: AbortSignal): Promise<V
     try {
       const json = await resp.json()
       if (json.detail) detail = json.detail
-    } catch {}
+    } catch (e) {
+      console.error('Failed to parse error response as JSON:', e)
+    }
     throw new ApiError(resp.status, detail)
   }
 
@@ -106,7 +108,7 @@ export async function analyzeVision(file: File, signal?: AbortSignal): Promise<V
 export async function negotiateItem(
   itemId: string,
   bidAmount: number,
-  _signal?: AbortSignal
+  signal?: AbortSignal
 ): Promise<NegotiateResult> {
   if (import.meta.env.VITE_MOCK_RWA === 'true') {
     await delay(1000)
@@ -115,7 +117,7 @@ export async function negotiateItem(
 
   const wallet = getWallet()
   const body = {
-    request_id: `req_${Date.now()}`,
+    request_id: `req_${crypto.randomUUID()}`,
     item_id: itemId,
     bid_amount: bidAmount,
     currency_code: 'USD',
@@ -124,7 +126,7 @@ export async function negotiateItem(
 
   let resp: Response
   try {
-    resp = await wallet.fetchWithAuth('/negotiate', 'POST', body)
+    resp = await wallet.fetchWithAuth('/negotiate', 'POST', body, signal)
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err)
     throw new ApiError(0, msg)

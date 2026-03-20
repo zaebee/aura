@@ -113,7 +113,7 @@ export class AgentWallet implements Connector {
     }
   }
 
-  async fetchWithAuth(path: string, method: string = 'GET', body: unknown = null): Promise<Response> {
+  async fetchWithAuth(path: string, method: string = 'GET', body: unknown = null, signal?: AbortSignal): Promise<Response> {
     const headers = await this.signRequest(method, path, body)
 
     const response = await fetch(`${this.GATEWAY_URL}${path}`, {
@@ -122,7 +122,8 @@ export class AgentWallet implements Connector {
         'Content-Type': 'application/json',
         ...headers
       },
-      body: body ? JSON.stringify(body) : undefined
+      body: body ? JSON.stringify(body) : undefined,
+      signal,
     })
 
     if (!response.ok) {

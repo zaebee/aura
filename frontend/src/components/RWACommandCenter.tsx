@@ -77,7 +77,7 @@ export default function RWACommandCenter() {
   }, [])
 
   const pushError = useCallback((prefix: string, text: string) => {
-    setTerminalLines(prev => [...prev, { prefix, text, color: '#ef4444' }])
+    setTerminalLines(prev => [...prev, { prefix, text, color: 'var(--color-alert-magenta)' }])
   }, [])
 
   const resetToIdle = useCallback(() => {
@@ -133,7 +133,7 @@ export default function RWACommandCenter() {
       pushLine('Gateway', `200 OK. Asset: ${vision.make} ${vision.model} ${vision.year}`)
       pushLine('Core', 'Evaluating LTV and Compliance...')
 
-      const itemId = vision.id ?? `perceived-${vision.make}-${vision.model}`.replace(/\s+/g, '-')
+      const itemId = vision.id ?? `perceived-${crypto.randomUUID()}`
       const bidAmount = vision.estimated_price || 1000.0
 
       setPhase('compliance_0')
