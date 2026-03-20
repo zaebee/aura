@@ -1,5 +1,6 @@
 from datetime import UTC, datetime
 from typing import Any, cast
+from urllib.parse import quote
 
 import httpx
 import structlog
@@ -21,6 +22,7 @@ logger = structlog.get_logger(__name__)
 FINALIZED_COMMITMENT = "finalized"
 ASSOCIATED_TOKEN_PROGRAM_ID = "ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL"  # nosec
 AMOUNT_TOLERANCE = 0.0001
+USDC_DECIMALS = 6
 
 
 class SolanaProvider:
@@ -46,8 +48,17 @@ class SolanaProvider:
         user_pubkey = Pubkey.from_string(wallet_address)
         user_ata = self._derive_ata(user_pubkey, self.usdc_mint_pubkey)
 
-        # USDC usually has 6 decimals
-        amount_raw = int(amount_usdc * 1_000_000)
+        # 1. Verification of Token Decimals (Robustness check)
+        mint_info = (await self.async_rpc_client.get_token_supply(self.usdc_mint_pubkey)).value
+        if mint_info.decimals != USDC_DECIMALS:
+            logger.error(
+                "usdc_decimal_mismatch",
+                expected=USDC_DECIMALS,
+                actual=mint_info.decimals,
+            )
+            raise ValueError(f"USDC decimal mismatch: expected {USDC_DECIMALS}, got {mint_info.decimals}")
+
+        amount_raw = int(amount_usdc * (10**USDC_DECIMALS))
 
         logger.info(
             "executing_rwa_collateral",
@@ -56,7 +67,7 @@ class SolanaProvider:
             user_ata=str(user_ata),
         )
 
-        # Construct transfer instruction
+        # 2. Construct transfer instruction
         transfer_ix = transfer_checked(
             TransferCheckedParams(
                 source=self.usdc_token_account,
@@ -64,7 +75,7 @@ class SolanaProvider:
                 dest=user_ata,
                 owner=self.keypair.pubkey(),
                 amount=amount_raw,
-                decimals=6,
+                decimals=USDC_DECIMALS,
                 program_id=TOKEN_PROGRAM_ID,
             )
         )
@@ -201,7 +212,6 @@ class SolanaProvider:
         label: str = "Aura Hive",
         message: str = "Payment",
     ) -> str:
-        from urllib.parse import quote
         recipient = str(self.keypair.pubkey())
 
         base_url = f"solana:{recipient}"

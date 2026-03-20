@@ -234,7 +234,10 @@ class TransactionSkill(
         aml_risk = metadata.get("aml_risk")
 
         # 2. Strict C2C9 Enforcement logic
-        if kyc_status != "APPROVED" or aml_risk != "LOW":
+        required_kyc = self.settings.required_kyc_status if self.settings else "APPROVED"
+        required_aml = self.settings.required_aml_risk if self.settings else "LOW"
+
+        if kyc_status != required_kyc or aml_risk != required_aml:
             logger.error(
                 "c2c9_security_violation",
                 kyc_status=kyc_status,
