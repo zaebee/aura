@@ -1,14 +1,14 @@
 import { BrowserRouter, Routes, Route } from 'react-router-dom'
-import AgentConsole from './components/AgentConsole'
 import CourierPage from './pages/CourierPage'
+import RWACommandCenter from './components/RWACommandCenter'
 
 function App() {
   return (
     <BrowserRouter>
-      <main className="min-h-screen bg-[#0a0a0a]">
+      <main className="min-h-screen bg-[#0a0a0f]">
         <Routes>
           <Route path="/courier/:jobId" element={<CourierPage />} />
-          <Route path="*" element={<div className="p-4"><AgentConsole /></div>} />
+          <Route path="*" element={<RWACommandCenter />} />
         </Routes>
       </main>
     </BrowserRouter>
