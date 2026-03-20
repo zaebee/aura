@@ -40,7 +40,9 @@ class SolanaProvider:
     def _derive_ata(self, owner: Pubkey, mint: Pubkey) -> Pubkey:
         return get_associated_token_address(owner, mint)
 
-    async def execute_rwa_collateral(self, wallet_address: str, amount_usdc: float) -> str:
+    async def execute_rwa_collateral(
+        self, wallet_address: str, amount_usdc: float
+    ) -> str:
         """
         Execute an SPL Token transfer (USDC) from the Hive Treasury to the user's wallet.
         Simulates the release of a stablecoin loan.
@@ -49,14 +51,18 @@ class SolanaProvider:
         user_ata = self._derive_ata(user_pubkey, self.usdc_mint_pubkey)
 
         # 1. Verification of Token Decimals (Robustness check)
-        mint_info = (await self.async_rpc_client.get_token_supply(self.usdc_mint_pubkey)).value
+        mint_info = (
+            await self.async_rpc_client.get_token_supply(self.usdc_mint_pubkey)
+        ).value
         if mint_info.decimals != USDC_DECIMALS:
             logger.error(
                 "usdc_decimal_mismatch",
                 expected=USDC_DECIMALS,
                 actual=mint_info.decimals,
             )
-            raise ValueError(f"USDC decimal mismatch: expected {USDC_DECIMALS}, got {mint_info.decimals}")
+            raise ValueError(
+                f"USDC decimal mismatch: expected {USDC_DECIMALS}, got {mint_info.decimals}"
+            )
 
         amount_raw = int(amount_usdc * (10**USDC_DECIMALS))
 
@@ -81,7 +87,9 @@ class SolanaProvider:
         )
 
         # Build message and transaction using solders
-        recent_blockhash = (await self.async_rpc_client.get_latest_blockhash()).value.blockhash
+        recent_blockhash = (
+            await self.async_rpc_client.get_latest_blockhash()
+        ).value.blockhash
         msg = Message([transfer_ix], self.keypair.pubkey())
         tx = Transaction([self.keypair], msg, recent_blockhash)
 

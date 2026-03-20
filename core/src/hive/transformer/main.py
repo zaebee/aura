@@ -186,17 +186,31 @@ class AuraTransformer(Transformer[Context, Intent]):
         """
         vision_report: dict[str, Any] = _as_dict(metadata.get("vision_report"))  # type: ignore[assignment]
         wallet_address = str(metadata.get("wallet_address", ""))
-        kyc_status_str = "true" if metadata.get("kyc_status", "false") == "true" else "false"
+        kyc_status_str = (
+            "true" if metadata.get("kyc_status", "false") == "true" else "false"
+        )
         ltv_ratio_str = str(self._rwa_ltv_ratio())
         six_rates: dict[str, Any] = _as_dict(metadata.get("six_rates"))  # type: ignore[assignment]
         system_vitals: dict[str, Any] = _as_dict(metadata.get("vitals"))  # type: ignore[assignment]
-        return vision_report, wallet_address, kyc_status_str, ltv_ratio_str, six_rates, system_vitals
+        return (
+            vision_report,
+            wallet_address,
+            kyc_status_str,
+            ltv_ratio_str,
+            six_rates,
+            system_vitals,
+        )
 
     async def _think_rwa(self, context: Context, metadata: dict[str, Any]) -> Intent:
         """RWA path: invoke AppraiseAndVerifyRWA via the reasoning protein."""
-        vision_report, wallet_address, kyc_status_str, ltv_ratio_str, six_rates, system_vitals = (
-            self._build_rwa_context(metadata)
-        )
+        (
+            vision_report,
+            wallet_address,
+            kyc_status_str,
+            ltv_ratio_str,
+            six_rates,
+            system_vitals,
+        ) = self._build_rwa_context(metadata)
 
         obs = await self.registry.execute(
             "reasoning",
@@ -253,7 +267,9 @@ class AuraTransformer(Transformer[Context, Intent]):
 
         is_rejected = compliance_status == "REJECTED"
         action = (
-            ActionType.ACTION_TYPE_REJECT if is_rejected else ActionType.ACTION_TYPE_ACCEPT
+            ActionType.ACTION_TYPE_REJECT
+            if is_rejected
+            else ActionType.ACTION_TYPE_ACCEPT
         )
 
         if is_rejected:
@@ -354,9 +370,14 @@ class AuraTransformer(Transformer[Context, Intent]):
         )
 
         risk_threshold = self._trade_risk_threshold()
-        is_high_risk = risk_score > risk_threshold or "REJECTED_HIGH_RISK" in trade_intent.reasoning
+        is_high_risk = (
+            risk_score > risk_threshold
+            or "REJECTED_HIGH_RISK" in trade_intent.reasoning
+        )
         action = (
-            ActionType.ACTION_TYPE_REJECT if is_high_risk else ActionType.ACTION_TYPE_ACCEPT
+            ActionType.ACTION_TYPE_REJECT
+            if is_high_risk
+            else ActionType.ACTION_TYPE_ACCEPT
         )
 
         if is_high_risk:
