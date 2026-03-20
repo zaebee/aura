@@ -227,7 +227,7 @@ async def run_fresh_test() -> int:
     print("\n" + "=" * 60)
     print("In-Vivo Metabolic Test: Solana Devnet (Fresh Wallets)")
     print("=" * 60)
-    print(f"Network:    Solana Devnet")
+    print("Network:    Solana Devnet")
     print(f"RPC:        {RPC_URL}")
     print(f"USDC Mint:  {DEVNET_USDC_MINT}")
     print(f"Amount:     {TEST_AMOUNT_USDC} USDC")
@@ -244,9 +244,7 @@ async def run_fresh_test() -> int:
 
         # Fund treasury with SOL
         print("[2/7] Funding treasury with SOL...")
-        sol_success = await request_sol_airdrop(
-            client, treasury_keypair.pubkey(), SOL_AIRDROP_AMOUNT
-        )
+        await request_sol_airdrop(client, treasury_keypair.pubkey(), SOL_AIRDROP_AMOUNT)
         await asyncio.sleep(2)
         treasury_sol = await get_sol_balance(client, treasury_keypair.pubkey())
         print(
@@ -257,7 +255,7 @@ async def run_fresh_test() -> int:
         # Create treasury USDC ATA
         print("[3/7] Setting up treasury USDC account...")
         mint_pubkey = Pubkey.from_string(DEVNET_USDC_MINT)
-        treasury_ata = await create_ata_if_needed(
+        await create_ata_if_needed(
             client, treasury_keypair, treasury_keypair.pubkey(), mint_pubkey
         )
         treasury_usdc = await get_token_balance(
@@ -275,7 +273,7 @@ async def run_fresh_test() -> int:
             if fallback_key:
                 try:
                     fallback_kp = Keypair.from_base58_string(fallback_key)
-                    print(f"  Using fallback wallet...")
+                    print("  Using fallback wallet...")
 
                     # Fund fallback with SOL
                     await request_sol_airdrop(client, fallback_kp.pubkey(), 1.0)
@@ -288,7 +286,7 @@ async def run_fresh_test() -> int:
                     await asyncio.sleep(1)
 
                     # Request USDC to fallback
-                    usdc_success = await request_usdc_faucet(
+                    await request_usdc_faucet(
                         client, fallback_kp.pubkey(), mint_pubkey, USDC_AIRDROP_AMOUNT
                     )
                     await asyncio.sleep(3)
@@ -316,7 +314,7 @@ async def run_fresh_test() -> int:
             else:
                 print("  No fallback wallet (AURA_CRYPTO__TEST_WALLET)")
                 print("  Trying direct USDC faucet...")
-                usdc_success = await request_usdc_faucet(
+                await request_usdc_faucet(
                     client, treasury_keypair.pubkey(), mint_pubkey, USDC_AIRDROP_AMOUNT
                 )
                 await asyncio.sleep(3)
@@ -397,7 +395,7 @@ async def run_fresh_test() -> int:
         print(f"  From:     {treasury_keypair.pubkey()}")
         print(f"  To:       {user_keypair.pubkey()}")
         print()
-        print(f"🔗 View on Solscan:")
+        print("🔗 View on Solscan:")
         print(f"   {solscan_url}")
         print()
         print("⚠️  Debug keys (hex):")

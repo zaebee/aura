@@ -19,7 +19,6 @@ from unittest.mock import AsyncMock, MagicMock
 
 import betterproto
 import pytest
-
 from aura_core import SkillRegistry, make_struct
 from aura_core.metabolism import MetabolicLoop
 from aura_core_gen.aura.core.v1 import (
@@ -30,11 +29,11 @@ from aura_core_gen.aura.core.v1 import (
     RWAVaultIntent,
 )
 from hive.membrane import HiveMembrane
-from hive.proteins.guard.skill import GuardSkill
 from hive.proteins.guard.engine import OutputGuard
+from hive.proteins.guard.skill import GuardSkill
 from hive.transformer import AuraTransformer
-from config.policy import SafetySettings
 
+from config.policy import SafetySettings
 
 _APPROVED_VAULT = json.dumps(
     {
