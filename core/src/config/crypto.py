@@ -28,6 +28,10 @@ class CryptoSettings(BaseModel):
 
     wallet_address: str = ""
 
+    # Compliance Settings
+    required_kyc_status: str = "APPROVED"
+    required_aml_risk: str = "LOW"
+
     # Deal Expiration
     deal_ttl_seconds: int = 3600  # 1 hour default
 
