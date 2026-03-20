@@ -7,6 +7,7 @@ Public Membrane provides an API-key shortcut for trusted browser origins.
 
 import hashlib
 import json
+import logging
 import secrets
 import time
 
@@ -14,6 +15,8 @@ import nacl.encoding
 import nacl.exceptions
 import nacl.signing
 from fastapi import Header, HTTPException, Request
+
+logger = logging.getLogger(__name__)
 
 # Configuration constants
 TIMESTAMP_TOLERANCE_SECONDS = 60  # Allow ±60 seconds for clock skew
@@ -153,11 +156,14 @@ async def verify_signature(
         ) from None
     except HTTPException:
         raise
-    except Exception:
+    except Exception as e:
+        logger.exception(
+            "signature_verification_internal_error: %s: %s", type(e).__name__, e
+        )
         raise HTTPException(
             status_code=500,
             detail="An internal error occurred during signature verification.",
-        ) from None
+        ) from e
 
     # Return the verified agent DID for use in the endpoint
     return x_agent_id

@@ -141,6 +141,11 @@ async def request_id_middleware(
 ) -> Response:
     request_id = str(uuid.uuid4())
     bind_request_id(request_id)
+    # Pre-cache the raw body so that request.body() in the security dependency
+    # and request.form() for File(...) parameters both see the same bytes.
+    # Without this, File(...) consuming the ASGI stream first causes
+    # request.body() to raise RuntimeError("Stream consumed").
+    await request.body()
     try:
         return await call_next(request)
     finally:
