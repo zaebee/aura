@@ -19,7 +19,6 @@ from hive.proteins.reasoning.engine import AuraTradeNegotiator
 from hive.transformer import AuraTransformer
 from hive.transformer.signatures import GenerateTradeIntent, GenerateTradeRisk
 
-
 # ---------------------------------------------------------------------------
 # 1. Signature field contract
 # ---------------------------------------------------------------------------

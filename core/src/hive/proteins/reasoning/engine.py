@@ -5,9 +5,8 @@ from typing import Any, cast
 import dspy
 import structlog
 from aura_core import resolve_brain_path
-from langchain_mistralai import MistralAIEmbeddings
-
 from hive.transformer.signatures import GenerateTradeIntent, GenerateTradeRisk
+from langchain_mistralai import MistralAIEmbeddings
 
 logger = structlog.get_logger(__name__)
 
