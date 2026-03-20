@@ -95,6 +95,24 @@ export class AgentWallet implements Connector {
     }
   }
 
+  getGatewayUrl(): string {
+    return this.GATEWAY_URL
+  }
+
+  async signRawHash(method: string, path: string, bodyHash: string): Promise<Record<string, string>> {
+    const timestamp = Math.floor(Date.now() / 1000).toString()
+    const canonicalRequest = `${method.toUpperCase()}${path}${timestamp}${bodyHash}`
+    const signature = nacl.sign.detached(
+      new TextEncoder().encode(canonicalRequest),
+      this.keyPair.secretKey
+    )
+    return {
+      'X-Agent-ID': this.agentId,
+      'X-Timestamp': timestamp,
+      'X-Signature': Array.from(signature).map(b => b.toString(16).padStart(2, '0')).join('')
+    }
+  }
+
   async fetchWithAuth(path: string, method: string = 'GET', body: unknown = null): Promise<Response> {
     const headers = await this.signRequest(method, path, body)
 
