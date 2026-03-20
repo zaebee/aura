@@ -166,14 +166,18 @@ class AuraTransformer(Transformer[Context, Intent]):
         self, metadata: dict[str, Any]
     ) -> tuple[dict[str, Any], dict[str, Any], dict[str, Any]]:
         """Extract market_context, system_vitals, current_treasury from metadata."""
+
+        def _as_dict(value: Any) -> dict[str, Any]:
+            return cast(dict[str, Any], value) if isinstance(value, dict) else {}
+
         market_context: dict[str, Any] = {
-            "prices": metadata.get("prices", {}),
+            "prices": _as_dict(metadata.get("prices")),
             "vision_result": metadata.get("vision_result"),
             "asset_domain": metadata.get("asset_domain", ""),
             "asset_identifier": metadata.get("asset_identifier", ""),
         }
-        system_vitals: dict[str, Any] = dict(metadata.get("vitals") or {})
-        current_treasury: dict[str, Any] = dict(metadata.get("treasury") or {})
+        system_vitals: dict[str, Any] = _as_dict(metadata.get("vitals"))  # type: ignore[assignment]
+        current_treasury: dict[str, Any] = _as_dict(metadata.get("treasury"))  # type: ignore[assignment]
         return market_context, system_vitals, current_treasury
 
     async def _think_trade(self, context: Context, metadata: dict[str, Any]) -> Intent:
@@ -201,7 +205,10 @@ class AuraTransformer(Transformer[Context, Intent]):
             )
 
         raw = obs.metadata.to_dict() if obs.metadata else {}
-        trade_data: dict[str, Any] = raw.get("trade") or {}
+        _raw_trade = raw.get("trade")
+        trade_data: dict[str, Any] = (
+            cast(dict[str, Any], _raw_trade) if isinstance(_raw_trade, dict) else {}
+        )
         risk_score = float(str(raw.get("risk_score", "0.0")))
         risk_category = str(raw.get("risk_category", "LOW"))
         raw_think = str(raw.get("think", ""))
