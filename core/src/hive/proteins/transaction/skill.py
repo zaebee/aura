@@ -49,6 +49,7 @@ class TransactionSkill(
             "sign_trade_intent": self._sign_trade_intent,
             "submit_to_router": self._submit_to_router,
             "execute_rwa_collateral": self._execute_rwa_collateral,
+            "mint_rwa_vault": self._mint_rwa_vault,
         }
 
     def get_name(self) -> str:
@@ -229,7 +230,9 @@ class TransactionSkill(
             raise MetabolicSecurityError("Security context missing: HiveContext required")
 
         # Extract metadata from Context (google.protobuf.Struct)
-        metadata = context.metadata.to_dict() if hasattr(context.metadata, "to_dict") else {}
+        metadata = (
+            context.metadata.to_dict() if hasattr(context.metadata, "to_dict") else {}
+        )
         kyc_status = metadata.get("kyc_status")
         aml_risk = metadata.get("aml_risk")
 
@@ -264,6 +267,13 @@ class TransactionSkill(
         except Exception as e:
             logger.error(f"RWA Collateral execution failed: {e}")
             return Observation(success=False, error=str(e))
+
+    async def _mint_rwa_vault(self, params: dict[str, Any]) -> Observation:
+        # Stub pending Solana vault program ABI
+        return Observation(
+            success=False,
+            error="mint_rwa_vault_not_implemented_pending_solana_program_abi",
+        )
 
     async def close(self) -> None:
         if self.provider:

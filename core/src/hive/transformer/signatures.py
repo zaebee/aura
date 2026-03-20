@@ -1,6 +1,115 @@
 import dspy
 
 
+class AppraiseAndVerifyRWA(dspy.Signature):
+    """
+    Appraise a physical Real-World Asset and verify KYC/AML compliance before
+    issuing a stablecoin vault intent.
+
+    You are the Hive's institutional compliance officer and asset appraiser.
+    You must act as a strict Swiss Banker: compliance is checked first, appraisal
+    second. No vault intent may be issued without passing both gates.
+
+    Compliance rules (checked in order, first failure wins):
+    1. If kyc_status == "false": set compliance_status = "REJECTED",
+       violation_code = "KYC_MISSING", appraised_value_usd = "0.0",
+       collateral_value_usd = "0.0".
+    2. If vision_report contains any of the words "counterfeit", "damaged",
+       "unverified", "stolen", "forged": set compliance_status = "REJECTED",
+       violation_code = "ASSET_UNVERIFIED", both values "0.0".
+    3. If vision_report contains indicators of sanctions or high-risk jurisdiction:
+       set compliance_status = "REJECTED", violation_code = "AML_SUSPICIOUS",
+       both values "0.0".
+
+    Appraisal rules (only reached if compliance passes):
+    - appraised_value_usd is derived from vision_report asset value fields
+      combined with relevant six_rates (e.g. gold: price_per_troy_oz * weight_oz;
+      real estate: market_value_local * fx_rate_to_usd).
+    - collateral_value_usd = appraised_value_usd * float(ltv_ratio).
+    - compliance_status = "APPROVED", violation_code = "".
+
+    Output format:
+    - think must contain step-by-step reasoning wrapped in <think>...</think> tags.
+    - vault_intent_json must be a single valid JSON object — no markdown fences,
+      no prose. Required fields: vault_id, asset_identifier, asset_domain,
+      appraised_value_usd (float), ltv_ratio (float), collateral_value_usd (float),
+      stablecoin_currency, wallet_address, reasoning.
+    - vault_id format: "vault-<asset_domain>-<wallet_address[:8]>".
+    - stablecoin_currency must be "USDC" unless six_rates specifies otherwise.
+
+    Example output (KYC rejected):
+    vault_intent_json = {
+      "vault_id": "vault-GOLD-abc12345",
+      "asset_identifier": "gold-bar-001",
+      "asset_domain": "GOLD",
+      "appraised_value_usd": 0.0,
+      "ltv_ratio": 0.60,
+      "collateral_value_usd": 0.0,
+      "stablecoin_currency": "USDC",
+      "wallet_address": "abc12345...",
+      "reasoning": "REJECTED: KYC_MISSING — wallet not verified."
+    }
+
+    Example output (approved):
+    vault_intent_json = {
+      "vault_id": "vault-GOLD-abc12345",
+      "asset_identifier": "gold-bar-001",
+      "asset_domain": "GOLD",
+      "appraised_value_usd": 62000.0,
+      "ltv_ratio": 0.60,
+      "collateral_value_usd": 37200.0,
+      "stablecoin_currency": "USDC",
+      "wallet_address": "abc12345...",
+      "reasoning": "KYC passed. 2 troy oz gold at $31000/oz = $62000. LTV 60% = $37200 USDC."
+    }
+    """
+
+    vision_report: str = dspy.InputField(
+        desc="JSON string from Gemma 3 describing the physical asset: type, condition, "
+             "weight/size, estimated value, and any anomalies detected."
+    )
+    wallet_address: str = dspy.InputField(
+        desc="Solana wallet address of the counterparty submitting the asset."
+    )
+    kyc_status: str = dspy.InputField(
+        desc='KYC verification status as a plain string: "true" (verified) or "false" (not verified).'
+    )
+    six_rates: str = dspy.InputField(
+        desc="JSON string of SIX data partner FX and precious metals rates "
+             "(e.g. XAU/USD, XAG/USD, EUR/USD) used for asset valuation."
+    )
+    ltv_ratio: str = dspy.InputField(
+        desc="Loan-to-value ratio as a plain float string (e.g. '0.60'). "
+             "collateral_value_usd = appraised_value_usd * ltv_ratio."
+    )
+    system_vitals: str = dspy.InputField(
+        desc="JSON string with system health metrics (CPU, memory, latency)."
+    )
+
+    think: str = dspy.OutputField(
+        desc="Step-by-step compliance and appraisal reasoning wrapped in <think>...</think> tags."
+    )
+    compliance_status: str = dspy.OutputField(
+        desc='Compliance decision: "APPROVED" or "REJECTED".'
+    )
+    violation_code: str = dspy.OutputField(
+        desc='Empty string if approved. One of: "KYC_MISSING", "AML_SUSPICIOUS", '
+             '"ASSET_UNVERIFIED" if rejected.'
+    )
+    appraised_value_usd: str = dspy.OutputField(
+        desc='Appraised asset value in USD as a plain float string. "0.0" if rejected.'
+    )
+    collateral_value_usd: str = dspy.OutputField(
+        desc='Collateral value (appraised * ltv_ratio) as a plain float string. "0.0" if rejected.'
+    )
+    vault_intent_json: str = dspy.OutputField(
+        desc="A single valid JSON object with fields: vault_id, asset_identifier, "
+             "asset_domain, appraised_value_usd (float), ltv_ratio (float), "
+             "collateral_value_usd (float), stablecoin_currency, wallet_address, reasoning. "
+             "No markdown fences, no extra text."
+    )
+
+
 class GenerateTradeRisk(dspy.Signature):
     """
     Assess the risk of a proposed trade before committing to it.

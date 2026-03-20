@@ -15,6 +15,8 @@ from aura_core_gen.aura.core.v1 import (
     Context,
     Intent,
     NegotiationIntent,
+    RWAComplianceScore,
+    RWAVaultIntent,
     TradeIntent,
     ValidationScore,
 )
@@ -26,6 +28,11 @@ def _get_hive(context: Context) -> Any:
     """Safely extract HiveContextData from Context.data oneof — returns None for non-hive contexts."""
     name, value = betterproto.which_one_of(context, "data")
     return value if name == "hive" else None
+
+
+def _as_dict(value: Any) -> dict[str, Any]:
+    """Safely coerce a betterproto Struct value to a plain dict."""
+    return cast(dict[str, Any], value) if isinstance(value, dict) else {}
 
 
 class RuleBasedStrategy:
@@ -154,6 +161,115 @@ class AuraTransformer(Transformer[Context, Intent]):
             "vision_confidence_threshold": vision_confidence_threshold,
         }
 
+    def _is_rwa_context(self, metadata: dict[str, Any]) -> bool:
+        """Return True when the context carries an RWA vault signal."""
+        return metadata.get("rwa_mode") == "true"
+
+    def _rwa_ltv_ratio(self) -> float:
+        """Read rwa_ltv_ratio from SafetySettings, defaulting to 0.60."""
+        if (
+            self.settings
+            and hasattr(self.settings, "safety")
+            and hasattr(self.settings.safety, "rwa_ltv_ratio")
+        ):
+            return float(self.settings.safety.rwa_ltv_ratio)
+        return 0.60
+
+    def _build_rwa_context(
+        self, metadata: dict[str, Any]
+    ) -> tuple[dict[str, Any], str, str, str, dict[str, Any], dict[str, Any]]:
+        """Extract RWA fields from metadata.
+
+        kyc_status is returned as "true"/"false" string and ltv_ratio as a
+        float string (e.g. "0.60") to match the AppraiseAndVerifyRWA DSPy
+        signature InputField types directly — no conversion needed downstream.
+        """
+        vision_report: dict[str, Any] = _as_dict(metadata.get("vision_report"))  # type: ignore[assignment]
+        wallet_address = str(metadata.get("wallet_address", ""))
+        kyc_status_str = "true" if metadata.get("kyc_status", "false") == "true" else "false"
+        ltv_ratio_str = str(self._rwa_ltv_ratio())
+        six_rates: dict[str, Any] = _as_dict(metadata.get("six_rates"))  # type: ignore[assignment]
+        system_vitals: dict[str, Any] = _as_dict(metadata.get("vitals"))  # type: ignore[assignment]
+        return vision_report, wallet_address, kyc_status_str, ltv_ratio_str, six_rates, system_vitals
+
+    async def _think_rwa(self, context: Context, metadata: dict[str, Any]) -> Intent:
+        """RWA path: invoke AppraiseAndVerifyRWA via the reasoning protein."""
+        vision_report, wallet_address, kyc_status_str, ltv_ratio_str, six_rates, system_vitals = (
+            self._build_rwa_context(metadata)
+        )
+
+        obs = await self.registry.execute(
+            "reasoning",
+            "rwa",
+            {
+                "vision_report": vision_report,
+                "wallet_address": wallet_address,
+                "kyc_status": kyc_status_str,
+                "six_rates": six_rates,
+                "ltv_ratio": ltv_ratio_str,
+                "system_vitals": system_vitals,
+            },
+        )
+
+        if not obs.success:
+            logger.error("rwa_reasoning_failed", error=obs.error)
+            return Intent(
+                action=cast(ActionType, ActionType.ACTION_TYPE_ERROR),
+                reasoning=f"<think>RWA reasoning failed: {obs.error}</think>",
+                rwa_vault=RWAVaultIntent(reasoning=f"ERROR: {obs.error}"),
+            )
+
+        raw = obs.metadata.to_dict() if obs.metadata else {}
+        _raw_vault = raw.get("vault")
+        vault_data: dict[str, Any] = (
+            cast(dict[str, Any], _raw_vault) if isinstance(_raw_vault, dict) else {}
+        )
+        compliance_status = str(raw.get("compliance_status", "REJECTED"))
+        violation_code = str(raw.get("violation_code", ""))
+        raw_think = str(raw.get("think", ""))
+        wrapped_think = f"<think>\n{raw_think}\n</think>" if raw_think else ""
+
+        kyc_passed = kyc_status_str == "true" and compliance_status == "APPROVED"
+        compliance = RWAComplianceScore(
+            kyc_passed=kyc_passed,
+            aml_passed=compliance_status == "APPROVED",
+            compliance_status=compliance_status,
+            violation_code=violation_code,
+            think=raw_think,
+        )
+
+        rwa_vault = RWAVaultIntent(
+            vault_id=str(vault_data.get("vault_id", "")),
+            asset_identifier=str(vault_data.get("asset_identifier", "")),
+            asset_domain=str(vault_data.get("asset_domain", "")),
+            appraised_value_usd=float(vault_data.get("appraised_value_usd", 0.0)),
+            ltv_ratio=float(vault_data.get("ltv_ratio", ltv_ratio_str)),
+            collateral_value_usd=float(vault_data.get("collateral_value_usd", 0.0)),
+            stablecoin_currency=str(vault_data.get("stablecoin_currency", "USDC")),
+            wallet_address=wallet_address,
+            compliance=compliance,
+            reasoning=str(vault_data.get("reasoning", "")),
+        )
+
+        is_rejected = compliance_status == "REJECTED"
+        action = (
+            ActionType.ACTION_TYPE_REJECT if is_rejected else ActionType.ACTION_TYPE_ACCEPT
+        )
+
+        if is_rejected:
+            logger.warning(
+                "rwa_vault_rejected",
+                violation_code=violation_code,
+                wallet_address=wallet_address,
+            )
+
+        return Intent(
+            action=cast(ActionType, action),
+            reasoning=wrapped_think,
+            metadata=make_struct({"brain_path": self.brain_path}),
+            rwa_vault=rwa_vault,
+        )
+
     def _trade_risk_threshold(self) -> float:
         """Read trade_risk_threshold from SafetySettings, defaulting to 0.10."""
         if (
@@ -176,10 +292,6 @@ class AuraTransformer(Transformer[Context, Intent]):
         self, metadata: dict[str, Any]
     ) -> tuple[dict[str, Any], dict[str, Any], dict[str, Any]]:
         """Extract market_context, system_vitals, current_treasury from metadata."""
-
-        def _as_dict(value: Any) -> dict[str, Any]:
-            return cast(dict[str, Any], value) if isinstance(value, dict) else {}
-
         market_context: dict[str, Any] = {
             "prices": _as_dict(metadata.get("prices")),
             "vision_result": metadata.get("vision_result"),
@@ -278,6 +390,10 @@ class AuraTransformer(Transformer[Context, Intent]):
 
         try:
             metadata = context.metadata.to_dict()
+
+            # RWA path: institutional compliance + vault intent (checked first)
+            if self._is_rwa_context(metadata):
+                return await self._think_rwa(context, metadata)
 
             # Trade path: ERC-8004 structured trade intent generation
             if self._is_trade_context(metadata):

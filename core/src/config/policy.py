@@ -12,6 +12,7 @@ class SafetySettings(BaseModel):
     ui_trigger_price: float = 1000.0  # High-value threshold for UI confirmation
     max_x402_payment: float = 5.0  # Max USDC per autonomous x402 payment
     trade_risk_threshold: float = 0.10  # Max acceptable risk_score for trade intents
+    rwa_ltv_ratio: float = 0.60  # Max LTV ratio for RWA-backed vault collateral
     allowed_addons: list[str] = Field(
         default_factory=lambda: ["Breakfast", "Late checkout", "Room upgrade"]
     )
