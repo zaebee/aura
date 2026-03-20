@@ -5,11 +5,16 @@ from typing import Any, cast
 import httpx
 from solana.rpc.async_api import AsyncClient
 from solana.rpc.commitment import Finalized
-from solders.transaction import Transaction
+from solders.keypair import Keypair  # type: ignore
 from solders.message import Message
-from solders.keypair import Keypair # type: ignore
-from solders.pubkey import Pubkey # type: ignore
-from spl.token.instructions import transfer_checked, get_associated_token_address
+from solders.pubkey import Pubkey  # type: ignore
+from solders.transaction import Transaction
+from spl.token.constants import TOKEN_PROGRAM_ID
+from spl.token.instructions import (
+    TransferCheckedParams,
+    get_associated_token_address,
+    transfer_checked,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -54,13 +59,15 @@ class SolanaProvider:
 
         # Construct transfer instruction
         transfer_ix = transfer_checked(
-            source=self.usdc_token_account,
-            mint=self.usdc_mint_pubkey,
-            dest=user_ata,
-            owner=self.keypair.pubkey(),
-            amount=amount_raw,
-            decimals=6,
-            program_id=Pubkey.from_string(TOKEN_PROGRAM_ID),
+            TransferCheckedParams(
+                source=self.usdc_token_account,
+                mint=self.usdc_mint_pubkey,
+                dest=user_ata,
+                owner=self.keypair.pubkey(),
+                amount=amount_raw,
+                decimals=6,
+                program_id=TOKEN_PROGRAM_ID,
+            )
         )
 
         # Build message and transaction using solders

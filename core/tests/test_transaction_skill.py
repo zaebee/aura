@@ -5,8 +5,8 @@ from hive.proteins.transaction.engine import (
     PriceConverter,
     SecretEncryption,
 )
-from hive.proteins.transaction.solana_engine import SolanaProvider
 from hive.proteins.transaction.skill import TransactionSkill
+from hive.proteins.transaction.solana_engine import SolanaProvider
 from solders.keypair import Keypair
 from solders.pubkey import Pubkey
 
