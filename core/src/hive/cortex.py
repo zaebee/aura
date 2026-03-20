@@ -30,8 +30,8 @@ from hive.proteins.transaction.engine import (
     EVMProvider,
     PriceConverter,
     SecretEncryption,
-    SolanaProvider,
 )
+from hive.proteins.transaction.solana_engine import SolanaProvider
 from hive.transformer import AuraTransformer
 from opentelemetry.instrumentation.grpc import GrpcInstrumentorServer
 from opentelemetry.instrumentation.langchain import LangchainInstrumentor

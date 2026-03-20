@@ -36,3 +36,8 @@ class TradeIntentParams(BaseModel):
     proposed_price: float
     currency_code: str
     reasoning: str = ""
+
+
+class RWACollateralParams(BaseModel):
+    wallet_address: str
+    amount_usdc: float

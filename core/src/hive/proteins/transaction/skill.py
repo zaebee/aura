@@ -3,6 +3,7 @@ from typing import Any
 import structlog
 from aura_core import SkillProtocol, make_struct
 from aura_core_gen.aura.core.v1 import Observation
+from hive.metabolism import MetabolicSecurityError
 
 from config.crypto import CryptoSettings
 
@@ -11,6 +12,7 @@ from .schema import (
     PaymentProof,
     PaymentRequestParams,
     PaymentVerificationParams,
+    RWACollateralParams,
     TaxCalculationParams,
     TradeIntentParams,
 )
@@ -45,6 +47,7 @@ class TransactionSkill(
             "transfer": self._transfer,
             "sign_trade_intent": self._sign_trade_intent,
             "submit_to_router": self._submit_to_router,
+            "execute_rwa_collateral": self._execute_rwa_collateral,
         }
 
     def get_name(self) -> str:
@@ -88,6 +91,8 @@ class TransactionSkill(
 
         try:
             return await handler(params)
+        except MetabolicSecurityError:
+            raise
         except Exception as e:
             logger.error(f"Transaction skill error: {e}")
             return Observation(success=False, error=str(e))
@@ -212,6 +217,49 @@ class TransactionSkill(
             success=False,
             error="submit_to_router_not_implemented_pending_abi",
         )
+
+    async def _execute_rwa_collateral(self, params: dict[str, Any]) -> Observation:
+        """
+        C2C9 Membrane Enforcement: Release SPL Token transfer only if KYC/AML is cleared.
+        """
+        # 1. Access context metadata for security enforcement
+        context = params.get("_context")
+        if not context:
+            raise MetabolicSecurityError("Security context missing: HiveContext required")
+
+        # Extract metadata from Context (google.protobuf.Struct)
+        metadata = context.metadata.to_dict() if hasattr(context.metadata, "to_dict") else {}
+        kyc_status = metadata.get("kyc_status")
+        aml_risk = metadata.get("aml_risk")
+
+        # 2. Strict C2C9 Enforcement logic
+        if kyc_status != "APPROVED" or aml_risk != "LOW":
+            logger.error(
+                "c2c9_security_violation",
+                kyc_status=kyc_status,
+                aml_risk=aml_risk,
+                agent_did=metadata.get("agent_did", "unknown"),
+            )
+            raise MetabolicSecurityError(
+                f"C2C9 Membrane Violation: Compliance failure (KYC: {kyc_status}, AML: {aml_risk})"
+            )
+
+        # 3. Execution (Motor Neuron action)
+        if not self.solana_provider:
+            return Observation(success=False, error="solana_provider_not_initialized")
+
+        p = RWACollateralParams(**params)
+        try:
+            tx_hash = await self.solana_provider.execute_rwa_collateral(
+                p.wallet_address, p.amount_usdc
+            )
+            return Observation(
+                success=True,
+                metadata=make_struct({"transaction_hash": tx_hash}),
+            )
+        except Exception as e:
+            logger.error(f"RWA Collateral execution failed: {e}")
+            return Observation(success=False, error=str(e))
 
     async def close(self) -> None:
         if self.provider:
