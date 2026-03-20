@@ -198,6 +198,7 @@ message Intent {
     UIIntent ui = 12;
     AssetIntent asset = 13;  // Generic asset intent (decoupled)
     TradeIntent trade = 14;  // ERC-8004 Genomic Sequencing trade intent
+    RWAVaultIntent rwa_vault = 15;  // Institutional RWA-backed stablecoin vault intent
   }
 }
 
@@ -578,4 +579,36 @@ message TradeFailedEvent {
   string failure_reason = 1;             // Why the trade failed
   string error_code = 2;                 // Machine-readable error code
   map<string, string> error_details = 3; // Additional error context
+}
+
+// ============================================================
+// Institutional RWA-Backed Stablecoin Vault (StableHacks 2026)
+// ============================================================
+
+// RWAComplianceScore captures the KYC/AML result for a vault intent.
+// The Agent must act as a strict compliance officer before any vault action.
+message RWAComplianceScore {
+  bool kyc_passed = 1;
+  bool aml_passed = 2;
+  string compliance_status = 3;  // "APPROVED", "REJECTED", "PENDING"
+  string violation_code = 4;     // "KYC_MISSING", "AML_SUSPICIOUS", "ASSET_UNVERIFIED", or ""
+  string think = 5;              // LLM <think> reasoning block
+  repeated string flags = 6;     // Human-readable compliance flags
+}
+
+// RWAVaultIntent is the structured output for locking/minting RWA-backed
+// stablecoin collateral on Solana. Triggered by the AuraTransformer when
+// rwa_mode is set in Context.metadata.
+message RWAVaultIntent {
+  string vault_id = 1;
+  string asset_identifier = 2;
+  string asset_domain = 3;           // "GOLD", "REAL_ESTATE", "VEHICLE", etc.
+  double appraised_value_usd = 4;    // Raw appraisal from vision + SIX rates
+  double ltv_ratio = 5;              // e.g. 0.60
+  double collateral_value_usd = 6;   // appraised_value_usd * ltv_ratio
+  string stablecoin_currency = 7;    // "USDC"
+  string wallet_address = 8;
+  RWAComplianceScore compliance = 9;
+  string reasoning = 10;
+  map<string, string> metadata = 11;
 }

@@ -26,3 +26,14 @@ class TradeParams(BaseModel):
     system_vitals: dict[str, Any] = {}
     current_treasury: dict[str, Any] = {}
     risk_threshold: float = 0.10
+
+
+class RWAParams(BaseModel):
+    vision_report: dict[str, Any] = {}
+    wallet_address: str = ""
+    # String form matching AppraiseAndVerifyRWA DSPy signature: "true" or "false"
+    kyc_status: str = "false"
+    six_rates: dict[str, Any] = {}
+    # String form matching AppraiseAndVerifyRWA DSPy signature: e.g. "0.60"
+    ltv_ratio: str = "0.60"
+    system_vitals: dict[str, Any] = {}
