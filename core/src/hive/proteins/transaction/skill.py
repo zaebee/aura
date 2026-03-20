@@ -45,6 +45,7 @@ class TransactionSkill(
             "transfer": self._transfer,
             "sign_trade_intent": self._sign_trade_intent,
             "submit_to_router": self._submit_to_router,
+            "mint_rwa_vault": self._mint_rwa_vault,
         }
 
     def get_name(self) -> str:
@@ -211,6 +212,13 @@ class TransactionSkill(
         return Observation(
             success=False,
             error="submit_to_router_not_implemented_pending_abi",
+        )
+
+    async def _mint_rwa_vault(self, params: dict[str, Any]) -> Observation:
+        # Stub pending Solana vault program ABI
+        return Observation(
+            success=False,
+            error="mint_rwa_vault_not_implemented_pending_solana_program_abi",
         )
 
     async def close(self) -> None:

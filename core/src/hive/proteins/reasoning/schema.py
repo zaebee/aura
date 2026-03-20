@@ -26,3 +26,12 @@ class TradeParams(BaseModel):
     system_vitals: dict[str, Any] = {}
     current_treasury: dict[str, Any] = {}
     risk_threshold: float = 0.10
+
+
+class RWAParams(BaseModel):
+    vision_report: dict[str, Any] = {}
+    wallet_address: str = ""
+    kyc_status: bool = False
+    six_rates: dict[str, Any] = {}
+    ltv_ratio: float = 0.60
+    system_vitals: dict[str, Any] = {}

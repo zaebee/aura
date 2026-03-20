@@ -8,6 +8,7 @@ from aura_core_gen.aura.core.v1 import (
     Context,
     Intent,
     NegotiationIntent,
+    RWAVaultIntent,
     TradeIntent,
 )
 
@@ -124,6 +125,22 @@ class HiveMembrane(Membrane[Any, Intent, Context]):
         floor_price = float(str(ctx_meta.get("floor_price", 0.0)))
 
         params_name, params_value = betterproto.which_one_of(decision, "params")
+
+        # RWA vault guard: backstop for KYC failures that slipped through
+        if params_name == "rwa_vault" and params_value is not None:
+            rwa_intent = cast(RWAVaultIntent, params_value)
+            if not rwa_intent.compliance.kyc_passed:
+                logger.warning(
+                    "membrane_blocked_kyc_failure",
+                    violation_code=rwa_intent.compliance.violation_code,
+                    wallet_address=rwa_intent.wallet_address,
+                )
+                return Intent(
+                    action=cast(ActionType, ActionType.ACTION_TYPE_REJECT),
+                    reasoning=decision.reasoning + " [MEMBRANE: KYC compliance failure]",
+                    rwa_vault=rwa_intent,
+                )
+            return decision
 
         # Trade intent guard: backstop for high-risk trades that slipped through
         if params_name == "trade" and params_value is not None:

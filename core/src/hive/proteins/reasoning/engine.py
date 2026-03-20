@@ -5,7 +5,11 @@ from typing import Any, cast
 import dspy
 import structlog
 from aura_core import resolve_brain_path
-from hive.transformer.signatures import GenerateTradeIntent, GenerateTradeRisk
+from hive.transformer.signatures import (
+    AppraiseAndVerifyRWA,
+    GenerateTradeIntent,
+    GenerateTradeRisk,
+)
 from langchain_mistralai import MistralAIEmbeddings
 
 logger = structlog.get_logger(__name__)
@@ -147,6 +151,58 @@ class AuraTradeNegotiator(dspy.Module):
                 "risk_score": risk_pred.risk_score,
                 "risk_category": risk_pred.risk_category,
                 "trade": trade_data,
+            },
+        )
+
+
+class AuraRWANegotiator(dspy.Module):
+    """
+    Single-stage DSPy module for RWA compliance appraisal and vault intent generation.
+
+    Runs KYC/AML compliance check and LTV-adjusted asset appraisal in one pass.
+    Rejects immediately if kyc_status is false or the vision report contains
+    suspicious indicators.
+    """
+
+    def __init__(self) -> None:
+        super().__init__()
+        self.appraise = dspy.Predict(AppraiseAndVerifyRWA)
+
+    def forward(
+        self,
+        vision_report: dict[str, Any],
+        wallet_address: str,
+        kyc_status: bool,
+        six_rates: dict[str, Any],
+        ltv_ratio: float,
+        system_vitals: dict[str, Any],
+    ) -> dict[str, Any]:
+        pred = self.appraise(
+            vision_report=json.dumps(vision_report),
+            wallet_address=wallet_address,
+            kyc_status=str(kyc_status).lower(),
+            six_rates=json.dumps(six_rates),
+            ltv_ratio=str(ltv_ratio),
+            system_vitals=json.dumps(system_vitals),
+        )
+
+        try:
+            vault_data = clean_and_parse_json(pred.vault_intent_json)
+        except Exception as e:
+            raise ValueError(
+                f"RWANegotiator JSON parsing failed: {e}. "
+                f"Raw output: {pred.vault_intent_json!r}"
+            ) from e
+
+        return cast(
+            dict[str, Any],
+            {
+                "think": pred.think,
+                "compliance_status": pred.compliance_status,
+                "violation_code": pred.violation_code,
+                "appraised_value_usd": pred.appraised_value_usd,
+                "collateral_value_usd": pred.collateral_value_usd,
+                "vault": vault_data,
             },
         )
 
