@@ -1,17 +1,17 @@
 import logging
-from datetime import UTC, datetime
 from decimal import Decimal
-from typing import Any, Literal, cast
-from urllib.parse import quote
+from typing import Any, Literal
 
-import httpx
 from cryptography.fernet import Fernet, InvalidToken
 from eth_account import Account
-from solders.keypair import Keypair  # type: ignore
-from solders.pubkey import Pubkey  # type: ignore
+from eth_account.messages import encode_typed_data
 from web3 import AsyncWeb3
 
 logger = logging.getLogger(__name__)
+
+# EIP-712 constants for TradeIntent signing
+EIP712_DOMAIN_NAME = "HackathonRiskRouter"
+EIP712_DOMAIN_VERSION = "1"
 
 # --- Encryption Logic ---
 
@@ -64,173 +64,27 @@ class PriceConverter:
         }
 
 
-# --- Solana Provider Logic ---
-
-FINALIZED_COMMITMENT = "finalized"
-TOKEN_PROGRAM_ID = "TokenkegQfeZyiNJbNbNbNbNbNbNbNbNbNbNbNbNbN"  # nosec
-ASSOCIATED_TOKEN_PROGRAM_ID = "ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL"  # nosec
-AMOUNT_TOLERANCE = 0.0001
-
-
-class SolanaProvider:
-    def __init__(self, private_key_base58: str, rpc_url: str, usdc_mint: str):
-        self.keypair = Keypair.from_base58_string(private_key_base58)
-        self.rpc_url = rpc_url
-        self.usdc_mint = usdc_mint
-        self.client = httpx.AsyncClient(timeout=30.0)
-        self.usdc_token_account = self._derive_ata(
-            self.keypair.pubkey(), Pubkey.from_string(usdc_mint)
-        )
-
-    def _derive_ata(self, owner: Pubkey, mint: Pubkey) -> Pubkey:
-        seeds = [bytes(owner), bytes(Pubkey.from_string(TOKEN_PROGRAM_ID)), bytes(mint)]
-        ata, _ = Pubkey.find_program_address(
-            seeds, Pubkey.from_string(ASSOCIATED_TOKEN_PROGRAM_ID)
-        )
-        return ata
-
-    async def verify_payment(
-        self, amount: float, memo: str, currency: str
-    ) -> dict[str, Any] | None:
-        signatures = await self._get_signatures()
-        for sig_info in signatures:
-            tx = await self._get_tx(sig_info["signature"])
-            if not tx:
-                continue
-            is_match, from_addr = self._check_match(tx, amount, memo, currency)
-            if is_match:
-                return self._get_proof(tx, sig_info["signature"], from_addr)
-        return None
-
-    async def _get_signatures(self) -> list[dict[str, Any]]:
-        payload = {
-            "jsonrpc": "2.0",
-            "id": 1,
-            "method": "getSignaturesForAddress",
-            "params": [
-                str(self.keypair.pubkey()),
-                {"limit": 20, "commitment": FINALIZED_COMMITMENT},
-            ],
-        }
-        r = await self.client.post(self.rpc_url, json=payload)
-        return cast(list[dict[str, Any]], r.json().get("result", []))
-
-    async def _get_tx(self, sig: str) -> dict[str, Any] | None:
-        payload = {
-            "jsonrpc": "2.0",
-            "id": 1,
-            "method": "getTransaction",
-            "params": [
-                sig,
-                {
-                    "encoding": "jsonParsed",
-                    "commitment": FINALIZED_COMMITMENT,
-                    "maxSupportedTransactionVersion": 0,
-                },
-            ],
-        }
-        r = await self.client.post(self.rpc_url, json=payload)
-        return cast(dict[str, Any] | None, r.json().get("result"))
-
-    def _check_match(
-        self, tx: dict, amt: float, memo: str, curr: str
-    ) -> tuple[bool, str]:
-        # Simple memo check
-        has_memo = False
-        for instr in (
-            tx.get("transaction", {}).get("message", {}).get("instructions", [])
-        ):
-            if instr.get("program") == "spl-memo" and instr.get("parsed") == memo:
-                has_memo = True
-                break
-        if not has_memo:
-            return False, ""
-
-        if curr == "SOL":
-            return self._check_sol(tx, amt)
-        return self._check_usdc(tx, amt)
-
-    def _check_sol(self, tx: dict, amt: float) -> tuple[bool, str]:
-        meta = tx.get("meta", {})
-        post = meta.get("postBalances", [])
-        pre = meta.get("preBalances", [])
-        keys = tx.get("transaction", {}).get("message", {}).get("accountKeys", [])
-        my_addr = str(self.keypair.pubkey())
-        for i, k in enumerate(keys):
-            pub = k if isinstance(k, str) else k.get("pubkey")
-            if pub == my_addr:
-                if abs((post[i] - pre[i]) / 1e9 - amt) < AMOUNT_TOLERANCE:
-                    # find sender (biggest decrease)
-                    sender = ""
-                    max_d = 0
-                    for j, k2 in enumerate(keys):
-                        if i == j:
-                            continue
-                        d = pre[j] - post[j]
-                        if d > max_d:
-                            max_d = d
-                            sender = k2 if isinstance(k2, str) else k2.get("pubkey", "")
-                    return True, sender
-        return False, ""
-
-    def _check_usdc(self, tx: dict, amt: float) -> tuple[bool, str]:
-        for instr in (
-            tx.get("transaction", {}).get("message", {}).get("instructions", [])
-        ):
-            if (
-                instr.get("program") == "spl-token"
-                and instr.get("parsed", {}).get("type") == "transfer"
-            ):
-                info = instr.get("parsed", {}).get("info", {})
-                if info.get("destination") == str(self.usdc_token_account):
-                    if abs(int(info.get("amount", 0)) / 1e6 - amt) < AMOUNT_TOLERANCE:
-                        return True, info.get("authority", info.get("source", ""))
-        return False, ""
-
-    def _get_proof(self, tx: dict, sig: str, addr: str) -> dict:
-        return {
-            "transaction_hash": sig,
-            "block_number": str(tx.get("slot", 0)),
-            "from_address": addr or "unknown",
-            "confirmed_at": datetime.fromtimestamp(tx.get("blockTime", 0), UTC)
-            if tx.get("blockTime")
-            else datetime.now(UTC),
-        }
-
-    def generate_payment_request(
-        self,
-        amount: float,
-        memo: str,
-        currency: str,
-        label: str = "Aura Hive",
-        message: str = "Payment",
-    ) -> str:
-        recipient = str(self.keypair.pubkey())
-
-        base_url = f"solana:{recipient}"
-        params = [
-            f"amount={amount}",
-            f"label={quote(label)}",
-            f"message={quote(message)}",
-            f"memo={quote(memo)}",
-        ]
-        if currency == "USDC":
-            params.append(f"spl-token={self.usdc_mint}")
-
-        return f"{base_url}?{'&'.join(params)}"
-
-    async def close(self) -> None:
-        await self.client.aclose()
-
-
 # --- EVM Provider Logic ---
 
 
 class EVMProvider:
-    def __init__(self, private_key_hex: str, rpc_url: str, usdc_address: str):
+    def __init__(
+        self,
+        private_key_hex: str,
+        rpc_url: str,
+        usdc_address: str,
+        chain_id: int = 84532,
+        risk_router_address: str = "",
+    ):
         self.account = Account.from_key(private_key_hex)
         self.w3 = AsyncWeb3(AsyncWeb3.AsyncHTTPProvider(rpc_url))
         self.usdc_address = self.w3.to_checksum_address(usdc_address)
+        self.chain_id = chain_id
+        self.risk_router_address = (
+            self.w3.to_checksum_address(risk_router_address)
+            if risk_router_address
+            else ""
+        )
         # Minimal ERC20 ABI for transfer
         self.usdc_abi = [
             {
@@ -276,6 +130,75 @@ class EVMProvider:
         signed_tx = self.account.sign_transaction(tx)
         tx_hash = await self.w3.eth.send_raw_transaction(signed_tx.raw_transaction)
         return tx_hash.hex()
+
+    async def sign_eip712_trade_intent(self, trade_intent: dict[str, Any]) -> dict:
+        """
+        Signs a TradeIntent using EIP-712.
+        Follows ERC-8004 genomic sequencing standard.
+        """
+        if not self.risk_router_address:
+            raise ValueError("risk_router_address not configured")
+
+        domain = {
+            "name": EIP712_DOMAIN_NAME,
+            "version": EIP712_DOMAIN_VERSION,
+            "chainId": self.chain_id,
+            "verifyingContract": self.risk_router_address,
+        }
+
+        # Define EIP-712 types based on TradeIntent protobuf
+        types = {
+            "TradeIntent": [
+                {"name": "trade_id", "type": "string"},
+                {"name": "asset_identifier", "type": "string"},
+                {"name": "asset_domain", "type": "string"},
+                {"name": "proposed_price", "type": "uint256"},
+                {"name": "currency_code", "type": "string"},
+                {"name": "reasoning", "type": "string"},
+            ],
+            "EIP712Domain": [
+                {"name": "name", "type": "string"},
+                {"name": "version", "type": "string"},
+                {"name": "chainId", "type": "uint256"},
+                {"name": "verifyingContract", "type": "address"},
+            ],
+        }
+
+        # Enforce USDC requirement for simplified decimal conversion
+        if trade_intent["currency_code"] != "USDC":
+            raise ValueError(
+                f"EIP-712 signing currently only supports USDC, but got {trade_intent['currency_code']}"
+            )
+
+        # Convert float price to uint256 (assuming 6 decimals for USDC)
+        proposed_price_uint = int(
+            Decimal(str(trade_intent["proposed_price"])) * Decimal("1e6")
+        )
+
+        message = {
+            "trade_id": trade_intent["trade_id"],
+            "asset_identifier": trade_intent["asset_identifier"],
+            "asset_domain": trade_intent["asset_domain"],
+            "proposed_price": proposed_price_uint,
+            "currency_code": trade_intent["currency_code"],
+            "reasoning": trade_intent["reasoning"],
+        }
+
+        structured_data = {
+            "types": types,
+            "domain": domain,
+            "primaryType": "TradeIntent",
+            "message": message,
+        }
+
+        signed_msg = encode_typed_data(full_message=structured_data)
+        signature = self.account.sign_message(signed_msg)
+
+        return {
+            "signature": signature.signature.hex(),
+            "signed_by": self.account.address,
+            "structured_data": structured_data,
+        }
 
     async def close(self) -> None:
         # AsyncWeb3 doesn't strictly need close for HTTP provider, but good practice

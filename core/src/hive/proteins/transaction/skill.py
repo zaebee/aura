@@ -3,16 +3,20 @@ from typing import Any
 import structlog
 from aura_core import SkillProtocol, make_struct
 from aura_core_gen.aura.core.v1 import Observation
+from hive.metabolism import MetabolicSecurityError
 
 from config.crypto import CryptoSettings
 
-from .engine import PriceConverter, SecretEncryption
+from .engine import EVMProvider, PriceConverter, SecretEncryption
 from .schema import (
     PaymentProof,
     PaymentRequestParams,
     PaymentVerificationParams,
+    RWACollateralParams,
     TaxCalculationParams,
+    TradeIntentParams,
 )
+from .solana_engine import SolanaProvider
 
 logger = structlog.get_logger(__name__)
 
@@ -26,9 +30,9 @@ class TransactionSkill(
 
     def __init__(self) -> None:
         self.settings: CryptoSettings | None = None
-        self.provider: Any = None
-        self.solana_provider: Any = None
-        self.evm_provider: Any = None
+        self.provider: SolanaProvider | None = None
+        self.solana_provider: SolanaProvider | None = None
+        self.evm_provider: EVMProvider | None = None
         self.encryption: SecretEncryption | None = None
         self.converter: PriceConverter | None = None
         self._capabilities = {
@@ -42,6 +46,10 @@ class TransactionSkill(
             "convert_price": self._convert_price,
             "get_network_name": self._get_network_name,
             "transfer": self._transfer,
+            "sign_trade_intent": self._sign_trade_intent,
+            "submit_to_router": self._submit_to_router,
+            "execute_rwa_collateral": self._execute_rwa_collateral,
+            "mint_rwa_vault": self._mint_rwa_vault,
         }
 
     def get_name(self) -> str:
@@ -85,6 +93,8 @@ class TransactionSkill(
 
         try:
             return await handler(params)
+        except MetabolicSecurityError:
+            raise
         except Exception as e:
             logger.error(f"Transaction skill error: {e}")
             return Observation(success=False, error=str(e))
@@ -182,6 +192,88 @@ class TransactionSkill(
         except Exception as e:
             logger.error(f"Transfer failed: {e}")
             return Observation(success=False, error=str(e))
+
+    async def _sign_trade_intent(self, params: dict[str, Any]) -> Observation:
+        if not self.evm_provider:
+            return Observation(success=False, error="evm_provider_not_initialized")
+
+        trade_intent_dict = params.get("intent")
+        if not trade_intent_dict:
+            return Observation(success=False, error="intent_params_missing")
+
+        try:
+            # Validate input using Pydantic schema
+            p = TradeIntentParams(**trade_intent_dict)
+            result = await self.evm_provider.sign_eip712_trade_intent(p.model_dump())
+            return Observation(
+                success=True,
+                metadata=make_struct(result),
+            )
+        except Exception as e:
+            logger.error(f"EIP-712 signing failed: {e}")
+            return Observation(success=False, error=str(e))
+
+    async def _submit_to_router(self, params: dict[str, Any]) -> Observation:
+        # Stub for March 9th release
+        return Observation(
+            success=False,
+            error="submit_to_router_not_implemented_pending_abi",
+        )
+
+    async def _execute_rwa_collateral(self, params: dict[str, Any]) -> Observation:
+        """
+        C2C9 Membrane Enforcement: Release SPL Token transfer only if KYC/AML is cleared.
+        """
+        # 1. Access context metadata for security enforcement
+        context = params.get("_context")
+        if not context:
+            raise MetabolicSecurityError("Security context missing: HiveContext required")
+
+        # Extract metadata from Context (google.protobuf.Struct)
+        metadata = (
+            context.metadata.to_dict() if hasattr(context.metadata, "to_dict") else {}
+        )
+        kyc_status = metadata.get("kyc_status")
+        aml_risk = metadata.get("aml_risk")
+
+        # 2. Strict C2C9 Enforcement logic
+        required_kyc = self.settings.required_kyc_status if self.settings else "APPROVED"
+        required_aml = self.settings.required_aml_risk if self.settings else "LOW"
+
+        if kyc_status != required_kyc or aml_risk != required_aml:
+            logger.error(
+                "c2c9_security_violation",
+                kyc_status=kyc_status,
+                aml_risk=aml_risk,
+                agent_did=metadata.get("agent_did", "unknown"),
+            )
+            raise MetabolicSecurityError(
+                f"C2C9 Membrane Violation: Compliance failure (KYC: {kyc_status}, AML: {aml_risk})"
+            )
+
+        # 3. Execution (Motor Neuron action)
+        if not self.solana_provider:
+            return Observation(success=False, error="solana_provider_not_initialized")
+
+        p = RWACollateralParams(**params)
+        try:
+            tx_hash = await self.solana_provider.execute_rwa_collateral(
+                p.wallet_address, p.amount_usdc
+            )
+            return Observation(
+                success=True,
+                metadata=make_struct({"transaction_hash": tx_hash}),
+            )
+        except Exception as e:
+            logger.error(f"RWA Collateral execution failed: {e}")
+            return Observation(success=False, error=str(e))
+
+    async def _mint_rwa_vault(self, params: dict[str, Any]) -> Observation:
+        # Stub pending Solana vault program ABI
+        return Observation(
+            success=False,
+            error="mint_rwa_vault_not_implemented_pending_solana_program_abi",
+        )
 
     async def close(self) -> None:
         if self.provider:

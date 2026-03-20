@@ -30,8 +30,8 @@ from hive.proteins.transaction.engine import (
     EVMProvider,
     PriceConverter,
     SecretEncryption,
-    SolanaProvider,
 )
+from hive.proteins.transaction.solana_engine import SolanaProvider
 from hive.transformer import AuraTransformer
 from opentelemetry.instrumentation.grpc import GrpcInstrumentorServer
 from opentelemetry.instrumentation.langchain import LangchainInstrumentor
@@ -215,6 +215,8 @@ class HiveCell:
                     private_key_hex=get_raw_key(self.settings.crypto.evm_private_key),
                     rpc_url=str(self.settings.crypto.evm_rpc_url),
                     usdc_address=self.settings.crypto.evm_usdc_address,
+                    chain_id=self.settings.crypto.evm_chain_id,
+                    risk_router_address=self.settings.crypto.risk_router_address,
                 ),
                 "encryption": SecretEncryption(
                     get_raw_key(self.settings.crypto.secret_encryption_key)

@@ -4,9 +4,9 @@ import pytest
 from hive.proteins.transaction.engine import (
     PriceConverter,
     SecretEncryption,
-    SolanaProvider,
 )
 from hive.proteins.transaction.skill import TransactionSkill
+from hive.proteins.transaction.solana_engine import SolanaProvider
 from solders.keypair import Keypair
 from solders.pubkey import Pubkey
 
@@ -51,7 +51,7 @@ async def test_transaction_skill_calculate_tax_and_margin():
 
 
 @pytest.mark.asyncio
-@patch("hive.proteins.transaction.engine.Pubkey.from_string")
+@patch("hive.proteins.transaction.solana_engine.Pubkey.from_string")
 async def test_transaction_skill_generate_payment_request(mock_from_string):
     # Mock Pubkey.from_string to handle the project's non-standard TOKEN_PROGRAM_ID
     # Use pre-created Pubkey objects to avoid recursion

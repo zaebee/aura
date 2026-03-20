@@ -197,6 +197,8 @@ message Intent {
     AuditIntent audit = 11;
     UIIntent ui = 12;
     AssetIntent asset = 13;  // Generic asset intent (decoupled)
+    TradeIntent trade = 14;  // ERC-8004 Genomic Sequencing trade intent
+    RWAVaultIntent rwa_vault = 15;  // Institutional RWA-backed stablecoin vault intent
   }
 }
 
@@ -259,6 +261,7 @@ message Observation {
     SearchObservation search = 15;
     DiscoveryObservation discovery = 16;
     BlockchainDiscoveryResult blockchain_discovery = 17;
+    TradeObservation trade = 18;  // ERC-8004 Genomic Sequencing trade observation
   }
 }
 
@@ -387,6 +390,7 @@ message Event {
     AuditEvent audit = 14;
     LogEvent log = 15;
     AssetEvent asset = 16;  // Generic asset event (decoupled)
+    TradeEvent trade = 17;  // ERC-8004 Genomic Sequencing trade event
   }
 }
 
@@ -439,4 +443,172 @@ message AuditEvent {
   bool is_pure = 2;
   repeated string heresies = 3;
   double negotiation_success_rate = 4;
+}
+
+// =============================================================================
+// ERC-8004 GENOMIC SEQUENCING - Trade Intent and Validation
+// =============================================================================
+
+/**
+ * TradeIntent represents a structured trade decision following ERC-8004
+ * Genomic Sequencing standards. This enables the Transformer (LLM) to
+ * generate trade intentions in a format compatible with Risk Router systems.
+ */
+message TradeIntent {
+  string trade_id = 1;                    // Unique trade identifier
+  string asset_identifier = 2;           // Reference to the asset being traded
+  string asset_domain = 3;                // Asset domain (e.g., "VEHICLE", "PROPERTY")
+  double proposed_price = 4;             // Proposed trade price
+  string currency_code = 5;               // ISO 4217 currency code
+  ValidationScore validation_score = 6;  // Risk assessment score
+  string reasoning = 7;                   // LLM reasoning for the trade decision
+  map<string, string> metadata = 8;      // Additional trade context
+  string eip712_domain = 9;               // EIP-712 domain separator
+  string eip712_types = 10;               // EIP-712 type definitions
+  google.protobuf.Struct eip712_message = 11; // EIP-712 structured message
+}
+
+/**
+ * ValidationScore represents risk assessment following ERC-8004 standards.
+ * Lower risk_score values indicate lower risk (0.0 = no risk, 1.0 = maximum risk).
+ */
+message ValidationScore {
+  double risk_score = 1;                  // Risk assessment (0.0-1.0, lower is better)
+  string risk_category = 2;              // "LOW", "MEDIUM", "HIGH", "CRITICAL"
+  string validation_method = 3;          // "EIP-712", "ERC-8004", "CUSTOM"
+  string validation_context = 4;         // Additional validation details
+  google.protobuf.Timestamp validated_at = 5; // When validation occurred
+  repeated string validation_rules = 6;  // Rules applied during validation
+  map<string, string> validation_metadata = 7; // Additional validation data
+}
+
+// =============================================================================
+// ERC-8004 GENOMIC SEQUENCING - Trade Observation
+// =============================================================================
+
+/**
+ * TradeObservation represents the result of executing a trade intent.
+ * This includes payment verification, asset transfer, and validation results.
+ */
+message TradeObservation {
+  string trade_id = 1;                    // Reference to the original trade intent
+  string asset_identifier = 2;           // Asset being traded
+  string asset_domain = 3;                // Asset domain
+  Status status = 4;                     // Overall trade status
+  ValidationScore validation_score = 5;  // Final validation score
+
+  // Payment information
+  string payment_transaction_hash = 6;   // Blockchain transaction hash
+  string payment_network = 7;             // "eip155:8453" (Base), "solana", etc.
+  string payment_currency = 8;            // "USDC", "SOL", etc.
+  double payment_amount = 9;             // Amount paid
+  string payment_status = 10;             // "PENDING", "COMPLETED", "FAILED"
+
+  // Trade execution results
+  string trade_result = 11;               // "SUCCESS", "FAILED", "REJECTED", "PENDING"
+  string failure_reason = 12;             // If failed, why
+  map<string, string> execution_metadata = 13; // Additional execution details
+
+  // ERC-8004 validation results
+  repeated string validation_rules_applied = 14; // Rules that were checked
+  repeated string validation_warnings = 15; // Non-critical validation issues
+  repeated string validation_errors = 16; // Critical validation failures
+
+  // EIP-712 signing information
+  string eip712_signature = 17;           // Cryptographic signature
+  string eip712_signed_by = 18;           // Address that signed
+  string eip712_domain_hash = 19;         // Domain separator hash
+  string eip712_message_hash = 20;        // Message hash
+}
+
+// =============================================================================
+// ERC-8004 GENOMIC SEQUENCING - Trade Event
+// =============================================================================
+
+/**
+ * TradeEvent represents trade-related events emitted to the Hive's bloodstream.
+ * This includes trade creation, execution, validation, and completion events.
+ */
+message TradeEvent {
+  string trade_id = 1;                    // Unique trade identifier
+  string asset_identifier = 2;           // Asset being traded
+  string asset_domain = 3;                // Asset domain
+  string event_type = 4;                 // "TRADE_CREATED", "TRADE_EXECUTED", "TRADE_VALIDATED", "TRADE_COMPLETED", "TRADE_FAILED"
+  google.protobuf.Timestamp event_time = 5;
+  string initiated_by = 6;               // Agent or service that initiated the event
+
+  // Trade-specific data
+  oneof trade_data {
+    TradeCreatedEvent created = 7;
+    TradeExecutedEvent executed = 8;
+    TradeValidatedEvent validated = 9;
+    TradeCompletedEvent completed = 10;
+    TradeFailedEvent failed = 11;
+  }
+}
+
+message TradeCreatedEvent {
+  string trade_intent_id = 1;            // Reference to the original intent
+  double proposed_price = 2;             // Proposed trade price
+  string currency_code = 3;               // ISO 4217 currency code
+  ValidationScore initial_validation = 4; // Initial validation score
+}
+
+message TradeExecutedEvent {
+  string payment_transaction_hash = 1;   // Blockchain transaction hash
+  string payment_network = 2;             // "eip155:8453" (Base), "solana", etc.
+  double payment_amount = 3;             // Amount paid
+  string payment_currency = 4;            // "USDC", "SOL", etc.
+}
+
+message TradeValidatedEvent {
+  ValidationScore validation_score = 1;  // Final validation score
+  repeated string validation_rules = 2;  // Rules applied
+  repeated string validation_warnings = 3; // Non-critical issues
+  repeated string validation_errors = 4; // Critical failures
+}
+
+message TradeCompletedEvent {
+  string final_price = 1;                 // Final agreed price
+  string currency_code = 2;               // ISO 4217 currency code
+  string reservation_code = 3;           // Reservation/reference code
+  string eip712_signature = 4;           // Cryptographic signature
+}
+
+message TradeFailedEvent {
+  string failure_reason = 1;             // Why the trade failed
+  string error_code = 2;                 // Machine-readable error code
+  map<string, string> error_details = 3; // Additional error context
+}
+
+// ============================================================
+// Institutional RWA-Backed Stablecoin Vault (StableHacks 2026)
+// ============================================================
+
+// RWAComplianceScore captures the KYC/AML result for a vault intent.
+// The Agent must act as a strict compliance officer before any vault action.
+message RWAComplianceScore {
+  bool kyc_passed = 1;
+  bool aml_passed = 2;
+  string compliance_status = 3;  // "APPROVED", "REJECTED", "PENDING"
+  string violation_code = 4;     // "KYC_MISSING", "AML_SUSPICIOUS", "ASSET_UNVERIFIED", or ""
+  string think = 5;              // LLM <think> reasoning block
+  repeated string flags = 6;     // Human-readable compliance flags
+}
+
+// RWAVaultIntent is the structured output for locking/minting RWA-backed
+// stablecoin collateral on Solana. Triggered by the AuraTransformer when
+// rwa_mode is set in Context.metadata.
+message RWAVaultIntent {
+  string vault_id = 1;
+  string asset_identifier = 2;
+  string asset_domain = 3;           // "GOLD", "REAL_ESTATE", "VEHICLE", etc.
+  double appraised_value_usd = 4;    // Raw appraisal from vision + SIX rates
+  double ltv_ratio = 5;              // e.g. 0.60
+  double collateral_value_usd = 6;   // appraised_value_usd * ltv_ratio
+  string stablecoin_currency = 7;    // "USDC"
+  string wallet_address = 8;
+  RWAComplianceScore compliance = 9;
+  string reasoning = 10;
+  map<string, string> metadata = 11;
 }
