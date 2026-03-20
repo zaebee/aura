@@ -82,7 +82,7 @@ export async function analyzeVision(file: File, signal?: AbortSignal): Promise<V
     .map(b => b.toString(16).padStart(2, '0'))
     .join('')
 
-  const authHeaders = await wallet.signRawHash('POST', '/vision/analyze', bodyHash)
+  const authHeaders = await wallet.signRawHash('POST', wallet.getSigningPath('/vision/analyze'), bodyHash)
 
   const resp = await fetch(`${wallet.getGatewayUrl()}/vision/analyze`, {
     method: 'POST',
