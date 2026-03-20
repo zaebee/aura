@@ -1,8 +1,8 @@
-import logging
 from datetime import UTC, datetime
 from typing import Any, cast
 
 import httpx
+import structlog
 from solana.rpc.async_api import AsyncClient
 from solana.rpc.commitment import Finalized
 from solders.keypair import Keypair  # type: ignore
@@ -16,7 +16,7 @@ from spl.token.instructions import (
     transfer_checked,
 )
 
-logger = logging.getLogger(__name__)
+logger = structlog.get_logger(__name__)
 
 FINALIZED_COMMITMENT = "finalized"
 ASSOCIATED_TOKEN_PROGRAM_ID = "ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL"  # nosec
