@@ -1,0 +1,28 @@
+hive:
+  version: "1.0"
+  description: "bee.Evolver — autonomous Hive self-improvement agent"
+  nucleotides:
+    A: "src/hive/aggregator/__init__.py"
+    T: "src/hive/transformer/__init__.py"
+    C: "src/hive/connector/__init__.py"
+    G: "src/hive/generator/__init__.py"
+  entry_point: "main.py"
+  config: "src/config.py"
+  models: "src/hive/models.py"
+  metabolism: "src/hive/metabolism.py"
+  prompts:
+    - "prompts/bee_evolver.md"
+  triggers:
+    - schedule: "0 6 * * 1"
+    - workflow_dispatch: true
+  outputs:
+    - github_pr
+    - github_issues
+    - telegram_pulse
+  requires_nats: false
+  requires_secrets:
+    - AURA_LLM__API_KEY
+    - GITHUB_TOKEN
+    - GITHUB_REPOSITORY
+    - AURA_TELEGRAM_TOKEN
+    - AURA_BEE_KEEPER__ADMIN_CHAT_ID
