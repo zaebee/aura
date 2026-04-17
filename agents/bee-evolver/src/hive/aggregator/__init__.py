@@ -1,3 +1,4 @@
+import os
 import subprocess  # nosec
 from pathlib import Path
 from typing import Any
@@ -86,14 +87,21 @@ class EvolverAggregator:
         return ""
 
     def _scan_filesystem(self) -> list[str]:
+        """Recursively scan the repo, pruning excluded dirs before descending.
+
+        Uses os.walk with in-place dirs mutation so excluded directories
+        (e.g. .git, .venv, node_modules) are never traversed at all,
+        which is significantly faster than rglob + post-filter on large repos.
+        """
         exclude = set(self.settings.exclude_dirs)
         items: list[str] = []
-        for p in self._root.rglob("*"):
-            # Skip any path whose parts contain an excluded directory name
-            if any(part in exclude for part in p.parts):
-                continue
-            if p.is_file():
-                items.append(str(p.relative_to(self._root)))
+        root_str = str(self._root)
+        for dirpath, dirnames, filenames in os.walk(root_str):
+            # Prune excluded dirs in-place to prevent os.walk from descending
+            dirnames[:] = [d for d in dirnames if d not in exclude]
+            for filename in filenames:
+                full = os.path.join(dirpath, filename)
+                items.append(os.path.relpath(full, root_str))
         return sorted(items)
 
     def _extract_recent_heresies(self, hive_state: str) -> list[str]:
@@ -114,28 +122,44 @@ class EvolverAggregator:
         return heresies[:10]
 
     async def _fetch_issues(self, client: httpx.AsyncClient) -> list[dict[str, Any]]:
+        """Fetch all open issues across pages, up to issues_per_page total items."""
+        results: list[dict[str, Any]] = []
+        limit = self.settings.issue_body_limit
+        page = 1
+        per_page = min(self.settings.issues_per_page, 100)  # GitHub max is 100
         try:
-            resp = await client.get(
-                f"{_GITHUB_API}/repos/{self.settings.github_repository}/issues",
-                headers=self._gh_headers(),
-                # Omit 'labels' param entirely to return all open issues
-                params={"state": "open", "per_page": self.settings.issues_per_page},
-            )
-            if resp.status_code == 200:
-                data: list[dict[str, Any]] = resp.json()
-                limit = self.settings.issue_body_limit
-                return [
-                    {
-                        "number": i["number"],
-                        "title": i["title"],
-                        "body": (i["body"] or "")[:limit],
-                    }
-                    for i in data
-                    if "pull_request" not in i  # exclude PRs from issues endpoint
-                ]
+            while len(results) < self.settings.issues_per_page:
+                resp = await client.get(
+                    f"{_GITHUB_API}/repos/{self.settings.github_repository}/issues",
+                    headers=self._gh_headers(),
+                    params={"state": "open", "per_page": per_page, "page": page},
+                )
+                if resp.status_code != 200:
+                    logger.warning(
+                        "github_issues_fetch_failed", status=resp.status_code
+                    )
+                    break
+                page_data: list[dict[str, Any]] = resp.json()
+                if not page_data:
+                    break  # no more pages
+                for i in page_data:
+                    if "pull_request" in i:
+                        continue  # issues endpoint also returns PRs
+                    results.append(
+                        {
+                            "number": i["number"],
+                            "title": i["title"],
+                            "body": (i["body"] or "")[:limit],
+                        }
+                    )
+                    if len(results) >= self.settings.issues_per_page:
+                        break
+                if len(page_data) < per_page:
+                    break  # last page reached
+                page += 1
         except Exception as e:
             logger.warning("github_issues_fetch_failed", error=str(e))
-        return []
+        return results
 
     async def _fetch_prs(self, client: httpx.AsyncClient) -> list[dict[str, Any]]:
         try:

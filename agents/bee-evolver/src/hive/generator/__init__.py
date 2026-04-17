@@ -18,10 +18,14 @@ class EvolverGenerator:
         self._root: Path = find_hive_root()
 
     def prepare_branch(self, timestamp: str) -> str:
-        """Create and checkout a new evolver branch. Returns branch name."""
+        """Create and checkout a new evolver branch. Returns branch name.
+
+        Uses -B (force-reset) so a previously interrupted cycle on the same
+        timestamp doesn't cause a 'branch already exists' failure.
+        """
         branch = f"evolver/cycle-{timestamp}"
         try:
-            self._git(["checkout", "-b", branch])
+            self._git(["checkout", "-B", branch])
             logger.info("evolver_branch_created", branch=branch)
         except Exception as e:
             logger.error("branch_creation_failed", branch=branch, error=str(e))

@@ -216,7 +216,9 @@ class EvolverConnector:
                 json={
                     "chat_id": self.settings.admin_chat_id,
                     "text": message,
-                    "parse_mode": "Markdown",
+                    # HTML is more robust than Markdown V1 — no risk of parse
+                    # failures from unescaped _, *, or ` in LLM-generated titles.
+                    "parse_mode": "HTML",
                     "disable_web_page_preview": True,
                 },
             )
@@ -233,6 +235,11 @@ class EvolverConnector:
             logger.error("telegram_error", error=str(e))
         return False
 
+    @staticmethod
+    def _h(text: str) -> str:
+        """Escape a string for safe embedding in Telegram HTML messages."""
+        return text.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+
     def _build_telegram_message(
         self,
         plan: EvolutionPlan,
@@ -241,27 +248,28 @@ class EvolverConnector:
         timestamp: str,
         errors: list[str],
     ) -> str:
+        h = self._h
         if plan.hive_is_optimal:
             return (
-                f"🍯 *bee.Evolver Pulse* — {timestamp}\n"
+                f"🍯 <b>bee.Evolver Pulse</b> — {h(timestamp)}\n"
                 "The Hive is crystalline. No mutations required."
             )
 
-        lines = [f"🧬 *bee.Evolver Pulse* — {timestamp}", ""]
+        lines = [f"🧬 <b>bee.Evolver Pulse</b> — {h(timestamp)}", ""]
 
         if plan.improvements:
-            lines.append(f"*Improvements generated:* {len(plan.improvements)}")
+            lines.append(f"<b>Improvements generated:</b> {len(plan.improvements)}")
             for imp in plan.improvements:
                 icon = {"code": "🔧", "prompt": "🧠", "doc": "📄", "issue": "📋"}.get(
                     imp.type, "•"
                 )
-                lines.append(f"{icon} {imp.title} `({imp.type})`")
+                lines.append(f"{icon} {h(imp.title)} <code>({h(imp.type)})</code>")
             lines.append("")
 
-        lines.append(f"*Tokens consumed:* {plan.token_usage}")
+        lines.append(f"<b>Tokens consumed:</b> {plan.token_usage}")
 
         if pr_url:
-            lines.append(f"*PR:* {pr_url}")
+            lines.append(f"<b>PR:</b> {h(pr_url)}")
 
         if errors:
             status = "⚠️ Partial"
@@ -270,13 +278,13 @@ class EvolverConnector:
         else:
             status = "❌ No improvements generated"
 
-        lines.append(f"*Status:* {status}")
+        lines.append(f"<b>Status:</b> {status}")
 
         if errors:
             lines.append("")
-            lines.append("*Patch errors:*")
+            lines.append("<b>Patch errors:</b>")
             for err in errors[:3]:
-                lines.append(f"• {err[:100]}")
+                lines.append(f"• <code>{h(err[:100])}</code>")
 
         return "\n".join(lines)
 
