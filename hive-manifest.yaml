@@ -58,6 +58,8 @@ allowed_chambers:
   agents: WorkerCells
   agents/bee-keeper: KeeperCell
   agents/bee-keeper/src/hive/: KeeperNucleus
+  agents/bee-evolver: EvolverCell
+  agents/bee-evolver/src/hive/: EvolverNucleus
   core/src/hive/aggregator/db.py: AuthorizedEnzyme
   core/src/hive/aggregator/embeddings.py: AuthorizedEnzyme
   core/src/hive/aggregator/main.py: AuthorizedEnzyme

@@ -86,6 +86,7 @@ exclude = [
     "**/proto/**",  # Auto-generated protobuf files
     "**/gen/**",  # Auto-generated dataclass files
     "**/gen-proto/**",  # Auto-generated proto files
+    "tools/evolver_colab.ipynb",  # Colab notebook — cross-cell state makes E402/I001 inapplicable
 ]
 
 [tool.ruff.lint]

@@ -1,0 +1,63 @@
+name: bee.Evolver
+
+on:
+  schedule:
+    # Every Monday at 06:00 UTC
+    - cron: '0 6 * * 1'
+  workflow_dispatch:
+    inputs:
+      focus:
+        description: 'Optional focus hint for the Evolver (e.g. "improve prompts", "fix heresies")'
+        required: false
+        default: ''
+        type: string
+
+jobs:
+  evolve:
+    name: Evolutionary Cycle
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+      issues: write
+
+    steps:
+      - name: Checkout Hive
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+
+      - name: Install Dependencies
+        run: |
+          uv python install 3.12
+          uv sync --directory agents/bee-evolver
+
+      - name: Configure Git Identity
+        run: |
+          git config --global user.name "bee.Evolver"
+          git config --global user.email "evolver@aura.hive"
+
+      - name: Run bee.Evolver
+        env:
+          AURA_LLM__API_KEY: ${{ secrets.MISTRAL_API_KEY }}
+          AURA_LLM__MODEL: "mistral/mistral-large-latest"
+          AURA_LLM__FALLBACK_MODEL: "openai/gpt-4o-mini"
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          GITHUB_EVENT_NAME: ${{ github.event_name }}
+          AURA_TELEGRAM_TOKEN: ${{ secrets.AURA_TELEGRAM_TOKEN }}
+          AURA_BEE_KEEPER__ADMIN_CHAT_ID: ${{ secrets.AURA_BEE_KEEPER__ADMIN_CHAT_ID }}
+          EVOLVER_ASSIGNEE: "zaebee"
+          EVOLVER_FOCUS: ${{ inputs.focus || '' }}
+          EVOLVER_MAX_IMPROVEMENTS: "3"
+          AURA_BEE_EVOLVER__MAX_TOKENS: "2000"
+          MISTRAL_API_KEY: ${{ secrets.MISTRAL_API_KEY }}
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+        run: |
+          uv run --directory agents/bee-evolver python main.py
