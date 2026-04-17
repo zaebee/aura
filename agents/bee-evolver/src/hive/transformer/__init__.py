@@ -6,7 +6,7 @@ import litellm
 import structlog
 
 from config import EvolverSettings
-from aura_core import find_hive_root
+from ..utils import find_hive_root
 from ..models import EvolutionPlan, Improvement, HiveContext
 
 logger = structlog.get_logger(__name__)

@@ -83,7 +83,7 @@ class EvolverMetabolism:
 
     def _configure_git(self) -> None:
         """Set git identity scoped to the current repository (not global)."""
-        from aura_core import find_hive_root
+        from .utils import find_hive_root
         root = str(find_hive_root())
         try:
             subprocess.run(  # nosec

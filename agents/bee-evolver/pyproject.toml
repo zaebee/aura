@@ -9,12 +9,7 @@ dependencies = [
     "httpx>=0.28.1",
     "pydantic-settings>=2.12.0",
     "structlog>=25.5.0",
-    "gitpython>=3.1.0",
-    "aura-core",
 ]
-
-[tool.uv.sources]
-aura-core = { workspace = true }
 
 [project.scripts]
 aura-evolver = "main:main"
