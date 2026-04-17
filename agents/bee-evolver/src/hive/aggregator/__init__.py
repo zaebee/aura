@@ -86,11 +86,14 @@ class EvolverAggregator:
         return ""
 
     def _scan_filesystem(self) -> list[str]:
+        exclude = set(self.settings.exclude_dirs)
         items: list[str] = []
-        for p in self._root.iterdir():
-            if p.name.startswith(".") or p.name in ("node_modules", ".venv"):
+        for p in self._root.rglob("*"):
+            # Skip any path whose parts contain an excluded directory name
+            if any(part in exclude for part in p.parts):
                 continue
-            items.append(str(p.relative_to(self._root)))
+            if p.is_file():
+                items.append(str(p.relative_to(self._root)))
         return sorted(items)
 
     def _extract_recent_heresies(self, hive_state: str) -> list[str]:
@@ -115,15 +118,17 @@ class EvolverAggregator:
             resp = await client.get(
                 f"{_GITHUB_API}/repos/{self.settings.github_repository}/issues",
                 headers=self._gh_headers(),
-                params={"state": "open", "per_page": 20, "labels": ""},
+                # Omit 'labels' param entirely to return all open issues
+                params={"state": "open", "per_page": self.settings.issues_per_page},
             )
             if resp.status_code == 200:
                 data: list[dict[str, Any]] = resp.json()
+                limit = self.settings.issue_body_limit
                 return [
                     {
-                        "number": i.get("number"),
-                        "title": i.get("title", ""),
-                        "body": (i.get("body") or "")[:500],
+                        "number": i["number"],
+                        "title": i["title"],
+                        "body": (i["body"] or "")[:limit],
                     }
                     for i in data
                     if "pull_request" not in i  # exclude PRs from issues endpoint

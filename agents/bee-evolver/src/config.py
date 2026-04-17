@@ -36,3 +36,16 @@ class EvolverSettings(BaseSettings):
     evolver_focus: str = Field("", alias="EVOLVER_FOCUS")
     max_improvements: int = Field(3, alias="EVOLVER_MAX_IMPROVEMENTS")
     max_tokens: int = Field(2000, alias="AURA_BEE_EVOLVER__MAX_TOKENS")
+
+    # Filesystem scan: directories to exclude (comma-separated)
+    exclude_dirs: list[str] = Field(
+        default=[
+            ".git", ".venv", "node_modules", "__pycache__",
+            "gen-proto", "gen", ".mypy_cache", ".ruff_cache",
+        ],
+        alias="EVOLVER_EXCLUDE_DIRS",
+    )
+    # GitHub Issues pagination limit
+    issues_per_page: int = Field(20, alias="EVOLVER_ISSUES_PER_PAGE")
+    # Max chars of issue body passed to the LLM
+    issue_body_limit: int = Field(500, alias="EVOLVER_ISSUE_BODY_LIMIT")

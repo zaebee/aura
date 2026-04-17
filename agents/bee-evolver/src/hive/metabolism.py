@@ -82,17 +82,26 @@ class EvolverMetabolism:
         return observation
 
     def _configure_git(self) -> None:
-        """Set git identity for CI commits."""
+        """Set git identity scoped to the current repository (not global)."""
+        from aura_core import find_hive_root
+        root = str(find_hive_root())
         try:
             subprocess.run(  # nosec
-                ["git", "config", "--global", "user.name", "bee.Evolver"],
-                check=False,
+                ["git", "config", "user.name", "bee.Evolver"],
+                check=True,
                 capture_output=True,
+                cwd=root,
             )
             subprocess.run(  # nosec
-                ["git", "config", "--global", "user.email", "evolver@aura.hive"],
-                check=False,
+                ["git", "config", "user.email", "evolver@aura.hive"],
+                check=True,
                 capture_output=True,
+                cwd=root,
             )
-        except Exception as e:
-            logger.warning("git_config_failed", error=str(e))
+            logger.info("git_identity_configured")
+        except subprocess.CalledProcessError as e:
+            logger.error(
+                "git_config_failed",
+                error=e.stderr.decode(errors="replace").strip(),
+            )
+            raise
