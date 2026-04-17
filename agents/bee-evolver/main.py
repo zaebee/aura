@@ -8,10 +8,9 @@ _src = Path(__file__).parent / "src"
 if str(_src) not in sys.path:
     sys.path.insert(0, str(_src))
 
-import structlog
-
-from config import EvolverSettings
-from hive.metabolism import EvolverMetabolism
+import structlog  # noqa: E402
+from config import EvolverSettings  # noqa: E402
+from hive.metabolism import EvolverMetabolism  # noqa: E402
 
 structlog.configure(
     processors=[
