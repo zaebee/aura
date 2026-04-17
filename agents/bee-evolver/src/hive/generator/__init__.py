@@ -1,5 +1,4 @@
 import subprocess  # nosec
-from datetime import UTC, datetime
 from pathlib import Path
 
 import structlog
