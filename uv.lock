@@ -12,6 +12,7 @@ members = [
     "api-gateway",
     "aura",
     "aura-core",
+    "aura-evolver",
     "aura-keeper",
     "aura-mcp",
     "aura-worker",
@@ -413,6 +414,25 @@ dev = [
     { name = "build", specifier = ">=1.4.0" },
     { name = "grpcio-tools", specifier = ">=1.76.0" },
     { name = "hatchling", specifier = ">=1.28.0" },
+]
+
+[[package]]
+name = "aura-evolver"
+version = "0.1.0"
+source = { editable = "agents/bee-evolver" }
+dependencies = [
+    { name = "httpx" },
+    { name = "litellm" },
+    { name = "pydantic-settings" },
+    { name = "structlog" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "httpx", specifier = ">=0.28.1" },
+    { name = "litellm", specifier = ">=1.63.0" },
+    { name = "pydantic-settings", specifier = ">=2.12.0" },
+    { name = "structlog", specifier = ">=25.5.0" },
 ]
 
 [[package]]
