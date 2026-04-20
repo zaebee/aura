@@ -1,0 +1,63 @@
+// Metabolic Mapping: Aura Python -> Verum Explicit Capabilities
+
+// 1. Define the Core Capabilities (Contexts)
+context protocol Aggregator {
+    fn perceive(&self, signal: &Signal) -> Context;
+};
+
+context protocol Transformer {
+    fn think(&self, context: &Context) -> Intent;
+};
+
+context protocol Connector {
+    fn act(&self, intent: &Intent) -> Observation;
+};
+
+context protocol Generator {
+    fn pulse(&self, observation: &Observation);
+};
+
+// 2. The Metabolic Loop as a Verum Function
+// Instead of a class instance with injected members, we use the context system.
+// This enforces "Semantic Honesty" - if you execute a cycle, you MUST provide these.
+
+@verify(formal)
+fn execute_cycle(signal: &Signal)
+    using [Aggregator, Transformer, Connector, Generator, Coherence]
+    where ensures Coherence.purity() >= 2.0/7.0
+{
+    // Layer 4: Propagation is implicit
+    let context     = Aggregator.perceive(signal);
+    let intent      = Transformer.think(&context);
+    let observation = Connector.act(&intent);
+    Generator.pulse(&observation);
+}
+
+// 3. Skill Execution (Connector implementation)
+// In Python, we have BaseConnector + SkillRegistry.
+// In Verum, we use 'provide' for late binding.
+
+implement Connector for SkillConnector {
+    fn act(&self, intent: &Intent) -> Observation
+        using [FileSystem, Database, Network] // Skills are contexts too
+    {
+        // ... execution logic ...
+    }
+}
+
+// 4. Wiring it together in main()
+fn main() using [IO] {
+    // Stage providers
+    let agg = CoreAggregator.new();
+    let dsp = DspyTransformer.new();
+    let skm = SkillConnector.new();
+    let nts = NatsGenerator.new();
+
+    // The Hive's "Bloodstream" is now a scope of provided capabilities
+    provide Aggregator  = agg;
+    provide Transformer = dsp;
+    provide Connector   = skm;
+    provide Generator   = nts in {
+        // Run loop...
+    }
+}
