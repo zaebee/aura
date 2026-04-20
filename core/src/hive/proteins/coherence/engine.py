@@ -13,12 +13,12 @@ class CoherenceEngine:
     Simulates the 7-dimensional coherence matrix Γ and purity thresholds.
     """
 
-    PCRIT: float = 2.0 / 7.0  # ~0.286
-
-    def __init__(self) -> None:
+    def __init__(self, pcrit: float = 2.0 / 7.0) -> None:
         # Initialize a 7x7 identity matrix (normalized trace)
+        self.pcrit = pcrit
         self.gamma = np.eye(7, dtype=complex) / 7.0
         self.purity = self._calculate_purity()
+        self.prev_purity = self.purity
 
     def _calculate_purity(self) -> float:
         """P = trace(Γ²)"""
@@ -29,22 +29,29 @@ class CoherenceEngine:
         Adjust coherence based on signal strength.
         High entropy signals decay purity.
         """
+        self.prev_purity = self.purity
+
         # Simple simulation: update diagonal elements
         # In a real UHM implementation, this would use octonion algebra
         noise = np.random.normal(0, 0.01, (7, 7)) + 1j * np.random.normal(0, 0.01, (7, 7))
         self.gamma = self.gamma + noise * (1.0 - signal_strength)
 
-        # Re-normalize to trace 1
-        self.gamma /= np.trace(self.gamma)
+        # Re-normalize to trace 1 with safety check
+        trace_val = np.trace(self.gamma)
+        if np.abs(trace_val) > 1e-15:
+            self.gamma /= trace_val
+
         self.purity = self._calculate_purity()
 
-        status = "COHERENT" if self.purity >= self.PCRIT else "ZOMBIE"
+        status = "COHERENT" if self.purity >= self.pcrit else "ZOMBIE"
+        # valence = dP/dτ (rate of change of purity)
+        valence = self.purity - self.prev_purity
 
         return {
             "purity": self.purity,
-            "threshold": self.PCRIT,
+            "threshold": self.pcrit,
             "status": status,
-            "valence": self.purity - self.PCRIT # Vhed
+            "valence": valence
         }
 
     async def execute(self, intent: str, params: Any) -> Observation:
