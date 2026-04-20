@@ -10,11 +10,16 @@ context protocol Transformer {
 };
 
 context protocol Connector {
-    fn act(&self, intent: &Intent) -> Observation;
+    fn act(&self, intent: &Intent, context: &Context) -> Observation;
 };
 
 context protocol Generator {
     fn pulse(&self, observation: &Observation);
+};
+
+context protocol Membrane {
+    fn inspect_inbound(&self, signal: &Signal) -> Signal;
+    fn inspect_outbound(&self, intent: &Intent, context: &Context) -> Intent;
 };
 
 // 2. The Metabolic Loop as a Verum Function
@@ -23,13 +28,15 @@ context protocol Generator {
 
 @verify(formal)
 fn execute_cycle(signal: &Signal)
-    using [Aggregator, Transformer, Connector, Generator, Coherence]
+    using [Aggregator, Transformer, Connector, Generator, Membrane, Coherence]
     where ensures Coherence.purity() >= 2.0/7.0
 {
     // Layer 4: Propagation is implicit
-    let context     = Aggregator.perceive(signal);
+    let signal      = Membrane.inspect_inbound(signal);
+    let context     = Aggregator.perceive(&signal);
     let intent      = Transformer.think(&context);
-    let observation = Connector.act(&intent);
+    let intent      = Membrane.inspect_outbound(&intent, &context);
+    let observation = Connector.act(&intent, &context);
     Generator.pulse(&observation);
 }
 
@@ -38,7 +45,7 @@ fn execute_cycle(signal: &Signal)
 // In Verum, we use 'provide' for late binding.
 
 implement Connector for SkillConnector {
-    fn act(&self, intent: &Intent) -> Observation
+    fn act(&self, intent: &Intent, context: &Context) -> Observation
         using [FileSystem, Database, Network] // Skills are contexts too
     {
         // ... execution logic ...
@@ -52,12 +59,14 @@ fn main() using [IO] {
     let dsp = DspyTransformer.new();
     let skm = SkillConnector.new();
     let nts = NatsGenerator.new();
+    let mbr = CoreMembrane.new();
 
     // The Hive's "Bloodstream" is now a scope of provided capabilities
-    provide Aggregator  = agg;
-    provide Transformer = dsp;
-    provide Connector   = skm;
-    provide Generator   = nts in {
+    provide Aggregator  = agg,
+            Transformer = dsp,
+            Connector   = skm,
+            Generator   = nts,
+            Membrane    = mbr in {
         // Run loop...
     }
 }
