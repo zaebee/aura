@@ -51,6 +51,7 @@ dependencies = [
     "eth-account>=0.13.7",
     "web3>=7.14.1",
     "uagents-core>=0.4.2",
+    "numpy>=2.4.1",
 ]
 
 [tool.uv.workspace]

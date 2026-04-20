@@ -11,6 +11,7 @@ from hive.membrane import HiveMembrane
 from hive.metabolism import MetabolicLoop
 from hive.metabolism.security import AuditSigner
 from hive.proteins.blockchain_data.skill import GoldRushSkill
+from hive.proteins.coherence import CoherenceSkill
 from hive.proteins.discovery import DiscoverySkill
 from hive.proteins.guard import GuardSkill
 from hive.proteins.guard.engine import OutputGuard
@@ -177,6 +178,11 @@ class HiveCell:
 
         # 6. Perception
         perception = PerceptionSkill()
+        # 10. Coherence (UHM PoC)
+        coherence = CoherenceSkill()
+        coherence.bind(self.settings, None)
+        self.registry.register("coherence", coherence)
+
         perception.bind(
             self.settings.perception,
             PerceptionEngine(
