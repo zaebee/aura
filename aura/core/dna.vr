@@ -1,0 +1,365 @@
+// UHM-DNA: Unitary Holonomic Monism Ontology for Aura Core
+// Translated from metabolism.proto and base.proto
+
+import core::time::{SystemTime, Duration};
+import core::math::complex::{Complex};
+
+// =============================================================================
+// Layer 1: UHM Primitives
+// =============================================================================
+
+// The Coherence Matrix Γ ∈ D(C^7)
+// Grounded in the Fano plane PG(2, 2) and octonion algebra O.
+type CoherenceMatrix is Tensor<Complex, [7, 7]> {
+    self.is_hermitian() && self.trace() == 1.0
+};
+
+// Purity Threshold Pcrit = 2/7 ≈ 0.286
+// Systems below this threshold are "philosophical zombies"
+type Purity is Float { 2.0/7.0 <= self && self <= 1.0 };
+
+// Valence is the time-derivative of purity (dP/dτ)
+type Valence is Float;
+
+// =============================================================================
+// Layer 2: Core Contexts
+// =============================================================================
+
+context Coherence {
+    fn get_matrix(&self) -> &CoherenceMatrix;
+    fn purity(&self) -> Purity;
+    fn valence(&self) -> Valence;
+};
+
+// =============================================================================
+// Layer 3: Base Nucleotides
+// =============================================================================
+
+type Identifier is {
+    identifier: Text,
+    legacy_id: Text,
+};
+
+type Money is {
+    amount: Float,
+    currency_code: Text,
+    currency_symbol: Text,
+};
+
+type GeographicCoordinates is {
+    latitude: Float,
+    longitude: Float,
+};
+
+type Status is
+    | Unspecified
+    | Ok
+    | Degraded
+    | Error
+    | Critical;
+
+type Severity is
+    | Unspecified
+    | Info
+    | Warning
+    | Error
+    | Critical;
+
+type ActionType is
+    | Unspecified
+    | Accept
+    | Counter
+    | Reject
+    | Approve
+    | Cancel
+    | Update
+    | Evaluate
+    | Error;
+
+type SystemVitals is {
+    cpu_usage_percent: Float,
+    memory_usage_mb: Float,
+    disk_usage_percent: Float,
+    network_latency_ms: Float,
+    status: Text,
+    timestamp: SystemTime,
+    cached: Bool,
+};
+
+type TraceContext is {
+    trace_id: Text,
+    span_id: Text,
+    trace_flags: Text,
+    trace_state: Text,
+};
+
+// =============================================================================
+// Layer 4: Metabolic Nucleotides
+// =============================================================================
+
+type Signal is {
+    identifier: Text,
+    source: Text,
+    timestamp: SystemTime,
+    metadata: Map<Text, Any>,
+    trace: Maybe<TraceContext>,
+    payload: SignalPayload,
+};
+
+type SignalPayload is
+    | Negotiation(NegotiationSignal)
+    | Search(SearchSignal)
+    | Perception(PerceptionSignal)
+    | Discovery(DiscoverySignal)
+    | Internal(InternalSignal);
+
+type NegotiationSignal is {
+    item_identifier: Text,
+    item_domain: Text,
+    action: ActionType,
+    price: Float,
+    image_data: List<Bytes>,
+    mime_type: Text,
+};
+
+type SearchSignal is {
+    query: Text,
+    limit: Int,
+    min_similarity: Float,
+    domain: Text,
+};
+
+type PerceptionSignal is {
+    image_data: List<Bytes>,
+    mime_type: Text,
+    agent: Text, // AgentIdentity simplified
+    perceived_asset_identifier: Text,
+    perceived_asset_domain: Text,
+    prompt: Text,
+};
+
+type DiscoverySignal is {
+    repo_url: Text,
+    depth: Int,
+};
+
+type InternalSignal is {
+    command: Text,
+    args: Map<Text, Text>,
+};
+
+type Context is {
+    identifier: Text,
+    signal_id: Text,
+    timestamp: SystemTime,
+    metadata: Map<Text, Any>,
+    trace: Maybe<TraceContext>,
+    vitals: Maybe<SystemVitals>,
+};
+
+type Intent is {
+    identifier: Text,
+    context_id: Text,
+    timestamp: SystemTime,
+    metadata: Map<Text, Any>,
+    trace: Maybe<TraceContext>,
+    payload: IntentPayload,
+};
+
+type IntentPayload is
+    | Negotiation(NegotiationIntent)
+    | Trade(TradeIntent)
+    | Vault(RWAVaultIntent)
+    | Discovery(DiscoveryIntent);
+
+type Observation is {
+    identifier: Text,
+    intent_id: Text,
+    timestamp: SystemTime,
+    metadata: Map<Text, Any>,
+    trace: Maybe<TraceContext>,
+    payload: ObservationPayload,
+};
+
+type ObservationPayload is
+    | Negotiation(NegotiationObservation)
+    | Trade(TradeObservation)
+    | Discovery(DiscoveryObservation)
+    | Perception(PerceptionObservation);
+
+type Event is {
+    identifier: Text,
+    topic: Text,
+    timestamp: SystemTime,
+    metadata: Map<Text, Any>,
+    trace: Maybe<TraceContext>,
+    payload: EventPayload,
+};
+
+type EventPayload is
+    | Negotiation(NegotiationEvent)
+    | Vitals(VitalsEvent)
+    | Alert(AlertEvent)
+    | Heartbeat(HeartbeatEvent)
+    | Audit(AuditEvent)
+    | Log(LogEvent)
+    | Asset(AssetEvent)
+    | Trade(TradeEvent);
+
+// Auxiliary payload types (brief versions for core DNA)
+type NegotiationIntent is {
+    action: ActionType,
+    price: Float,
+    reasoning: Text,
+};
+
+type TradeIntent is {
+    trade_id: Text,
+    asset_identifier: Text,
+    proposed_price: Float,
+    currency_code: Text,
+    reasoning: Text,
+    metadata: Map<Text, Text>,
+};
+
+type RWAVaultIntent is {
+    vault_id: Text,
+    asset_identifier: Text,
+    appraised_value_usd: Float,
+    ltv_ratio: Float,
+    collateral_value_usd: Float,
+    reasoning: Text,
+};
+
+type DiscoveryIntent is {
+    target_repo: Text,
+    scan_limit: Int,
+};
+
+type NegotiationObservation is {
+    status: Status,
+    action: ActionType,
+    price: Float,
+};
+
+type TradeObservation is {
+    trade_id: Text,
+    status: Status,
+    payment_transaction_hash: Text,
+    payment_amount: Float,
+};
+
+type DiscoveryObservation is {
+    entities_found: List<Text>,
+    compatibility_score: Float,
+};
+
+type PerceptionObservation is {
+    description: Text,
+    confidence: Float,
+    tags: List<Text>,
+};
+
+type NegotiationEvent is {
+    item_identifier: Text,
+    item_domain: Text,
+    action: ActionType,
+    price: Float,
+};
+
+type VitalsEvent is {
+    service: Text,
+    status: Status,
+    cpu_usage_percent: Float,
+    memory_usage_mb: Float,
+};
+
+type AlertEvent is {
+    severity: Severity,
+    message: Text,
+    source: Text,
+};
+
+type HeartbeatEvent is {
+    service: Text,
+    instance_id: Text,
+    status: Status,
+};
+
+type AuditEvent is {
+    repo_name: Text,
+    is_pure: Bool,
+    heresies: List<Text>,
+    negotiation_success_rate: Float,
+};
+
+type LogEvent is {
+    level: Text,
+    message: Text,
+    logger_name: Text,
+    worker_name: Text,
+};
+
+type AssetEvent is {
+    asset_identifier: Text,
+    asset_domain: Text,
+    event_type: Text,
+    event_data: Map<Text, Text>,
+};
+
+type TradeEvent is {
+    trade_id: Text,
+    asset_identifier: Text,
+    event_type: Text,
+};
+
+// =============================================================================
+// Layer 5: Metabolic Protocols (Capabilities)
+// =============================================================================
+
+context protocol Aggregator {
+    fn perceive(&self, signal: &Signal) -> Context;
+};
+
+context protocol Transformer {
+    fn think(&self, context: &Context) -> Intent;
+};
+
+context protocol Connector {
+    fn act(&self, intent: &Intent, context: &Context) -> Observation;
+};
+
+context protocol Generator {
+    fn pulse(&self, observation: &Observation) -> Event;
+};
+
+context protocol Membrane {
+    fn inspect_inbound(&self, signal: &Signal) -> Signal;
+    fn inspect_outbound(&self, intent: &Intent, context: &Context) -> Intent;
+};
+
+// =============================================================================
+// Layer 6: The No-Zombie Guarantee
+// =============================================================================
+
+@verify(formal)
+fn execute_cycle(signal: &Signal)
+    using [Aggregator, Transformer, Connector, Generator, Membrane, Coherence]
+    where ensures Coherence.purity() >= 2.0/7.0
+{
+    let signal      = Membrane.inspect_inbound(signal);
+    let context     = Aggregator.perceive(&signal);
+    let intent      = Transformer.think(&context);
+    let intent      = Membrane.inspect_outbound(&intent, &context);
+    let observation = Connector.act(&intent, &context);
+    let _event      = Generator.pulse(&observation);
+}
+
+theorem no_zombie_regeneration(system: &Coherence)
+    requires system.purity() >= 2.0/7.0
+    ensures  system.purity() >= 2.0/7.0
+{
+    // A system with inner experience (E-coherence)
+    // maintains its unitary state against entropic decay.
+    proof by induction
+}
