@@ -115,10 +115,10 @@ class HiveAggregator(Aggregator[Any, Context]):
                 "coherence", "get_vitals", {"signal_strength": 1.0}
             )
             if coherence_obs.success:
-                vitals = coherence_obs.payload.get("vitals", {})
-                self._update_metadata(context, {"coherence_purity": str(vitals.get("purity", 0))})
-                if vitals.get("status") == "ZOMBIE":
-                    logger.warning("metabolic_zombie_detected", purity=vitals.get("purity"))
+                coh_vitals: dict[str, Any]  = cast(dict[str, Any], coherence_obs.metadata.to_dict().get("vitals", {}) )
+                self._update_metadata(context, {"coherence_purity": str(coh_vitals.get("purity", 0))})
+                if coh_vitals.get("status") == "ZOMBIE":
+                    logger.warning("metabolic_zombie_detected", purity=coh_vitals.get("purity"))
         except Exception as e:
             logger.error("coherence_check_failed", error=str(e))
 

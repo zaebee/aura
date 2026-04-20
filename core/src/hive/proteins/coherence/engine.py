@@ -2,6 +2,7 @@ from typing import Any
 
 import numpy as np
 import structlog
+from aura_core.struct_utils import make_struct
 from aura_core_gen.aura.core.v1 import Observation
 
 logger = structlog.get_logger(__name__)
@@ -12,9 +13,9 @@ class CoherenceEngine:
     Simulates the 7-dimensional coherence matrix Γ and purity thresholds.
     """
 
-    PCRIT = 2.0 / 7.0  # ~0.286
+    PCRIT: float = 2.0 / 7.0  # ~0.286
 
-    def __init__(self):
+    def __init__(self) -> None:
         # Initialize a 7x7 identity matrix (normalized trace)
         self.gamma = np.eye(7, dtype=complex) / 7.0
         self.purity = self._calculate_purity()
@@ -53,6 +54,6 @@ class CoherenceEngine:
             return Observation(
                 success=True,
                 event_type="coherence_vitals",
-                payload={"vitals": vitals}
+                metadata=make_struct({"vitals": vitals})
             )
         return Observation(success=False, error=f"Unknown intent: {intent}")

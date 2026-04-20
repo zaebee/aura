@@ -9,7 +9,7 @@ from .engine import CoherenceEngine
 class CoherenceSkill(SkillProtocol[Any, Any, Any, Any]):
     """Protein wrapper for the UHM Coherence Engine."""
 
-    def __init__(self):
+    def __init__(self) -> None:
         self.engine = CoherenceEngine()
         self.settings = None
         self.provider = None
