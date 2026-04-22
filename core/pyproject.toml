@@ -39,6 +39,7 @@ dependencies = [
     "betterproto>=2.0.0b7",
     "pygithub>=2.1.1",
     "web3>=7.0.0",
+    "psutil>=7.2.2",
 ]
 
 [tool.uv.sources]
