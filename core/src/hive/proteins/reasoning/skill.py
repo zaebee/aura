@@ -5,6 +5,7 @@ from typing import Any
 import dspy
 from aura_core import SkillProtocol, make_struct
 from aura_core_gen.aura.core.v1 import Observation
+from hive.chemistry.hill_regulator import HillRegulator
 
 from config.llm import LLMSettings
 
@@ -24,6 +25,7 @@ class ReasoningSkill(
 ):
     """
     Reasoning Protein: Handles LLM logic, DSPy negotiation, and embeddings.
+    Now integrated with HillRegulator to prevent Memory Famine.
     """
 
     def __init__(self) -> None:
@@ -82,10 +84,42 @@ class ReasoningSkill(
             logger.error(f"Reasoning skill error: {e}")
             return Observation(success=False, error=str(e))
 
+    def _apply_hill_dampening(self, context_str: str) -> str:
+        """Apply HillRegulator to dampen context if memory is high."""
+        try:
+            import psutil
+
+            process = psutil.Process()
+            mem_mb = process.memory_info().rss / (1024 * 1024)
+            # Limit at 1GB for dampening start
+            limit_mb = 1024.0
+
+            char_count = len(context_str)
+            dampened_chars = HillRegulator.regulate_context(
+                char_count, mem_mb, limit_mb
+            )
+
+            if dampened_chars < char_count:
+                logger.warning(
+                    "hill_dampening_applied",
+                    original=char_count,
+                    dampened=dampened_chars,
+                    mem_mb=mem_mb,
+                )
+                return context_str[:dampened_chars]
+        except Exception as e:
+            logger.error("hill_regulator_error", error=str(e))
+
+        return context_str
+
     async def _negotiate(self, params: dict[str, Any]) -> Observation:
         if not self.negotiator:
             return Observation(success=False, error="negotiator_not_ready")
         p_neg = NegotiationParams(**params)
+
+        # Apply Hill Dampening to context and history
+        p_neg.context = self._apply_hill_dampening(str(p_neg.context))
+        p_neg.history = self._apply_hill_dampening(str(p_neg.history))
 
         def call() -> dict[str, Any]:
             from typing import cast
@@ -102,10 +136,6 @@ class ReasoningSkill(
 
         result = await asyncio.to_thread(call)
         metadata = result.copy()
-        if "action" in metadata:
-            # Ensure action fields are serializable if they are complex
-            pass
-
         return Observation(success=True, metadata=make_struct(metadata))
 
     async def _rwa(self, params: dict[str, Any]) -> Observation:

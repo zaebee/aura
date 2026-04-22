@@ -40,8 +40,14 @@ class EvolverSettings(BaseSettings):
     # Filesystem scan: directories to exclude (comma-separated)
     exclude_dirs: list[str] = Field(
         default=[
-            ".git", ".venv", "node_modules", "__pycache__",
-            "gen-proto", "gen", ".mypy_cache", ".ruff_cache",
+            ".git",
+            ".venv",
+            "node_modules",
+            "__pycache__",
+            "gen-proto",
+            "gen",
+            ".mypy_cache",
+            ".ruff_cache",
         ],
         alias="EVOLVER_EXCLUDE_DIRS",
     )

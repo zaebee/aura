@@ -7,6 +7,7 @@ from aura_core_gen.aura.core.v1 import Observation
 
 logger = structlog.get_logger(__name__)
 
+
 class CoherenceEngine:
     """
     Unitary Holonomic Monism (UHM) Engine PoC.
@@ -33,7 +34,9 @@ class CoherenceEngine:
 
         # Simple simulation: update diagonal elements
         # In a real UHM implementation, this would use octonion algebra
-        noise = np.random.normal(0, 0.01, (7, 7)) + 1j * np.random.normal(0, 0.01, (7, 7))
+        noise = np.random.normal(0, 0.01, (7, 7)) + 1j * np.random.normal(
+            0, 0.01, (7, 7)
+        )
         self.gamma = self.gamma + noise * (1.0 - signal_strength)
 
         # Re-normalize to trace 1 with safety check
@@ -51,7 +54,7 @@ class CoherenceEngine:
             "purity": self.purity,
             "threshold": self.pcrit,
             "status": status,
-            "valence": valence
+            "valence": valence,
         }
 
     async def execute(self, intent: str, params: Any) -> Observation:
@@ -61,6 +64,6 @@ class CoherenceEngine:
             return Observation(
                 success=True,
                 event_type="coherence_vitals",
-                metadata=make_struct({"vitals": vitals})
+                metadata=make_struct({"vitals": vitals}),
             )
         return Observation(success=False, error=f"Unknown intent: {intent}")

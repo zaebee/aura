@@ -33,8 +33,7 @@ class EvolverConnector:
 
         async with httpx.AsyncClient(timeout=20.0) as client:
             has_github = (
-                self.settings.github_token
-                and self.settings.github_token != "mock"  # nosec B105
+                self.settings.github_token and self.settings.github_token != "mock"  # nosec B105
             )
 
             if has_github:
@@ -72,9 +71,7 @@ class EvolverConnector:
     # GitHub helpers
     # ------------------------------------------------------------------
 
-    async def _create_issue(
-        self, client: httpx.AsyncClient, imp: Improvement
-    ) -> str:
+    async def _create_issue(self, client: httpx.AsyncClient, imp: Improvement) -> str:
         try:
             payload: dict[str, Any] = {
                 "title": imp.title,
@@ -145,9 +142,7 @@ class EvolverConnector:
             logger.error("github_pr_error", error=str(e))
         return ""
 
-    async def _add_pr_labels(
-        self, client: httpx.AsyncClient, pr_number: int
-    ) -> None:
+    async def _add_pr_labels(self, client: httpx.AsyncClient, pr_number: int) -> None:
         try:
             await client.post(
                 f"{_GITHUB_API}/repos/{self.settings.github_repository}"

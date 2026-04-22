@@ -42,8 +42,7 @@ class EvolverTransformer:
                 logger.error("evolver_transformer_llm_failed", error=str(fe))
                 return EvolutionPlan(
                     narrative=(
-                        "The Evolver's brain is offline. "
-                        f"Primary: {e}. Fallback: {fe}"
+                        f"The Evolver's brain is offline. Primary: {e}. Fallback: {fe}"
                     ),
                     token_usage=0,
                 )

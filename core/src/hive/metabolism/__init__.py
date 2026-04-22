@@ -1,13 +1,21 @@
-from .errors import MetabolicError as MetabolicError
-from .errors import MetabolicSecurityError as MetabolicSecurityError
-from .main import MetabolicLoop as MetabolicLoop
-from .math import HillDampener as HillDampener
-from .security import AuditSigner as AuditSigner
+from .errors import (
+    ApoptosisTrigger,
+    GeometricCeilingError,
+    MetabolicError,
+    MetabolicSecurityError,
+)
+from .holonom_v3 import HolonomV3
+from .main import MetabolicLoop
+from .math import HillDampener
+from .security import AuditSigner
 
 __all__ = [
     "MetabolicLoop",
     "HillDampener",
     "AuditSigner",
+    "HolonomV3",
     "MetabolicError",
     "MetabolicSecurityError",
+    "GeometricCeilingError",
+    "ApoptosisTrigger",
 ]

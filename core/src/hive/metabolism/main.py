@@ -1,5 +1,6 @@
 from typing import Any
 
+import numpy as np
 import structlog
 from aura_core import (
     Aggregator,
@@ -17,7 +18,13 @@ from aura_core_gen.aura.core.v1 import (
     Intent,
     Observation,
 )
+from aura_core_gen.aura.dna.v1 import (
+    Signal as DnaSignal,
+)
 from opentelemetry import trace
+
+from .errors import ApoptosisTrigger, GeometricCeilingError
+from .holonom_v3 import HolonomV3
 
 logger = structlog.get_logger(__name__)
 tracer = trace.get_tracer(__name__)
@@ -27,6 +34,7 @@ class MetabolicLoop(BaseMetabolicLoop[Any, Context, Intent, Observation, Any]):
     """
     Orchestrates the ATCG flow with core-specific monitoring via Telemetry Protein.
     Pure Pipe: Signal -> A -> T -> M -> C -> G.
+    Now integrated with Holonom v3.0 (ASDLEOU) and DNA Binary Bloodstream.
     """
 
     def __init__(
@@ -40,6 +48,8 @@ class MetabolicLoop(BaseMetabolicLoop[Any, Context, Intent, Observation, Any]):
     ):
         super().__init__(aggregator, transformer, connector, generator, membrane)
         self.registry = registry
+        # Initialize Holonom v3.0 Core
+        self.holonom = HolonomV3()
 
     async def execute(self, signal: Any, **kwargs: Any) -> Observation:
         """
@@ -53,43 +63,93 @@ class MetabolicLoop(BaseMetabolicLoop[Any, Context, Intent, Observation, Any]):
                 {"name": "negotiation_total", "labels": {"service": "core"}},
             )
 
-        logger.info("metabolism_cycle_started")
+        logger.info("metabolism_cycle_started", version="v3.0")
 
-        with tracer.start_as_current_span("metabolic_loop"):
-            # 1. Inbound Membrane
-            if self.membrane and hasattr(self.membrane, "inspect_inbound"):
-                signal = await self.membrane.inspect_inbound(signal)
+        # Verify Binary Bloodstream protocol
+        if isinstance(signal, bytes) and kwargs.get("is_nats"):
+            try:
+                # Ensure it's a valid DnaSignal from dna.proto
+                DnaSignal().parse(signal)
+                logger.debug("binary_bloodstream_verified", schema="dna.proto")
+            except Exception as e:
+                logger.warning("binary_bloodstream_validation_failed", error=str(e))
 
-            # 2. Aggregator (A) - Perceives Signal + Internal State (Vitals)
-            context = await self.aggregator.perceive(signal, **kwargs)
+        self.holonom.reset_recursion()
 
-            # 3. Transformer (T) - Reasoning
-            decision = await self.transformer.think(context, **kwargs)
+        try:
+            with tracer.start_as_current_span("metabolic_loop"):
+                # 1. Inbound Membrane
+                if self.membrane and hasattr(self.membrane, "inspect_inbound"):
+                    signal = await self.membrane.inspect_inbound(signal)
 
-            # 4. Outbound Membrane - Deterministic Guards
-            if self.membrane and hasattr(self.membrane, "inspect_outbound"):
-                decision = await self.membrane.inspect_outbound(decision, context)
+                # 2. Aggregator (A) - Perceives Signal + Internal State (Vitals)
+                context = await self.aggregator.perceive(signal, **kwargs)
 
-            # 5. Connector (C) - Physical Action
-            observation = await self.connector.act(decision, context)
-
-            # 6. Generator (G) - Event Emission
-            await self.generator.pulse(observation)
-
-        if observation.success and observation.event_type == "negotiation_accept":
-            if self.registry:
-                await self.registry.execute(
-                    "telemetry",
-                    "increment_counter",
-                    {
-                        "name": "negotiation_accepted_total",
-                        "labels": {"service": "core"},
-                    },
+                # 7D Perception Step (Larva simulation)
+                # Maps vitals and signal data to ASDLEOU
+                vitals = await self.aggregator.get_vitals()
+                mock_7d_signals = np.array(
+                    [
+                        0.1,  # A: Articulation
+                        vitals.cpu_usage_percent / 100.0,  # S: Structure
+                        0.2,  # D: Dynamics
+                        0.0,  # L: Logic
+                        0.0,  # E: Interiority (updated during Reasoning)
+                        vitals.memory_usage_mb / 1024.0,  # O: Foundation
+                        0.5,  # U: Unity
+                    ]
                 )
 
-        logger.info(
-            "metabolism_cycle_completed",
-            success=observation.success,
-        )
+                # 3. Transformer (T) - Reasoning
+                # Track self-modeling recursion
+                self.holonom.track_self_modeling(1)
+                decision = await self.transformer.think(context, **kwargs)
 
-        return observation
+                # Update Holonom with Interiority (E) from reasoning
+                # We use a heuristic: successful thinking improves E-coherence
+                interiority_gain = 0.1 if decision.action != 0 else -0.05
+                stats = self.holonom.step(interiority_gain, mock_7d_signals)
+                logger.info("holonom_v3_step", **stats)
+
+                # 4. Outbound Membrane - Deterministic Guards
+                if self.membrane and hasattr(self.membrane, "inspect_outbound"):
+                    decision = await self.membrane.inspect_outbound(decision, context)
+
+                # 5. Connector (C) - Physical Action
+                observation = await self.connector.act(decision, context)
+
+                # 6. Generator (G) - Event Emission
+                await self.generator.pulse(observation)
+
+            if observation.success and observation.event_type == "negotiation_accept":
+                if self.registry:
+                    await self.registry.execute(
+                        "telemetry",
+                        "increment_counter",
+                        {
+                            "name": "negotiation_accepted_total",
+                            "labels": {"service": "core"},
+                        },
+                    )
+
+            logger.info(
+                "metabolism_cycle_completed",
+                success=observation.success,
+                purity=stats["purity"],
+            )
+
+            return observation
+
+        except (GeometricCeilingError, ApoptosisTrigger) as e:
+            logger.critical("holonom_metabolic_failure", error=str(e))
+            # Emergency fallback / Alert
+            if self.registry:
+                await self.registry.execute(
+                    "pulse",
+                    "emit_alert",
+                    {"message": f"HOLONOM_CRITICAL: {str(e)}", "severity": "CRITICAL"},
+                )
+            return Observation(success=False, error=str(e))
+        except Exception as e:
+            logger.error("metabolic_failure", error=str(e), exc_info=True)
+            raise e

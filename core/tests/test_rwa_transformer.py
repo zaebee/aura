@@ -266,9 +266,9 @@ async def test_transformer_rwa_takes_priority_over_trade():
     intent = await transformer.think(context)
 
     params_name, _ = betterproto.which_one_of(intent, "params")
-    assert (
-        params_name == "rwa_vault"
-    ), f"RWA path should take priority over trade path, got '{params_name}'"
+    assert params_name == "rwa_vault", (
+        f"RWA path should take priority over trade path, got '{params_name}'"
+    )
     # Verify reasoning protein was called with 'rwa', not 'trade'
     # skill.execute(intent, params) — intent is the first positional arg
     call_args = mock_reasoning.execute.call_args
