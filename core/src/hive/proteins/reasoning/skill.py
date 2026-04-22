@@ -3,12 +3,12 @@ import logging
 from typing import Any, cast
 
 import dspy
-import psutil # type: ignore[import-untyped]
+import psutil  # type: ignore[import-untyped]
 from aura_core import SkillProtocol, make_struct
 from aura_core_gen.aura.core.v1 import Observation
+from hive.chemistry.hill_regulator import HillRegulator
 
 from config.llm import LLMSettings
-from hive.chemistry.hill_regulator import HillRegulator
 
 from .engine import (
     AuraRWANegotiator,
