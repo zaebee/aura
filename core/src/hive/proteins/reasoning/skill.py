@@ -3,6 +3,7 @@ import logging
 from typing import Any
 
 import dspy
+import psutil  # type: ignore[import-untyped]
 from aura_core import SkillProtocol, make_struct
 from aura_core_gen.aura.core.v1 import Observation
 from hive.chemistry.hill_regulator import HillRegulator
@@ -84,42 +85,65 @@ class ReasoningSkill(
             logger.error(f"Reasoning skill error: {e}")
             return Observation(success=False, error=str(e))
 
-    def _apply_hill_dampening(self, context_str: str) -> str:
+    def _apply_hill_dampening(self, content_str: str) -> str:
         """Apply HillRegulator to dampen context if memory is high."""
         try:
-            import psutil
-
             process = psutil.Process()
             mem_mb = process.memory_info().rss / (1024 * 1024)
             # Limit at 1GB for dampening start
             limit_mb = 1024.0
 
-            char_count = len(context_str)
+            char_count = len(content_str)
             dampened_chars = HillRegulator.regulate_context(
                 char_count, mem_mb, limit_mb
             )
 
             if dampened_chars < char_count:
                 logger.warning(
-                    "hill_dampening_applied",
-                    original=char_count,
-                    dampened=dampened_chars,
-                    mem_mb=mem_mb,
+                    "hill_dampening_applied: original=%d dampened=%d mem_mb=%f",
+                    char_count,
+                    dampened_chars,
+                    mem_mb,
                 )
-                return context_str[:dampened_chars]
+                return content_str[:dampened_chars]
         except Exception as e:
-            logger.error("hill_regulator_error", error=str(e))
+            logger.error("hill_regulator_error: %s", str(e))
 
-        return context_str
+        return content_str
 
     async def _negotiate(self, params: dict[str, Any]) -> Observation:
         if not self.negotiator:
             return Observation(success=False, error="negotiator_not_ready")
-        p_neg = NegotiationParams(**params)
+
+        # We need to handle the dict fields before passing to NegotiationParams
+        # since mypy complained about type mismatch in CI
+        context_data = params.get("context", {})
+        history_data = params.get("history", [])
+
+        if isinstance(context_data, str):
+            context_data = {"raw": context_data}
+        if isinstance(history_data, str):
+            history_data = [{"raw": history_data}]
+
+        p_neg = NegotiationParams(
+            bid=params.get("bid", 0.0),
+            context=context_data,
+            history=history_data
+        )
 
         # Apply Hill Dampening to context and history
-        p_neg.context = self._apply_hill_dampening(str(p_neg.context))
-        p_neg.history = self._apply_hill_dampening(str(p_neg.history))
+        # We convert to str for dampening logic then keep it simple
+        context_str = str(p_neg.context)
+        history_str = str(p_neg.history)
+
+        dampened_context = self._apply_hill_dampening(context_str)
+        # Note: we don't convert back to dict yet, just ensuring we don't OOM
+        # In Larva phase, we keep the original objects if no dampening triggered
+        # or we could just use the dampened strings if needed.
+        # For now, if no reduction, use original.
+
+        final_context = p_neg.context if len(dampened_context) == len(context_str) else {"dampened": dampened_context}
+        final_history = p_neg.history if len(self._apply_hill_dampening(history_str)) == len(history_str) else [{"dampened": history_str}]
 
         def call() -> dict[str, Any]:
             from typing import cast
@@ -129,8 +153,8 @@ class ReasoningSkill(
                 dict[str, Any],
                 neg(
                     input_bid=p_neg.bid,
-                    context=p_neg.context,
-                    history=p_neg.history,
+                    context=final_context,
+                    history=final_history,
                 ),
             )
 

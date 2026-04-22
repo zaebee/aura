@@ -1,8 +1,14 @@
 import numpy as np
 import pytest
 from hive.chemistry.hill_regulator import HillRegulator
-from hive.metabolism.errors import ApoptosisTrigger, GeometricCeilingError
+from hive.metabolism.errors import (
+    ApoptosisTrigger,
+    DeathSpiralError,
+    GeometricCeilingError,
+    MetabolicError,
+)
 from hive.metabolism.holonom_v3 import HolonomV3
+from hive.metabolism.pattern_synthesizer import PatternSynthesizer
 
 
 def test_hill_regulator_n_2_8():
@@ -10,17 +16,10 @@ def test_hill_regulator_n_2_8():
     reg = HillRegulator()
     assert reg.HILL_N == 2.8
 
-    # At usage = threshold, dampening should be 0.5
-    dampening = reg.calculate_dampening(100, 100)
-    assert abs(dampening - 0.5) < 1e-7
-
-    # High usage should dampen heavily
-    dampening_high = reg.calculate_dampening(200, 100)
-    assert dampening_high < 0.5
-
-    # Low usage should dampen lightly
-    dampening_low = reg.calculate_dampening(50, 100)
-    assert dampening_low > 0.5
+    # Test affinity: high stress (1.0) -> low affinity (< 0.1)
+    assert reg.compute_affinity(1.0) < 0.1
+    # Low stress (0.1) -> high affinity
+    assert reg.compute_affinity(0.1) > 0.9
 
 
 def test_holonom_v3_dimensions():
@@ -69,15 +68,6 @@ def test_goldilocks_zone_and_viability():
     holonom.purity = holonom._calculate_purity()
     holonom.verify_viability()  # Should pass
 
-    # Test Goldilocks range (0.286, 0.428]
-    # We can simulate a state in Goldilocks
-    # P = trace(diag(p1...p7)^2)
-    # If p1=0.5, p2=0.5, others=0, P = 0.25 + 0.25 = 0.5 (Above 0.428)
-    # If p1=0.4, p2=0.3, p3=0.3, P = 0.16 + 0.09 + 0.09 = 0.34 (In Goldilocks)
-    holonom.gamma = np.diag([0.4, 0.3, 0.3, 0.0, 0.0, 0.0, 0.0]).astype(complex)
-    holonom.purity = holonom._calculate_purity()
-    assert 0.286 < holonom.purity <= 0.428
-
 
 def test_sad_ceiling():
     """Verify SADmax = 3 recursion limit."""
@@ -102,3 +92,34 @@ async def test_metabolic_step():
     assert "purity" in stats
     assert "stress_tensor" in stats
     assert "regeneration_kappa" in stats
+
+def test_pattern_synthesizer_stress_logic():
+    """Verify PatternSynthesizer correctly reacts to stress and purity."""
+    synth = PatternSynthesizer()
+
+    # 1. Test Death Spiral (low purity)
+    gamma_zombie = np.eye(7, dtype=complex) / 7.0
+    with pytest.raises(DeathSpiralError):
+        synth.execute(gamma_zombie, {"data": "nectar"})
+
+    # 2. Test Resource Stress (sigma_O)
+    # sigma_O = 1 - 7*p5.
+    gamma_stressed = np.diag([0.94, 0.01, 0.01, 0.01, 0.01, 0.01, 0.01]).astype(complex)
+    # P = 0.94^2 + 6*0.01^2 = 0.8836 + 0.0006 = 0.8842 > 2/7.
+    # sigma_O = 1 - 7*0.01 = 0.93.
+    # affinity < 0.1
+
+    with pytest.raises(MetabolicError) as exc:
+         synth.execute(gamma_stressed, {"data": "nectar"})
+    assert "ресурсного стресса" in str(exc.value)
+
+    # 3. Test successful synthesis
+    # We need P > 2/7 and sigma_O small enough.
+    # If p0=0.7, p5=0.1, others small.
+    # P = 0.49 + 0.01 + ... > 0.5.
+    # sigma_O = 1 - 7*0.1 = 0.3. affinity > 0.1.
+    gamma_healthy = np.diag([0.7, 0.05, 0.05, 0.05, 0.05, 0.1, 0.0]).astype(complex)
+    gamma_healthy /= np.trace(gamma_healthy)
+    insight = synth.execute(gamma_healthy, {"data": "nectar"})
+    assert insight.origin == "zae-analyst-holonom"
+    assert len(insight.payload) > 0

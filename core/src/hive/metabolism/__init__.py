@@ -1,5 +1,6 @@
 from .errors import (
     ApoptosisTrigger,
+    DeathSpiralError,
     GeometricCeilingError,
     MetabolicError,
     MetabolicSecurityError,
@@ -7,6 +8,7 @@ from .errors import (
 from .holonom_v3 import HolonomV3
 from .main import MetabolicLoop
 from .math import HillDampener
+from .pattern_synthesizer import Insight, PatternSynthesizer, Transformation
 from .security import AuditSigner
 
 __all__ = [
@@ -18,4 +20,8 @@ __all__ = [
     "MetabolicSecurityError",
     "GeometricCeilingError",
     "ApoptosisTrigger",
+    "DeathSpiralError",
+    "PatternSynthesizer",
+    "Insight",
+    "Transformation",
 ]
