@@ -83,18 +83,16 @@ $(PROTO_SENTINEL): $(PROTO_SOURCES) buf.gen.yaml
 	# Uses buf.gen.yaml which leverages betterproto
 	mkdir -p packages/aura-core/gen-proto/aura_core_gen
 	buf generate
-	# Fix betterproto google import shim
-	if [ -d "packages/aura-core/gen-proto/aura_core_gen/aura/core" ]; then \
-		mkdir -p packages/aura-core/gen-proto/aura_core_gen/aura/core/google; \
-		echo "from betterproto.lib.google import protobuf" > packages/aura-core/gen-proto/aura_core_gen/aura/core/google/__init__.py; \
-	fi
+	# Fix betterproto google import shim for all chromosomal sub-packages
+	@for dir in packages/aura-core/gen-proto/aura_core_gen/aura/*; do \
+		if [ -d "$$dir" ]; then \
+			mkdir -p "$$dir/google"; \
+			echo "from betterproto.lib.google import protobuf" > "$$dir/google/__init__.py"; \
+		fi \
+	done
 	# Post-generation fix for double-prefix in negotiation chromosome
 	if [ -f "packages/aura-core/gen-proto/aura_core_gen/aura/negotiation/v1.py" ]; then \
 		sed -i 's/from \.aura\.core import v1/from aura_core_gen.aura.core import v1/g' packages/aura-core/gen-proto/aura_core_gen/aura/negotiation/v1.py; \
-	fi
-	if [ -d "packages/aura-core/gen-proto/aura_core_gen/aura/assets" ]; then \
-		mkdir -p packages/aura-core/gen-proto/aura_core_gen/aura/assets/google; \
-		echo "from betterproto.lib.google import protobuf" > packages/aura-core/gen-proto/aura_core_gen/aura/assets/google/__init__.py; \
 	fi
 	touch $(PROTO_SENTINEL)
 

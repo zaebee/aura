@@ -1,14 +1,14 @@
 import asyncio
 import logging
-from typing import Any
+from typing import Any, cast
 
 import dspy
-import psutil  # type: ignore[import-untyped]
+import psutil # type: ignore[import-untyped]
 from aura_core import SkillProtocol, make_struct
 from aura_core_gen.aura.core.v1 import Observation
-from hive.chemistry.hill_regulator import HillRegulator
 
 from config.llm import LLMSettings
+from hive.chemistry.hill_regulator import HillRegulator
 
 from .engine import (
     AuraRWANegotiator,
@@ -115,46 +115,25 @@ class ReasoningSkill(
         if not self.negotiator:
             return Observation(success=False, error="negotiator_not_ready")
 
-        # We need to handle the dict fields before passing to NegotiationParams
-        # since mypy complained about type mismatch in CI
-        context_data = params.get("context", {})
-        history_data = params.get("history", [])
-
-        if isinstance(context_data, str):
-            context_data = {"raw": context_data}
-        if isinstance(history_data, str):
-            history_data = [{"raw": history_data}]
-
         p_neg = NegotiationParams(
             bid=params.get("bid", 0.0),
-            context=context_data,
-            history=history_data
+            context=params.get("context", {}),
+            history=params.get("history", [])
         )
 
         # Apply Hill Dampening to context and history
-        # We convert to str for dampening logic then keep it simple
-        context_str = str(p_neg.context)
-        history_str = str(p_neg.history)
-
-        dampened_context = self._apply_hill_dampening(context_str)
-        # Note: we don't convert back to dict yet, just ensuring we don't OOM
-        # In Larva phase, we keep the original objects if no dampening triggered
-        # or we could just use the dampened strings if needed.
-        # For now, if no reduction, use original.
-
-        final_context = p_neg.context if len(dampened_context) == len(context_str) else {"dampened": dampened_context}
-        final_history = p_neg.history if len(self._apply_hill_dampening(history_str)) == len(history_str) else [{"dampened": history_str}]
+        # We dampen the string representation to prevent token explosion under memory pressure
+        context_str = self._apply_hill_dampening(str(p_neg.context))
+        history_str = self._apply_hill_dampening(str(p_neg.history))
 
         def call() -> dict[str, Any]:
-            from typing import cast
-
             neg = cast(Any, self.negotiator)
             return cast(
                 dict[str, Any],
                 neg(
                     input_bid=p_neg.bid,
-                    context=final_context,
-                    history=final_history,
+                    context=context_str,
+                    history=history_str,
                 ),
             )
 
@@ -168,8 +147,6 @@ class ReasoningSkill(
         p_rwa = RWAParams(**params)
 
         def call() -> dict[str, Any]:
-            from typing import cast
-
             neg = cast(AuraRWANegotiator, self.rwa_negotiator)
             return neg.forward(
                 vision_report=p_rwa.vision_report,
@@ -189,8 +166,6 @@ class ReasoningSkill(
         p_trade = TradeParams(**params)
 
         def call() -> dict[str, Any]:
-            from typing import cast
-
             neg = cast(AuraTradeNegotiator, self.trade_negotiator)
             return neg.forward(
                 market_context=p_trade.market_context,
