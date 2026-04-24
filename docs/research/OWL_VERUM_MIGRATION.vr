@@ -1,0 +1,252 @@
+// OWL2 to Verum Migration Draft: "The Ontological Purifier"
+// Version: 0.1.0
+// Objective: Mapping OWL2 Description Logic to Verum's Capability-based System.
+// Grounded in "Semantic Honesty" and "Metabolic DNA" principles.
+
+// --- 1. TAXONOMY & ATOMIC DNA ---
+
+// OWL Classes are represented as refined types (Refined Types).
+// This ensures that "Semantic Honesty" is checked at compile-time.
+type IRI is Text;
+
+type Person is {
+    id: IRI,
+    name: Text,
+    is_female: Bool,
+};
+
+// SubClassOf: Woman ⊑ Person
+type Woman is Person { self.is_female };
+
+// SubClassOf: Man ⊑ Person
+type Man is Person { !self.is_female };
+
+// --- 2. THE KNOWLEDGE NERVOUS SYSTEM (PROPERTIES) ---
+
+// Properties in OWL are often "global". In Verum, they are "Capabilities" (Contexts).
+// This prevents "Ambient Toxicity" and makes dependencies explicit.
+context protocol KnowledgeBase {
+    // Object Properties (Relational DNA)
+    fn has_child(parent: &Person) -> List<&Person>;
+    fn has_spouse(person: &Person) -> Optional<&Person>;
+    fn has_parent(person: &Person) -> List<&Person>;
+    fn loves(subject: &Person, object: &Person) -> Bool;
+
+    // Data Properties (Attribute DNA)
+    fn has_age(person: &Person) -> Optional<Int>;
+    fn has_ssn(person: &Person) -> Optional<Text>;
+};
+
+// Inverse Properties: hasParent ≡ hasChild⁻¹
+theorem inverse_parent_child(p: &Person, c: &Person)
+    using [KnowledgeBase]
+    ensures KnowledgeBase.has_parent(c).contains(p) <==> KnowledgeBase.has_child(p).contains(c)
+{
+    proof auto
+}
+
+// --- 3. COMPLEX CONSTRUCTS (ALC/SHOIQL Mapping) ---
+
+// Intersection (⊓): Mother ≡ Woman ⊓ Parent
+type Mother is Woman {
+    using [KnowledgeBase]
+    where KnowledgeBase.has_child(self).length() > 0
+};
+
+// Union (⊔): Parent ≡ Mother ⊔ Father
+// Verum uses sum types or type unions for this.
+type Parent is Mother | Father;
+
+// Complement (¬): ChildlessPerson ≡ Person ⊓ ¬Parent
+type ChildlessPerson is Person {
+    using [KnowledgeBase]
+    where KnowledgeBase.has_child(self).is_empty()
+};
+
+// Universal Restriction (∀): HappyPerson ≡ ∀hasChild.HappyPerson
+type HappyPerson is Person {
+    using [KnowledgeBase]
+    where KnowledgeBase.has_child(self).all(|c| c is HappyPerson)
+};
+
+// Existential Restriction (∃): Parent ≡ ∃hasChild.Person
+// (Already covered by the Mother refinement)
+
+// --- 4. ADVANCED PROPERTY CHARACTERISTICS ---
+
+// Symmetric Property: hasSpouse
+theorem symmetric_spouse(a: &Person, b: &Person)
+    using [KnowledgeBase]
+    requires KnowledgeBase.has_spouse(a) == Some(b)
+    ensures  KnowledgeBase.has_spouse(b) == Some(a)
+{
+    proof auto
+}
+
+// Asymmetric Property: hasChild
+theorem asymmetric_child(a: &Person, b: &Person)
+    using [KnowledgeBase]
+    requires KnowledgeBase.has_child(a).contains(b)
+    ensures  !KnowledgeBase.has_child(b).contains(a)
+{
+    proof auto
+}
+
+// Reflexive Property: hasRelative (Everyone is their own relative)
+fn is_relative_of(a: &Person, b: &Person) -> Bool {
+    if a.id == b.id { true }
+    else { /* logic for relatives */ false }
+}
+
+// Irreflexive Property: parentOf (No one is their own parent)
+theorem irreflexive_parent(p: &Person)
+    using [KnowledgeBase]
+    ensures !KnowledgeBase.has_parent(p).contains(p)
+{
+    proof auto
+}
+
+// Functional Property: hasSSN (One person, one SSN)
+// Handled by the Optional<Text> return type or explicit theorem.
+
+// --- 5. ADVANCED REASONING (REPLACING PELLET/HERMIT) ---
+
+// Property Chains: hasGrandparent ≡ hasParent ∘ hasParent
+context KnowledgeBase {
+    fn has_grandparent(p: &Person) -> List<&Person> {
+        self.has_parent(p).flat_map(|parent| self.has_parent(parent))
+    }
+
+    // hasUncle ≡ hasFather ∘ hasBrother
+    fn has_uncle(p: &Person) -> List<&Person> {
+        self.has_parent(p)
+            .filter(|m| !m.is_female) // Filter for Father (simplified)
+            .flat_map(|father| self.has_sibling(father))
+            .filter(|sibling| !sibling.is_female)
+    }
+};
+
+// Transitive Properties: hasAncestor*
+// Verum's Proof DSL handles recursion and induction.
+theorem transitive_ancestor(a: &Person, b: &Person, c: &Person)
+    using [KnowledgeBase]
+    requires is_ancestor(a, b) && is_ancestor(b, c)
+    ensures  is_ancestor(a, c)
+{
+    // Verification of the recursive property
+}
+
+// Keys (HasKey): Person hasKey hasSSN
+theorem ssn_is_unique(p1: &Person, p2: &Person)
+    using [KnowledgeBase]
+    requires KnowledgeBase.has_ssn(p1) == KnowledgeBase.has_ssn(p2)
+    requires KnowledgeBase.has_ssn(p1).is_some()
+    ensures  p1.id == p2.id
+{
+    proof auto
+}
+
+// --- 6. OPEN WORLD ASSUMPTION (OWA) & EXISTENTIALS ---
+
+// OWL: "Every person has a biological mother" (even if not in DB).
+// In Verum, we separate 'Data' (List) from 'Ontological Truth' (exists).
+
+theorem exists_biological_mother(p: &Person)
+    ensures exists m: &Woman . is_biological_mother_of(m, p)
+{
+    // This theorem is a constraint on any implementation of the Hive's world model.
+    // Even if the KnowledgeBase returns an empty list (missing data),
+    // the system "knows" one must exist.
+}
+
+// --- 7. PUNNING & METAMODELING ---
+
+// OWL2 allows an IRI to be both a Class and an Individual.
+// Verum handles this via type-level values or reflection.
+type SocialRole is IRI;
+const FatherRole: SocialRole = "http://example.com/roles/Father";
+
+// We can map a Role (Individual) to a Type (Class)
+fn role_to_type(role: SocialRole) -> Type {
+    match role {
+        FatherRole => type Mother | type Father, // Simplified
+        _          => type Person,
+    }
+}
+
+// --- 8. CARDINALITY & DATA FACETS ---
+
+// ObjectMaxCardinality(4 hasChild Parent)
+type JohnLikePerson is Person {
+    using [KnowledgeBase]
+    where KnowledgeBase.has_child(self).filter(|c| c is Parent).length() <= 4
+};
+
+// ObjectMinCardinality(2 hasChild Parent)
+type ProductiveParent is Person {
+    using [KnowledgeBase]
+    where KnowledgeBase.has_child(self).filter(|c| c is Parent).length() >= 2
+};
+
+// DataRange (Facets): integer[>= 13, <= 19]
+type TeenagerAge is Int { 13 <= self && self <= 19 };
+
+// --- 9. MIGRATION EXECUTION (THE REASONER ENZYME) ---
+
+// Instead of a static reasoner, we use the "Enzymatic" approach.
+// The reasoning is a Pure Function with checked effects.
+fn verify_family_integrity(family: List<&Person>)
+    using [KnowledgeBase, Logger]
+{
+    for p in family {
+        // Assert invariants via Proof DSL at runtime if needed,
+        // or let the VBC verifier handle it at compile time.
+        if p is HappyPerson {
+            Logger.info("Verified happiness", { "name": p.name });
+        }
+    }
+}
+
+// --- 10. SUMMARY OF ANALOGY (DNA AURA) ---
+// - OWL Class       -> Verum Refined Type (Refinement ensures purity)
+// - OWL Property    -> Verum Context Function (Explicit metabolic cost)
+// - OWL Restriction -> Verum 'where' clause (Invariants)
+// - OWL Reasoner    -> Verum Proof DSL + VBC Verifier (Deterministic honesty)
+
+// --- 11. INFERENCE & CONSISTENCY (THE PROOF DSL) ---
+
+// In OWL, a reasoner infers that if John hasWife Mary, then Mary is a Woman.
+// In Verum, this is an "Enzymatic Inference".
+
+theorem infer_gender_from_spouse(a: &Person, b: &Person)
+    using [KnowledgeBase]
+    requires KnowledgeBase.has_spouse(a) == Some(b)
+    requires a is Man
+    ensures  b is Woman
+{
+    // The proof uses the domain/range restrictions of the 'has_spouse' context
+    // (if we defined them) or the intrinsic logic of the family model.
+    proof auto
+}
+
+// Consistency Check: Detecting "Metabolic Toxicity" (Logical Contradictions)
+// OWL: Mary is a Woman AND Mary is a Man -> Inconsistent
+theorem check_consistency(p: &Person)
+    ensures !(p is Woman && p is Man)
+{
+    // Verum's compiler will flag any attempt to instantiate a Person
+    // that satisfies both refinements as a compile-time error.
+    proof auto
+}
+
+// Complex Inference: If all children are Happy, and p has children, p is a Parent and potentially Happy.
+fn discover_happiness(p: &Person) -> Optional<HappyPerson>
+    using [KnowledgeBase]
+{
+    let children = KnowledgeBase.has_child(p);
+    if !children.is_empty() && children.all(|c| c is HappyPerson) {
+        // Safe cast: The compiler verified the 'HappyPerson' refinement
+        return Some(p as HappyPerson);
+    }
+    None
+}
