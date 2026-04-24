@@ -1,252 +1,134 @@
 // OWL2 to Verum Migration Draft: "The Ontological Purifier"
-// Version: 0.1.0
+// Version: 0.2.0 (Aligned with HOL Semantics - DS2HOL-1)
 // Objective: Mapping OWL2 Description Logic to Verum's Capability-based System.
-// Grounded in "Semantic Honesty" and "Metabolic DNA" principles.
 
-// --- 1. TAXONOMY & ATOMIC DNA ---
+// --- 1. SORTS & ATOMIC DNA ---
 
-// OWL Classes are represented as refined types (Refined Types).
-// This ensures that "Semantic Honesty" is checked at compile-time.
+// Aligned with HOL sort 'o' (Objects) and sort 'd' (Literals)
 type IRI is Text;
 
-type Person is {
+// Sort 'o' - Individuals/Objects
+type Object is {
     id: IRI,
-    name: Text,
-    is_female: Bool,
+    is_individual: Bool,
+};
+
+// Sort 'd' - Literals (Value Types)
+type Literal is Text | Int | Float | Bool;
+
+// --- 2. CLASS EXPRESSIONS (HOL Semantics) ---
+
+// Classes are Unary Predicates on sort 'o'.
+type Person is Object {
+    // Intrinsic properties or metadata
+    self.is_individual
 };
 
 // SubClassOf: Woman ⊑ Person
-type Woman is Person { self.is_female };
+type Woman is Person { self.has_type("Woman") };
 
-// SubClassOf: Man ⊑ Person
-type Man is Person { !self.is_female };
+// DisjointClasses: Woman ⊓ Man ≡ ⊥
+type Man is Person { !self.has_type("Woman") && self.has_type("Man") };
 
-// --- 2. THE KNOWLEDGE NERVOUS SYSTEM (PROPERTIES) ---
+// --- 3. THE KNOWLEDGE NERVOUS SYSTEM (PROPERTIES) ---
 
-// Properties in OWL are often "global". In Verum, they are "Capabilities" (Contexts).
-// This prevents "Ambient Toxicity" and makes dependencies explicit.
+// Object Properties: Binary Predicates on o × o
+// Data Properties: Binary Predicates on o × d
 context protocol KnowledgeBase {
-    // Object Properties (Relational DNA)
-    fn has_child(parent: &Person) -> List<&Person>;
-    fn has_spouse(person: &Person) -> Optional<&Person>;
-    fn has_parent(person: &Person) -> List<&Person>;
-    fn loves(subject: &Person, object: &Person) -> Bool;
+    fn OP(name: IRI, x: &Object, y: &Object) -> Bool;
+    fn DP(name: IRI, x: &Object, y: &Literal) -> Bool;
 
-    // Data Properties (Attribute DNA)
-    fn has_age(person: &Person) -> Optional<Int>;
-    fn has_ssn(person: &Person) -> Optional<Text>;
+    // Counting Quantifier (#y:o P(y))
+    // Verum implements this as a high-order function on the context
+    fn count_objects(predicate: fn(&Object) -> Bool) -> Int;
+    fn count_literals(predicate: fn(&Literal) -> Bool) -> Int;
 };
 
-// Inverse Properties: hasParent ≡ hasChild⁻¹
-theorem inverse_parent_child(p: &Person, c: &Person)
+// --- 4. ADVANCED OPERATORS (HOL Alignment) ---
+
+// ObjectInverseOf(OP)(x y) ≝ OP(y x)
+fn inverse_op(name: IRI, x: &Object, y: &Object) -> Bool
     using [KnowledgeBase]
-    ensures KnowledgeBase.has_parent(c).contains(p) <==> KnowledgeBase.has_child(p).contains(c)
+{
+    KnowledgeBase.OP(name, y, x)
+}
+
+// ObjectPropertyChain(OPE1 ... OPEn)(x y) ≝ ∃y1...yn-1 ⋀ OPEj(yj-1 yj)
+fn property_chain_2(op1: IRI, op2: IRI, x: &Object, z: &Object) -> Bool
+    using [KnowledgeBase]
+{
+    // Implementation of existential quantifier via search/matching
+    exists y: &Object . KnowledgeBase.OP(op1, x, y) && KnowledgeBase.OP(op2, y, z)
+}
+
+// --- 5. CARDINALITY (The '#' Quantifier) ---
+
+// ObjectMinCardinality(n OPE CE)(x) ≝ (#y:o OPE(x y) ∧ CE(y)) ≥ n
+type LargeFamilyPerson is Person {
+    using [KnowledgeBase]
+    where KnowledgeBase.count_objects(|y| KnowledgeBase.OP("hasChild", self, y) && y is Person) >= 5
+};
+
+// DataMaxCardinality(n DPE DR)(x) ≝ (#y:d DPE(x y) ∧ DR(y)) ≤ n
+type SingleAgePerson is Person {
+    using [KnowledgeBase]
+    where KnowledgeBase.count_literals(|y| KnowledgeBase.DP("hasAge", self, y)) <= 1
+};
+
+// --- 6. SATISFACTION & AXIOMS ---
+
+// SubClassOf(CE1 CE2) ≝ ∀z:o CE1(z) → CE2(z)
+theorem subclass_axiom(p: &Object)
+    requires p is Woman
+    ensures  p is Person
 {
     proof auto
 }
 
-// --- 3. COMPLEX CONSTRUCTS (ALC/SHOIQL Mapping) ---
-
-// Intersection (⊓): Mother ≡ Woman ⊓ Parent
-type Mother is Woman {
+// HasKey(CE (OPE) (DPE)) ≝ ∀x,y CE(x) ∧ CE(y) ∧ OPE(x z) ∧ OPE(y z) ... → x = y
+theorem key_integrity(x: &Person, y: &Person, ssn: &Literal)
     using [KnowledgeBase]
-    where KnowledgeBase.has_child(self).length() > 0
-};
-
-// Union (⊔): Parent ≡ Mother ⊔ Father
-// Verum uses sum types or type unions for this.
-type Parent is Mother | Father;
-
-// Complement (¬): ChildlessPerson ≡ Person ⊓ ¬Parent
-type ChildlessPerson is Person {
-    using [KnowledgeBase]
-    where KnowledgeBase.has_child(self).is_empty()
-};
-
-// Universal Restriction (∀): HappyPerson ≡ ∀hasChild.HappyPerson
-type HappyPerson is Person {
-    using [KnowledgeBase]
-    where KnowledgeBase.has_child(self).all(|c| c is HappyPerson)
-};
-
-// Existential Restriction (∃): Parent ≡ ∃hasChild.Person
-// (Already covered by the Mother refinement)
-
-// --- 4. ADVANCED PROPERTY CHARACTERISTICS ---
-
-// Symmetric Property: hasSpouse
-theorem symmetric_spouse(a: &Person, b: &Person)
-    using [KnowledgeBase]
-    requires KnowledgeBase.has_spouse(a) == Some(b)
-    ensures  KnowledgeBase.has_spouse(b) == Some(a)
+    requires KnowledgeBase.DP("hasSSN", x, ssn) && KnowledgeBase.DP("hasSSN", y, ssn)
+    ensures  x.id == y.id
 {
     proof auto
 }
 
-// Asymmetric Property: hasChild
-theorem asymmetric_child(a: &Person, b: &Person)
-    using [KnowledgeBase]
-    requires KnowledgeBase.has_child(a).contains(b)
-    ensures  !KnowledgeBase.has_child(b).contains(a)
+// --- 7. OPEN WORLD ASSUMPTION (OWA) ---
+
+// HOL allows expressing existence without a witness in the current state.
+theorem biological_truth(p: &Person)
+    ensures exists m: &Woman . is_parent_of(m, p)
 {
-    proof auto
+    // This is a requirement for Semantic Honesty (Metabolic Integrity).
 }
 
-// Reflexive Property: hasRelative (Everyone is their own relative)
-fn is_relative_of(a: &Person, b: &Person) -> Bool {
-    if a.id == b.id { true }
-    else { /* logic for relatives */ false }
-}
+// --- 8. MIGRATION SUMMARY (Aura DNA Alignment) ---
+// - Sort 'o'       -> Verum 'Object'
+// - Sort 'd'       -> Verum 'Literal'
+// - '#' Quantifier -> Verum 'count_*' closures
+// - Axioms         -> Verum 'theorem' + Proof DSL
+// - Properties     -> Verum 'context protocol' (Capabilities)
 
-// Irreflexive Property: parentOf (No one is their own parent)
-theorem irreflexive_parent(p: &Person)
-    using [KnowledgeBase]
-    ensures !KnowledgeBase.has_parent(p).contains(p)
-{
-    proof auto
-}
+// --- 9. HOL SEMANTICS ALIGNMENT TABLE (DS2HOL-1 Mapping) ---
 
-// Functional Property: hasSSN (One person, one SSN)
-// Handled by the Optional<Text> return type or explicit theorem.
+/*
+| OWL 2 Operator          | HOL Semantic Body (Report)           | Verum Implementation Pattern         |
+|-------------------------|--------------------------------------|--------------------------------------|
+| ObjectIntersectionOf    | ⋀1≤j≤n CEj(x)                        | type T is CE1 { self is CE2 ... }    |
+| ObjectOneOf             | ⋁1≤j≤n x=aj                          | self.id in [a1, a2, ...]             |
+| ObjectSomeValuesFrom    | ∃y:o CE(y) ∧ OPE(x y)                | exists y . OP(ope, x, y) && y is CE  |
+| ObjectAllValuesFrom     | ∀y:o OP(x y) → C(y)                  | OP(ope, x, y).all(|y| y is C)        |
+| ObjectInverseOf         | OP(y x)                              | fn inv(x, y) => OP(y, x)             |
+| ObjectMinCardinality    | (#y:o OP(x y)) ≥ n                   | count_objects(|y| OP(x, y)) >= n     |
+| SubClassOf              | ∀z:o CE1(z) → CE2(z)                 | theorem ensures p is CE2 if p is CE1 |
+| EquivalentClasses       | ∀z:o CEj(z) ≡ CEk(z)                 | theorem ensures p is CEk <==> CEj    |
+| ObjectPropertyChain     | ∃y1...yn-1 ⋀ OPEj(yj-1 yj)           | recursive exists or flat_map chain   |
+| HasKey                  | (Body) → x = y                       | theorem ensures x == y               |
+*/
 
-// --- 5. ADVANCED REASONING (REPLACING PELLET/HERMIT) ---
+// --- 10. FINAL METABOLIC INTEGRATION ---
 
-// Property Chains: hasGrandparent ≡ hasParent ∘ hasParent
-context KnowledgeBase {
-    fn has_grandparent(p: &Person) -> List<&Person> {
-        self.has_parent(p).flat_map(|parent| self.has_parent(parent))
-    }
-
-    // hasUncle ≡ hasFather ∘ hasBrother
-    fn has_uncle(p: &Person) -> List<&Person> {
-        self.has_parent(p)
-            .filter(|m| !m.is_female) // Filter for Father (simplified)
-            .flat_map(|father| self.has_sibling(father))
-            .filter(|sibling| !sibling.is_female)
-    }
-};
-
-// Transitive Properties: hasAncestor*
-// Verum's Proof DSL handles recursion and induction.
-theorem transitive_ancestor(a: &Person, b: &Person, c: &Person)
-    using [KnowledgeBase]
-    requires is_ancestor(a, b) && is_ancestor(b, c)
-    ensures  is_ancestor(a, c)
-{
-    // Verification of the recursive property
-}
-
-// Keys (HasKey): Person hasKey hasSSN
-theorem ssn_is_unique(p1: &Person, p2: &Person)
-    using [KnowledgeBase]
-    requires KnowledgeBase.has_ssn(p1) == KnowledgeBase.has_ssn(p2)
-    requires KnowledgeBase.has_ssn(p1).is_some()
-    ensures  p1.id == p2.id
-{
-    proof auto
-}
-
-// --- 6. OPEN WORLD ASSUMPTION (OWA) & EXISTENTIALS ---
-
-// OWL: "Every person has a biological mother" (even if not in DB).
-// In Verum, we separate 'Data' (List) from 'Ontological Truth' (exists).
-
-theorem exists_biological_mother(p: &Person)
-    ensures exists m: &Woman . is_biological_mother_of(m, p)
-{
-    // This theorem is a constraint on any implementation of the Hive's world model.
-    // Even if the KnowledgeBase returns an empty list (missing data),
-    // the system "knows" one must exist.
-}
-
-// --- 7. PUNNING & METAMODELING ---
-
-// OWL2 allows an IRI to be both a Class and an Individual.
-// Verum handles this via type-level values or reflection.
-type SocialRole is IRI;
-const FatherRole: SocialRole = "http://example.com/roles/Father";
-
-// We can map a Role (Individual) to a Type (Class)
-fn role_to_type(role: SocialRole) -> Type {
-    match role {
-        FatherRole => type Mother | type Father, // Simplified
-        _          => type Person,
-    }
-}
-
-// --- 8. CARDINALITY & DATA FACETS ---
-
-// ObjectMaxCardinality(4 hasChild Parent)
-type JohnLikePerson is Person {
-    using [KnowledgeBase]
-    where KnowledgeBase.has_child(self).filter(|c| c is Parent).length() <= 4
-};
-
-// ObjectMinCardinality(2 hasChild Parent)
-type ProductiveParent is Person {
-    using [KnowledgeBase]
-    where KnowledgeBase.has_child(self).filter(|c| c is Parent).length() >= 2
-};
-
-// DataRange (Facets): integer[>= 13, <= 19]
-type TeenagerAge is Int { 13 <= self && self <= 19 };
-
-// --- 9. MIGRATION EXECUTION (THE REASONER ENZYME) ---
-
-// Instead of a static reasoner, we use the "Enzymatic" approach.
-// The reasoning is a Pure Function with checked effects.
-fn verify_family_integrity(family: List<&Person>)
-    using [KnowledgeBase, Logger]
-{
-    for p in family {
-        // Assert invariants via Proof DSL at runtime if needed,
-        // or let the VBC verifier handle it at compile time.
-        if p is HappyPerson {
-            Logger.info("Verified happiness", { "name": p.name });
-        }
-    }
-}
-
-// --- 10. SUMMARY OF ANALOGY (DNA AURA) ---
-// - OWL Class       -> Verum Refined Type (Refinement ensures purity)
-// - OWL Property    -> Verum Context Function (Explicit metabolic cost)
-// - OWL Restriction -> Verum 'where' clause (Invariants)
-// - OWL Reasoner    -> Verum Proof DSL + VBC Verifier (Deterministic honesty)
-
-// --- 11. INFERENCE & CONSISTENCY (THE PROOF DSL) ---
-
-// In OWL, a reasoner infers that if John hasWife Mary, then Mary is a Woman.
-// In Verum, this is an "Enzymatic Inference".
-
-theorem infer_gender_from_spouse(a: &Person, b: &Person)
-    using [KnowledgeBase]
-    requires KnowledgeBase.has_spouse(a) == Some(b)
-    requires a is Man
-    ensures  b is Woman
-{
-    // The proof uses the domain/range restrictions of the 'has_spouse' context
-    // (if we defined them) or the intrinsic logic of the family model.
-    proof auto
-}
-
-// Consistency Check: Detecting "Metabolic Toxicity" (Logical Contradictions)
-// OWL: Mary is a Woman AND Mary is a Man -> Inconsistent
-theorem check_consistency(p: &Person)
-    ensures !(p is Woman && p is Man)
-{
-    // Verum's compiler will flag any attempt to instantiate a Person
-    // that satisfies both refinements as a compile-time error.
-    proof auto
-}
-
-// Complex Inference: If all children are Happy, and p has children, p is a Parent and potentially Happy.
-fn discover_happiness(p: &Person) -> Optional<HappyPerson>
-    using [KnowledgeBase]
-{
-    let children = KnowledgeBase.has_child(p);
-    if !children.is_empty() && children.all(|c| c is HappyPerson) {
-        // Safe cast: The compiler verified the 'HappyPerson' refinement
-        return Some(p as HappyPerson);
-    }
-    None
-}
+// The Hive Core uses these Verum types to ensure that every "discovery"
+// or "negotiation" is ontologically grounded and formally verified.
+// No "Metabolic Leakage" is possible when invariants are enforced by the VBC Verifier.
