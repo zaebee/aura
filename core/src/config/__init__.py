@@ -11,6 +11,7 @@ from .heartbeat import HeartbeatSettings
 from .kinetic import KineticSettings
 from .llm import LLMSettings
 from .logic import LogicSettings
+from .metabolism import MetabolismSettings
 from .perception import PerceptionSettings
 from .policy import SafetySettings
 from .server import ServerSettings
@@ -38,6 +39,7 @@ class Settings(BaseSettings):
     blockchain_data: BlockchainDataSettings = Field(
         default_factory=lambda: BlockchainDataSettings()
     )  # type: ignore
+    metabolism: MetabolismSettings = Field(default_factory=lambda: MetabolismSettings())  # type: ignore
 
 
 @lru_cache

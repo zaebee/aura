@@ -18,9 +18,6 @@ from aura_core_gen.aura.core.v1 import (
     Intent,
     Observation,
 )
-from aura_core_gen.aura.dna.v1 import (
-    Signal as DnaSignal,
-)
 from opentelemetry import trace
 
 from .errors import ApoptosisTrigger, GeometricCeilingError
@@ -63,17 +60,7 @@ class MetabolicLoop(BaseMetabolicLoop[Any, Context, Intent, Observation, Any]):
                 {"name": "negotiation_total", "labels": {"service": "core"}},
             )
 
-        logger.info("metabolism_cycle_started", version="v3.0")
-
-        # Verify Binary Bloodstream protocol
-        if isinstance(signal, bytes) and kwargs.get("is_nats"):
-            try:
-                # Ensure it's a valid DnaSignal from dna.proto
-                DnaSignal().parse(signal)
-                logger.debug("binary_bloodstream_verified", schema="dna.proto")
-            except Exception as e:
-                logger.warning("binary_bloodstream_validation_failed", error=str(e))
-
+        logger.info("metabolism_cycle_started", version="v4.0")
         self.holonom.reset_recursion()
 
         try:
@@ -83,20 +70,30 @@ class MetabolicLoop(BaseMetabolicLoop[Any, Context, Intent, Observation, Any]):
                     signal = await self.membrane.inspect_inbound(signal)
 
                 # 2. Aggregator (A) - Perceives Signal + Internal State (Vitals)
+                # Aggregator handles parsing of binary signals from NATS
                 context = await self.aggregator.perceive(signal, **kwargs)
 
-                # 7D Perception Step (Larva simulation)
-                # Maps vitals and signal data to ASDLEOU
+                # 7D Perception Step (ASDLEOU)
                 vitals = await self.aggregator.get_vitals()
+
+                # Derive 7D signals from context and vitals
+                meta = context.metadata.to_dict() if hasattr(context.metadata, "to_dict") else {}
+
+                # Heuristic derivation for MSFS phase
+                # A: Articulation (input volume)
+                articulation = min(1.0, len(str(signal)) / 2000.0)
+                # D: Dynamics (reputation or activity)
+                dynamics = float(meta.get("reputation", 0.5))
+
                 mock_7d_signals = np.array(
                     [
-                        0.1,  # A: Articulation
-                        vitals.cpu_usage_percent / 100.0,  # S: Structure
-                        0.2,  # D: Dynamics
-                        0.0,  # L: Logic
-                        0.0,  # E: Interiority (updated during Reasoning)
-                        vitals.memory_usage_mb / 1024.0,  # O: Foundation
-                        0.5,  # U: Unity
+                        articulation,                       # A: Articulation
+                        vitals.cpu_usage_percent / 100.0,   # S: Structure
+                        dynamics,                           # D: Dynamics
+                        0.1,                                # L: Logic (base coherence)
+                        0.0,                                # E: Interiority (updated during Reasoning)
+                        vitals.memory_usage_mb / 1024.0,    # O: Foundation
+                        0.5,                                # U: Unity
                     ]
                 )
 
@@ -106,7 +103,6 @@ class MetabolicLoop(BaseMetabolicLoop[Any, Context, Intent, Observation, Any]):
                 decision = await self.transformer.think(context, **kwargs)
 
                 # Update Holonom with Interiority (E) from reasoning
-                # We use a heuristic: successful thinking improves E-coherence
                 interiority_gain = 0.1 if decision.action != 0 else -0.05
                 stats = self.holonom.step(interiority_gain, mock_7d_signals)
                 logger.info("holonom_v3_step", **stats)

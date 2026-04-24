@@ -3,10 +3,12 @@ Holonom v3.0: Quantum Regeneration & 7-Dimensional Metabolism (UHM-Native).
 """
 
 from datetime import UTC, datetime
-from typing import Any
+from typing import Any, Dict, List, Optional
 
 import numpy as np
 import structlog
+
+from config import get_settings
 
 from .errors import ApoptosisTrigger, GeometricCeilingError
 
@@ -19,14 +21,24 @@ class HolonomV3:
     """
 
     DIMENSIONS = ["A", "S", "D", "L", "E", "O", "U"]
-    PCRIT = 2.0 / 7.0  # ≈ 0.2857
-    SAD_MAX = 3
-    KAPPA_BOOT = 5.71  # omega_0 / 7
-    SIGMA_K_MAX = 0.95
 
     def __init__(self, kappa_0: float = 1.0):
-        # 7x7 complex coherence matrix
-        self.gamma = np.eye(7, dtype=complex) / 7.0
+        settings = get_settings().metabolism
+        self.pcrit = settings.pcrit
+        self.sad_max = settings.sad_max
+        self.kappa_boot = settings.kappa_boot
+        self.sigma_k_max = settings.sigma_k_max
+
+        # Initialize complex coherence matrix from configurable diagonal
+        # This ensures initial purity P > pcrit
+        diag = np.array(settings.initial_diagonal, dtype=complex)
+        self.gamma = np.diag(diag)
+
+        # Ensure trace 1
+        trace_val = np.trace(self.gamma)
+        if np.abs(trace_val) > 1e-15:
+            self.gamma /= trace_val
+
         self.purity = self._calculate_purity()
         self.kappa_0 = kappa_0
         self.recursion_depth = 0
@@ -48,28 +60,28 @@ class HolonomV3:
         Quantum regeneration κ = κ_boot + κ0 * CohE
         """
         coh_e = float(np.real(self.gamma[4, 4]))
-        kappa = self.KAPPA_BOOT + self.kappa_0 * coh_e
+        kappa = self.kappa_boot + self.kappa_0 * coh_e
         return kappa
 
     def verify_viability(self) -> None:
         """
         Enforce the Viability Gate.
         """
-        if self.purity < self.PCRIT:
+        if self.purity < self.pcrit:
             logger.error(
-                "viability_gate_failure", purity=self.purity, threshold=self.PCRIT
+                "viability_gate_failure", purity=self.purity, threshold=self.pcrit
             )
             raise ApoptosisTrigger("Critical loss of coherence: P < 2/7")
 
     def track_self_modeling(self, increment: int = 1) -> None:
         """
-        Track self-modeling recursion depth (SAD_MAX = 3).
+        Track self-modeling recursion depth (SAD_MAX).
         """
         self.recursion_depth += increment
-        if self.recursion_depth > self.SAD_MAX:
+        if self.recursion_depth > self.sad_max:
             logger.error("geometric_ceiling_exceeded", depth=self.recursion_depth)
             raise GeometricCeilingError(
-                f"Recursion depth {self.recursion_depth} exceeds SADmax={self.SAD_MAX}"
+                f"Recursion depth {self.recursion_depth} exceeds SADmax={self.sad_max}"
             )
 
     def reset_recursion(self) -> None:
@@ -77,7 +89,7 @@ class HolonomV3:
 
     def step(
         self, internal_experience: float, external_signals: np.ndarray
-    ) -> dict[str, Any]:
+    ) -> Dict[str, Any]:
         """
         Perform one metabolic step.
         """
@@ -91,7 +103,7 @@ class HolonomV3:
         sigma = self.get_stress_tensor()
         kappa = self.calculate_regeneration()
         self.verify_viability()
-        if np.any(sigma > self.SIGMA_K_MAX):
+        if np.any(sigma > self.sigma_k_max):
             logger.info("stress_induced_regeneration_triggered", sigma=sigma)
             self.gamma += np.eye(7) * (kappa * 0.01)
             self.gamma /= np.trace(self.gamma)
