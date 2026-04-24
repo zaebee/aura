@@ -5,8 +5,6 @@ Uses the Hill Equation to prevent Memory Famine (OOM)
 by dampening processing loads as they approach physical or logical limits.
 """
 
-from typing import Optional
-
 import structlog
 
 from config import get_settings
@@ -19,12 +17,16 @@ class HillRegulator:
     Bio-digital resource regulator based on the Hill Equation.
     """
 
-    def __init__(self, coefficient: Optional[float] = None):
+    def __init__(self, coefficient: float | None = None):
         settings = get_settings()
-        self.hill_n = coefficient if coefficient is not None else settings.metabolism.hill_n
+        self.hill_n = (
+            coefficient if coefficient is not None else settings.metabolism.hill_n
+        )
 
     @classmethod
-    def calculate_dampening(cls, current_usage: float, threshold: float, n: float = 2.8) -> float:
+    def calculate_dampening(
+        cls, current_usage: float, threshold: float, n: float = 2.8
+    ) -> float:
         """
         Calculate dampening factor [0, 1].
         """
@@ -49,12 +51,16 @@ class HillRegulator:
         return self.calculate_dampening(stress_level, 0.4, n=self.hill_n)
 
     @classmethod
-    def regulate_context(cls, requested_tokens: int, current_memory_mb: float, memory_limit_mb: float) -> int:
+    def regulate_context(
+        cls, requested_tokens: int, current_memory_mb: float, memory_limit_mb: float
+    ) -> int:
         """
         Adjust context window size to prevent Memory Famine.
         """
         settings = get_settings()
-        dampening = cls.calculate_dampening(current_memory_mb, memory_limit_mb, n=settings.metabolism.hill_n)
+        dampening = cls.calculate_dampening(
+            current_memory_mb, memory_limit_mb, n=settings.metabolism.hill_n
+        )
         dampened_tokens = int(requested_tokens * dampening)
 
         if dampening < 0.2:

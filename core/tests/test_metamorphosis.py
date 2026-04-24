@@ -1,10 +1,15 @@
 import numpy as np
 import pytest
 from hive.chemistry.hill_regulator import HillRegulator
-from hive.metabolism.errors import ApoptosisTrigger, GeometricCeilingError, DeathSpiralError, MetabolicError
+from hive.metabolism.errors import (
+    ApoptosisTrigger,
+    DeathSpiralError,
+    GeometricCeilingError,
+    MetabolicError,
+)
 from hive.metabolism.holonom_v3 import HolonomV3
 from hive.metabolism.pattern_synthesizer import PatternSynthesizer
-from hive.metabolism.theory_interop import TheorySpace, Theory
+from hive.metabolism.theory_interop import Theory, TheorySpace
 
 
 def test_hill_regulator_initialization():
@@ -111,7 +116,7 @@ def test_pattern_synthesizer_v4_logic():
     gamma_stressed = np.diag([0.94, 0.01, 0.01, 0.01, 0.01, 0.01, 0.01]).astype(complex)
     # P = 0.94^2 + 6*0.01^2 = 0.8836 + 0.0006 = 0.8842 > 0.2857
     with pytest.raises(MetabolicError) as exc:
-         synth.execute(gamma_stressed, {"data": "nectar"})
+        synth.execute(gamma_stressed, {"data": "nectar"})
     assert "ресурсного стресса" in str(exc.value)
 
     # 3. Test Nu-monitoring and adaptive rigor
@@ -140,9 +145,9 @@ def test_theory_interop():
     assert "translated(set_axiom)_from_LFnd_to_LFnd" in result
 
     coherence = space.check_coherence()
-    assert coherence == 1.0 # Both are LFnd
+    assert coherence == 1.0  # Both are LFnd
 
     t3 = Theory(name="Classy", foundation="LCls")
     space.load_theory(t3)
     coherence_mixed = space.check_coherence()
-    assert coherence_mixed < 1.0 # Mixed foundations
+    assert coherence_mixed < 1.0  # Mixed foundations

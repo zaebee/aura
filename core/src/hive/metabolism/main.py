@@ -1,4 +1,4 @@
-from typing import Any
+from typing import Any, cast
 
 import numpy as np
 import structlog
@@ -77,23 +77,27 @@ class MetabolicLoop(BaseMetabolicLoop[Any, Context, Intent, Observation, Any]):
                 vitals = await self.aggregator.get_vitals()
 
                 # Derive 7D signals from context and vitals
-                meta = context.metadata.to_dict() if hasattr(context.metadata, "to_dict") else {}
+                meta = (
+                    context.metadata.to_dict()
+                    if hasattr(context.metadata, "to_dict")
+                    else {}
+                )
 
                 # Heuristic derivation for MSFS phase
                 # A: Articulation (input volume)
                 articulation = min(1.0, len(str(signal)) / 2000.0)
                 # D: Dynamics (reputation or activity)
-                dynamics = float(meta.get("reputation", 0.5))
+                dynamics = float(cast(Any, meta.get("reputation", 0.5)))
 
                 mock_7d_signals = np.array(
                     [
-                        articulation,                       # A: Articulation
-                        vitals.cpu_usage_percent / 100.0,   # S: Structure
-                        dynamics,                           # D: Dynamics
-                        0.1,                                # L: Logic (base coherence)
-                        0.0,                                # E: Interiority (updated during Reasoning)
-                        vitals.memory_usage_mb / 1024.0,    # O: Foundation
-                        0.5,                                # U: Unity
+                        articulation,  # A: Articulation
+                        vitals.cpu_usage_percent / 100.0,  # S: Structure
+                        dynamics,  # D: Dynamics
+                        0.1,  # L: Logic (base coherence)
+                        0.0,  # E: Interiority (updated during Reasoning)
+                        vitals.memory_usage_mb / 1024.0,  # O: Foundation
+                        0.5,  # U: Unity
                     ]
                 )
 

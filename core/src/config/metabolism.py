@@ -1,5 +1,6 @@
 from pydantic import BaseModel
 
+
 class MetabolismSettings(BaseModel):
     # Holonom v3.0 Parameters
     pcrit: float = 0.2857  # 2/7

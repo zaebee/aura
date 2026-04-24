@@ -3,7 +3,7 @@ Holonom v3.0: Quantum Regeneration & 7-Dimensional Metabolism (UHM-Native).
 """
 
 from datetime import UTC, datetime
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 import numpy as np
 import structlog
@@ -89,7 +89,7 @@ class HolonomV3:
 
     def step(
         self, internal_experience: float, external_signals: np.ndarray
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """
         Perform one metabolic step.
         """
