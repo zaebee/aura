@@ -9,6 +9,7 @@ from hive.metabolism.errors import (
 )
 from hive.metabolism.holonom_v3 import HolonomV3
 from hive.metabolism.pattern_synthesizer import PatternSynthesizer
+from hive.metabolism.theory_interop import Theory, TheorySpace
 
 
 def test_hill_regulator_n_2_8():
@@ -93,8 +94,9 @@ async def test_metabolic_step():
     assert "stress_tensor" in stats
     assert "regeneration_kappa" in stats
 
-def test_pattern_synthesizer_stress_logic():
-    """Verify PatternSynthesizer correctly reacts to stress and purity."""
+
+def test_pattern_synthesizer_v4_logic():
+    """Verify PatternSynthesizer correctly reacts to stress, purity, and nu."""
     synth = PatternSynthesizer()
 
     # 1. Test Death Spiral (low purity)
@@ -103,23 +105,40 @@ def test_pattern_synthesizer_stress_logic():
         synth.execute(gamma_zombie, {"data": "nectar"})
 
     # 2. Test Resource Stress (sigma_O)
-    # sigma_O = 1 - 7*p5.
     gamma_stressed = np.diag([0.94, 0.01, 0.01, 0.01, 0.01, 0.01, 0.01]).astype(complex)
-    # P = 0.94^2 + 6*0.01^2 = 0.8836 + 0.0006 = 0.8842 > 2/7.
-    # sigma_O = 1 - 7*0.01 = 0.93.
-    # affinity < 0.1
-
     with pytest.raises(MetabolicError) as exc:
-         synth.execute(gamma_stressed, {"data": "nectar"})
+        synth.execute(gamma_stressed, {"data": "nectar"})
     assert "ресурсного стресса" in str(exc.value)
 
-    # 3. Test successful synthesis
-    # We need P > 2/7 and sigma_O small enough.
-    # If p0=0.7, p5=0.1, others small.
-    # P = 0.49 + 0.01 + ... > 0.5.
-    # sigma_O = 1 - 7*0.1 = 0.3. affinity > 0.1.
+    # 3. Test Nu-monitoring and adaptive rigor
     gamma_healthy = np.diag([0.7, 0.05, 0.05, 0.05, 0.05, 0.1, 0.0]).astype(complex)
     gamma_healthy /= np.trace(gamma_healthy)
-    insight = synth.execute(gamma_healthy, {"data": "nectar"})
-    assert insight.origin == "zae-analyst-holonom"
-    assert len(insight.payload) > 0
+
+    # Low complexity -> certified rigor
+    insight_low = synth.execute(gamma_healthy, {"data": "small"})
+    assert insight_low.rigor_mode == "certified"
+
+    # High complexity -> fast rigor
+    insight_high = synth.execute(gamma_healthy, {"data": "large" * 1000})
+    assert insight_high.rigor_mode == "fast"
+
+
+def test_theory_interop():
+    """Verify theory space immersion and translation."""
+    space = TheorySpace()
+    t1 = Theory(name="ZFC", foundation="LFnd")
+    t2 = Theory(name="HoTT", foundation="LFnd")
+
+    space.load_theory(t1)
+    space.load_theory(t2)
+
+    result = space.translate("ZFC", "HoTT", "set_axiom")
+    assert "translated(set_axiom)_from_LFnd_to_LFnd" in result
+
+    coherence = space.check_coherence()
+    assert coherence == 1.0  # Both are LFnd
+
+    t3 = Theory(name="Classy", foundation="LCls")
+    space.load_theory(t3)
+    coherence_mixed = space.check_coherence()
+    assert coherence_mixed < 1.0  # Mixed foundations

@@ -5,10 +5,10 @@ Uses the Hill Equation (n=2.8) to prevent Memory Famine (OOM)
 by dampening processing loads as they approach physical or logical limits.
 """
 
-
 import structlog
 
 logger = structlog.get_logger(__name__)
+
 
 class HillRegulator:
     """
@@ -51,13 +51,15 @@ class HillRegulator:
 
         n = self.HILL_N
         usage_n = float(pow(stress_level, n))
-        threshold_n = float(pow(0.4, n)) # K = 0.4
+        threshold_n = float(pow(0.4, n))  # K = 0.4
 
         saturation = usage_n / (threshold_n + usage_n)
         return float(1.0 - saturation)
 
     @classmethod
-    def regulate_context(cls, requested_tokens: int, current_memory_mb: float, memory_limit_mb: float) -> int:
+    def regulate_context(
+        cls, requested_tokens: int, current_memory_mb: float, memory_limit_mb: float
+    ) -> int:
         """
         Adjust context window size to prevent Memory Famine.
         """
@@ -65,9 +67,11 @@ class HillRegulator:
         dampened_tokens = int(requested_tokens * dampening)
 
         if dampening < 0.2:
-            logger.warning("memory_famine_imminent",
-                           usage=current_memory_mb,
-                           limit=memory_limit_mb,
-                           dampening=dampening)
+            logger.warning(
+                "memory_famine_imminent",
+                usage=current_memory_mb,
+                limit=memory_limit_mb,
+                dampening=dampening,
+            )
 
         return max(0, dampened_tokens)

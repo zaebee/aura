@@ -10,6 +10,7 @@ from .main import MetabolicLoop
 from .math import HillDampener
 from .pattern_synthesizer import Insight, PatternSynthesizer, Transformation
 from .security import AuditSigner
+from .theory_interop import Theory, TheorySpace
 
 __all__ = [
     "MetabolicLoop",
@@ -24,4 +25,6 @@ __all__ = [
     "PatternSynthesizer",
     "Insight",
     "Transformation",
+    "TheorySpace",
+    "Theory",
 ]

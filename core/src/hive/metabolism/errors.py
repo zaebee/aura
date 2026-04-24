@@ -26,6 +26,8 @@ class ApoptosisTrigger(MetabolicError):
 
     pass
 
+
 class DeathSpiralError(ApoptosisTrigger):
     """Raised when purity falls below the critical threshold (2/7)."""
+
     pass

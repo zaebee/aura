@@ -12,6 +12,7 @@ from .errors import ApoptosisTrigger, GeometricCeilingError
 
 logger = structlog.get_logger(__name__)
 
+
 class HolonomV3:
     """
     Quantum Holonom implementation for Project "Queen Bee" v3.0.
@@ -55,7 +56,9 @@ class HolonomV3:
         Enforce the Viability Gate.
         """
         if self.purity < self.PCRIT:
-            logger.error("viability_gate_failure", purity=self.purity, threshold=self.PCRIT)
+            logger.error(
+                "viability_gate_failure", purity=self.purity, threshold=self.PCRIT
+            )
             raise ApoptosisTrigger("Critical loss of coherence: P < 2/7")
 
     def track_self_modeling(self, increment: int = 1) -> None:
@@ -65,12 +68,16 @@ class HolonomV3:
         self.recursion_depth += increment
         if self.recursion_depth > self.SAD_MAX:
             logger.error("geometric_ceiling_exceeded", depth=self.recursion_depth)
-            raise GeometricCeilingError(f"Recursion depth {self.recursion_depth} exceeds SADmax={self.SAD_MAX}")
+            raise GeometricCeilingError(
+                f"Recursion depth {self.recursion_depth} exceeds SADmax={self.SAD_MAX}"
+            )
 
     def reset_recursion(self) -> None:
         self.recursion_depth = 0
 
-    def step(self, internal_experience: float, external_signals: np.ndarray) -> dict[str, Any]:
+    def step(
+        self, internal_experience: float, external_signals: np.ndarray
+    ) -> dict[str, Any]:
         """
         Perform one metabolic step.
         """
@@ -94,5 +101,5 @@ class HolonomV3:
             "purity": self.purity,
             "stress_tensor": sigma.tolist(),
             "regeneration_kappa": kappa,
-            "timestamp": datetime.now(UTC).isoformat()
+            "timestamp": datetime.now(UTC).isoformat(),
         }

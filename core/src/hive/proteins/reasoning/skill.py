@@ -118,7 +118,7 @@ class ReasoningSkill(
         p_neg = NegotiationParams(
             bid=params.get("bid", 0.0),
             context=params.get("context", {}),
-            history=params.get("history", [])
+            history=params.get("history", []),
         )
 
         # Apply Hill Dampening to context and history
