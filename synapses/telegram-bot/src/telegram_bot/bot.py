@@ -14,8 +14,9 @@ from aiogram.types import (
     CallbackQuery,
     Message,
 )
-from nats_adapter import NatsAdapter
-from translator import TelegramTranslator
+
+from .nats_adapter import NatsAdapter
+from .translator import TelegramTranslator
 
 router = Router()
 

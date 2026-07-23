@@ -3,8 +3,8 @@ from unittest.mock import AsyncMock, MagicMock
 import pytest
 from aiogram.filters import CommandObject
 from aura_core_gen.aura.core.v1 import Observation as ProtoObservation
-from receptor import NegotiationStates, TelegramReceptor
-from translator import TelegramTranslator
+from telegram_bot.receptor import NegotiationStates, TelegramReceptor
+from telegram_bot.translator import TelegramTranslator
 
 
 @pytest.fixture

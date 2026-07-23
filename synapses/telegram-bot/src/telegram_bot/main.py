@@ -5,14 +5,15 @@ import os
 import nats
 import structlog
 from aiogram import Bot, Dispatcher
-from effector import TelegramEffector
-from grpc_adapter import GrpcAdapter
-from health import start_health_server
-from health import state as health_state
-from nats_adapter import NatsAdapter
-from receptor import TelegramReceptor
-from synapse_settings import settings as tg_settings
-from translator import TelegramTranslator
+
+from .effector import TelegramEffector
+from .grpc_adapter import GrpcAdapter
+from .health import start_health_server
+from .health import state as health_state
+from .nats_adapter import NatsAdapter
+from .receptor import TelegramReceptor
+from .synapse_settings import settings as tg_settings
+from .translator import TelegramTranslator
 
 # Setup logging
 level = (
