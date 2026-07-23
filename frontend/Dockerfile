@@ -1,5 +1,9 @@
 # Stage 1: Build static assets
-FROM oven/bun:1.1-alpine AS builder
+# Pin a full bun patch (not the floating 1.1 tag): the repo's bun.lock uses the
+# text format (lockfileVersion 1) written by bun 1.3.x, which older 1.1.x patches
+# fail to parse ("Unknown lockfile version"). Keep this aligned with the bun used
+# to author the lockfile.
+FROM oven/bun:1.3.14-alpine AS builder
 
 WORKDIR /app
 
@@ -15,7 +19,7 @@ COPY proto ./proto
 
 # Copy lockfile and package.json from the frontend directory
 COPY frontend/package.json frontend/bun.lock ./frontend/
-RUN cd frontend && bun install
+RUN cd frontend && bun install --frozen-lockfile
 
 # Copy configuration files
 COPY frontend/tsconfig.json frontend/tsconfig.app.json frontend/tsconfig.node.json ./frontend/
