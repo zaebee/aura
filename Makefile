@@ -52,6 +52,8 @@ setup-hooks:
 test: $(PROTO_SENTINEL)
 	# Run core tests
 	PYTHONPATH=$(CORE_PATH) uv run pytest core/tests/ -v
+	# Run api-gateway tests (env is provided by api-gateway/tests/conftest.py)
+	PYTHONPATH=$(GATEWAY_PATH) uv run pytest api-gateway/tests/ -v
 	# Run telegram-bot tests with isolated path to avoid 'src' collision
 	PYTHONPATH=$(TG_PATH) uv run pytest synapses/telegram-bot/tests/ -v
 	# Run mcp-server tests if they exist

@@ -1,0 +1,42 @@
+version: 2
+updates:
+  # Python dependencies — single uv workspace lock at the repo root.
+  # (Member uv.lock files were removed; only the root lock is authoritative.)
+  - package-ecosystem: "uv"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+    open-pull-requests-limit: 10
+    labels:
+      - "dependencies"
+      - "python"
+    groups:
+      # Collapse routine minor/patch bumps into a single weekly PR so the
+      # alert backlog can't pile up again. Major bumps are intentionally
+      # left ungrouped — each lands as its own PR for isolated review.
+      python-minor-patch:
+        applies-to: version-updates
+        update-types:
+          - "minor"
+          - "patch"
+      # Group security fixes together so they are easy to spot and merge.
+      python-security:
+        applies-to: security-updates
+        patterns:
+          - "*"
+
+  # GitHub Actions — keep workflow action pins current and least-surprising.
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+    open-pull-requests-limit: 5
+    labels:
+      - "dependencies"
+      - "ci"
+    groups:
+      github-actions:
+        patterns:
+          - "*"
