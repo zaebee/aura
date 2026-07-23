@@ -5,8 +5,8 @@ import nats
 import nats.errors
 import structlog
 
-from config import KeeperSettings
-from hive.metabolism import BeeMetabolism
+from aura_keeper.config import KeeperSettings
+from aura_keeper.hive.metabolism import BeeMetabolism
 
 # Configure logging
 structlog.configure(
@@ -52,7 +52,7 @@ async def main() -> None:
             try:
                 logger.info("error_signal_detected", subject=msg.subject)
                 # Execute one complete metabolic cycle for each error
-                await metabolism.execute(signal=msg.data, event_name="error_diagnosis")
+                await metabolism.execute(event_name="error_diagnosis")
             except Exception as e:
                 logger.error("cycle_failure", error=str(e))
 

@@ -5,7 +5,7 @@ from typing import Any, cast
 import litellm
 import structlog
 
-from config import KeeperSettings
+from aura_keeper.config import KeeperSettings
 from aura_core import (
     ALLOWED_CHAMBERS,
     find_hive_root,

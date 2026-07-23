@@ -11,7 +11,7 @@ from datetime import UTC, datetime
 
 import structlog
 
-from config import KeeperSettings
+from aura_keeper.config import KeeperSettings
 from aura_core import Aggregator, find_hive_root, make_struct
 from aura_core_gen.aura.core.v1 import (
     Context,
