@@ -20,9 +20,16 @@ env:
     REGISTRY: ghcr.io
     IMAGE_NAME: ${{ github.repository }}
 
+# Least-privilege default for all jobs; jobs that need more override below.
+permissions:
+    contents: read
+
 jobs:
     check-changes:
         runs-on: ubuntu-latest
+        permissions:
+            contents: read
+            pull-requests: read # dorny/paths-filter reads changed files on PRs
         outputs:
             code: ${{ steps.filter.outputs.code }}
             infra: ${{ steps.filter.outputs.infra }}

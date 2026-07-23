@@ -20,10 +20,17 @@ on:
       - 'tools/validate_knowledge.py'
       - 'docs/ARCHITECTURAL_ANCHOR.md'
 
+# Least-privilege default for all jobs; jobs that need more override below.
+permissions:
+  contents: read
+
 jobs:
   distill-and-validate:
     name: Extract and Validate Architecture
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write # posts a failure comment on the PR
 
     steps:
       - name: Checkout code
@@ -124,6 +131,8 @@ jobs:
   attach-to-release:
     name: Attach to Release
     runs-on: ubuntu-latest
+    permissions:
+      contents: write # softprops/action-gh-release creates/updates a release
     needs: distill-and-validate
     if: startsWith(github.ref, 'refs/tags/')
 
