@@ -19,8 +19,9 @@ from enum import Enum
 from typing import TYPE_CHECKING
 
 from fastapi import FastAPI, HTTPException
-from logging_config import get_logger
 from pydantic import BaseModel, Field
+
+from .logging_config import get_logger
 
 if TYPE_CHECKING:
     from grpc_health.v1 import health_pb2_grpc

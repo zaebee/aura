@@ -3,10 +3,10 @@ from unittest.mock import AsyncMock, MagicMock
 
 import nats
 import pytest
+from api_gateway.main import app
+from api_gateway.security import verify_public_membrane
 from aura_core_gen.aura.core.v1 import Signal
 from fastapi.testclient import TestClient
-from main import app
-from security import verify_public_membrane
 
 
 @pytest.fixture

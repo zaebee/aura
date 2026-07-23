@@ -58,4 +58,4 @@ ENV PYTHONPATH=/app/api-gateway/src:/app/api-gateway/gen-proto
 
 EXPOSE 8000
 
-CMD ["uvicorn", "src.main:app", "--host", "0.0.0.0", "--port", "8000"]
+CMD ["uvicorn", "api_gateway.main:app", "--host", "0.0.0.0", "--port", "8000"]
