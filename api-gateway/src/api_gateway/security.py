@@ -195,7 +195,7 @@ async def verify_public_membrane(
 
     Returns the verified agent DID (or gateway DID for frontend requests).
     """
-    from config import get_settings
+    from .config import get_settings
 
     settings = get_settings()
 

@@ -134,7 +134,7 @@ run-core: $(PROTO_SENTINEL)
 
 run-gateway: $(PROTO_SENTINEL)
 	# Run API Gateway
-	PYTHONPATH=$(GATEWAY_PATH):$(DNA_PATH) uv run uvicorn main:app --host 0.0.0.0 --port 8000 --app-dir api-gateway/src
+	PYTHONPATH=$(GATEWAY_PATH):$(DNA_PATH) uv run uvicorn api_gateway.main:app --host 0.0.0.0 --port 8000 --app-dir api-gateway/src
 
 prepare-bun:
 	# Install frontend dependencies via bun

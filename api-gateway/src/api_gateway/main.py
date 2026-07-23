@@ -23,22 +23,22 @@ from fastapi import (
     Response,
     UploadFile,
 )
-from health import register_health_endpoints
-from logging_config import (
+from opentelemetry.instrumentation.fastapi import FastAPIInstrumentor
+from pydantic import BaseModel
+from starlette.middleware.cors import CORSMiddleware
+from starlette.types import ASGIApp, Message, Receive, Scope, Send
+
+from .config import get_settings
+from .health import register_health_endpoints
+from .logging_config import (
     bind_request_id,
     clear_request_context,
     configure_logging,
     get_current_request_id,
     get_logger,
 )
-from opentelemetry.instrumentation.fastapi import FastAPIInstrumentor
-from pydantic import BaseModel
-from security import verify_public_membrane
-from starlette.middleware.cors import CORSMiddleware
-from starlette.types import ASGIApp, Message, Receive, Scope, Send
-from telemetry import init_telemetry
-
-from config import get_settings
+from .security import verify_public_membrane
+from .telemetry import init_telemetry
 
 settings = get_settings()
 
