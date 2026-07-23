@@ -20,7 +20,7 @@ dependencies = [
 requires-python = ">=3.12"
 
 [project.scripts]
-aura-mcp = "main:main"
+aura-mcp = "aura_mcp.main:main"
 
 [tool.uv.sources]
 aura-core = { workspace = true }
@@ -30,14 +30,10 @@ core = { workspace = true }
 requires = ["hatchling"]
 build-backend = "hatchling.build"
 
-# The service uses a flat src/ layout (top-level modules: main, receptor,
-# translator, effector) rather than a src/<package> dir, so hatchling cannot
-# auto-detect what to ship. Point it at src/ and strip the prefix so the
-# modules install as top-level (matching how they are imported and the
-# `aura-mcp = "main:main"` entry point).
+# Standard src-layout: ship the aura_mcp package. No flat top-level modules,
+# so the wheel no longer collides with other services' `main`/`config`.
 [tool.hatch.build.targets.wheel]
-only-include = ["src"]
-sources = ["src"]
+packages = ["src/aura_mcp"]
 
 [tool.ruff]
 target-version = "py312"

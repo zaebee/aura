@@ -5,7 +5,7 @@ import structlog
 from aura_core_gen.aura.core.v1 import Event as ProtoEvent
 from opentelemetry import trace
 
-from translator import MCPTranslator
+from .translator import MCPTranslator
 
 logger = structlog.get_logger(__name__)
 tracer = trace.get_tracer(__name__)

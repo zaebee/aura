@@ -4,7 +4,7 @@ import structlog
 from aura_core import MetabolicLoop
 from fastmcp import FastMCP  # type: ignore
 
-from translator import MCPTranslator
+from .translator import MCPTranslator
 
 logger = structlog.get_logger(__name__)
 

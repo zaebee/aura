@@ -15,8 +15,8 @@ from aura_core_gen.aura.core.v1 import (
 )
 from fastmcp import Client, FastMCP
 
-from receptor import MCPReceptor
-from translator import MCPTranslator
+from aura_mcp.receptor import MCPReceptor
+from aura_mcp.translator import MCPTranslator
 
 
 def _make_receptor(observation: Observation):
