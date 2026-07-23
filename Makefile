@@ -56,8 +56,14 @@ test: $(PROTO_SENTINEL)
 	PYTHONPATH=$(GATEWAY_PATH) uv run pytest api-gateway/tests/ -v
 	# Run telegram-bot tests with isolated path to avoid 'src' collision
 	PYTHONPATH=$(TG_PATH) uv run pytest synapses/telegram-bot/tests/ -v
-	# Run mcp-server tests if they exist
-	if [ -d "synapses/mcp-server/tests" ]; then PYTHONPATH=$(MCP_PATH):$(CORE_PATH) uv run pytest synapses/mcp-server/tests/ -v; fi
+	# Run mcp-server tests if they exist.
+	# aura-mcp's runtime deps (fastmcp) aren't in the root dev group, so add them
+	# additively (--inexact keeps the already-synced dev deps, avoids aura-worker's
+	# heavy torch stack); --no-sync stops `uv run` from reverting that.
+	if [ -d "synapses/mcp-server/tests" ]; then \
+		uv sync --package aura-mcp --inexact; \
+		PYTHONPATH=$(MCP_PATH):$(CORE_PATH) uv run --no-sync pytest synapses/mcp-server/tests/ -v; \
+	fi
 
 # Run tests with coverage report
 test-cov:
