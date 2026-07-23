@@ -809,18 +809,6 @@ wheels = [
 ]
 
 [[package]]
-name = "colorlog"
-version = "6.10.1"
-source = { registry = "https://pypi.org/simple" }
-dependencies = [
-    { name = "colorama", marker = "sys_platform == 'win32'" },
-]
-sdist = { url = "https://files.pythonhosted.org/packages/a2/61/f083b5ac52e505dfc1c624eafbf8c7589a0d7f32daa398d2e7590efa5fda/colorlog-6.10.1.tar.gz", hash = "sha256:eb4ae5cb65fe7fec7773c2306061a8e63e02efc2c72eba9d27b0fa23c94f1321", size = 17162, upload-time = "2025-10-16T16:14:11.978Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/6d/c1/e419ef3723a074172b68aaa89c9f3de486ed4c2399e2dbd8113a4fdcaf9e/colorlog-6.10.1-py3-none-any.whl", hash = "sha256:2d7e8348291948af66122cff006c9f8da6255d224e7cf8e37d8de2df3bad8c9c", size = 11743, upload-time = "2025-10-16T16:14:10.512Z" },
-]
-
-[[package]]
 name = "construct"
 version = "2.10.70"
 source = { registry = "https://pypi.org/simple" }
@@ -1119,7 +1107,7 @@ wheels = [
 
 [[package]]
 name = "dspy"
-version = "3.1.2"
+version = "3.2.1"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "anyio" },
@@ -1132,30 +1120,30 @@ dependencies = [
     { name = "litellm" },
     { name = "numpy" },
     { name = "openai" },
-    { name = "optuna" },
     { name = "orjson" },
     { name = "pydantic" },
     { name = "regex" },
     { name = "requests" },
     { name = "tenacity" },
     { name = "tqdm" },
+    { name = "typeguard" },
     { name = "xxhash" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/22/92/4eeed6796c48e799a41aa521bf206fabab3dbb2fbf0958655b476e43726e/dspy-3.1.2.tar.gz", hash = "sha256:6dfd8a4bbf74b1b432ff466468994a590c43fce0d45c2c0094313c9314aa3bb6", size = 261253, upload-time = "2026-01-19T14:21:47.424Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/44/6f/77a79122a16c60b7d5853c11943531bc60f32545369cd05cce4057403a1d/dspy-3.2.1.tar.gz", hash = "sha256:245d6531753cd3e844e7cc47835cfb283c8f57a36a977beabe5034457d9c7241", size = 278428, upload-time = "2026-05-05T19:35:07.471Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/91/18/1c93641f25f4e76772b4ffb52a4e289f1706d6bda4f3b59bb6f7c339df46/dspy-3.1.2-py3-none-any.whl", hash = "sha256:23b98bf5abeda260722c445d397d07ea27488c204b8c0ccd6d3e607c4b41bc6b", size = 312290, upload-time = "2026-01-19T14:21:45.776Z" },
+    { url = "https://files.pythonhosted.org/packages/c5/a1/26ccff78d9e67b17e51fce8ac6d5f57d182ddb20915bf86daf09fc50191a/dspy-3.2.1-py3-none-any.whl", hash = "sha256:4f36c3c0f9d54cd66eeb2a7892df950119e4193deb1fbbc9d46c3438ee1f4df3", size = 331015, upload-time = "2026-05-05T19:35:05.816Z" },
 ]
 
 [[package]]
 name = "dspy-ai"
-version = "3.1.2"
+version = "3.2.1"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "dspy" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/df/f1/9d7f77d6f59d635319d22ff88c2d270dff7b973fff45e185374761b05c58/dspy_ai-3.1.2.tar.gz", hash = "sha256:0dbc0f827ad4087e44fc3e9ca6648b6bb17c84b2f0844b39d53bcbbf79d5c340", size = 1104, upload-time = "2026-01-19T14:21:56.398Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/3b/9e/e09701f7ac9a9f7dc3d4407eacb022268eb2000b8fcce2e4b76ae08ffafd/dspy_ai-3.2.1.tar.gz", hash = "sha256:d5cb7e0dc1597612a8b49e06f42bc446235e84bd68249fe6adc3287c8184e41b", size = 1220, upload-time = "2026-05-05T19:35:16.765Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/c3/7a/148ad996676a166ab043d52c7beb82f79870d04c76a30858371ef6f31b42/dspy_ai-3.1.2-py3-none-any.whl", hash = "sha256:f3d3cf8bbf567211dfae537eca0e024e248c233d0cbddc1cef2685e92c84c885", size = 1096, upload-time = "2026-01-19T14:21:55.268Z" },
+    { url = "https://files.pythonhosted.org/packages/e2/37/e4dc75151932629a1a9c20f24f7ea83d080f47d6c19c402ebf2b3536dc8e/dspy_ai-3.2.1-py3-none-any.whl", hash = "sha256:613d0ce08d7965fa6ea078df0923c17cfb38489cb3a7300a0a425a54c70ea396", size = 1170, upload-time = "2026-05-05T19:35:15.429Z" },
 ]
 
 [[package]]
@@ -1414,11 +1402,11 @@ wheels = [
 
 [[package]]
 name = "gepa"
-version = "0.0.24"
+version = "0.0.27"
 source = { registry = "https://pypi.org/simple" }
-sdist = { url = "https://files.pythonhosted.org/packages/bc/2c/8f249827bcdc56212a445f4f671ee2201b864e433d2c88428933bd4b08f3/gepa-0.0.24.tar.gz", hash = "sha256:8035d1a0877661b6a63db457dc935b4878ee76acf7da1e488d7e6209bb32c054", size = 135673, upload-time = "2026-01-05T16:45:30.553Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/4e/99/6840f84498f2dcbfd27e8a15eeb4e637e84e9dbbd6331977b71f6ffad9c7/gepa-0.0.27.tar.gz", hash = "sha256:02ecb19e4aa6a1f5bb2994cd54b2057f25cd5e8cd662fee514303b2a8ba0a738", size = 155106, upload-time = "2026-01-28T00:33:51.72Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/7e/b1/33b035ff1aaf22d4e104c5b15ba48fe5050639764457048e967c20d6317a/gepa-0.0.24-py3-none-any.whl", hash = "sha256:6d8b16699e7b24ed01435dea7bbbc89156a88cbb4b877b14d90e7455db2b0032", size = 137539, upload-time = "2026-01-05T16:45:29.244Z" },
+    { url = "https://files.pythonhosted.org/packages/a3/bd/f9e83519099a9fd5d090520ab0c51a6278e473b914a9b32d1e812662dd3b/gepa-0.0.27-py3-none-any.whl", hash = "sha256:592beb084fd638d525edae84ca75ad8e9e9c3758e5498b933c17153addf5dd2d", size = 146454, upload-time = "2026-01-28T00:33:50.262Z" },
 ]
 
 [[package]]
@@ -2713,24 +2701,6 @@ wheels = [
 ]
 
 [[package]]
-name = "optuna"
-version = "4.7.0"
-source = { registry = "https://pypi.org/simple" }
-dependencies = [
-    { name = "alembic" },
-    { name = "colorlog" },
-    { name = "numpy" },
-    { name = "packaging" },
-    { name = "pyyaml" },
-    { name = "sqlalchemy" },
-    { name = "tqdm" },
-]
-sdist = { url = "https://files.pythonhosted.org/packages/58/b2/b5e12de7b4486556fe2257611b55dbabf30d0300bdb031831aa943ad20e4/optuna-4.7.0.tar.gz", hash = "sha256:d91817e2079825557bd2e97de2e8c9ae260bfc99b32712502aef8a5095b2d2c0", size = 479740, upload-time = "2026-01-19T05:45:52.604Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/75/d1/6c8a4fbb38a9e3565f5c36b871262a85ecab3da48120af036b1e4937a15c/optuna-4.7.0-py3-none-any.whl", hash = "sha256:e41ec84018cecc10eabf28143573b1f0bde0ba56dba8151631a590ecbebc1186", size = 413894, upload-time = "2026-01-19T05:45:50.815Z" },
-]
-
-[[package]]
 name = "orjson"
 version = "3.11.9"
 source = { registry = "https://pypi.org/simple" }
@@ -3867,6 +3837,18 @@ wheels = [
 ]
 
 [[package]]
+name = "typeguard"
+version = "4.4.3"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "typing-extensions" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/34/53/f701077a29ddf65ed4556119961ef517d767c07f15f6cdf0717ad985426b/typeguard-4.4.3.tar.gz", hash = "sha256:be72b9c85f322c20459b29060c5c099cd733d5886c4ee14297795e62b0c0d59b", size = 75072, upload-time = "2025-06-04T21:47:07.733Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/5c/18/662e2a14fcdbbc9e7842ad801a7f9292fcd6cf7df43af94e59ac9c0da9af/typeguard-4.4.3-py3-none-any.whl", hash = "sha256:7d8b4a3d280257fd1aa29023f22de64e29334bda0b172ff1040f05682223795e", size = 34855, upload-time = "2025-06-04T21:47:03.683Z" },
+]
+
+[[package]]
 name = "typer"
 version = "0.21.1"
 source = { registry = "https://pypi.org/simple" }
@@ -3970,17 +3952,18 @@ wheels = [
 
 [[package]]
 name = "uagents-core"
-version = "0.4.2"
+version = "0.4.8"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "bech32" },
     { name = "ecdsa" },
+    { name = "httpx" },
     { name = "pydantic" },
     { name = "requests" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/f5/88/dd143c8ea0f7fff57eb6632f6498806b7c702605987ef3c1cd1c1f40ca82/uagents_core-0.4.2.tar.gz", hash = "sha256:a2cb50415e5c56ec9417e024b200377460c8b8d1e33bee6831d440e6a5916618", size = 24472, upload-time = "2026-02-19T11:20:49.496Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/45/d7/f9ef4f3bcfb7910ce8d9fb99e297bb1f16cdbd2a636232a3afd357e742ee/uagents_core-0.4.8.tar.gz", hash = "sha256:fedee1101a98f187c46b9723b794a075ffc6d111570d5e536fd3e07fedc4a86a", size = 91347, upload-time = "2026-07-13T13:54:59.205Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/6a/07/cb31c239691b75ace9441e7ecb6621fb3f76d610ec3685e52b8b9e5c40e2/uagents_core-0.4.2-py3-none-any.whl", hash = "sha256:5cbeca4ee80fe4b166988f1ed8fef4f67e6a62ea6b1a91eeb8875355f8394e51", size = 30742, upload-time = "2026-02-19T11:20:50.84Z" },
+    { url = "https://files.pythonhosted.org/packages/41/df/38d242d5acbb278335482abc52295e1a0e2503bf36bee27782d8333698b5/uagents_core-0.4.8-py3-none-any.whl", hash = "sha256:015364cd39a57c02583318dbd8779c853cd0c9e2bea9ee75a04c299002d7aaaa", size = 45615, upload-time = "2026-07-13T13:54:58.223Z" },
 ]
 
 [[package]]
