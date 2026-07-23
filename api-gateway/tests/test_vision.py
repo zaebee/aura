@@ -3,9 +3,10 @@ from unittest.mock import AsyncMock, MagicMock
 
 import nats
 import pytest
+from aura_core_gen.aura.core.v1 import Signal
 from fastapi.testclient import TestClient
 from main import app
-from security import verify_signature
+from security import verify_public_membrane
 
 
 @pytest.fixture
@@ -26,7 +27,7 @@ async def test_analyze_vision_endpoint():
     app.state.nc = mock_nc
 
     # We override the dependency to skip signature verification for this test
-    app.dependency_overrides[verify_signature] = lambda: "did:key:test"
+    app.dependency_overrides[verify_public_membrane] = lambda: "did:key:test"
 
     client = TestClient(app)
 
@@ -59,13 +60,14 @@ async def test_analyze_vision_endpoint():
     # Verify NATS request was called
     mock_nc.request.assert_called_once()
     args, kwargs = mock_nc.request.call_args
-    # Subject should match settings default or be passed as param (we use default)
+    # Subject should match the configured vision subject
     assert args[0] == "aura.worker.v1.vision.analyze"
 
-    payload = json.loads(args[1].decode())
-    assert "images" in payload
-    assert len(payload["images"]) == 2
-    assert payload["prompt"] == "car search"
+    # The gateway serializes a protobuf Signal (not JSON) onto the wire.
+    signal = Signal().parse(args[1])
+    assert len(signal.perception.image_data) == 2
+    assert signal.perception.prompt == "car search"
+    assert signal.perception.agent.did == "did:key:test"
 
     # Cleanup
     app.dependency_overrides = {}
