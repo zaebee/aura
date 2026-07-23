@@ -9,7 +9,7 @@ from aura_core_gen.aura.core.v1 import (
     SignalType,
 )
 
-from translator import MCPTranslator
+from aura_mcp.translator import MCPTranslator
 
 
 def _struct_to_dict(struct):

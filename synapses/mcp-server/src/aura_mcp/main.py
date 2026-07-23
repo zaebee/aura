@@ -6,9 +6,9 @@ from config import Settings as CoreSettings
 from fastmcp import FastMCP  # type: ignore
 from hive.cortex import HiveCell
 
-from effector import MCPEffector
-from receptor import MCPReceptor
-from translator import MCPTranslator
+from .effector import MCPEffector
+from .receptor import MCPReceptor
+from .translator import MCPTranslator
 
 # Setup logging
 log_format = os.getenv("AURA_LOG_FORMAT", "json").lower()

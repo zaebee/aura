@@ -5,8 +5,8 @@ from types import SimpleNamespace
 import pytest
 from aura_core_gen.aura.core.v1 import Event
 
-from effector import MCPEffector
-from translator import MCPTranslator
+from aura_mcp.effector import MCPEffector
+from aura_mcp.translator import MCPTranslator
 
 
 @pytest.mark.asyncio
