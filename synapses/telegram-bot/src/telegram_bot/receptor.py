@@ -8,9 +8,10 @@ from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
 from aiogram.types import CallbackQuery, Message
 from aura_core_gen.aura.negotiation.v1 import NegotiateRequest
-from grpc_adapter import GrpcAdapter
-from nats_adapter import NatsAdapter
-from translator import TelegramTranslator
+
+from .grpc_adapter import GrpcAdapter
+from .nats_adapter import NatsAdapter
+from .translator import TelegramTranslator
 
 logger = structlog.get_logger(__name__)
 

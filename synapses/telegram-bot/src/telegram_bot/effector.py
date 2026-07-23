@@ -7,7 +7,8 @@ from aiogram import Bot
 from aura_core_gen.aura.core.v1 import ActionType
 from aura_core_gen.aura.core.v1 import Event as ProtoEvent
 from opentelemetry import trace
-from translator import TelegramTranslator
+
+from .translator import TelegramTranslator
 
 logger = structlog.get_logger(__name__)
 tracer = trace.get_tracer(__name__)

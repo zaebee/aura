@@ -21,7 +21,8 @@ from aura_core_gen.aura.core.v1 import (
     SignalType,
     TelegramSignal,
 )
-from synapse_settings import settings
+
+from .synapse_settings import settings
 
 logger = structlog.get_logger(__name__)
 
