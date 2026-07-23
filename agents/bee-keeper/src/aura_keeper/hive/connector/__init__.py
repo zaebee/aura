@@ -8,7 +8,7 @@ import nats
 import nats.errors
 import structlog
 
-from config import KeeperSettings
+from aura_keeper.config import KeeperSettings
 from aura_core import (
     Connector,
     SkillRegistry,

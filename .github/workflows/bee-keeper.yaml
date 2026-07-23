@@ -85,4 +85,4 @@ jobs:
           git config --global user.name "bee.Keeper"
           git config --global user.email "keeper@aura.hive"
 
-          # SKIP: uv run --directory agents/bee-keeper python main.py
+          # SKIP: PYTHONPATH=agents/bee-keeper/src uv run python -m aura_keeper.main
