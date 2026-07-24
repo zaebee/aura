@@ -1,10 +1,9 @@
 from unittest.mock import AsyncMock, patch
 
 import pytest
-from hive.proteins.perception.engine import PerceptionEngine
-from hive.proteins.perception.skill import PerceptionSkill
-
-from config.perception import PerceptionSettings
+from aura_hive.config.perception import PerceptionSettings
+from aura_hive.hive.proteins.perception.engine import PerceptionEngine
+from aura_hive.hive.proteins.perception.skill import PerceptionSkill
 
 
 @pytest.fixture

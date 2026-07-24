@@ -3,10 +3,9 @@ from unittest.mock import AsyncMock, MagicMock
 import httpx
 import pytest
 from aura_core import SkillRegistry
-from hive.aggregator import HiveAggregator
-from hive.proteins.telemetry import TelemetrySkill
-
-from config.server import ServerSettings
+from aura_hive.config.server import ServerSettings
+from aura_hive.hive.aggregator import HiveAggregator
+from aura_hive.hive.proteins.telemetry import TelemetrySkill
 
 
 @pytest.mark.asyncio

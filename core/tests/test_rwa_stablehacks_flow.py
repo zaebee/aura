@@ -28,12 +28,11 @@ from aura_core_gen.aura.core.v1 import (
     Observation,
     RWAVaultIntent,
 )
-from hive.membrane import HiveMembrane
-from hive.proteins.guard.engine import OutputGuard
-from hive.proteins.guard.skill import GuardSkill
-from hive.transformer import AuraTransformer
-
-from config.policy import SafetySettings
+from aura_hive.config.policy import SafetySettings
+from aura_hive.hive.membrane import HiveMembrane
+from aura_hive.hive.proteins.guard.engine import OutputGuard
+from aura_hive.hive.proteins.guard.skill import GuardSkill
+from aura_hive.hive.transformer import AuraTransformer
 
 _APPROVED_VAULT = json.dumps(
     {
@@ -256,18 +255,18 @@ async def test_rwa_stablehacks_flow_approved(metabolic_loop):
     assert observation.success is True, f"Metabolic loop failed: {observation.error}"
 
     meta = observation.metadata.to_dict()
-    assert meta.get("transaction_chain") == "SOLANA", (
-        "Expected Solana as the transaction chain"
-    )
-    assert meta.get("transaction_type") == "RWA_VAULT_MINT", (
-        "Expected RWA_VAULT_MINT transaction type"
-    )
-    assert meta.get("vault_id") == "vault-stablehacks-001", (
-        "Expected vault ID from approved vault"
-    )
-    assert float(meta.get("collateral_amount", "0")) > 0, (
-        "Expected positive collateral amount"
-    )
+    assert (
+        meta.get("transaction_chain") == "SOLANA"
+    ), "Expected Solana as the transaction chain"
+    assert (
+        meta.get("transaction_type") == "RWA_VAULT_MINT"
+    ), "Expected RWA_VAULT_MINT transaction type"
+    assert (
+        meta.get("vault_id") == "vault-stablehacks-001"
+    ), "Expected vault ID from approved vault"
+    assert (
+        float(meta.get("collateral_amount", "0")) > 0
+    ), "Expected positive collateral amount"
 
 
 @pytest.mark.asyncio
@@ -310,16 +309,16 @@ async def test_rwa_transformer_produces_solana_intent(rwa_transformer):
 
     params_name, params_value = betterproto.which_one_of(intent, "params")
     assert params_name == "rwa_vault", f"Expected 'rwa_vault', got '{params_name}'"
-    assert intent.action == ActionType.ACTION_TYPE_ACCEPT, (
-        f"Expected ActionType.ACTION_TYPE_ACCEPT for compliant RWA, got {intent.action}"
-    )
-    assert params_value.wallet_address == "SolanaVaultExample123", (
-        "Expected Solana wallet address in vault intent"
-    )
+    assert (
+        intent.action == ActionType.ACTION_TYPE_ACCEPT
+    ), f"Expected ActionType.ACTION_TYPE_ACCEPT for compliant RWA, got {intent.action}"
+    assert (
+        params_value.wallet_address == "SolanaVaultExample123"
+    ), "Expected Solana wallet address in vault intent"
     assert params_value.compliance.kyc_passed is True, "Expected KYC to pass"
-    assert params_value.compliance.compliance_status == "APPROVED", (
-        "Expected compliance status APPROVED"
-    )
+    assert (
+        params_value.compliance.compliance_status == "APPROVED"
+    ), "Expected compliance status APPROVED"
 
 
 @pytest.mark.asyncio
@@ -366,12 +365,12 @@ async def test_membrane_blocks_kyc_failure(rwa_membrane):
 
     result = await rwa_membrane.inspect_outbound(bad_intent, context)
 
-    assert result.action == ActionType.ACTION_TYPE_REJECT, (
-        "Membrane should reject KYC failure"
-    )
-    assert "MEMBRANE" in result.reasoning or "KYC" in result.reasoning, (
-        "Membrane should explain the block reason"
-    )
+    assert (
+        result.action == ActionType.ACTION_TYPE_REJECT
+    ), "Membrane should reject KYC failure"
+    assert (
+        "MEMBRANE" in result.reasoning or "KYC" in result.reasoning
+    ), "Membrane should explain the block reason"
 
 
 @pytest.mark.asyncio
@@ -429,9 +428,9 @@ async def test_rwa_kyc_rejected_path(mock_reasoning_skill, skill_registry):
 
     intent = await transformer.think(context)
 
-    assert intent.action == ActionType.ACTION_TYPE_REJECT, (
-        "KYC failure should result in REJECT"
-    )
+    assert (
+        intent.action == ActionType.ACTION_TYPE_REJECT
+    ), "KYC failure should result in REJECT"
 
     params_name, params_value = betterproto.which_one_of(intent, "params")
     assert params_name == "rwa_vault"
@@ -458,9 +457,9 @@ async def test_metabolic_loop_rejects_kyc_failure(
     observation = await metabolic_loop.execute(mock_signal)
 
     meta = observation.metadata.to_dict()
-    assert meta.get("transaction_chain") != "SOLANA" or not observation.success, (
-        "KYC/AML failure should not produce successful Solana transaction"
-    )
+    assert (
+        meta.get("transaction_chain") != "SOLANA" or not observation.success
+    ), "KYC/AML failure should not produce successful Solana transaction"
 
 
 if __name__ == "__main__":

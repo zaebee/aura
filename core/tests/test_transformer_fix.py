@@ -9,7 +9,7 @@ from aura_core_gen.aura.core.v1 import (
     NegotiationOffer,
     Observation,
 )
-from hive.transformer import AuraTransformer
+from aura_hive.hive.transformer import AuraTransformer
 
 
 @pytest.mark.asyncio

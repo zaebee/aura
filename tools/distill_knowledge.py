@@ -49,7 +49,7 @@ def validate_repo_structure() -> None:
     required_markers = [
         "packages/aura-core",
         "proto/aura",
-        "core/src/hive",
+        "core/src/aura_hive/hive",
     ]
     for marker in required_markers:
         matches = list(repo_root.glob(marker))
@@ -119,8 +119,8 @@ def extract_nucleus_services() -> list[ComponentDefinition]:
     """Discover nucleotide implementations and HiveCortex."""
     services = []
 
-    # Find HiveCortex by convention (*/src/hive/cortex.py)
-    cortex_files = find_files_by_pattern("*/src/hive/cortex.py")
+    # Find HiveCortex by convention (*/src/*/hive/cortex.py)
+    cortex_files = find_files_by_pattern("*/src/*/hive/cortex.py")
     for cortex_file in cortex_files:
         services.append(
             ComponentDefinition(
@@ -143,10 +143,10 @@ def extract_nucleus_services() -> list[ComponentDefinition]:
         "membrane",
         "metabolism",
     ]:
-        # Try: */src/hive/{nucleotide}.py OR */src/hive/{nucleotide}/__init__.py
+        # Try: */src/*/hive/{nucleotide}.py OR */src/*/hive/{nucleotide}/__init__.py
         nucleotide_files = find_files_by_pattern(
-            f"*/src/hive/{nucleotide}.py"
-        ) + find_files_by_pattern(f"*/src/hive/{nucleotide}/__init__.py")
+            f"*/src/*/hive/{nucleotide}.py"
+        ) + find_files_by_pattern(f"*/src/*/hive/{nucleotide}/__init__.py")
 
         for nuc_file in nucleotide_files:
             # Extract class name from file
@@ -185,7 +185,7 @@ def extract_organ_proteins() -> list[ComponentDefinition]:
     proteins = []
 
     # Find all manifest.yaml files in proteins directories
-    manifest_files = find_files_by_pattern("*/src/hive/proteins/*/manifest.yaml")
+    manifest_files = find_files_by_pattern("*/src/*/hive/proteins/*/manifest.yaml")
 
     for manifest_path in manifest_files:
         protein_dir = manifest_path.parent
@@ -302,7 +302,7 @@ def extract_citizen_adapters() -> list[ComponentDefinition]:
 def discover_atcgm_services() -> list[Path]:
     """Find all services with hive/ directory structure."""
     # Any directory containing src/hive/ is a potential ATCG-M service
-    hive_dirs = find_files_by_pattern("*/src/hive")
+    hive_dirs = find_files_by_pattern("*/src/*/hive")
     return [d for d in hive_dirs if d.is_dir()]
 
 
@@ -393,7 +393,7 @@ def discover_sacred_chambers() -> list[ChamberDefinition]:
             "Protocol Buffer definitions",
             OntologyLevel.ONTOLOGY_LEVEL_GENOME,
         ),
-        "src/hive/proteins/": (
+        "hive/proteins/": (
             "EnzymaticHelpers",
             "SkillProtocol implementations",
             OntologyLevel.ONTOLOGY_LEVEL_ORGANS,

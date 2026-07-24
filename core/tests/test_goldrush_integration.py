@@ -2,10 +2,9 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 from aura_core_gen.aura.core.v1 import Observation
-from hive.proteins.blockchain_data.skill import GoldRushSkill
-from hive.proteins.transaction.skill import TransactionSkill
-
-from config.crypto import CryptoSettings
+from aura_hive.config.crypto import CryptoSettings
+from aura_hive.hive.proteins.blockchain_data.skill import GoldRushSkill
+from aura_hive.hive.proteins.transaction.skill import TransactionSkill
 
 
 @pytest.mark.asyncio
