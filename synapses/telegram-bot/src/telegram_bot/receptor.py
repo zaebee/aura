@@ -1,3 +1,11 @@
+"""Telegram synapse — Receptor (ATCG-M phase A: Aggregator).
+
+Perceives inbound stimuli: Telegram messages and callbacks enter the synapse
+here and are handed to the Translator. This is the A phase of the synapse
+mini-metabolism  receptor -> translator -> effector = A -> T -> C·G  documented
+in docs/ontology/patterns.yaml.
+"""
+
 from io import BytesIO
 
 import betterproto

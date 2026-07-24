@@ -1,3 +1,10 @@
+"""Telegram synapse — Translator (ATCG-M phase T: Transformer).
+
+Transforms between the synapse's external language (Telegram updates) and the
+Hive's internal Signals/Observations. The T phase of the synapse mini-metabolism
+receptor -> translator -> effector = A -> T -> C·G  (docs/ontology/patterns.yaml).
+"""
+
 import json
 import uuid
 from datetime import UTC, datetime

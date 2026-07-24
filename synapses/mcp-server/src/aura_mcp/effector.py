@@ -1,3 +1,11 @@
+"""MCP synapse — Effector (ATCG-M phase C·G: Connector · Generator).
+
+Acts on Hive decisions and pulses events back out to MCP clients (background
+event propagation / notifications) — the combined C (act) and G (pulse) phases
+of the synapse mini-metabolism  receptor -> translator -> effector = A -> T -> C·G
+(docs/ontology/patterns.yaml).
+"""
+
 from typing import Any
 
 import nats
