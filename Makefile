@@ -33,6 +33,8 @@ lint: $(PROTO_SENTINEL)
 	MYPYPATH=$(DNA_PATH) uv run mypy packages/aura-core/src
 	# Security Audit (Bandit)
 	uv run bandit -r . -c pyproject.toml
+	# Fractal Completeness (ATCG-M baseline-lock gate)
+	uv run python tools/check_fractal_completeness.py
 	# Frontend Lint
 	# cd frontend && bun run lint
 
