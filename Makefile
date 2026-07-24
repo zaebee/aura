@@ -130,7 +130,7 @@ format:
 # --- 6. RUN SERVICES (auto-generates protos if needed) ---
 run-core: $(PROTO_SENTINEL)
 	# Run Core gRPC service
-	PYTHONPATH=$(TOOL_PATH) uv run python -m core.src.main
+	PYTHONPATH=$(TOOL_PATH) uv run python -m aura_hive.main
 
 run-gateway: $(PROTO_SENTINEL)
 	# Run API Gateway

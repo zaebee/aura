@@ -68,4 +68,4 @@ RUN python -c "import grpc_health.v1.health_pb2"
 EXPOSE 50051
 EXPOSE 9091
 
-CMD ["python", "src/main.py"]
+CMD ["python", "-m", "aura_hive.main"]
