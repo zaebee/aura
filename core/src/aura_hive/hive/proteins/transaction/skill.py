@@ -7,6 +7,7 @@ from aura_core_gen.aura.core.v1 import Observation
 from aura_hive.config.crypto import CryptoSettings
 from aura_hive.hive.metabolism import MetabolicSecurityError
 
+from .compliance import enforce_rwa_compliance
 from .engine import EVMProvider, PriceConverter, SecretEncryption
 from .schema import (
     PaymentProof,
@@ -224,38 +225,14 @@ class TransactionSkill(
         """
         C2C9 Membrane Enforcement: Release SPL Token transfer only if KYC/AML is cleared.
         """
-        # 1. Access context metadata for security enforcement
-        context = params.get("_context")
-        if not context:
-            raise MetabolicSecurityError(
-                "Security context missing: HiveContext required"
-            )
-
-        # Extract metadata from Context (google.protobuf.Struct)
-        metadata = (
-            context.metadata.to_dict() if hasattr(context.metadata, "to_dict") else {}
-        )
-        kyc_status = metadata.get("kyc_status")
-        aml_risk = metadata.get("aml_risk")
-
-        # 2. Strict C2C9 Enforcement logic
+        # 1. Membrane guard: enforce KYC/AML compliance before any motor action.
         required_kyc = (
             self.settings.required_kyc_status if self.settings else "APPROVED"
         )
         required_aml = self.settings.required_aml_risk if self.settings else "LOW"
+        enforce_rwa_compliance(params.get("_context"), required_kyc, required_aml)
 
-        if kyc_status != required_kyc or aml_risk != required_aml:
-            logger.error(
-                "c2c9_security_violation",
-                kyc_status=kyc_status,
-                aml_risk=aml_risk,
-                agent_did=metadata.get("agent_did", "unknown"),
-            )
-            raise MetabolicSecurityError(
-                f"C2C9 Membrane Violation: Compliance failure (KYC: {kyc_status}, AML: {aml_risk})"
-            )
-
-        # 3. Execution (Motor Neuron action)
+        # 2. Execution (Motor Neuron action)
         if not self.solana_provider:
             return Observation(success=False, error="solana_provider_not_initialized")
 
