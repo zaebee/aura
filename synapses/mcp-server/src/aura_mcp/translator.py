@@ -1,3 +1,10 @@
+"""MCP synapse — Translator (ATCG-M phase T: Transformer).
+
+Transforms between the synapse's external language (MCP tool calls) and the
+Hive's internal Signals/Observations. The T phase of the synapse mini-metabolism
+receptor -> translator -> effector = A -> T -> C·G  (docs/ontology/patterns.yaml).
+"""
+
 import uuid
 from datetime import UTC, datetime
 from typing import Any, cast

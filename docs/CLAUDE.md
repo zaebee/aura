@@ -95,8 +95,12 @@ The self-model (`distill`) declares **6 hard invariants**. Honor them:
 | **bee-keeper** | `aura_keeper` | Citizen agent — audits the Hive's architecture (partial cell). | `python -m aura_keeper.main` |
 | **aura-worker** | `aura_worker` | Citizen — remote Jupyter/Colab vision worker (Ollama + gradio); frpc tunnel. | (Colab / worker node) |
 
-Synapses use a **`receptor → translator → effector`** shape — this is a lightweight
-mini-metabolism (receptor≈A, translator≈T, effector≈C/G), just not named as ATCG-M.
+Synapses use a **`receptor → translator → effector`** shape — a lightweight
+mini-metabolism with the ATCG-M mapping **receptor = A, translator = T,
+effector = C·G**. This is now stated explicitly in each synapse module's
+docstring and in `docs/ontology/patterns.yaml` (`synapse_pattern`). Applies to
+the NATS/MCP synapses (`telegram-bot`, `mcp-server`); `api-gateway` is an HTTP
+edge with a different shape.
 
 ## Development Commands
 

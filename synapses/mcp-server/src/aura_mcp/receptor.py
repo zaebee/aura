@@ -1,3 +1,11 @@
+"""MCP synapse — Receptor (ATCG-M phase A: Aggregator).
+
+Perceives inbound stimuli: MCP tool calls from clients (e.g. Claude) enter the
+synapse here and trigger Metabolic Loop executions. This is the A phase of the
+synapse mini-metabolism  receptor -> translator -> effector = A -> T -> C·G
+documented in docs/ontology/patterns.yaml.
+"""
+
 from typing import cast
 
 import structlog

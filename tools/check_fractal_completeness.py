@@ -96,6 +96,24 @@ def main(root: Path) -> int:
         mark = "FAIL" if missing else "ok"
         print(f"  [{mark:>4}] {name:<12} {coverage}  {status}")
 
+    # Synapse mini-metabolism: receptor -> translator -> effector (A -> T -> C·G).
+    synapse_spec = spec.get("synapse_pattern")
+    if synapse_spec:
+        stages = list(synapse_spec["stages"])
+        print(
+            "\nSynapse mini-metabolism (receptor->translator->effector = A->T->C·G)\n"
+        )
+        for name, syn in synapse_spec.get("synapses", {}).items():
+            syn_root = root / syn["root"]
+            missing = [s for s in stages if not _module_exists(syn_root, s)]
+            for stage in missing:
+                regressions.append(
+                    f"synapse {name}: stage {stage} missing at {syn['root']}"
+                )
+            mark = "FAIL" if missing else "ok"
+            present_stages = ",".join(s for s in stages if s not in missing)
+            print(f"  [{mark:>4}] {name:<12} {present_stages}")
+
     print()
     for line in improvements:
         print(f"  improved: {line}")

@@ -37,6 +37,29 @@ orchestrator:
   module: metabolism
   role: "MetabolicLoop — sequences the nucleotides"
 
+# Synapses (edge protocol adapters) run a lighter mini-metabolism, not a full
+# cell: receptor -> translator -> effector. Named biologically in code; this
+# section makes the ATCG-M correspondence explicit (review follow-up #3). The
+# module docstrings in each synapse carry the same mapping.
+synapse_pattern:
+  stages:
+    receptor:
+      maps_to: [A]
+      role: "perceive — inbound stimulus enters the synapse"
+    translator:
+      maps_to: [T]
+      role: "think/transform — external language <-> Hive Signals/Observations"
+    effector:
+      maps_to: [C, G]
+      role: "act + pulse — apply decisions and emit events outward"
+  # Synapses implementing the receptor/translator/effector trio. api-gateway is
+  # an HTTP edge with a different shape and is intentionally excluded.
+  synapses:
+    telegram-bot:
+      root: synapses/telegram-bot/src/telegram_bot
+    mcp-server:
+      root: synapses/mcp-server/src/aura_mcp
+
 # Per-service baseline. `present` is the locked floor; a full cell has all five
 # nucleotides A/T/C/G/M. `complete: false` services carry the documented review
 # drift — the checker records the gap but does not block on it.

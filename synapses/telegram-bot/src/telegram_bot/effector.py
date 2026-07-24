@@ -1,3 +1,10 @@
+"""Telegram synapse — Effector (ATCG-M phase C·G: Connector · Generator).
+
+Acts on Hive decisions and pulses events back out to Telegram/NATS — the
+combined C (act) and G (pulse) phases of the synapse mini-metabolism
+receptor -> translator -> effector = A -> T -> C·G  (docs/ontology/patterns.yaml).
+"""
+
 from typing import Any
 
 import betterproto
