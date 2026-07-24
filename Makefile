@@ -64,6 +64,13 @@ test: $(PROTO_SENTINEL)
 		uv sync --package aura-mcp --inexact; \
 		PYTHONPATH=$(MCP_PATH):$(CORE_PATH) uv run --no-sync pytest synapses/mcp-server/tests/ -v; \
 	fi
+	# Run aura-worker tests if they exist. Its runtime deps (gradio) aren't in
+	# the root dev group; add them additively (--inexact). The `ml` group with
+	# torch is NOT synced, so no heavy CUDA stack; --no-sync keeps the install.
+	if [ -d "packages/aura-worker/tests" ]; then \
+		uv sync --package aura-worker --inexact; \
+		PYTHONPATH=packages/aura-worker/src:$(DNA_PATH) uv run --no-sync pytest packages/aura-worker/tests/ -v; \
+	fi
 
 # Run tests with coverage report
 test-cov:
