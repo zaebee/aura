@@ -1,5 +1,5 @@
 import asyncio
-from datetime import UTC, datetime
+from datetime import datetime
 from typing import Any, cast
 
 import redis.asyncio as redis
@@ -12,16 +12,15 @@ from sqlalchemy.orm import Session, sessionmaker
 
 from aura_hive.config.database import DatabaseSettings
 
+from .deals import DealRepository
 from .engine import (
     Base,
-    DealStatus,
     InventoryItem,
-    LockedDeal,
     MetabolicCost,
     RedisCache,
     SanctifiedWallet,
 )
-from .schema import DealSchema, ItemSchema
+from .schema import ItemSchema
 from .tissue import ASSET_ENZYMES
 
 logger = structlog.get_logger(__name__)
@@ -67,6 +66,10 @@ class PersistenceSkill(
         # Asset enzymes: domain-to-enzyme mapping for "tissue specificity"
         # (defined in tissue.py so this persistence enzyme stays domain-agnostic).
         self._ASSET_ENZYMES = ASSET_ENZYMES
+
+        # Deal SQL lives in DealRepository; the _get_session reference is bound
+        # lazily and only invoked at operation time (after bind()).
+        self._deals = DealRepository(self._get_session)
 
     def get_name(self) -> str:
         return "persistence"
@@ -234,26 +237,7 @@ class PersistenceSkill(
 
     async def _create_deal(self, params: dict[str, Any]) -> Observation:
         try:
-
-            def create() -> bool:
-                with self._get_session() as session:
-                    deal = LockedDeal(
-                        id=params["id"],
-                        item_id=params["item_id"],
-                        item_name=params["item_name"],
-                        final_price=params["final_price"],
-                        currency=params["currency"],
-                        payment_memo=params["payment_memo"],
-                        secret_content=params["secret_content"],
-                        status=DealStatus.PENDING,
-                        buyer_did=params.get("buyer_did"),
-                        expires_at=params["expires_at"],
-                    )
-                    session.add(deal)
-                    session.commit()
-                    return True
-
-            await asyncio.to_thread(create)
+            await asyncio.to_thread(self._deals.create, params)
             return Observation(success=True)
         except Exception as e:
             return Observation(success=False, error=str(e))
@@ -262,15 +246,7 @@ class PersistenceSkill(
         deal_id = params.get("deal_id")
         if not deal_id:
             return Observation(success=False, error="deal_id_required")
-
-        def fetch() -> dict[str, Any] | None:
-            with self._get_session() as session:
-                deal = session.query(LockedDeal).filter_by(id=deal_id).first()
-                if deal:
-                    return DealSchema.model_validate(deal).model_dump()
-                return None
-
-        result = await asyncio.to_thread(fetch)
+        result = await asyncio.to_thread(self._deals.get_by_id, deal_id)
         if result:
             return Observation(success=True, metadata=make_struct(result))
         return Observation(success=False, error="deal_not_found")
@@ -279,15 +255,7 @@ class PersistenceSkill(
         memo = params.get("memo")
         if not memo:
             return Observation(success=False, error="memo_required")
-
-        def fetch() -> dict[str, Any] | None:
-            with self._get_session() as session:
-                deal = session.query(LockedDeal).filter_by(payment_memo=memo).first()
-                if deal:
-                    return DealSchema.model_validate(deal).model_dump()
-                return None
-
-        result = await asyncio.to_thread(fetch)
+        result = await asyncio.to_thread(self._deals.get_by_memo, memo)
         if result:
             return Observation(success=True, metadata=make_struct(result))
         return Observation(success=False, error="deal_not_found")
@@ -295,27 +263,12 @@ class PersistenceSkill(
     async def _update_deal_status(self, params: dict[str, Any]) -> Observation:
         deal_id = params.get("deal_id")
         status = params.get("status")
-
+        if not deal_id or not status:
+            return Observation(success=False, error="deal_id_and_status_required")
         try:
-
-            def update() -> bool:
-                with self._get_session() as session:
-                    deal = session.query(LockedDeal).filter_by(id=deal_id).first()
-                    if not deal:
-                        return False
-
-                    deal.status = DealStatus(status)
-                    if status == "PAID":
-                        deal.transaction_hash = params.get("transaction_hash")
-                        deal.block_number = params.get("block_number")
-                        deal.from_address = params.get("from_address")
-                        deal.paid_at = params.get("paid_at", datetime.now(UTC))
-
-                    deal.updated_at = datetime.now(UTC)
-                    session.commit()
-                    return True
-
-            success = await asyncio.to_thread(update)
+            success = await asyncio.to_thread(
+                self._deals.update_status, deal_id, status, params
+            )
             return Observation(success=success)
         except Exception as e:
             return Observation(success=False, error=str(e))
