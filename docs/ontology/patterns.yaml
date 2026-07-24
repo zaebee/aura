@@ -1,0 +1,66 @@
+# Canonical ATCG-M fractal pattern + per-service completeness baseline.
+#
+# tools/check_fractal_completeness.py enforces this file as a CI gate (wired into
+# `make lint`, run by the `quality` job). Semantics are BASELINE-LOCK:
+#   - `present` is the locked floor. If a service loses a nucleotide it currently
+#     has, the checker FAILS (fractal regression).
+#   - The gap between `present` and the full five-nucleotide set is the documented
+#     drift from the 2026-07-24 ATCG-M review — informational, never blocking.
+#   - When a gap is closed (a missing nucleotide appears), the checker prints a
+#     nudge to tighten the baseline here. Drift may only improve.
+#
+# See docs/CLAUDE.md and docs/knowledge/hive_architecture_v2.json (distill self-model).
+
+version: 1
+
+# The five ATCG-M nucleotides every complete cell implements, sequenced by the
+# metabolism loop:  M(in) -> A -> T -> M(out) -> C -> G
+nucleotides:
+  A:
+    module: aggregator
+    role: "perceive — normalize the inbound signal"
+  T:
+    module: transformer
+    role: "think — reasoning / strategy"
+  C:
+    module: connector
+    role: "act — outbound side effects"
+  G:
+    module: generator
+    role: "pulse — emit observations / events"
+  M:
+    module: membrane
+    role: "guard — inbound/outbound boundary, Hidden-Knowledge enforcement"
+
+# metabolism is the orchestrating loop, not a nucleotide; a complete cell has it.
+orchestrator:
+  module: metabolism
+  role: "MetabolicLoop — sequences the nucleotides"
+
+# Per-service baseline. `present` is the locked floor; a full cell has all five
+# nucleotides A/T/C/G/M. `complete: false` services carry the documented review
+# drift — the checker records the gap but does not block on it.
+services:
+  core:
+    hive_root: core/src/aura_hive/hive
+    present: [A, T, C, G, M]
+    orchestrator: true
+    complete: true          # the one full cell
+
+  bee-keeper:
+    hive_root: agents/bee-keeper/src/aura_keeper/hive
+    present: [A, T, C, G]
+    orchestrator: false
+    complete: false         # gap: M (membrane)
+
+  bee-evolver:
+    hive_root: agents/bee-evolver/src/hive
+    present: [A, T, C, G]
+    orchestrator: false
+    complete: false         # gap: M (membrane)
+
+  frontend:
+    hive_root: frontend/src/hive
+    present: [A, T, C, M]
+    orchestrator: false
+    complete: false         # gap: G (generator)
