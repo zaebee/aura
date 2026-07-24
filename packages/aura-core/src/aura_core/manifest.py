@@ -41,7 +41,10 @@ def _load_manifest() -> dict[str, Any]:
     manifest_path = root / "hive-manifest.yaml"
 
     if not manifest_path.exists():
-        logger.warning("hive-manifest.yaml not found at %s, using defaults", root)
+        # Optional config: absence is normal (e.g. standalone container runs
+        # without the k8s configmap mount). Genuine problems — a manifest that
+        # exists but is empty/malformed — still warn below.
+        logger.debug("hive-manifest.yaml not found at %s, using defaults", root)
         return _DEFAULT_MANIFEST
 
     try:
