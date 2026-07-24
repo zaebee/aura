@@ -18,9 +18,9 @@ from .engine import (
     InventoryItem,
     MetabolicCost,
     RedisCache,
-    SanctifiedWallet,
 )
 from .items import ItemRepository
+from .wallet import WalletRepository
 
 logger = structlog.get_logger(__name__)
 
@@ -66,6 +66,7 @@ class PersistenceSkill(
         # is bound lazily and only invoked at operation time (after bind()).
         self._deals = DealRepository(self._get_session)
         self._items = ItemRepository(self._get_session)
+        self._wallets = WalletRepository(self._get_session)
 
     def get_name(self) -> str:
         return "persistence"
@@ -277,39 +278,14 @@ class PersistenceSkill(
         if not wallet_address:
             return Observation(success=False, error="wallet_address_required")
         asset_domain = params.get("asset_domain", "")
-
-        def upsert() -> None:
-            with self._get_session() as session:
-                existing = (
-                    session.query(SanctifiedWallet)
-                    .filter_by(wallet_address=wallet_address)
-                    .first()
-                )
-                if not existing:
-                    session.add(
-                        SanctifiedWallet(
-                            wallet_address=wallet_address,
-                            asset_domain=asset_domain,
-                        )
-                    )
-                session.commit()
-
-        await asyncio.to_thread(upsert)
+        await asyncio.to_thread(self._wallets.sanctify, wallet_address, asset_domain)
         return Observation(success=True)
 
     async def _is_wallet_sanctified(self, params: dict[str, Any]) -> Observation:
         wallet_address = params.get("wallet_address")
-
-        def check() -> bool:
-            with self._get_session() as session:
-                return (
-                    session.query(SanctifiedWallet)
-                    .filter_by(wallet_address=wallet_address)
-                    .first()
-                    is not None
-                )
-
-        sanctified = await asyncio.to_thread(check)
+        sanctified = await asyncio.to_thread(
+            self._wallets.is_sanctified, wallet_address
+        )
         return Observation(
             success=True,
             metadata=make_struct({"sanctified": sanctified}),
