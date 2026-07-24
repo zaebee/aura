@@ -20,8 +20,7 @@ from .engine import (
     RedisCache,
     SanctifiedWallet,
 )
-from .schema import ItemSchema
-from .tissue import ASSET_ENZYMES
+from .items import ItemRepository
 
 logger = structlog.get_logger(__name__)
 
@@ -63,13 +62,10 @@ class PersistenceSkill(
             "log_metabolic_cost": self._log_metabolic_cost,
         }
 
-        # Asset enzymes: domain-to-enzyme mapping for "tissue specificity"
-        # (defined in tissue.py so this persistence enzyme stays domain-agnostic).
-        self._ASSET_ENZYMES = ASSET_ENZYMES
-
-        # Deal SQL lives in DealRepository; the _get_session reference is bound
-        # lazily and only invoked at operation time (after bind()).
+        # Entity SQL lives in dedicated repositories; the _get_session reference
+        # is bound lazily and only invoked at operation time (after bind()).
         self._deals = DealRepository(self._get_session)
+        self._items = ItemRepository(self._get_session)
 
     def get_name(self) -> str:
         return "persistence"
@@ -157,28 +153,13 @@ class PersistenceSkill(
         item_id = params.get("item_id")
         if not item_id:
             return Observation(success=False, error="item_id_required")
-
-        def fetch() -> dict[str, Any] | None:
-            with self._get_session() as session:
-                item = session.query(InventoryItem).filter_by(id=item_id).first()
-                if item:
-                    return ItemSchema.model_validate(item).model_dump()
-                return None
-
-        result = await asyncio.to_thread(fetch)
+        result = await asyncio.to_thread(self._items.get_by_id, item_id)
         if result:
             return Observation(success=True, metadata=make_struct(result))
         return Observation(success=False, error="item_not_found")
 
     async def _get_first_item(self, params: dict[str, Any]) -> Observation:
-        def fetch() -> dict[str, Any] | None:
-            with self._get_session() as session:
-                item = session.query(InventoryItem).first()
-                if item:
-                    return ItemSchema.model_validate(item).model_dump()
-                return None
-
-        result = await asyncio.to_thread(fetch)
+        result = await asyncio.to_thread(self._items.get_first)
         if result:
             return Observation(success=True, metadata=make_struct(result))
         return Observation(success=False, error="no_items_found")
@@ -274,79 +255,19 @@ class PersistenceSkill(
             return Observation(success=False, error=str(e))
 
     async def _upsert_item(self, params: dict[str, Any]) -> Observation:
-        """
-        Upsert an item using a native Asset object.
-        Transitioning from primitive if/else to enzymatic cascades.
-        """
+        """Upsert an item from a native Asset (falls back to legacy dict upsert)."""
         asset = params.get("asset")
         if not asset or not isinstance(asset, Asset):
-            # Backward compatibility for legacy dictionary-based upsert
             return await self._legacy_upsert_item(params)
-
         try:
-
-            def upsert() -> bool:
-                with self._get_session() as session:
-                    item = (
-                        session.query(InventoryItem)
-                        .filter_by(id=asset.identifier)
-                        .first()
-                    )
-                    if not item:
-                        item = InventoryItem(id=asset.identifier)
-                        session.add(item)
-
-                    item.name = asset.name
-                    if asset.rental_terms:
-                        item.base_price = float(asset.rental_terms.base_price)
-                        # Assume floor price is 80% if not specified elsewhere
-                        item.floor_price = float(asset.rental_terms.base_price) * 0.8
-
-                    # Store common attributes in meta
-                    item.meta["description"] = asset.description
-                    item.meta["domain"] = asset.domain.name
-
-                    # Enzymatic Cascade: Apply domain-specific attributes
-                    domain_val = int(asset.domain)
-                    if domain_val in self._ASSET_ENZYMES:
-                        enzyme = self._ASSET_ENZYMES[domain_val]
-                        enzyme(asset, item)
-
-                    session.commit()
-                    return True
-
-            await asyncio.to_thread(upsert)
+            await asyncio.to_thread(self._items.upsert_asset, asset)
             return Observation(success=True)
         except Exception as e:
             return Observation(success=False, error=str(e))
 
     async def _legacy_upsert_item(self, params: dict[str, Any]) -> Observation:
-        item_id = params.get("id")
         try:
-
-            def upsert() -> bool:
-                with self._get_session() as session:
-                    item = session.query(InventoryItem).filter_by(id=item_id).first()
-                    if item:
-                        item.name = params.get("name", item.name)
-                        item.base_price = params.get("base_price", item.base_price)
-                        item.floor_price = params.get("floor_price", item.floor_price)
-                        item.meta = params.get("meta", item.meta)
-                        item.embedding = params.get("embedding", item.embedding)
-                    else:
-                        item = InventoryItem(
-                            id=item_id,
-                            name=params["name"],
-                            base_price=params["base_price"],
-                            floor_price=params["floor_price"],
-                            meta=params.get("meta", {}),
-                            embedding=params.get("embedding"),
-                        )
-                        session.add(item)
-                    session.commit()
-                    return True
-
-            await asyncio.to_thread(upsert)
+            await asyncio.to_thread(self._items.upsert_legacy, params)
             return Observation(success=True)
         except Exception as e:
             return Observation(success=False, error=str(e))
@@ -415,37 +336,10 @@ class PersistenceSkill(
             return Observation(success=False, error=str(e))
 
     async def _vector_search(self, params: dict[str, Any]) -> Observation:
-        query_vector = params.get("query_vector")
-        limit = params.get("limit", 5)
-        min_similarity = params.get("min_similarity")
-
-        def search() -> list[dict[str, Any]]:
-            with self._get_session() as session:
-                results = (
-                    session.query(
-                        InventoryItem,
-                        InventoryItem.embedding.cosine_distance(query_vector).label(
-                            "distance"
-                        ),
-                    )
-                    .order_by(InventoryItem.embedding.cosine_distance(query_vector))
-                    .limit(limit)
-                    .all()
-                )
-
-                response_items = []
-                for item, distance in results:
-                    similarity = 1 - distance
-                    if min_similarity and similarity < min_similarity:
-                        continue
-
-                    response_items.append(
-                        ItemSchema.model_validate(item).model_dump()
-                        | {"similarity_score": similarity}
-                    )
-                return response_items
-
-        results = await asyncio.to_thread(search)
-        # Struct.from_dict expects a dict with standard JSON types.
-        # results is a list of dicts, which should be fine.
+        results = await asyncio.to_thread(
+            self._items.search_by_vector,
+            params.get("query_vector"),
+            params.get("limit", 5),
+            params.get("min_similarity"),
+        )
         return Observation(success=True, metadata=make_struct({"results": results}))
