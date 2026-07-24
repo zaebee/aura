@@ -1,12 +1,11 @@
 import asyncio
-from collections.abc import Callable
 from datetime import UTC, datetime
 from typing import Any, cast
 
 import redis.asyncio as redis
 import structlog
 from aura_core import SkillProtocol, make_struct
-from aura_core_gen.aura.assets.v1 import Asset, AssetDomain
+from aura_core_gen.aura.assets.v1 import Asset
 from aura_core_gen.aura.core.v1 import Observation
 from sqlalchemy import Engine, text
 from sqlalchemy.orm import Session, sessionmaker
@@ -23,6 +22,7 @@ from .engine import (
     SanctifiedWallet,
 )
 from .schema import DealSchema, ItemSchema
+from .tissue import ASSET_ENZYMES
 
 logger = structlog.get_logger(__name__)
 
@@ -64,13 +64,9 @@ class PersistenceSkill(
             "log_metabolic_cost": self._log_metabolic_cost,
         }
 
-        # Asset Enzymes: Domain-to-method mapping for "Tissue Specificity"
-        self._ASSET_ENZYMES: dict[int, Callable[[Asset, InventoryItem], None]] = {
-            int(AssetDomain.ASSET_DOMAIN_VEHICLE): self._store_vehicle_attributes,
-            int(AssetDomain.ASSET_DOMAIN_PROPERTY): self._store_property_attributes,
-            int(AssetDomain.ASSET_DOMAIN_EQUIPMENT): self._store_equipment_attributes,
-            int(AssetDomain.ASSET_DOMAIN_WORKSPACE): self._store_workspace_attributes,
-        }
+        # Asset enzymes: domain-to-enzyme mapping for "tissue specificity"
+        # (defined in tissue.py so this persistence enzyme stays domain-agnostic).
+        self._ASSET_ENZYMES = ASSET_ENZYMES
 
     def get_name(self) -> str:
         return "persistence"
@@ -370,40 +366,6 @@ class PersistenceSkill(
             return Observation(success=True)
         except Exception as e:
             return Observation(success=False, error=str(e))
-
-    def _store_vehicle_attributes(self, asset: Asset, item: InventoryItem) -> None:
-        """Enzyme: Specialized storage for Vehicle tissue."""
-        # Use hasattr for oneof fields or check field directly if supported by betterproto
-        if not asset.vehicle:
-            return
-
-        vehicle_data = {
-            "brand": str(getattr(asset.vehicle, "brand", "")),
-            "model": str(getattr(asset.vehicle, "model", "")),
-            "year": int(getattr(asset.vehicle, "year", 0)),
-            "vin": str(getattr(asset.vehicle, "vin", "")),
-            "color": str(getattr(asset.vehicle, "color", "")),
-            "license_plate": str(getattr(asset.vehicle, "license_plate", "")),
-        }
-        item.meta["vehicle_details"] = vehicle_data
-
-    def _store_property_attributes(self, asset: Asset, item: InventoryItem) -> None:
-        """Enzyme: Specialized storage for Property tissue."""
-        if not asset.property:
-            return
-        item.meta["property_details"] = asset.property.to_dict()
-
-    def _store_equipment_attributes(self, asset: Asset, item: InventoryItem) -> None:
-        """Enzyme: Specialized storage for Equipment tissue."""
-        if not asset.equipment:
-            return
-        item.meta["equipment_details"] = asset.equipment.to_dict()
-
-    def _store_workspace_attributes(self, asset: Asset, item: InventoryItem) -> None:
-        """Enzyme: Specialized storage for Workspace tissue."""
-        if not asset.workspace:
-            return
-        item.meta["workspace_details"] = asset.workspace.to_dict()
 
     async def _legacy_upsert_item(self, params: dict[str, Any]) -> Observation:
         item_id = params.get("id")
