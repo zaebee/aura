@@ -11,7 +11,7 @@ from aura_core_gen.aura.core.v1 import Observation
 from sqlalchemy import Engine, text
 from sqlalchemy.orm import Session, sessionmaker
 
-from config.database import DatabaseSettings
+from aura_hive.config.database import DatabaseSettings
 
 from .engine import (
     Base,

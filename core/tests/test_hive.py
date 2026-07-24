@@ -16,8 +16,8 @@ from aura_core_gen.aura.core.v1 import (
     Observation,
     Signal,
 )
-from hive.aggregator import HiveAggregator
-from hive.membrane import HiveMembrane
+from aura_hive.hive.aggregator import HiveAggregator
+from aura_hive.hive.membrane import HiveMembrane
 
 
 @pytest.mark.asyncio

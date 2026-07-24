@@ -6,9 +6,8 @@ Phase B: Immune System Hardening.
 from unittest.mock import MagicMock
 
 import pytest
-from hive.proteins.persistence.skill import PersistenceSkill
-
-from config.database import DatabaseSettings
+from aura_hive.config.database import DatabaseSettings
+from aura_hive.hive.proteins.persistence.skill import PersistenceSkill
 
 
 def _make_skill_with_session(session_mock: MagicMock) -> PersistenceSkill:
@@ -47,7 +46,7 @@ async def test_sanctify_wallet_creates_record():
 @pytest.mark.asyncio
 async def test_is_wallet_sanctified_true():
     """Returns sanctified=True for a wallet that has been sanctified."""
-    from hive.proteins.persistence.engine import SanctifiedWallet
+    from aura_hive.hive.proteins.persistence.engine import SanctifiedWallet
 
     existing_wallet = MagicMock(spec=SanctifiedWallet)
 

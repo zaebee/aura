@@ -12,7 +12,7 @@ from aura_core_gen.aura.core.v1 import (
     TradeIntent,
 )
 
-from config import get_settings
+from aura_hive.config import get_settings
 
 logger = structlog.get_logger(__name__)
 

@@ -1,15 +1,14 @@
 from unittest.mock import MagicMock
 
 import pytest
-from eth_account import Account
-from hive.proteins.transaction.engine import (
+from aura_hive.config.crypto import CryptoSettings
+from aura_hive.hive.proteins.transaction.engine import (
     EVMProvider,
     PriceConverter,
     SecretEncryption,
 )
-from hive.proteins.transaction.skill import TransactionSkill
-
-from config.crypto import CryptoSettings
+from aura_hive.hive.proteins.transaction.skill import TransactionSkill
+from eth_account import Account
 
 
 @pytest.mark.asyncio

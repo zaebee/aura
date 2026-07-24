@@ -5,12 +5,13 @@ from typing import Any, cast
 import dspy
 import structlog
 from aura_core import resolve_brain_path
-from hive.transformer.signatures import (
+from langchain_mistralai import MistralAIEmbeddings
+
+from aura_hive.hive.transformer.signatures import (
     AppraiseAndVerifyRWA,
     GenerateTradeIntent,
     GenerateTradeRisk,
 )
-from langchain_mistralai import MistralAIEmbeddings
 
 logger = structlog.get_logger(__name__)
 

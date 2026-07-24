@@ -2,9 +2,9 @@ import asyncio
 import os
 
 import structlog
-from config import Settings as CoreSettings
+from aura_hive.config import Settings as CoreSettings
+from aura_hive.hive.cortex import HiveCell
 from fastmcp import FastMCP  # type: ignore
-from hive.cortex import HiveCell
 
 from .effector import MCPEffector
 from .receptor import MCPReceptor

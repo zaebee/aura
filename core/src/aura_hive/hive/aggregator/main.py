@@ -112,11 +112,21 @@ class HiveAggregator(Aggregator[Any, Context]):
         # UHM Coherence Check
         try:
             coherence_obs = await self.registry.execute(
-                "coherence", "get_vitals", {"signal_strength": getattr(self.settings, "default_signal_strength", 1.0) if self.settings else 1.0}
+                "coherence",
+                "get_vitals",
+                {
+                    "signal_strength": getattr(
+                        self.settings, "default_signal_strength", 1.0
+                    )
+                    if self.settings
+                    else 1.0
+                },
             )
             if coherence_obs.success:
                 coh_vitals = _get_metadata_dict(coherence_obs).get("vitals", {})
-                self._update_metadata(context, {"coherence_purity": str(coh_vitals.get("purity", 0))})
+                self._update_metadata(
+                    context, {"coherence_purity": str(coh_vitals.get("purity", 0))}
+                )
         except Exception as e:
             logger.error("coherence_check_failed", error=str(e))
 

@@ -4,7 +4,7 @@ import structlog
 from aura_core import SkillProtocol, make_struct
 from aura_core_gen.aura.core.v1 import Observation
 
-from config.perception import PerceptionSettings
+from aura_hive.config.perception import PerceptionSettings
 
 from .engine import PerceptionEngine
 from .schema import PerceiveImageParams, PerceiveImageResult

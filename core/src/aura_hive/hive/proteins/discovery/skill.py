@@ -6,7 +6,7 @@ from aura_core import SkillProtocol, get_raw_key, make_struct
 from aura_core_gen.aura.core.v1 import DiscoveryObservation, Observation, XenoEntity
 from github import Github
 
-from config.discovery import DiscoverySettings
+from aura_hive.config.discovery import DiscoverySettings
 
 from .engine import (
     analyze_compatibility,

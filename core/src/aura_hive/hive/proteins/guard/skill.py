@@ -4,7 +4,7 @@ from typing import Any
 from aura_core import SkillProtocol, SkillRegistry, make_struct
 from aura_core_gen.aura.core.v1 import Observation
 
-from config.policy import SafetySettings
+from aura_hive.config.policy import SafetySettings
 
 from .engine import OutputGuard, SafetyViolation
 from .schema import SafePriceParams, ValidationParams, VisionValidationParams
@@ -101,9 +101,9 @@ class GuardSkill(
 
     async def _validate_transaction(self, params: dict[str, Any]) -> Observation:
         assert self.provider is not None
-        assert self._registry is not None, (
-            "registry not injected — call inject_registry() first"
-        )
+        assert (
+            self._registry is not None
+        ), "registry not injected — call inject_registry() first"
         wallet_address = params.get("wallet_address", "")
         sanct_obs = await self._registry.execute(
             "persistence", "is_wallet_sanctified", {"wallet_address": wallet_address}
@@ -123,9 +123,9 @@ class GuardSkill(
 
     async def _validate_x402_payment(self, params: dict[str, Any]) -> Observation:
         assert self.provider is not None
-        assert self._registry is not None, (
-            "registry not injected — call inject_registry() first"
-        )
+        assert (
+            self._registry is not None
+        ), "registry not injected — call inject_registry() first"
         wallet_address = params.get("wallet_address", "")
         amount = float(params.get("amount", 0.0))
         sanct_obs = await self._registry.execute(

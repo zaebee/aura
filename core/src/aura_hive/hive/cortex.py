@@ -4,44 +4,45 @@ import dspy
 import redis.asyncio as redis
 import structlog
 from aura_core import SkillProtocol, SkillRegistry, get_raw_key
-from hive.aggregator import HiveAggregator
-from hive.connector import HiveConnector
-from hive.generator import HiveGenerator
-from hive.membrane import HiveMembrane
-from hive.metabolism import MetabolicLoop
-from hive.metabolism.security import AuditSigner
-from hive.proteins.blockchain_data.skill import GoldRushSkill
-from hive.proteins.coherence import CoherenceSkill
-from hive.proteins.discovery import DiscoverySkill
-from hive.proteins.guard import GuardSkill
-from hive.proteins.guard.engine import OutputGuard
-from hive.proteins.kinetic.engine import KineticEngine
-from hive.proteins.kinetic.skill import KineticSkill
-from hive.proteins.perception import PerceptionSkill
-from hive.proteins.perception.engine import PerceptionEngine
-from hive.proteins.persistence import PersistenceSkill
-from hive.proteins.pulse import PulseSkill
-from hive.proteins.pulse.engine import NatsProvider
-from hive.proteins.reasoning import ReasoningSkill
-from hive.proteins.reasoning.engine import get_embedding_model
-from hive.proteins.telemetry import TelemetrySkill
-from hive.proteins.telemetry.engine import init_telemetry
-from hive.proteins.transaction import TransactionSkill
-from hive.proteins.transaction.engine import (
-    EVMProvider,
-    PriceConverter,
-    SecretEncryption,
-)
-from hive.proteins.transaction.solana_engine import SolanaProvider
-from hive.transformer import AuraTransformer
 from opentelemetry.instrumentation.grpc import GrpcInstrumentorServer
 from opentelemetry.instrumentation.langchain import LangchainInstrumentor
 from prometheus_client import start_http_server
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
+from aura_hive.hive.aggregator import HiveAggregator
+from aura_hive.hive.connector import HiveConnector
+from aura_hive.hive.generator import HiveGenerator
+from aura_hive.hive.membrane import HiveMembrane
+from aura_hive.hive.metabolism import MetabolicLoop
+from aura_hive.hive.metabolism.security import AuditSigner
+from aura_hive.hive.proteins.blockchain_data.skill import GoldRushSkill
+from aura_hive.hive.proteins.coherence import CoherenceSkill
+from aura_hive.hive.proteins.discovery import DiscoverySkill
+from aura_hive.hive.proteins.guard import GuardSkill
+from aura_hive.hive.proteins.guard.engine import OutputGuard
+from aura_hive.hive.proteins.kinetic.engine import KineticEngine
+from aura_hive.hive.proteins.kinetic.skill import KineticSkill
+from aura_hive.hive.proteins.perception import PerceptionSkill
+from aura_hive.hive.proteins.perception.engine import PerceptionEngine
+from aura_hive.hive.proteins.persistence import PersistenceSkill
+from aura_hive.hive.proteins.pulse import PulseSkill
+from aura_hive.hive.proteins.pulse.engine import NatsProvider
+from aura_hive.hive.proteins.reasoning import ReasoningSkill
+from aura_hive.hive.proteins.reasoning.engine import get_embedding_model
+from aura_hive.hive.proteins.telemetry import TelemetrySkill
+from aura_hive.hive.proteins.telemetry.engine import init_telemetry
+from aura_hive.hive.proteins.transaction import TransactionSkill
+from aura_hive.hive.proteins.transaction.engine import (
+    EVMProvider,
+    PriceConverter,
+    SecretEncryption,
+)
+from aura_hive.hive.proteins.transaction.solana_engine import SolanaProvider
+from aura_hive.hive.transformer import AuraTransformer
+
 if TYPE_CHECKING:
-    from hive.metabolism import MetabolicLoop
+    from aura_hive.hive.metabolism import MetabolicLoop
 
 logger = structlog.get_logger("hive.cortex")
 
@@ -78,7 +79,7 @@ class HiveCell:
         # Market Service (Higher-order organ)
         market_service = None
         if self.settings.crypto.enabled:
-            from hive.services.market import MarketService
+            from aura_hive.hive.services.market import MarketService
 
             persistence = cast(SkillProtocol, self.registry.get("persistence"))
             transaction = cast(SkillProtocol, self.registry.get("transaction"))

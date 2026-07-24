@@ -2,7 +2,7 @@ import os
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
-from hive.proteins.kinetic.engine import KineticEngine
+from aura_hive.hive.proteins.kinetic.engine import KineticEngine
 
 
 def test_kinetic_engine_identity_mapping():

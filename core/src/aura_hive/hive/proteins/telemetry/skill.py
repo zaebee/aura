@@ -4,7 +4,7 @@ from typing import Any
 from aura_core import SkillProtocol, make_struct
 from aura_core_gen.aura.core.v1 import Observation
 
-from config.server import ServerSettings
+from aura_hive.config.server import ServerSettings
 
 from .engine import (
     MetricsCache,

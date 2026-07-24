@@ -13,8 +13,8 @@ from aura_core_gen.aura.core.v1 import (
     NegotiationSignal,
     Signal,
 )
-from hive.membrane import HiveMembrane
-from hive.proteins.guard import GuardSkill
+from aura_hive.hive.membrane import HiveMembrane
+from aura_hive.hive.proteins.guard import GuardSkill
 
 
 @pytest.mark.asyncio
@@ -22,9 +22,8 @@ async def test_membrane_rule1_floor_price_override():
     """
     Rule 1: If price < floor_price, override to counter-offer at floor_price + 5%.
     """
-    from hive.proteins.guard.engine import OutputGuard
-
-    from config.policy import SafetySettings
+    from aura_hive.config.policy import SafetySettings
+    from aura_hive.hive.proteins.guard.engine import OutputGuard
 
     registry = SkillRegistry()
     guard = GuardSkill()
@@ -62,9 +61,8 @@ async def test_membrane_rule2_data_leak_prevention():
     """
     Rule 2: Block any response containing "floor_price" in the human message.
     """
-    from hive.proteins.guard.engine import OutputGuard
-
-    from config.policy import SafetySettings
+    from aura_hive.config.policy import SafetySettings
+    from aura_hive.hive.proteins.guard.engine import OutputGuard
 
     registry = SkillRegistry()
     guard = GuardSkill()
@@ -104,9 +102,8 @@ async def test_membrane_combined_violations():
     """
     Test both Rule 1 and Rule 2 triggered at once.
     """
-    from hive.proteins.guard.engine import OutputGuard
-
-    from config.policy import SafetySettings
+    from aura_hive.config.policy import SafetySettings
+    from aura_hive.hive.proteins.guard.engine import OutputGuard
 
     registry = SkillRegistry()
     guard = GuardSkill()

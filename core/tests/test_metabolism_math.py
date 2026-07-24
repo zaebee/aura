@@ -1,4 +1,4 @@
-from src.hive.metabolism.math import HillDampener
+from aura_hive.hive.metabolism.math import HillDampener
 
 
 def test_hill_cap_bid_equals_base_price() -> None:

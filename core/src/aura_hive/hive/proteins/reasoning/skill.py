@@ -6,7 +6,7 @@ import dspy
 from aura_core import SkillProtocol, make_struct
 from aura_core_gen.aura.core.v1 import Observation
 
-from config.llm import LLMSettings
+from aura_hive.config.llm import LLMSettings
 
 from .engine import (
     AuraRWANegotiator,

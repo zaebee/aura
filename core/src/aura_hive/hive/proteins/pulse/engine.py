@@ -24,7 +24,8 @@ from aura_core_gen.aura.core.v1 import (
     TraceContext,
     VitalsEvent,
 )
-from hive.metabolism.security import AuditSigner
+
+from aura_hive.hive.metabolism.security import AuditSigner
 
 logger = logging.getLogger(__name__)
 

@@ -17,18 +17,18 @@ from aura_core_gen.aura.negotiation.v1 import (
 )
 from grpclib.health.service import Health
 from grpclib.server import Server
-from hive.cortex import HiveCell
-from hive.metabolism import MetabolicLoop
-from hive.metabolism.logging_config import (
+from opentelemetry import trace
+
+from aura_hive.config import settings
+from aura_hive.hive.cortex import HiveCell
+from aura_hive.hive.metabolism import MetabolicLoop
+from aura_hive.hive.metabolism.logging_config import (
     bind_request_id,
     clear_request_context,
     configure_logging,
     get_logger,
 )
-from nats_gateway import NatsSignalGateway
-from opentelemetry import trace
-
-from config import settings
+from aura_hive.nats_gateway import NatsSignalGateway
 
 tracer = trace.get_tracer(__name__)
 

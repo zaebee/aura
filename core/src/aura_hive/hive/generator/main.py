@@ -6,7 +6,7 @@ import structlog
 from aura_core import Generator, SkillRegistry
 from aura_core_gen.aura.core.v1 import Observation
 
-from config import get_settings
+from aura_hive.config import get_settings
 
 logger = structlog.get_logger(__name__)
 

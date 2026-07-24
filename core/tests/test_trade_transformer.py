@@ -14,10 +14,10 @@ from aura_core_gen.aura.core.v1 import (
     TradeIntent,
     ValidationScore,
 )
-from hive.membrane import HiveMembrane
-from hive.proteins.reasoning.engine import AuraTradeNegotiator
-from hive.transformer import AuraTransformer
-from hive.transformer.signatures import GenerateTradeIntent, GenerateTradeRisk
+from aura_hive.hive.membrane import HiveMembrane
+from aura_hive.hive.proteins.reasoning.engine import AuraTradeNegotiator
+from aura_hive.hive.transformer import AuraTransformer
+from aura_hive.hive.transformer.signatures import GenerateTradeIntent, GenerateTradeRisk
 
 # ---------------------------------------------------------------------------
 # 1. Signature field contract

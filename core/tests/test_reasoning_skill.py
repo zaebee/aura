@@ -1,13 +1,12 @@
 import pytest
-from hive.proteins.reasoning.skill import ReasoningSkill
-
-from config.llm import LLMSettings
+from aura_hive.config.llm import LLMSettings
+from aura_hive.hive.proteins.reasoning.skill import ReasoningSkill
 
 
 @pytest.mark.asyncio
 async def test_reasoning_skill_initialize_rule_mode(mocker):
     skill = ReasoningSkill()
-    mocker.patch("hive.proteins.reasoning.skill.load_brain")
+    mocker.patch("aura_hive.hive.proteins.reasoning.skill.load_brain")
     settings = LLMSettings(model="rule")
     skill.bind(settings, {"lm": None, "embedder": None})
     success = await skill.initialize()

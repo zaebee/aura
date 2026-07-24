@@ -8,7 +8,7 @@ from aura_core_gen.aura.core.v1 import (
     HiveContextData,
     NegotiationOffer,
 )
-from hive.transformer.main import RuleBasedStrategy
+from aura_hive.hive.transformer.main import RuleBasedStrategy
 
 
 class TestRuleBasedStrategy:

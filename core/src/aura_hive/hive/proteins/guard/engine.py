@@ -1,7 +1,8 @@
 from typing import Any
 
 import structlog
-from hive.metabolism.math import HillDampener
+
+from aura_hive.hive.metabolism.math import HillDampener
 
 logger = structlog.get_logger(__name__)
 

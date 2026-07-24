@@ -3,9 +3,9 @@ from typing import Any
 import structlog
 from aura_core import SkillProtocol, make_struct
 from aura_core_gen.aura.core.v1 import Observation
-from hive.metabolism import MetabolicSecurityError
 
-from config.crypto import CryptoSettings
+from aura_hive.config.crypto import CryptoSettings
+from aura_hive.hive.metabolism import MetabolicSecurityError
 
 from .engine import EVMProvider, PriceConverter, SecretEncryption
 from .schema import (

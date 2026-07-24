@@ -2,9 +2,8 @@ from unittest.mock import AsyncMock, patch
 
 import httpx
 import pytest
-from hive.proteins.telemetry.skill import TelemetrySkill
-
-from config.server import ServerSettings
+from aura_hive.config.server import ServerSettings
+from aura_hive.hive.proteins.telemetry.skill import TelemetrySkill
 
 
 @pytest.mark.asyncio
@@ -36,7 +35,7 @@ async def test_telemetry_skill_increment_counter():
 
 
 @pytest.mark.asyncio
-@patch("hive.proteins.telemetry.engine.httpx.AsyncClient")
+@patch("aura_hive.hive.proteins.telemetry.engine.httpx.AsyncClient")
 async def test_telemetry_skill_query_loki(mock_client_class):
     mock_client = AsyncMock()
     mock_response = httpx.Response(
@@ -63,7 +62,7 @@ async def test_telemetry_skill_query_loki(mock_client_class):
 
 
 @pytest.mark.asyncio
-@patch("hive.proteins.telemetry.engine.httpx.AsyncClient")
+@patch("aura_hive.hive.proteins.telemetry.engine.httpx.AsyncClient")
 async def test_telemetry_skill_health_check_k8s(mock_client_class):
     mock_client = AsyncMock()
     mock_response = httpx.Response(
