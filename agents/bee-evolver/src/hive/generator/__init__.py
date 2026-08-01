@@ -106,7 +106,20 @@ class EvolverGenerator:
                         f"Patch for '{imp.title}' failed dry-run: "
                         f"{result.stderr.strip()[:200]}"
                     )
-                    logger.warning("patch_dry_run_failed", title=imp.title)
+                    # git's stderr says exactly WHY the patch will not apply. It
+                    # used to reach only the returned message, which the
+                    # Connector reports — and dry-run short-circuits the
+                    # Connector, so during baseline collection the reason was
+                    # unobservable. The diff header goes with it: a wrong target
+                    # path fails identically to a malformed hunk, and the two
+                    # need different fixes.
+                    logger.warning(
+                        "patch_dry_run_failed",
+                        title=imp.title,
+                        target_file=imp.target_file,
+                        error=result.stderr.strip()[:300],
+                        patch_header=" | ".join(imp.patch.splitlines()[:4]),
+                    )
                     return msg
 
                 subprocess.run(  # nosec
