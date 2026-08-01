@@ -64,7 +64,7 @@ jobs:
           AURA_BEE_EVOLVER__MAX_TOKENS: "2000"
           MISTRAL_API_KEY: ${{ secrets.MISTRAL_API_KEY }}
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
-          AURA_METABOLISM_LOG: ".hive/metabolism.jsonl"
+          AURA_METABOLISM_LOG: "${{ github.workspace }}/.hive/metabolism.jsonl"
           GITHUB_SHA: ${{ github.sha }}
           # Empty on scheduled runs, so the fallback keeps the default off.
           EVOLVER_DRY_RUN: ${{ inputs.dry_run || false }}
