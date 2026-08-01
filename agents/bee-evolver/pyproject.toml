@@ -26,3 +26,14 @@ target-version = "py312"
 python_version = "3.12"
 strict = true
 ignore_missing_imports = true
+
+[dependency-groups]
+dev = [
+    "pytest>=8.0.0",
+    "pytest-asyncio>=0.24.0",
+]
+
+[tool.pytest.ini_options]
+pythonpath = ["src"]
+testpaths = ["tests"]
+asyncio_mode = "auto"

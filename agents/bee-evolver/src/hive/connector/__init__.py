@@ -1,3 +1,4 @@
+from pathlib import Path
 from typing import Any
 
 import httpx
@@ -5,6 +6,7 @@ import structlog
 
 from config import EvolverSettings
 from ..models import EvolutionPlan, EvolverObservation, Improvement
+from ..records import MetabolicRecord
 
 logger = structlog.get_logger(__name__)
 
@@ -17,6 +19,17 @@ class EvolverConnector:
 
     def __init__(self, settings: EvolverSettings) -> None:
         self.settings = settings
+
+    def write_metabolic_record(self, record: MetabolicRecord) -> None:
+        """Append one metabolic record. Never raises — an instrument that
+        crashes the organism is worse than no instrument."""
+        path = Path(self.settings.metabolism_log)
+        try:
+            path.parent.mkdir(parents=True, exist_ok=True)
+            with path.open("a", encoding="utf-8") as handle:
+                handle.write(record.to_json_line())
+        except Exception as e:  # noqa: BLE001 - deliberate: see docstring
+            logger.warning("metabolism_write_failed", error=str(e), path=str(path))
 
     async def act(
         self,
