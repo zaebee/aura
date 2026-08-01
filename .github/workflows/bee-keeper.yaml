@@ -7,6 +7,7 @@ on:
       - 'HIVE_STATE.md'
       - 'CHRONICLES.md'
       - 'llms.txt'
+      - '.hive/metabolism.jsonl'
   push:
     branches:
       - main
@@ -14,6 +15,7 @@ on:
       - 'HIVE_STATE.md'
       - 'CHRONICLES.md'
       - 'llms.txt'
+      - '.hive/metabolism.jsonl'
   schedule:
     - cron: '0 */18 * * *' # Every 6 hours
 

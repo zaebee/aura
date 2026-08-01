@@ -1,0 +1,48 @@
+name: Metabolism Aggregate
+
+# Runs OUTSIDE the measured loop, so unlike the bees it may commit freely.
+on:
+  schedule:
+    - cron: '0 3 * * *'
+  workflow_dispatch:
+
+jobs:
+  aggregate:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      actions: read
+
+    steps:
+      - name: Checkout Hive
+        uses: actions/checkout@v4
+
+      - name: Download metabolic artifacts
+        uses: actions/download-artifact@v4
+        with:
+          pattern: metabolism-*
+          path: .artifacts
+          merge-multiple: false
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Merge records
+        run: |
+          shopt -s nullglob
+          files=(.artifacts/*/metabolism.jsonl)
+          if [ ${#files[@]} -eq 0 ]; then
+            echo "No artifacts to merge."
+            exit 0
+          fi
+          python3 tools/aggregate_metabolism.py .hive/metabolism.jsonl "${files[@]}"
+
+      - name: Commit if changed
+        run: |
+          git config user.name "aura-metabolism"
+          git config user.email "metabolism@aura.hive"
+          if git diff --quiet -- .hive/metabolism.jsonl; then
+            echo "No new records."
+            exit 0
+          fi
+          git add .hive/metabolism.jsonl
+          git commit -m "chore(metabolism): aggregate per-cycle cost records"
+          git push
