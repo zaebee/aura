@@ -30,6 +30,20 @@ def _plan() -> EvolutionPlan:
     )
 
 
+def test_dry_run_parses_the_string_forms_a_workflow_passes(tmp_path):
+    """The workflow sets EVOLVER_DRY_RUN from a boolean input, which reaches the
+    process as the string "true"/"false". This is the seam between the YAML and
+    the code — the switch existed for a while with no wire running to it."""
+    for raw, expected in (("true", True), ("false", False), ("1", True), ("0", False)):
+        settings = EvolverSettings(
+            AURA_LLM__API_KEY="test-key",
+            GITHUB_REPOSITORY="zaebee/aura",
+            AURA_METABOLISM_LOG=str(tmp_path / "metabolism.jsonl"),
+            EVOLVER_DRY_RUN=raw,
+        )
+        assert settings.dry_run is expected, f"{raw!r} should parse to {expected}"
+
+
 async def test_dry_run_makes_no_http_calls(tmp_path, monkeypatch):
     calls: list[str] = []
 
