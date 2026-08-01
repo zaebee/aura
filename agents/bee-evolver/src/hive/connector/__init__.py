@@ -40,6 +40,18 @@ class EvolverConnector:
     ) -> EvolverObservation:
         logger.info("evolver_connector_act_started")
 
+        if self.settings.dry_run:
+            logger.info(
+                "evolver_connector_dry_run_skipping_outbound",
+                improvements=len(plan.improvements),
+            )
+            return EvolverObservation(
+                success=True,
+                branch_name=branch,
+                errors=list(apply_errors),
+                plan=plan,
+            )
+
         issue_urls: list[str] = []
         pr_url = ""
         errors = list(apply_errors)
