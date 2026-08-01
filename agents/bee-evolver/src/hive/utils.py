@@ -19,6 +19,8 @@ def find_hive_root(start: Path | None = None) -> Path:
     ``start`` exists so the search is testable; it defaults to this file.
     """
     p = (start or Path(__file__)).resolve()
+    if not p.is_dir():
+        p = p.parent
     outermost: Path | None = None
 
     for parent in [p] + list(p.parents):
