@@ -23,6 +23,12 @@ def _read_record(path):
     return json.loads(lines[0])
 
 
+def _read_records(path):
+    return [
+        json.loads(x) for x in open(path, encoding="utf-8").read().splitlines()
+    ]
+
+
 async def test_transformer_failure_still_writes_a_record(tmp_path, monkeypatch):
     settings = _settings(tmp_path)
     metabolism = EvolverMetabolism(settings)
@@ -64,6 +70,47 @@ async def test_aggregator_failure_is_not_labelled_llm_error(tmp_path, monkeypatc
         await metabolism.execute()
 
     assert _read_record(settings.metabolism_log)["outcome"] == "aggregator_error"
+
+
+async def test_sequential_cycles_do_not_accumulate_usage(tmp_path, monkeypatch):
+    """Two cycles on one long-lived metabolism must report their own usage,
+    not a running total.
+
+    Today main.py calls execute() once and exits, so this cannot bite — but
+    that is a property of how the Evolver is invoked, not of this code. Raising
+    the cadence via a long-lived process would expose it, and the same defect
+    was real in bee.Keeper, whose main() is a continuous loop.
+    """
+    settings = _settings(tmp_path)
+    metabolism = EvolverMetabolism(settings)
+
+    async def _perceive():
+        return object()
+
+    def _think_returning(prompt_tokens: int):
+        async def _think(_context):
+            return EvolutionPlan(
+                prompt_tokens=prompt_tokens,
+                completion_tokens=1,
+                usd=0.001,
+                model_used="mistral/mistral-large-latest",
+                llm_calls=1,
+            )
+
+        return _think
+
+    monkeypatch.setattr(metabolism, "_configure_git", lambda: None)
+    monkeypatch.setattr(metabolism.aggregator, "perceive", _perceive)
+
+    monkeypatch.setattr(metabolism.transformer, "think", _think_returning(100))
+    await metabolism.execute()
+    monkeypatch.setattr(metabolism.transformer, "think", _think_returning(400))
+    await metabolism.execute()
+
+    records = _read_records(settings.metabolism_log)
+    assert len(records) == 2
+    assert [r["prompt_tokens"] for r in records] == [100, 400]
+    assert [r["llm_calls"] for r in records] == [1, 1]
 
 
 async def test_connector_failure_is_labelled_connector_error(tmp_path, monkeypatch):
