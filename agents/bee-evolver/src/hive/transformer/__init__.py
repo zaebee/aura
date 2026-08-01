@@ -12,6 +12,27 @@ from ..models import EvolutionPlan, Improvement, HiveContext
 logger = structlog.get_logger(__name__)
 
 
+def extract_usage(response: Any) -> tuple[int | None, int | None]:
+    """Return (prompt_tokens, completion_tokens). None means unknown — never 0,
+    because a zero would turn a paid cycle into a free one in the record."""
+    usage = getattr(response, "usage", None)
+    if not usage:
+        return None, None
+    return (
+        getattr(usage, "prompt_tokens", None),
+        getattr(usage, "completion_tokens", None),
+    )
+
+
+def extract_cost(response: Any) -> float | None:
+    """USD for this call, or None when the model cannot be priced."""
+    try:
+        return float(litellm.completion_cost(completion_response=response))
+    except Exception as e:  # noqa: BLE001 - unpriceable models are expected
+        logger.debug("completion_cost_unavailable", error=str(e))
+        return None
+
+
 class EvolverTransformer:
     """T - Transformer: Analyzes Hive context and produces an EvolutionPlan."""
 
@@ -46,6 +67,7 @@ class EvolverTransformer:
                         f"Primary: {e}. Fallback: {fe}"
                     ),
                     token_usage=0,
+                    llm_failed=True,
                 )
 
         logger.info(
@@ -161,6 +183,8 @@ Rules:
         tokens = 0
         if hasattr(response, "usage") and response.usage:
             tokens = getattr(response.usage, "total_tokens", 0)
+        prompt_tokens, completion_tokens = extract_usage(response)
+        usd = extract_cost(response)
 
         data: dict[str, Any] = json.loads(content)
         improvements = [
@@ -180,5 +204,10 @@ Rules:
             narrative=data.get("narrative", ""),
             token_usage=tokens,
             hive_is_optimal=bool(data.get("hive_is_optimal", False)),
+            prompt_tokens=prompt_tokens,
+            completion_tokens=completion_tokens,
+            usd=usd,
+            model_used=model,
+            llm_calls=1,
         )
         return plan, tokens
