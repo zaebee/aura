@@ -31,6 +31,21 @@ def test_usage_sums_across_multiple_calls(tmp_path):
     assert transformer.usage_totals["completion_tokens"] == 50
 
 
+def test_usage_resets_between_cycles(tmp_path):
+    """main() runs a continuous loop, calling execute() once per NATS event on
+    one long-lived transformer. Without a per-cycle reset, every record after
+    the first reports the sum of all preceding cycles."""
+    transformer = BeeTransformer(_settings(tmp_path))
+
+    transformer._accumulate_usage(_response(100, 10), "mistral/mistral-large-latest")
+    transformer.reset_usage()
+    transformer._accumulate_usage(_response(400, 40), "mistral/mistral-large-latest")
+
+    assert transformer.usage_totals["llm_calls"] == 1
+    assert transformer.usage_totals["prompt_tokens"] == 400
+    assert transformer.usage_totals["completion_tokens"] == 40
+
+
 def test_unknown_usage_does_not_become_zero(tmp_path):
     transformer = BeeTransformer(_settings(tmp_path))
 

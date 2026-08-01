@@ -34,6 +34,9 @@ class BeeMetabolism:
         start_time = time.monotonic()
         cycle_id = datetime.now(UTC).strftime("%Y%m%d-%H%M%S")
         outcome: Outcome = "success"
+        # The cycle boundary, not think(): scheduled runs skip the LLM entirely
+        # and would otherwise carry the previous cycle's totals into their record.
+        self.transformer.reset_usage()
 
         try:
             # 1. Aggregator (A) - Senses the environment

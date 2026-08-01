@@ -55,7 +55,18 @@ class BeeTransformer(Transformer[Context, AuditObservation]):
         litellm.api_key = settings.llm__api_key
         # Metabolism instrumentation (Gate 0). bee.Keeper makes more than one
         # LLM call per cycle, so usage is accumulated rather than overwritten.
-        self.usage_totals: dict[str, Any] = {
+        self.usage_totals: dict[str, Any] = {}
+        self.reset_usage()
+
+    def reset_usage(self) -> None:
+        """Clear per-cycle usage. Called at the start of every cycle.
+
+        main() runs a continuous loop, calling execute() once per NATS error
+        event on this same long-lived instance. Without a reset the totals
+        accumulate across cycles, so every record after the first reports the
+        sum of all preceding cycles — silently and without bound.
+        """
+        self.usage_totals = {
             "llm_calls": 0,
             "prompt_tokens": None,
             "completion_tokens": None,
