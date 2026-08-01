@@ -25,6 +25,27 @@ from .signatures import DiagnoseError
 logger = structlog.get_logger(__name__)
 
 
+def extract_usage(response: Any) -> tuple[int | None, int | None]:
+    """Return (prompt_tokens, completion_tokens). None means unknown — never 0,
+    because a zero would turn a paid cycle into a free one in the record."""
+    usage = getattr(response, "usage", None)
+    if not usage:
+        return None, None
+    return (
+        getattr(usage, "prompt_tokens", None),
+        getattr(usage, "completion_tokens", None),
+    )
+
+
+def extract_cost(response: Any) -> float | None:
+    """USD for this call, or None when the model cannot be priced."""
+    try:
+        return float(litellm.completion_cost(completion_response=response))
+    except Exception as e:  # noqa: BLE001 - unpriceable models are expected
+        logger.debug("completion_cost_unavailable", error=str(e))
+        return None
+
+
 class BeeTransformer(Transformer[Context, AuditObservation]):
     """T - Transformer: Analyzes purity and generates audit observations."""
 
@@ -32,9 +53,59 @@ class BeeTransformer(Transformer[Context, AuditObservation]):
         self.settings = settings
         self.model = settings.llm__model
         litellm.api_key = settings.llm__api_key
+        # Metabolism instrumentation (Gate 0). bee.Keeper makes more than one
+        # LLM call per cycle, so usage is accumulated rather than overwritten.
+        self.usage_totals: dict[str, Any] = {}
+        self.reset_usage()
+
+    def reset_usage(self) -> None:
+        """Clear per-cycle usage. Called at the start of every cycle.
+
+        main() runs a continuous loop, calling execute() once per NATS error
+        event on this same long-lived instance. Without a reset the totals
+        accumulate across cycles, so every record after the first reports the
+        sum of all preceding cycles — silently and without bound.
+        """
+        self.usage_totals = {
+            "llm_calls": 0,
+            "prompt_tokens": None,
+            "completion_tokens": None,
+            "usd": None,
+            "model": None,
+        }
         self.lm = dspy.LM(
             f"openai/{self.model}", api_key=self.settings.llm__api_key, cache=False
         )
+        self._init_paths()
+
+    def _accumulate_usage(self, response: Any, model: str) -> None:
+        """Sum usage across every LLM call in a cycle.
+
+        bee.Keeper makes more than one call per cycle (_summarize_diff and
+        _call_llm); recording only one would undercount its baseline by
+        construction. None + value keeps 'unknown' from silently becoming 0.
+        """
+        prompt, completion = extract_usage(response)
+        usd = extract_cost(response)
+
+        def _add(current: Any, addition: Any) -> Any:
+            if addition is None:
+                return current
+            if current is None:
+                return addition
+            return current + addition
+
+        self.usage_totals["llm_calls"] = int(self.usage_totals["llm_calls"]) + 1
+        self.usage_totals["prompt_tokens"] = _add(
+            self.usage_totals["prompt_tokens"], prompt
+        )
+        self.usage_totals["completion_tokens"] = _add(
+            self.usage_totals["completion_tokens"], completion
+        )
+        self.usage_totals["usd"] = _add(self.usage_totals["usd"], usd)
+        self.usage_totals["model"] = model
+
+    def _init_paths(self) -> None:
         root = find_hive_root()
 
         prompt_path = root / "agents/bee-keeper/prompts/bee_keeper.md"
@@ -305,6 +376,7 @@ class BeeTransformer(Transformer[Context, AuditObservation]):
                 messages=[{"role": "user", "content": prompt}],
                 max_tokens=200,
             )
+            self._accumulate_usage(response, self.model)
             return str(response.choices[0].message.content)
         except Exception as e:
             logger.warning("diff_summarization_failed", error=str(e))
@@ -326,6 +398,7 @@ class BeeTransformer(Transformer[Context, AuditObservation]):
             kwargs["api_base"] = self.settings.llm__ollama_base_url
 
         response = await litellm.acompletion(**kwargs)
+        self._accumulate_usage(response, model)
         content = response.choices[0].message.content
 
         data: dict[str, Any] = json.loads(content)

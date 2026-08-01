@@ -58,6 +58,11 @@ test: $(PROTO_SENTINEL)
 	PYTHONPATH=$(GATEWAY_PATH) uv run pytest api-gateway/tests/ -v
 	# Run telegram-bot tests with isolated path to avoid 'src' collision
 	PYTHONPATH=$(TG_PATH) uv run pytest synapses/telegram-bot/tests/ -v
+	# Run bee.Keeper tests from the root env: its transformer imports dspy, which
+	# is declared in the root pyproject rather than the agent's own.
+	PYTHONPATH=$(KEEPER_PATH) uv run pytest agents/bee-keeper/tests/ -v
+	# Run bee.Evolver tests in its own env — it deliberately has no aura-core dep.
+	cd agents/bee-evolver && uv run --group dev pytest tests/ -v
 	# Run mcp-server tests if they exist.
 	# aura-mcp's runtime deps (fastmcp) aren't in the root dev group, so add them
 	# additively (--inexact keeps the already-synced dev deps, avoids aura-worker's

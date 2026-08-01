@@ -49,3 +49,9 @@ class EvolverSettings(BaseSettings):
     issues_per_page: int = Field(20, alias="EVOLVER_ISSUES_PER_PAGE")
     # Max chars of issue body passed to the LLM
     issue_body_limit: int = Field(500, alias="EVOLVER_ISSUE_BODY_LIMIT")
+
+    # Metabolism instrumentation (Gate 0)
+    metabolism_log: str = Field(".hive/metabolism.jsonl", alias="AURA_METABOLISM_LOG")
+    git_sha: str = Field("", alias="GITHUB_SHA")
+    # When true the Connector opens no Issues/PRs and sends no Telegram pulse.
+    dry_run: bool = Field(False, alias="EVOLVER_DRY_RUN")

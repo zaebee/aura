@@ -47,4 +47,11 @@ ignore_missing_imports = true
 dev = [
     "pydantic-settings>=2.12.0",
     "types-pyyaml>=6.0.12.20250915",
+    "pytest>=8.0.0",
+    "pytest-asyncio>=0.24.0",
 ]
+
+[tool.pytest.ini_options]
+pythonpath = ["src"]
+testpaths = ["tests"]
+asyncio_mode = "auto"
