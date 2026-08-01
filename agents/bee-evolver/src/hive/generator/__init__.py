@@ -118,7 +118,7 @@ class EvolverGenerator:
                         title=imp.title,
                         target_file=imp.target_file,
                         error=result.stderr.strip()[:300],
-                        patch_header=" | ".join(imp.patch.splitlines()[:4]),
+                        patch_header=" | ".join(imp.patch[:1000].splitlines()[:4]),
                     )
                     return msg
 
