@@ -6,7 +6,14 @@ import json
 from dataclasses import asdict, dataclass
 from typing import Literal
 
-Outcome = Literal["success", "llm_error", "generator_error", "connector_error"]
+Outcome = Literal[
+    "success",
+    "aggregator_error",
+    "llm_error",
+    "generator_error",
+    "connector_error",
+    "unknown_error",
+]
 
 
 @dataclass

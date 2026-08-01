@@ -9,7 +9,7 @@ from .aggregator import EvolverAggregator
 from .connector import EvolverConnector
 from .generator import EvolverGenerator
 from .models import EvolverObservation, EvolutionPlan
-from .records import MetabolicRecord
+from .records import MetabolicRecord, Outcome
 from .transformer import EvolverTransformer
 
 logger = structlog.get_logger(__name__)
@@ -32,7 +32,7 @@ class EvolverMetabolism:
 
         started = time.monotonic()
         plan = EvolutionPlan()
-        outcome = "success"
+        outcome: Outcome = "success"
         proposals = 0
         applied = 0
 
@@ -41,10 +41,18 @@ class EvolverMetabolism:
             self._configure_git()
 
             # 1. A — Aggregate: sense the Hive
-            context = await self.aggregator.perceive()
+            try:
+                context = await self.aggregator.perceive()
+            except Exception:
+                outcome = "aggregator_error"
+                raise
 
             # 2. T — Transform: produce improvement plan
-            plan = await self.transformer.think(context)
+            try:
+                plan = await self.transformer.think(context)
+            except Exception:
+                outcome = "llm_error"
+                raise
             if plan.llm_failed:
                 outcome = "llm_error"
             proposals = len(plan.improvements)
@@ -82,12 +90,16 @@ class EvolverMetabolism:
                     )
 
             # 4. C — Connect: open Issues/PR + Telegram pulse
-            observation = await self.connector.act(
-                plan=plan,
-                branch=branch,
-                timestamp=timestamp,
-                apply_errors=apply_errors,
-            )
+            try:
+                observation = await self.connector.act(
+                    plan=plan,
+                    branch=branch,
+                    timestamp=timestamp,
+                    apply_errors=apply_errors,
+                )
+            except Exception:
+                outcome = "connector_error"
+                raise
 
             logger.info(
                 "evolver_metabolism_completed",
@@ -98,8 +110,10 @@ class EvolverMetabolism:
             )
             return observation
         except Exception:
+            # Every stage above labels its own failure. Anything reaching here
+            # failed outside them, and must not be mislabelled as one of them.
             if outcome == "success":
-                outcome = "llm_error"
+                outcome = "unknown_error"
             raise
         finally:
             self.connector.write_metabolic_record(
