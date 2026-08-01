@@ -56,6 +56,11 @@ class BeeConnector(Connector[AuditObservation, BeeObservation, Context]):
         self._http_client = httpx.AsyncClient(timeout=30.0)
         self._nc: nats.NATS | None = None
 
+        self.gh = None
+        if self.github_token and self.github_token != "mock":  # nosec B105
+            self.gh = VCS_Skill()
+            self.gh.bind(settings, self._http_client)
+
     def write_metabolic_record(self, record: MetabolicRecord) -> None:
         """Append one metabolic record. Never raises — an instrument that
         crashes the organism is worse than no instrument."""
@@ -66,11 +71,6 @@ class BeeConnector(Connector[AuditObservation, BeeObservation, Context]):
                 handle.write(record.to_json_line())
         except Exception as e:  # noqa: BLE001 - deliberate: see docstring
             logger.warning("metabolism_write_failed", error=str(e), path=str(path))
-
-        self.gh = None
-        if self.github_token and self.github_token != "mock":  # nosec B105
-            self.gh = VCS_Skill()
-            self.gh.bind(settings, self._http_client)
 
     async def close(self) -> None:
         """Cleanup resources."""

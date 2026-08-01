@@ -1,4 +1,5 @@
 import time
+from datetime import UTC, datetime
 
 import structlog
 
@@ -6,6 +7,7 @@ from aura_keeper.config import KeeperSettings
 from aura_core_gen.aura.core.v1 import (
     AuditObservation,
 )
+from .records import MetabolicRecord
 from .aggregator import BeeAggregator
 from .connector import BeeConnector, BeeObservation
 from .generator import BeeGenerator
@@ -28,37 +30,63 @@ class BeeMetabolism:
         """Execute one complete metabolic cycle."""
         logger.info("bee_metabolism_started", trigger_event=event_name)
         start_time = time.time()
+        cycle_id = datetime.now(UTC).strftime("%Y%m%d-%H%M%S")
+        outcome = "success"
 
-        # 1. Aggregator (A) - Senses the environment
-        context = await self.aggregator.perceive(None, event_name=event_name)
+        try:
+            # 1. Aggregator (A) - Senses the environment
+            context = await self.aggregator.perceive(None, event_name=event_name)
 
-        # 2. Transformer (T) - Reasons and audits
-        if event_name == "schedule":
-            logger.info("scheduled_heartbeat_detected_skipping_llm_audit")
-            report = AuditObservation(
-                is_pure=True,
-                narrative="The Keeper performs a routine inspection. The Hive's pulse is steady.",
-                reasoning="Scheduled heartbeat run. LLM audit skipped to save honey.",
+            # 2. Transformer (T) - Reasons and audits
+            if event_name == "schedule":
+                logger.info("scheduled_heartbeat_detected_skipping_llm_audit")
+                report = AuditObservation(
+                    is_pure=True,
+                    narrative="The Keeper performs a routine inspection. The Hive's pulse is steady.",
+                    reasoning="Scheduled heartbeat run. LLM audit skipped to save honey.",
+                )
+            else:
+                # T now performs deterministic regex audit + reflective LLM analysis
+                report = await self.transformer.think(context)
+
+            report.execution_time = float(time.time() - start_time)
+
+            # 3. Connector (C) - Interacts with the outer world (GitHub)
+            observation: BeeObservation = await self.connector.act(
+                report, context=context
             )
-        else:
-            # T now performs deterministic regex audit + reflective LLM analysis
-            report = await self.transformer.think(context)
 
-        report.execution_time = float(time.time() - start_time)
+            # Enrich observation with context and report for the Generator
+            observation.context = context
+            observation.report = report
 
-        # 3. Connector (C) - Interacts with the outer world (GitHub)
-        observation: BeeObservation = await self.connector.act(report, context=context)
+            # 4. Generator (G) - Updates records and chronicles
+            await self.generator.pulse(observation)
 
-        # Enrich observation with context and report for the Generator
-        observation.context = context
-        observation.report = report
-
-        # 4. Generator (G) - Updates records and chronicles
-        await self.generator.pulse(observation)
-
-        logger.info(
-            "bee_metabolism_completed",
-            pure=report.is_pure,
-            heresies=len(report.heresies),
-            execution_time=f"{report.execution_time:.2f}s",
-        )
+            logger.info(
+                "bee_metabolism_completed",
+                pure=report.is_pure,
+                heresies=len(report.heresies),
+                execution_time=f"{report.execution_time:.2f}s",
+            )
+        except Exception:
+            outcome = "llm_error"
+            raise
+        finally:
+            totals = self.transformer.usage_totals
+            self.connector.write_metabolic_record(
+                MetabolicRecord(
+                    ts=datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ"),
+                    bee="keeper",
+                    cycle_id=cycle_id,
+                    git_sha=self.settings.git_sha,
+                    model=totals["model"],
+                    llm_calls=int(totals["llm_calls"]),
+                    prompt_tokens=totals["prompt_tokens"],
+                    completion_tokens=totals["completion_tokens"],
+                    usd=totals["usd"],
+                    wall_clock_s=round(time.time() - start_time, 3),
+                    outcome=outcome,
+                    dry_run=False,
+                )
+            )
