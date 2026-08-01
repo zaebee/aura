@@ -41,3 +41,7 @@ class KeeperSettings(BaseSettings):  # type: ignore
     github_cc_recipients: str = Field("@jules", alias="GITHUB_CC_RECIPIENTS")
 
     max_tokens: int = Field(1000, alias="AURA_BEE_KEEPER__MAX_TOKENS")
+
+    # Metabolism instrumentation (Gate 0)
+    metabolism_log: str = Field(".hive/metabolism.jsonl", alias="AURA_METABOLISM_LOG")
+    git_sha: str = Field("", alias="GITHUB_SHA")

@@ -2,6 +2,7 @@ import asyncio
 import json
 import uuid
 from dataclasses import dataclass, field
+from pathlib import Path
 from typing import Any, cast
 
 import nats
@@ -24,6 +25,7 @@ from aura_core_gen.aura.core.v1 import (
 )
 from datetime import UTC, datetime
 import httpx
+from ..records import MetabolicRecord
 from .proteins.vcs import VCS_Skill
 
 logger = structlog.get_logger(__name__)
@@ -53,6 +55,17 @@ class BeeConnector(Connector[AuditObservation, BeeObservation, Context]):
         self.nats_url = settings.nats_url
         self._http_client = httpx.AsyncClient(timeout=30.0)
         self._nc: nats.NATS | None = None
+
+    def write_metabolic_record(self, record: MetabolicRecord) -> None:
+        """Append one metabolic record. Never raises — an instrument that
+        crashes the organism is worse than no instrument."""
+        path = Path(self.settings.metabolism_log)
+        try:
+            path.parent.mkdir(parents=True, exist_ok=True)
+            with path.open("a", encoding="utf-8") as handle:
+                handle.write(record.to_json_line())
+        except Exception as e:  # noqa: BLE001 - deliberate: see docstring
+            logger.warning("metabolism_write_failed", error=str(e), path=str(path))
 
         self.gh = None
         if self.github_token and self.github_token != "mock":  # nosec B105
