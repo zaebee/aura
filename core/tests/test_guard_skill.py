@@ -1,8 +1,7 @@
 import pytest
-from hive.proteins.guard.enzymes.guard_logic import OutputGuard
-from hive.proteins.guard.main import GuardSkill
-
-from config.policy import SafetySettings
+from aura_hive.config.policy import SafetySettings
+from aura_hive.hive.proteins.guard.engine import OutputGuard
+from aura_hive.hive.proteins.guard.skill import GuardSkill
 
 
 @pytest.mark.asyncio

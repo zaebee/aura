@@ -1,0 +1,39 @@
+[project]
+name = "aura-evolver"
+version = "0.1.0"
+description = "bee.Evolver: Autonomous Hive self-improvement agent"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "litellm>=1.63.0",
+    "httpx>=0.28.1",
+    "pydantic-settings>=2.12.0",
+    "structlog>=25.5.0",
+]
+
+[project.scripts]
+aura-evolver = "main:main"
+
+[tool.uv]
+managed = true
+package = true
+
+[tool.ruff]
+line-length = 88
+target-version = "py312"
+
+[tool.mypy]
+python_version = "3.12"
+strict = true
+ignore_missing_imports = true
+
+[dependency-groups]
+dev = [
+    "pytest>=8.0.0",
+    "pytest-asyncio>=0.24.0",
+]
+
+[tool.pytest.ini_options]
+pythonpath = ["src"]
+testpaths = ["tests"]
+asyncio_mode = "auto"

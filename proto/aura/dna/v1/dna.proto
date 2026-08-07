@@ -40,6 +40,7 @@ message Signal {
     AuditSignal audit = 11;
     TelegramSignal telegram = 12;
     HeartbeatSignal heartbeat = 13;
+    PerceptionSignal perception = 14;
   }
 }
 
@@ -49,6 +50,7 @@ enum SignalType {
   SIGNAL_TYPE_AUDIT = 2;
   SIGNAL_TYPE_TELEGRAM = 3;
   SIGNAL_TYPE_HEARTBEAT = 4;
+  SIGNAL_TYPE_PERCEPTION = 5;
 }
 
 message NegotiationSignal {
@@ -80,6 +82,12 @@ message TelegramSignal {
 message HeartbeatSignal {
   string service_name = 1;
   string instance_id = 2;
+}
+
+message PerceptionSignal {
+  bytes image_data = 1;
+  string mime_type = 2;
+  AgentIdentity agent = 3;
 }
 
 // =============================================================================
@@ -215,12 +223,14 @@ message Observation {
     NegotiationObservation negotiation = 10;
     AuditObservation audit = 11;
     TelegramObservation telegram = 12;
+    PerceptionObservation perception = 13;
   }
 }
 
 message NegotiationObservation {
   string session_token = 1;
   int64 valid_until_timestamp = 2;
+  string payment_uri = 6;
 
   oneof result {
     OfferAccepted accepted = 3;
@@ -269,6 +279,24 @@ message TelegramObservation {
   bool delivered = 2;
 }
 
+message PerceptionObservation {
+  ItemData item = 1;
+}
+
+message PaymentProof {
+  string transaction_hash = 1;
+  string block_number = 2;
+  string from_address = 3;
+  google.protobuf.Timestamp confirmed_at = 4;
+}
+
+message TransactionContext {
+  string deal_id = 1;
+  double amount = 2;
+  string currency = 3;
+  string status = 4; // excited, ground
+}
+
 // =============================================================================
 // EVENT - Emitted to the Hive's bloodstream (G output -> NATS JetStream)
 // =============================================================================
@@ -287,7 +315,15 @@ message Event {
     AlertEvent alert = 12;
     HeartbeatEvent heartbeat = 13;
     AuditEvent audit = 14;
+    LogEvent log = 15;
   }
+}
+
+message LogEvent {
+  string level = 1;
+  string message = 2;
+  string logger_name = 3;
+  string worker_name = 4;
 }
 
 message NegotiationEvent {
@@ -351,4 +387,64 @@ message SystemVitals {
   bool cached = 5;
   repeated string warnings = 6;
   string error = 7;
+}
+
+// =============================================================================
+// PRODUCT DATA - Mobility Ecosystem Support
+// =============================================================================
+
+// Vehicle types for mobility services
+enum VehicleType {
+  VEHICLE_TYPE_UNSPECIFIED = 0;
+  VEHICLE_TYPE_CAR = 1;
+  VEHICLE_TYPE_BIKE = 2;
+  VEHICLE_TYPE_SCOOTER = 3;
+  VEHICLE_TYPE_MOPED = 4;
+  VEHICLE_TYPE_E_BIKE = 5;
+  VEHICLE_TYPE_E_SCOOTER = 6;
+}
+
+// Vehicle categories for classification
+enum VehicleCategory {
+  VEHICLE_CATEGORY_UNSPECIFIED = 0;
+  VEHICLE_CATEGORY_ECONOMY = 1;
+  VEHICLE_CATEGORY_COMPACT = 2;
+  VEHICLE_CATEGORY_MIDSIZE = 3;
+  VEHICLE_CATEGORY_STANDARD = 4;
+  VEHICLE_CATEGORY_FULLSIZE = 5;
+  VEHICLE_CATEGORY_PREMIUM = 6;
+  VEHICLE_CATEGORY_LUXURY = 7;
+  VEHICLE_CATEGORY_SUV = 8;
+  VEHICLE_CATEGORY_VAN = 9;
+  VEHICLE_CATEGORY_SPORTS = 10;
+  VEHICLE_CATEGORY_EXOTIC = 11;
+}
+
+// Fuel types for different vehicle configurations
+enum FuelType {
+  FUEL_TYPE_UNSPECIFIED = 0;
+  FUEL_TYPE_PETROL = 1;
+  FUEL_TYPE_DIESEL = 2;
+  FUEL_TYPE_ELECTRIC = 3;
+  FUEL_TYPE_HYBRID = 4;
+  FUEL_TYPE_CNG = 5;
+  FUEL_TYPE_HYDROGEN = 6;
+}
+
+// Transmission types
+enum TransmissionType {
+  TRANSMISSION_TYPE_TRANSMISSION_UNSPECIFIED = 0;
+  TRANSMISSION_TYPE_TRANSMISSION_MANUAL = 1;
+  TRANSMISSION_TYPE_TRANSMISSION_AUTOMATIC = 2;
+  TRANSMISSION_TYPE_TRANSMISSION_SEMI_AUTOMATIC = 3;
+  TRANSMISSION_TYPE_TRANSMISSION_CVT = 4;
+}
+
+// Insurance tiers for rental vehicles
+enum InsuranceTier {
+  INSURANCE_TIER_UNSPECIFIED = 0;
+  INSURANCE_TIER_BASIC = 1;
+  INSURANCE_TIER_STANDARD = 2;
+  INSURANCE_TIER_PREMIUM = 3;
+  INSURANCE_TIER_ZERO_DEPOSIT = 4;
 }

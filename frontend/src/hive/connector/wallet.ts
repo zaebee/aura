@@ -16,7 +16,7 @@ export class AgentWallet implements Connector {
   constructor(gatewayUrl?: string) {
     this.GATEWAY_URL = gatewayUrl ||
       (import.meta.env.VITE_API_GATEWAY_URL) ||
-      'http://localhost:8000/v1'
+      '/api/v1'
 
     this.keyPair = nacl.sign.keyPair()
     this.agentId = `did:key:${Array.from(this.keyPair.publicKey).map(b => b.toString(16).padStart(2, '0')).join('')}`
@@ -95,8 +95,38 @@ export class AgentWallet implements Connector {
     }
   }
 
-  async fetchWithAuth(path: string, method: string = 'GET', body: unknown = null): Promise<Response> {
-    const headers = await this.signRequest(method, path, body)
+  getGatewayUrl(): string {
+    return this.GATEWAY_URL
+  }
+
+  getSigningPath(relativePath: string): string {
+    let pathPrefix: string
+    try {
+      pathPrefix = new URL(this.GATEWAY_URL).pathname
+    } catch {
+      // GATEWAY_URL is relative (e.g., '/api/v1')
+      pathPrefix = this.GATEWAY_URL
+    }
+    const base = pathPrefix.replace(/\/$/, '')
+    return base + (relativePath.startsWith('/') ? relativePath : '/' + relativePath)
+  }
+
+  async signRawHash(method: string, path: string, bodyHash: string): Promise<Record<string, string>> {
+    const timestamp = Math.floor(Date.now() / 1000).toString()
+    const canonicalRequest = `${method.toUpperCase()}${path}${timestamp}${bodyHash}`
+    const signature = nacl.sign.detached(
+      new TextEncoder().encode(canonicalRequest),
+      this.keyPair.secretKey
+    )
+    return {
+      'X-Agent-ID': this.agentId,
+      'X-Timestamp': timestamp,
+      'X-Signature': Array.from(signature).map(b => b.toString(16).padStart(2, '0')).join('')
+    }
+  }
+
+  async fetchWithAuth(path: string, method: string = 'GET', body: unknown = null, signal?: AbortSignal): Promise<Response> {
+    const headers = await this.signRequest(method, this.getSigningPath(path), body)
 
     const response = await fetch(`${this.GATEWAY_URL}${path}`, {
       method,
@@ -104,7 +134,8 @@ export class AgentWallet implements Connector {
         'Content-Type': 'application/json',
         ...headers
       },
-      body: body ? JSON.stringify(body) : undefined
+      body: body ? JSON.stringify(body) : undefined,
+      signal,
     })
 
     if (!response.ok) {

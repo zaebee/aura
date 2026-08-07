@@ -14,13 +14,31 @@ wheels/
 # Generated Protobuf files
 **/gen/
 **/proto/
+**/gen-proto/
 !/proto/
+*_pb.ts
+*_pb.js
 
 # Virtual environments
 .venv
+
+# Node dependencies. Untracked and unignored, these get swept into `git add -A`
+# and the pre-commit hooks then rewrite tens of thousands of vendored files.
+node_modules/
+.pnp.*
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
 
 # Environment variables (secrets)
 .env
 
 # FRP client configuration (contains secrets)
 ona-dance.toml
+
+# Knowledge distillation artifacts (generated in CI/CD)
+docs/knowledge/*.bin
+docs/knowledge/*.json
+
+# Makefile proto generation sentinel
+.gen-proto.stamp

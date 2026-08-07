@@ -1,23 +1,14 @@
 apiVersion: v1
 kind: ConfigMap
 metadata:
-  name: "{{ .Release.Name }}-frpc-entrypoint-config"
-data:
-  entrypoint.sh: |
-    #!/bin/sh
-    # Append the secretKey to the frpc.toml file
-    echo "secretKey = \"$FRP_STCP_SECRET_KEY\"" >> /etc/frp/frpc.toml
-    # Execute the original frpc command
-    exec frpc -c /etc/frp/frpc.toml
----
-apiVersion: v1
-kind: ConfigMap
-metadata:
   name: "{{ .Release.Name }}-frpc-config"
 data:
   frpc.toml: |
     serverAddr = "aura.zae.life"
     serverPort = 7000
+
+    [transport]
+    tcpMux = true
 
     [auth]
     method = "token"
@@ -26,7 +17,7 @@ data:
     type = "file"
 
     [auth.tokenSource.file]
-    path = "/etc/frp/token"
+    path = "/etc/frp-token/token"
 
     [[proxies]]
     name = "frontend"
@@ -57,10 +48,12 @@ data:
     remotePort = {{ .Values.tunnel.loki.remotePort }}
 
     [[proxies]]
-    name = "nats-hidden"
+    name = "hive-nats"
     type = "stcp"
+    secretKey = "{{ "{{" }} .Envs.FRP_STCP_SECRET_KEY {{ "}}" }}"
     localIP = "{{ .Release.Name }}-nats"
     localPort = 4222
+
 ---
 apiVersion: apps/v1
 kind: Deployment
@@ -71,10 +64,12 @@ spec:
   selector:
     matchLabels:
       app: frpc
+      # component: tunnel
   template:
     metadata:
       labels:
         app: frpc
+        component: tunnel
     spec:
       containers:
       - name: frpc
@@ -86,13 +81,13 @@ spec:
             secretKeyRef:
               name: "{{ .Release.Name }}-secrets"
               key: "stcp-key"
-        command: ["/usr/local/bin/entrypoint.sh"]
+        command: ["frpc", "-c", "/etc/frp/frpc.toml"]
+        # command: ["/usr/local/bin/entrypoint.sh"]
         volumeMounts:
         - name: config-volume
-          mountPath: /etc/frp/frpc.toml
-          subPath: frpc.toml
+          mountPath: /etc/frp/
         - name: token-volume
-          mountPath: /etc/frp/token
+          mountPath: /etc/frp-token/token
           subPath: frp-token
         - name: entrypoint-volume
           mountPath: /usr/local/bin/entrypoint.sh

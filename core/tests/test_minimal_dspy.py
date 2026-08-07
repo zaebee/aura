@@ -1,7 +1,7 @@
 import os
 
 import pytest
-from src.hive.proteins.reasoning.enzymes.reasoning_engine import AuraNegotiator
+from aura_hive.hive.proteins.reasoning.engine import AuraNegotiator
 
 
 @pytest.fixture

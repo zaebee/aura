@@ -39,6 +39,8 @@ spec:
           resources:
             {{- toYaml .Values.core.resources | nindent 12 }}
           env:
+            - name: PYTHONPATH
+              value: "{{ .Values.core.env.PYTHONPATH }}"
             - name: AURA_SERVER__LOG_LEVEL
               value: "{{ .Values.core.env.AURA_SERVER__LOG_LEVEL }}"
             - name: AURA_SERVER__PORT
@@ -51,6 +53,11 @@ spec:
               value: "postgresql://{{ .Values.postgres.auth.username }}:{{ .Values.postgres.auth.password }}@{{ .Release.Name }}-postgres.{{ .Release.Namespace }}.svc.cluster.local:5432/{{ .Values.postgres.auth.database }}"
             - name: AURA_DATABASE__REDIS_URL
               value: "redis://{{ .Release.Name }}-redis.{{ .Release.Namespace }}.svc.cluster.local:6379/0"
+            - name: MISTRAL_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: "{{ .Release.Name }}-secrets"
+                  key: "api-key"
             - name: AURA_LLM__API_KEY
               valueFrom:
                 secretKeyRef:
@@ -79,3 +86,5 @@ spec:
               value: "https://api.mainnet-beta.solana.com"
             - name: AURA_CRYPTO__SOLANA_USDC_MINT
               value: "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v"
+            - name: AURA_HEARTBEAT__INTERVAL_SECONDS
+              value: "1800"

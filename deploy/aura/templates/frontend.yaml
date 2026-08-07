@@ -39,9 +39,6 @@ spec:
             periodSeconds: {{ .Values.frontend.readinessProbe.periodSeconds }}
             timeoutSeconds: {{ .Values.frontend.readinessProbe.timeoutSeconds }}
             failureThreshold: {{ .Values.frontend.readinessProbe.failureThreshold }}
-          env:
-            - name: NEXT_PUBLIC_API_GATEWAY_URL
-              value: "{{ .Values.frontend.apiGatewayUrl }}"
 ---
 apiVersion: v1
 kind: Service

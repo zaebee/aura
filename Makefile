@@ -1,41 +1,87 @@
-.PHONY: lint test test-cov test-verbose build generate push install-dev format test-health
+.PHONY: lint mypy test test-cov test-verbose build generate push install-dev format test-health keeper-audit \
+       run-core run-gateway run-frontend prepare-bun
 
 # Makefile for Aura Project
 TAG ?= latest
 REGISTRY ?= ghcr.io/zaebee
 PLATFORM ?= linux/amd64
-CORE_PATH ?= core:core/src
-GATEWAY_PATH ?= api-gateway/src
-TG_PATH ?= adapters/telegram-bot/src:adapters/telegram-bot/src/proto
-KEEPER_PATH ?= agents/bee-keeper/src
+DNA_PATH := packages/aura-core/src:packages/aura-core/gen-proto
+CORE_PATH := core/src:core/gen-proto:$(DNA_PATH)
+GATEWAY_PATH := api-gateway/src:api-gateway/gen-proto:$(DNA_PATH)
+TG_PATH := synapses/telegram-bot/src:$(DNA_PATH)
+MCP_PATH := synapses/mcp-server/src:synapses/mcp-server/gen-proto:core/src:$(DNA_PATH)
+KEEPER_PATH := agents/bee-keeper/src:$(DNA_PATH)
+TOOL_PATH := $(CORE_PATH):$(DNA_PATH)
+
+# Proto source files (for incremental generation)
+PROTO_SOURCES := $(wildcard proto/aura/*/v1/*.proto)
+PROTO_SENTINEL := .gen-proto.stamp
 
 # --- 1. CODE QUALITY ---
-lint:
+lint: $(PROTO_SENTINEL)
 	# Protobuf Lint
 	cd proto && buf lint
 	# Python Lint (Ruff)
-	uv run ruff check .
+	PYTHONPATH=$(DNA_PATH):$(CORE_PATH):$(GATEWAY_PATH):$(TG_PATH):$(MCP_PATH):$(KEEPER_PATH) uv run ruff check .
 	# Python Type Check (Mypy)
-	MYPYPATH=$(CORE_PATH) uv run mypy core/src
-	MYPYPATH=$(GATEWAY_PATH):packages/aura-core/src uv run mypy api-gateway/src
-	MYPYPATH=$(TG_PATH):packages/aura-core/src uv run mypy adapters/telegram-bot/src
-	MYPYPATH=$(KEEPER_PATH):packages/aura-core/src uv run mypy agents/bee-keeper/main.py agents/bee-keeper/src
-	MYPYPATH=packages/aura-core/src uv run mypy packages/aura-core/src
+	# We use --explicit-package-bases to avoid double discovery when multiple paths overlap
+	MYPYPATH=$(CORE_PATH) uv run mypy --explicit-package-bases core/src
+	MYPYPATH=$(GATEWAY_PATH) uv run mypy --explicit-package-bases api-gateway/src
+	MYPYPATH=$(TG_PATH) uv run mypy --explicit-package-bases synapses/telegram-bot/src
+	MYPYPATH=$(MCP_PATH) uv run mypy --explicit-package-bases synapses/mcp-server/src
+	MYPYPATH=$(KEEPER_PATH) uv run mypy --explicit-package-bases agents/bee-keeper/src
+	MYPYPATH=$(DNA_PATH) uv run mypy packages/aura-core/src
 	# Security Audit (Bandit)
 	uv run bandit -r . -c pyproject.toml
+	# Fractal Completeness (ATCG-M baseline-lock gate)
+	uv run python tools/check_fractal_completeness.py
 	# Frontend Lint
 	# cd frontend && bun run lint
+
+mypy:
+	MYPYPATH=$(CORE_PATH) uv run mypy --explicit-package-bases core/src
+	MYPYPATH=$(GATEWAY_PATH) uv run mypy --explicit-package-bases api-gateway/src
+	MYPYPATH=$(TG_PATH) uv run mypy --explicit-package-bases synapses/telegram-bot/src
+	MYPYPATH=$(MCP_PATH) uv run mypy --explicit-package-bases synapses/mcp-server/src
+	MYPYPATH=$(KEEPER_PATH) uv run mypy --explicit-package-bases agents/bee-keeper/src
+	MYPYPATH=$(DNA_PATH) uv run mypy packages/aura-core/src
 
 setup-hooks:
 	# Install pre-commit hooks
 	uv run pre-commit install
 
 # Run tests
-test:
+keeper-audit: $(PROTO_SENTINEL)
+	# One bee.Keeper cycle, then exit. Without --once main.py is a NATS daemon.
+	PYTHONPATH=$(KEEPER_PATH) uv run python -m aura_keeper.main --once
+
+test: $(PROTO_SENTINEL)
 	# Run core tests
 	PYTHONPATH=$(CORE_PATH) uv run pytest core/tests/ -v
+	# Run api-gateway tests (env is provided by api-gateway/tests/conftest.py)
+	PYTHONPATH=$(GATEWAY_PATH) uv run pytest api-gateway/tests/ -v
 	# Run telegram-bot tests with isolated path to avoid 'src' collision
-	PYTHONPATH=$(TG_PATH) uv run pytest adapters/telegram-bot/tests/ -v
+	PYTHONPATH=$(TG_PATH) uv run pytest synapses/telegram-bot/tests/ -v
+	# Run bee.Keeper tests from the root env: its transformer imports dspy, which
+	# is declared in the root pyproject rather than the agent's own.
+	PYTHONPATH=$(KEEPER_PATH) uv run pytest agents/bee-keeper/tests/ -v
+	# Run bee.Evolver tests in its own env — it deliberately has no aura-core dep.
+	cd agents/bee-evolver && uv run --group dev pytest tests/ -v
+	# Run mcp-server tests if they exist.
+	# aura-mcp's runtime deps (fastmcp) aren't in the root dev group, so add them
+	# additively (--inexact keeps the already-synced dev deps, avoids aura-worker's
+	# heavy torch stack); --no-sync stops `uv run` from reverting that.
+	if [ -d "synapses/mcp-server/tests" ]; then \
+		uv sync --package aura-mcp --inexact; \
+		PYTHONPATH=$(MCP_PATH):$(CORE_PATH) uv run --no-sync pytest synapses/mcp-server/tests/ -v; \
+	fi
+	# Run aura-worker tests if they exist. Its runtime deps (gradio) aren't in
+	# the root dev group; add them additively (--inexact). The `ml` group with
+	# torch is NOT synced, so no heavy CUDA stack; --no-sync keeps the install.
+	if [ -d "packages/aura-worker/tests" ]; then \
+		uv sync --package aura-worker --inexact; \
+		PYTHONPATH=packages/aura-worker/src:$(DNA_PATH) uv run --no-sync pytest packages/aura-worker/tests/ -v; \
+	fi
 
 # Run tests with coverage report
 test-cov:
@@ -53,19 +99,32 @@ build: generate build-tg
 	docker build --platform $(PLATFORM) -t $(REGISTRY)/aura-frontend:$(TAG) -f frontend/Dockerfile .
 
 build-tg:
-	docker build --platform $(PLATFORM) -t $(REGISTRY)/aura-telegram-bot:$(TAG) -f adapters/telegram-bot/Dockerfile .
+	docker build --platform $(PLATFORM) -t $(REGISTRY)/aura-telegram-bot:$(TAG) -f synapses/telegram-bot/Dockerfile .
 
 # --- 3. HELPER ---
-generate:
-	# Generate Protobuf code directly into packages/aura-core/src/aura_core/gen/
+
+# Incremental generation: only re-run buf if .proto files changed
+$(PROTO_SENTINEL): $(PROTO_SOURCES) buf.gen.yaml
+	# Generate Protobuf code directly into packages/aura-core/gen-proto/aura_core_gen
 	# Uses buf.gen.yaml which leverages betterproto
-	mkdir -p packages/aura-core/src/aura_core/gen
+	mkdir -p packages/aura-core/gen-proto/aura_core_gen
 	buf generate
-	# Fix betterproto google import shim if needed
-	if [ -d "packages/aura-core/src/aura_core/gen/aura/dna" ]; then \
-		mkdir -p packages/aura-core/src/aura_core/gen/aura/dna/google; \
-		echo "from betterproto.lib.google import protobuf" > packages/aura-core/src/aura_core/gen/aura/dna/google/__init__.py; \
+	# Fix betterproto google import shim
+	if [ -d "packages/aura-core/gen-proto/aura_core_gen/aura/core" ]; then \
+		mkdir -p packages/aura-core/gen-proto/aura_core_gen/aura/core/google; \
+		echo "from betterproto.lib.google import protobuf" > packages/aura-core/gen-proto/aura_core_gen/aura/core/google/__init__.py; \
 	fi
+	# Post-generation fix for double-prefix in negotiation chromosome
+	if [ -f "packages/aura-core/gen-proto/aura_core_gen/aura/negotiation/v1.py" ]; then \
+		sed -i 's/from \.aura\.core import v1/from aura_core_gen.aura.core import v1/g' packages/aura-core/gen-proto/aura_core_gen/aura/negotiation/v1.py; \
+	fi
+	if [ -d "packages/aura-core/gen-proto/aura_core_gen/aura/assets" ]; then \
+		mkdir -p packages/aura-core/gen-proto/aura_core_gen/aura/assets/google; \
+		echo "from betterproto.lib.google import protobuf" > packages/aura-core/gen-proto/aura_core_gen/aura/assets/google/__init__.py; \
+	fi
+	touch $(PROTO_SENTINEL)
+
+generate: $(PROTO_SENTINEL)
 
 # --- 4. PUBLISH (CI ONLY) ---
 push: push-tg
@@ -86,7 +145,24 @@ format:
 	# Format code
 	uv run ruff format .
 
-# --- 6. CORE TASKS ---
+# --- 6. RUN SERVICES (auto-generates protos if needed) ---
+run-core: $(PROTO_SENTINEL)
+	# Run Core gRPC service
+	PYTHONPATH=$(TOOL_PATH) uv run python -m aura_hive.main
+
+run-gateway: $(PROTO_SENTINEL)
+	# Run API Gateway
+	PYTHONPATH=$(GATEWAY_PATH):$(DNA_PATH) uv run uvicorn api_gateway.main:app --host 0.0.0.0 --port 8000 --app-dir api-gateway/src
+
+prepare-bun:
+	# Install frontend dependencies via bun
+	cd frontend && bun install
+
+run-frontend: prepare-bun
+	# Run Frontend dev server
+	cd frontend && bun run dev
+
+# --- 7. CORE TASKS ---
 core-seed:
 	# Seed the database with initial inventory
 	PYTHONPATH=$(CORE_PATH) uv run python core/scripts/seed.py
@@ -102,12 +178,20 @@ core-train:
 # Test health endpoints
 tools-health:
 	# Test health check endpoints (requires running services)
-	PYTHONPATH=.:$(CORE_PATH) uv run python tools/test_health_endpoints.py
+	PYTHONPATH=$(TOOL_PATH) uv run python tools/test_health_endpoints.py
+
+tools-distill:
+	# Distill architectural knowledge from the codebase into binary/JSON artifacts
+	PYTHONPATH=$(TOOL_PATH) uv run python tools/distill_knowledge.py
+
+tools-validate:
+	# Validate knowledge artifacts against the markdown architectural anchor
+	PYTHONPATH=$(TOOL_PATH) uv run python tools/validate_knowledge.py
 
 tools-simulate:
 	# Run agent negotiation simulation
-	PYTHONPATH=:.$(CORE_PATH) uv run python tools/simulators/agent_sim.py
+	PYTHONPATH=$(TOOL_PATH) uv run python tools/simulators/agent_sim.py
 
 tools-buyer:
 	# Run agent negotiation simulation
-	PYTHONPATH=:.$(CORE_PATH) uv run python tools/simulators/autonomous_buyer.py
+	PYTHONPATH=$(TOOL_PATH) uv run python tools/simulators/autonomous_buyer.py

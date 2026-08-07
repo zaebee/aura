@@ -1,0 +1,219 @@
+import asyncio
+import logging
+import time
+from datetime import UTC, datetime
+from typing import Any, cast
+
+import httpx
+import structlog
+from aura_core_gen.aura.core.v1 import SystemVitals
+from opentelemetry import trace
+from opentelemetry.exporter.otlp.proto.grpc.trace_exporter import OTLPSpanExporter
+from opentelemetry.sdk.resources import Resource
+from opentelemetry.sdk.trace import TracerProvider
+from opentelemetry.sdk.trace.export import BatchSpanProcessor, ConsoleSpanExporter
+from prometheus_client import REGISTRY, Counter
+
+logger = structlog.get_logger(__name__)
+
+# --- Metrics Implementation ---
+
+
+def _get_counter(name: str, documentation: str, labelnames: list[str]) -> Counter:
+    if name in REGISTRY._names_to_collectors:
+        return cast(Counter, REGISTRY._names_to_collectors[name])
+    return Counter(name, documentation, labelnames)
+
+
+negotiation_total = _get_counter("negotiation_total", "Total negotiations", ["service"])
+negotiation_accepted_total = _get_counter(
+    "negotiation_accepted_total", "Total accepted", ["service"]
+)
+heartbeat_total = _get_counter("heartbeat_total", "Total heartbeats", ["service"])
+
+# --- Telemetry Implementation ---
+
+
+def init_telemetry(
+    service_name: str, otlp_endpoint: str = "http://jaeger:4317"
+) -> trace.Tracer:
+    service_name = service_name.lower().strip()
+    if not service_name:
+        raise ValueError("service_name required")
+    resource = Resource.create({"service.name": service_name})
+    provider = TracerProvider(resource=resource)
+    try:
+        otlp_exporter = OTLPSpanExporter(endpoint=otlp_endpoint, insecure=True)
+        provider.add_span_processor(BatchSpanProcessor(otlp_exporter))
+    except Exception as e:
+        logging.warning(f"OTLP failed, console fallback: {e}")
+        provider.add_span_processor(BatchSpanProcessor(ConsoleSpanExporter()))
+    trace.set_tracer_provider(provider)
+    return trace.get_tracer(service_name)
+
+
+# --- Vitals Implementation ---
+
+
+class MetricsCache:
+    def __init__(self, ttl_seconds: int = 30):
+        self.ttl_seconds = ttl_seconds
+        self._cache: dict[str, Any] = {}
+        self._timestamp: float = 0.0
+
+    def get(self, ignore_ttl: bool = False) -> dict[str, Any] | None:
+        if not self._cache:
+            return None
+        if not ignore_ttl and (time.time() - self._timestamp > self.ttl_seconds):
+            return None
+        return self._cache
+
+    def set(self, metrics: dict[str, Any]) -> None:
+        self._cache = metrics
+        self._timestamp = time.time()
+
+
+async def fetch_vitals(metrics_cache: MetricsCache, settings: Any) -> SystemVitals:
+    cached = metrics_cache.get()
+    if cached:
+        # Create fresh timestamp for cached vitals
+        return SystemVitals(
+            status=str(cached.get("status", "ok")),
+            cpu_usage_percent=float(cached.get("cpu_usage_percent", 0.0)),
+            memory_usage_mb=float(cached.get("memory_usage_mb", 0.0)),
+            timestamp=datetime.now(UTC),
+            cached=True,
+        )
+
+    cpu_q = (
+        'avg(rate(container_cpu_usage_seconds_total{namespace="default"}[5m])) * 100'
+    )
+    mem_q = 'avg(container_memory_working_set_bytes{namespace="default"}) / 1024 / 1024'
+
+    # DNA Rule: Proteins must not import global settings.
+    if not settings:
+        raise ValueError("SystemVitals fetch failed: settings not provided")
+
+    try:
+        async with httpx.AsyncClient(timeout=5.0) as client:
+            # Handle both global settings and sub-config (for flexibility)
+            if hasattr(settings, "prometheus_url"):
+                base_url = str(settings.prometheus_url).rstrip("/")
+            elif hasattr(settings, "server"):
+                base_url = str(settings.server.prometheus_url).rstrip("/")
+            else:
+                raise ValueError("Settings object missing prometheus_url")
+
+            resps = await asyncio.gather(
+                client.get(f"{base_url}/api/v1/query", params={"query": cpu_q}),
+                client.get(f"{base_url}/api/v1/query", params={"query": mem_q}),
+                return_exceptions=True,
+            )
+            errs: list[str] = []
+            cpu, cpu_ok = process_resp(resps[0], "cpu", errs)
+            mem, mem_ok = process_resp(resps[1], "mem", errs)
+
+            if not (cpu_ok or mem_ok):
+                cached_dict = metrics_cache.get(ignore_ttl=True)
+                if cached_dict:
+                    return SystemVitals(
+                        status="unstable",
+                        cpu_usage_percent=float(
+                            cached_dict.get("cpu_usage_percent", 0.0)
+                        ),
+                        memory_usage_mb=float(cached_dict.get("memory_usage_mb", 0.0)),
+                        timestamp=datetime.now(UTC),
+                        cached=True,
+                    )
+                return SystemVitals(
+                    status="unstable",
+                    timestamp=datetime.now(UTC),
+                )
+
+            m_dict = {
+                "status": "ok",
+                "cpu_usage_percent": float(round(cpu, 2)),
+                "memory_usage_mb": float(round(mem, 2)),
+            }
+            if errs:
+                m_dict["status"] = "PARTIAL"
+
+            # Update cache
+            metrics_cache.set(m_dict)
+
+            return SystemVitals(
+                status=str(m_dict["status"]),
+                cpu_usage_percent=cast(float, m_dict["cpu_usage_percent"]),
+                memory_usage_mb=cast(float, m_dict["memory_usage_mb"]),
+                timestamp=datetime.now(UTC),
+            )
+    except Exception as e:
+        logger.error("monitoring_failure", error=str(e))
+        cached_dict = metrics_cache.get(ignore_ttl=True)
+        if cached_dict:
+            return SystemVitals(
+                status="unstable",
+                cpu_usage_percent=float(cached_dict.get("cpu_usage_percent", 0.0)),
+                memory_usage_mb=float(cached_dict.get("memory_usage_mb", 0.0)),
+                timestamp=datetime.now(UTC),
+                cached=True,
+            )
+        return SystemVitals(status="unstable", timestamp=datetime.now(UTC))
+
+
+async def query_loki(query: str, limit: int, settings: Any) -> list[dict[str, Any]]:
+    """Fetch raw logs from Loki."""
+    if not settings or not hasattr(settings, "loki_url"):
+        raise ValueError("Loki URL not configured in settings")
+
+    base_url = str(settings.loki_url).rstrip("/")
+    async with httpx.AsyncClient(timeout=10.0) as client:
+        resp = await client.get(
+            f"{base_url}/loki/api/v1/query_range",
+            params={"query": query, "limit": limit},
+        )
+        resp.raise_for_status()
+        data = resp.json()
+        # Loki query_range returns { "status": "success", "data": { "resultType": "streams", "result": [...] } }
+        return cast(list[dict[str, Any]], data.get("data", {}).get("result", []))
+
+
+async def query_prometheus(query: str, settings: Any) -> dict[str, Any]:
+    """Execute a generic Prometheus query."""
+    if not settings or not hasattr(settings, "prometheus_url"):
+        raise ValueError("Prometheus URL not configured in settings")
+
+    base_url = str(settings.prometheus_url).rstrip("/")
+    async with httpx.AsyncClient(timeout=10.0) as client:
+        resp = await client.get(f"{base_url}/api/v1/query", params={"query": query})
+        resp.raise_for_status()
+        return cast(dict[str, Any], resp.json())
+
+
+async def check_k8s_health(namespace: str, settings: Any) -> dict[str, Any]:
+    """Check K8s pod health via Prometheus metrics."""
+    # Query for pods that are NOT in Running phase
+    query = f'count(kube_pod_status_phase{{namespace="{namespace}", phase!="Running"}} > 0) or vector(0)'
+    data = await query_prometheus(query, settings)
+
+    unhealthy_count = 0
+    if data["status"] == "success" and data["data"]["result"]:
+        unhealthy_count = int(float(data["data"]["result"][0]["value"][1]))
+
+    return {
+        "status": "healthy" if unhealthy_count == 0 else "degraded",
+        "unhealthy_pods_count": unhealthy_count,
+        "namespace": namespace,
+    }
+
+
+def process_resp(resp: Any, name: str, errs: list[str]) -> tuple[float, bool]:
+    if isinstance(resp, httpx.Response) and resp.status_code == 200:
+        try:
+            val = resp.json()["data"]["result"][0]["value"][1]
+            return float(val), True
+        except (KeyError, IndexError):
+            errs.append(f"{name}_no_data")
+    else:
+        errs.append(f"{name}_fetch_error")
+    return 0.0, False

@@ -3,7 +3,7 @@
 test_bloodstream.py - Verify binary proto publish/subscribe via NATS.
 
 This script tests the Binary Bloodstream by:
-1. Publishing a binary proto event
+1. Publishing a binary betterproto event
 2. Subscribing and deserializing the event
 3. Verifying the round-trip
 
@@ -21,7 +21,12 @@ from datetime import UTC, datetime
 from typing import Any
 
 import nats
-from google.protobuf.timestamp_pb2 import Timestamp
+from aura_core_gen.aura.core.v1 import (
+    Event,
+    HeartbeatEvent,
+    Status,
+    TraceContext,
+)
 
 
 async def test_basic_nats(nats_url: str) -> bool:
@@ -30,12 +35,11 @@ async def test_basic_nats(nats_url: str) -> bool:
 
     try:
         # Import proto
-        from hive.proto.aura.dna.v1 import dna_pb2
+        from aura_core_gen.aura.core.v1 import Event
 
         print("  ✓ Proto module imported")
     except ImportError as e:
         print(f"  ✗ Failed to import proto: {e}")
-        print("    Run: buf generate proto")
         return False
 
     try:
@@ -47,26 +51,26 @@ async def test_basic_nats(nats_url: str) -> bool:
         return False
 
     # Create a test event
-    event = dna_pb2.Event()
-    event.event_id = f"test-{uuid.uuid4().hex[:8]}"
-    event.topic = "aura.test.heartbeat"
-
-    ts = Timestamp()
-    ts.FromDatetime(datetime.now(UTC))
-    event.timestamp.CopyFrom(ts)
-
-    event.trace.trace_id = uuid.uuid4().hex
-    event.trace.span_id = uuid.uuid4().hex[:16]
-    event.trace.trace_flags = "01"
-
-    event.heartbeat.service = "test_bloodstream"
-    event.heartbeat.instance_id = "test-001"
-    event.heartbeat.status = dna_pb2.VITALS_STATUS_OK
+    event = Event(
+        identifier=f"test-{uuid.uuid4().hex[:8]}",
+        topic="aura.test.heartbeat",
+        timestamp=datetime.now(UTC),
+        trace=TraceContext(
+            trace_id=uuid.uuid4().hex,
+            span_id=uuid.uuid4().hex[:16],
+            trace_flags="01",
+        ),
+        heartbeat=HeartbeatEvent(
+            service="test_bloodstream",
+            instance_id="test-001",
+            status=Status.STATUS_OK,
+        ),
+    )
 
     # Serialize to binary
-    binary_data = event.SerializeToString()
+    binary_data = bytes(event)
     print(f"  ✓ Event serialized: {len(binary_data)} bytes")
-    print(f"    event_id: {event.event_id}")
+    print(f"    identifier: {event.identifier}")
     print(f"    trace_id: {event.trace.trace_id}")
 
     # Set up subscriber first
@@ -92,21 +96,19 @@ async def test_basic_nats(nats_url: str) -> bool:
         return False
 
     # Verify
-    received_event = dna_pb2.Event()
-    received_event.ParseFromString(msg.data)
+    received_event = Event().parse(msg.data)
     print("  ✓ Received and deserialized event")
-    print(f"    event_id: {received_event.event_id}")
+    print(f"    identifier: {received_event.identifier}")
     print(f"    topic: {received_event.topic}")
     print(f"    heartbeat.service: {received_event.heartbeat.service}")
-    print(
-        f"    heartbeat.status: {dna_pb2.VitalsStatus.Name(received_event.heartbeat.status)}"
-    )
+    print(f"    heartbeat.status: {received_event.heartbeat.status.name}")
 
-    if received_event.event_id == event.event_id:
-        print("  ✓ Round-trip verified: event_id matches")
+    if received_event.identifier == event.identifier:
+        print("  ✓ Round-trip verified: identifier matches")
+        await nc.close()
         return True
     else:
-        print("  ✗ Round-trip failed: event_id mismatch")
+        print("  ✗ Round-trip failed: identifier mismatch")
         await nc.close()
         return False
 
@@ -114,14 +116,6 @@ async def test_basic_nats(nats_url: str) -> bool:
 async def test_jetstream(nats_url: str) -> bool:
     """Test binary proto publish/subscribe with JetStream."""
     print(f"🩸 Testing Binary Bloodstream (JetStream) at {nats_url}")
-
-    try:
-        from hive.proto.aura.dna.v1 import dna_pb2
-
-        print("  ✓ Proto module imported")
-    except ImportError as e:
-        print(f"  ✗ Failed to import proto: {e}")
-        return False
 
     try:
         nc = await nats.connect(nats_url)
@@ -150,19 +144,18 @@ async def test_jetstream(nats_url: str) -> bool:
         return await test_basic_nats(nats_url)
 
     # Create and publish event
-    event = dna_pb2.Event()
-    event.event_id = f"test-{uuid.uuid4().hex[:8]}"
-    event.topic = "aura.test.heartbeat"
+    event = Event(
+        identifier=f"test-{uuid.uuid4().hex[:8]}",
+        topic="aura.test.heartbeat",
+        timestamp=datetime.now(UTC),
+        heartbeat=HeartbeatEvent(
+            service="test_bloodstream",
+            instance_id="test-001",
+            status=Status.STATUS_OK,
+        ),
+    )
 
-    ts = Timestamp()
-    ts.FromDatetime(datetime.now(UTC))
-    event.timestamp.CopyFrom(ts)
-
-    event.heartbeat.service = "test_bloodstream"
-    event.heartbeat.instance_id = "test-001"
-    event.heartbeat.status = dna_pb2.VITALS_STATUS_OK
-
-    binary_data = event.SerializeToString()
+    binary_data = bytes(event)
     print(f"  ✓ Event serialized: {len(binary_data)} bytes")
 
     try:
@@ -178,13 +171,12 @@ async def test_jetstream(nats_url: str) -> bool:
         sub = await js.subscribe("aura.test.>", stream="AURA_TEST")
         msg = await sub.next_msg(timeout=5)
 
-        received_event = dna_pb2.Event()
-        received_event.ParseFromString(msg.data)
+        received_event = Event().parse(msg.data)
 
         print("  ✓ Received and deserialized event")
-        print(f"    event_id: {received_event.event_id}")
+        print(f"    identifier: {received_event.identifier}")
 
-        if received_event.event_id == event.event_id:
+        if received_event.identifier == event.identifier:
             print("  ✓ Round-trip verified")
 
         await msg.ack()

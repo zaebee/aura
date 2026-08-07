@@ -1,0 +1,64 @@
+from pydantic import BaseModel, HttpUrl, SecretStr, model_validator
+
+
+class CryptoSettings(BaseModel):
+    """Crypto payment configuration for Pay-to-Reveal functionality."""
+
+    # Feature Toggle
+    enabled: bool = False  # Set true to enable crypto payment locks
+
+    # Provider Configuration
+    provider: str = "solana"  # "solana", "ethereum" (future)
+    currency: str = "SOL"  # "SOL", "USDC", "ETH" (future)
+
+    # Solana Configuration
+    solana_private_key: SecretStr = ""  # type: ignore # Base58-encoded private key
+    solana_rpc_url: HttpUrl = "https://api.devnet.solana.com"  # type: ignore
+    solana_network: str = "devnet"  # "mainnet-beta", "devnet", "testnet"
+    solana_usdc_mint: str = (
+        "Gh9ZwEmdLJ8DscKNTkTqPbNwLNNBjuSzaG9Vp2KGtKJr"  # Devnet USDC
+    )
+
+    # EVM Configuration (Base Sepolia)
+    evm_private_key: SecretStr = SecretStr("")  # Hex-encoded private key
+    evm_rpc_url: HttpUrl = "https://sepolia.base.org"  # type: ignore
+    evm_usdc_address: str = "0x036CbD53842c5426634e7929541eC2318f3dCF7e"
+    evm_chain_id: int = 84532  # Base Sepolia
+    risk_router_address: str = ""
+
+    wallet_address: str = ""
+
+    # Compliance Settings
+    required_kyc_status: str = "APPROVED"
+    required_aml_risk: str = "LOW"
+
+    # Deal Expiration
+    deal_ttl_seconds: int = 3600  # 1 hour default
+
+    # Secret Encryption
+    secret_encryption_key: SecretStr = ""  # type: ignore # Base64-encoded Fernet key (32 bytes)
+
+    # Pricing Configuration
+    hive_margin: float = 0.10  # 10% Hive Margin rule (The Homeostasis Law)
+    use_fixed_rates: bool = True  # Use fixed rates (not oracle)
+    sol_usd_rate: float = 100.0  # Fixed rate: 1 SOL = $100 USD
+    # Note: USDC rate is always 1.0 (stablecoin)
+
+    @model_validator(mode="after")
+    def validate_crypto_config(self) -> "CryptoSettings":
+        """Validate crypto payment configuration when enabled."""
+        if self.enabled:
+            if not self.solana_private_key:
+                raise ValueError(
+                    "AURA_CRYPTO__SOLANA_PRIVATE_KEY required when AURA_CRYPTO__ENABLED=true"
+                )
+            if not self.secret_encryption_key:
+                raise ValueError(
+                    "AURA_CRYPTO__SECRET_ENCRYPTION_KEY required when AURA_CRYPTO__ENABLED=true. "
+                    "See .env.example for key generation instructions."
+                )
+            if self.currency not in ["SOL", "USDC"]:
+                raise ValueError("AURA_CRYPTO__CURRENCY must be 'SOL' or 'USDC'")
+            if self.provider not in ["solana", "evm"]:
+                raise ValueError("AURA_CRYPTO__PROVIDER must be 'solana' or 'evm'")
+        return self

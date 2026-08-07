@@ -146,7 +146,7 @@ aura/
 ├── proto/                 # Protocol Buffer definitions
 ├── api-gateway/          # API Gateway service (FastAPI)
 ├── core/         # Core business logic service (DSPy Engine)
-├── adapters/             # External interface adapters
+├── synapses/             # External interface adapters
 │   ├── telegram-bot/     # Telegram Bot interface
 │   └── mcp-server/       # Model Context Protocol (MCP) server
 ├── docs/                 # Detailed documentation

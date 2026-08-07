@@ -49,10 +49,14 @@ spec:
           resources:
             {{ toYaml .Values.gateway.resources | nindent 12 }}
           env:
+            - name: AURA_GATEWAY__NATS_URL
+              value: "nats://{{ .Release.Name }}-nats.{{ .Release.Namespace }}.svc.cluster.local:4222"
             - name: AURA_GATEWAY__CORE_SERVICE_HOST
               value: "{{ .Release.Name }}-core.{{ .Release.Namespace }}.svc.cluster.local:50051"
             - name: AURA_GATEWAY__HTTP_PORT
               value: "8000"
+            - name: PYTHONPATH
+              value: "{{ .Values.gateway.env.PYTHONPATH }}"
             - name: AURA_GATEWAY__LOG_LEVEL
               value: "{{ .Values.gateway.env.LOG_LEVEL }}"
             - name: AURA_GATEWAY__REDIS_URL

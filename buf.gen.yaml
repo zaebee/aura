@@ -2,33 +2,25 @@ version: v2
 plugins:
   # Pydantic models from Proto (Source of Truth)
   - remote: buf.build/community/danielgtaylor-betterproto:v1.2.5
-    out: packages/aura-core/src/aura_core/gen
+    out: packages/aura-core/gen-proto/aura_core_gen
     opt:
       - pydantic_version=2
 
   # Core service proto
   - remote: buf.build/protocolbuffers/pyi
-    out: core/src/hive/proto
+    out: core/gen-proto
   - remote: buf.build/grpc/python:v1.76.0
-    out: core/src/hive/proto
+    out: core/gen-proto
   - remote: buf.build/protocolbuffers/python
-    out: core/src/hive/proto
+    out: core/gen-proto
 
   # Gateway proto
   - remote: buf.build/protocolbuffers/pyi
-    out: api-gateway/src/proto
+    out: api-gateway/gen-proto
   - remote: buf.build/grpc/python:v1.76.0
-    out: api-gateway/src/proto
+    out: api-gateway/gen-proto
   - remote: buf.build/protocolbuffers/python
-    out: api-gateway/src/proto
-
-  # Agents/Adaptors proto
-  - remote: buf.build/protocolbuffers/pyi
-    out: adapters/telegram-bot/src/proto
-  - remote: buf.build/grpc/python:v1.76.0
-    out: adapters/telegram-bot/src/proto
-  - remote: buf.build/protocolbuffers/python
-    out: adapters/telegram-bot/src/proto
+    out: api-gateway/gen-proto
 
   # Frontend ts proto
   - remote: buf.build/bufbuild/es

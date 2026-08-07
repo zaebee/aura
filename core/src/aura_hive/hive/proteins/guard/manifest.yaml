@@ -1,0 +1,85 @@
+# Internal Metadata (For Cortex)
+skill_name: "guard"
+version: "1.1.0"
+description: "Safety validation and safe price calculation protein"
+capabilities:
+  - "validate_decision"
+  - "validate_margin"
+  - "validate_floor"
+  - "get_safe_price"
+dependencies:
+  settings_class: "SafetySettings"
+  external_services: []
+
+# External Tool Definitions (MCP / Anthropic / OpenAI Tools)
+llm_tools:
+  - name: "guard__validate_safety"
+    description: "Validates a negotiation decision against safety guardrails including floor price and minimum margin requirements."
+
+    # Membrane Policy (CRISPR-like safety rules)
+    membrane_policy:
+      safety_level: "system"
+      redaction_rules: ["floor_price_redaction", "cost_redaction"]
+      validation_rules: ["floor_price_check", "margin_check"]
+
+    # Metabolic Cost
+    activation_cost:
+      tokens_est: 200
+      latency_ms_est: 50
+
+    input_schema:
+      type: "object"
+      properties:
+        decision:
+          type: "object"
+          description: "The negotiation decision to validate"
+          properties:
+            action:
+              type: "string"
+              description: "The action being taken (accept/counter)"
+            price:
+              type: "number"
+              description: "The proposed price"
+          required: ["action", "price"]
+        context:
+          type: "object"
+          description: "Contextual information for validation"
+          properties:
+            floor_price:
+              type: "number"
+              description: "The minimum acceptable price"
+            internal_cost:
+              type: "number"
+              description: "The internal cost of the item"
+          required: ["floor_price", "internal_cost"]
+      required: ["decision", "context"]
+
+  - name: "guard__get_safe_price"
+    description: "Calculates a safe counter-offer price when validation fails."
+
+    # Membrane Policy
+    membrane_policy:
+      safety_level: "read_only"
+      redaction_rules: ["cost_redaction"]
+      validation_rules: []
+
+    # Metabolic Cost
+    activation_cost:
+      tokens_est: 100
+      latency_ms_est: 30
+
+    input_schema:
+      type: "object"
+      properties:
+        context:
+          type: "object"
+          description: "Context for safe price calculation"
+          properties:
+            floor_price:
+              type: "number"
+              description: "The floor price that was violated"
+          required: ["floor_price"]
+        reason:
+          type: "string"
+          description: "The reason for needing a safe price (margin/floor violation)"
+      required: ["context", "reason"]
