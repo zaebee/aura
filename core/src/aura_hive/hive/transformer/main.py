@@ -420,7 +420,11 @@ class AuraTransformer(Transformer[Context, Intent]):
             )
             if not obs.success:
                 return []
-            history = _as_dict(obs.metadata).get("history", [])
+            # `.to_dict()`, not `_as_dict`: a betterproto Struct is not a dict,
+            # so the isinstance check there returns {} and the history silently
+            # stays empty. Same call the RWA and trade paths already use.
+            meta: dict[str, Any] = obs.metadata.to_dict() if obs.metadata else {}
+            history: Any = meta.get("history", [])
             return (
                 cast(list[dict[str, Any]], history) if isinstance(history, list) else []
             )

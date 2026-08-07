@@ -171,3 +171,87 @@ class TestGroupingApproximation:
 
         history = await cache.get_negotiation_history("did:a", "hotel")
         assert len(history) == 2
+
+
+class TestTransformerSeam:
+    """
+    The boundary the storage tests never crossed.
+
+    Everything above exercises RedisCache directly. That is where the first
+    version of this feature passed twelve tests while returning an empty history
+    every single time: `_as_dict` gives {} for a betterproto Struct, so the
+    protein's answer was discarded on arrival. Parts can all be correct while the
+    seam between them is not.
+    """
+
+    @pytest.mark.asyncio
+    async def test_history_survives_the_protein_boundary(self) -> None:
+        from aura_core.struct_utils import make_struct
+        from aura_core_gen.aura.core.v1 import (
+            Context,
+            HiveContextData,
+            NegotiationOffer,
+            Observation,
+        )
+        from aura_hive.hive.transformer.main import AuraTransformer
+
+        stored = [{"price": 900.0, "membrane_override": False}]
+
+        class Registry:
+            async def execute(
+                self, skill: str, intent: str, params: Any
+            ) -> Observation:
+                assert skill == "persistence"
+                assert intent == "get_negotiation_history"
+                assert params == {"agent_did": "did:key:abc", "item_id": "hotel"}
+                return Observation(
+                    success=True, metadata=make_struct({"history": stored})
+                )
+
+        transformer = AuraTransformer(registry=Registry())  # type: ignore[arg-type]
+        context = Context(
+            hive=HiveContextData(
+                item_identifier="hotel",
+                offer=NegotiationOffer(bid_amount=850.0, agent_did="did:key:abc"),
+            )
+        )
+
+        assert await transformer._load_history(context) == stored
+
+    @pytest.mark.asyncio
+    async def test_a_failing_protein_means_no_history_not_a_failed_deal(self) -> None:
+        from aura_core_gen.aura.core.v1 import (
+            Context,
+            HiveContextData,
+            NegotiationOffer,
+            Observation,
+        )
+        from aura_hive.hive.transformer.main import AuraTransformer
+
+        class Registry:
+            async def execute(self, *_: Any, **__: Any) -> Observation:
+                return Observation(success=False, error="cache_not_initialized")
+
+        transformer = AuraTransformer(registry=Registry())  # type: ignore[arg-type]
+        context = Context(
+            hive=HiveContextData(
+                item_identifier="hotel",
+                offer=NegotiationOffer(bid_amount=850.0, agent_did="did:key:abc"),
+            )
+        )
+
+        assert await transformer._load_history(context) == []
+
+    @pytest.mark.asyncio
+    async def test_a_context_without_an_agent_asks_for_nothing(self) -> None:
+        from aura_core_gen.aura.core.v1 import Context, HiveContextData
+        from aura_hive.hive.transformer.main import AuraTransformer
+
+        class Registry:
+            async def execute(self, *_: Any, **__: Any) -> Any:
+                raise AssertionError("must not query without an agent did")
+
+        transformer = AuraTransformer(registry=Registry())  # type: ignore[arg-type]
+        context = Context(hive=HiveContextData(item_identifier="hotel"))
+
+        assert await transformer._load_history(context) == []

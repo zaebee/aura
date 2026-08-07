@@ -57,6 +57,12 @@ def _record_intervention(direction: str, reason: str, **fields: Any) -> None:
     """Count it and say so. An intervention that leaves no trace cannot be measured."""
     try:
         membrane_interventions_total.labels(direction=direction, reason=reason).inc()
+        # Inside the try as well: **fields is caller-supplied and could fail to
+        # serialise, and a crash while reporting an intervention is the same
+        # failure as a crash while counting one.
+        logger.warning(
+            "membrane_intervention", direction=direction, reason=reason, **fields
+        )
     except Exception as e:
         # Accounting must never take the guarantee down with it. The decision
         # this call accompanies has already been made and still stands; losing a
@@ -64,9 +70,6 @@ def _record_intervention(direction: str, reason: str, **fields: Any) -> None:
         logger.error(
             "membrane_metric_failed", direction=direction, reason=reason, error=str(e)
         )
-    logger.warning(
-        "membrane_intervention", direction=direction, reason=reason, **fields
-    )
 
 
 def _action_label(action: Any) -> str:

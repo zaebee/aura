@@ -144,20 +144,24 @@ class HiveConnector(BaseConnector):
         model wanted would teach it nothing about what the guard allowed, and
         the override rate is precisely what we want to be able to read later.
         """
-        hive = _get_hive(context)
-        if not hive or not hive.offer:
-            return
-        agent_did = getattr(hive.offer, "agent_did", "")
-        item_id = hive.item_identifier or ""
-        if not agent_did or not item_id:
+        try:
+            hive = _get_hive(context)
+            offer = getattr(hive, "offer", None) if hive else None
+            agent_did = getattr(offer, "agent_did", "") if offer else ""
+            item_id = getattr(hive, "item_identifier", "") if hive else ""
+            if not agent_did or not item_id:
+                return
+        except Exception:
             return
 
         reasoning = action.reasoning or ""
         turn = {
             "action": event_type,
-            "bid": float(getattr(hive.offer, "bid_amount", 0.0)),
-            "price": float(neg_intent.price) if neg_intent else 0.0,
-            "message": (neg_intent.message if neg_intent else "")[:280],
+            "bid": float(getattr(offer, "bid_amount", 0.0) or 0.0),
+            "price": float(getattr(neg_intent, "price", 0.0) or 0.0)
+            if neg_intent
+            else 0.0,
+            "message": str(getattr(neg_intent, "message", "") or "")[:280],
             # The guard leaves this marker when it replaces a decision. Carrying
             # it forward is what makes the override rate measurable per round.
             "membrane_override": "Membrane Override" in reasoning,
@@ -166,11 +170,15 @@ class HiveConnector(BaseConnector):
         }
 
         try:
-            await self.registry.execute(
+            obs = await self.registry.execute(
                 "persistence",
                 "append_negotiation_turn",
                 {"agent_did": agent_did, "item_id": item_id, "turn": turn},
             )
+            # The registry reports a skill failure by returning success=False,
+            # not by raising, so an except block alone would swallow it.
+            if not obs.success:
+                logger.warning("negotiation_turn_not_recorded", error=obs.error)
         except Exception as e:
             # A negotiation must not fail because its transcript could not be
             # written. Losing a turn degrades the next prompt; raising loses the deal.
