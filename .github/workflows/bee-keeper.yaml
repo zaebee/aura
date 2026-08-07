@@ -87,4 +87,6 @@ jobs:
           git config --global user.name "bee.Keeper"
           git config --global user.email "keeper@aura.hive"
 
-          # SKIP: PYTHONPATH=agents/bee-keeper/src uv run python -m aura_keeper.main
+          # One cycle, then exit. Without --once this is a NATS daemon that
+          # blocks until the job timeout.
+          PYTHONPATH=agents/bee-keeper/src uv run python -m aura_keeper.main --once

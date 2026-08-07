@@ -56,6 +56,8 @@ class BeeTransformer(Transformer[Context, AuditObservation]):
         self.settings = settings
         self.model = settings.llm__model
         litellm.api_key = settings.llm__api_key
+        # The organ that owns the model also reports whether it answers.
+        self.brain_status: dict[str, bool] = {}
         # Metabolism instrumentation (Gate 0). bee.Keeper makes more than one
         # LLM call per cycle, so usage is accumulated rather than overwritten.
         self.usage_totals: dict[str, Any] = {}
@@ -125,6 +127,50 @@ class BeeTransformer(Transformer[Context, AuditObservation]):
                 self.manifest = yaml.safe_load(f)
         else:
             self.manifest = {}
+
+    async def test_brain_connectivity(self) -> bool:
+        """
+        Ping the configured models to verify connectivity.
+
+        Lives here rather than in the Aggregator: the Transformer is the only
+        organ permitted to call a model, and whether the brain answers is a
+        property of the brain, not of the senses.
+        """
+        logger.info("testing_brain_connectivity")
+        models = {
+            "primary": self.settings.llm__model,
+            "fallback": self.settings.llm__fallback_model,
+        }
+        # Reset status and ensure we have entries for both roles
+        self.brain_status = {role: False for role in models}
+
+        for role, model in models.items():
+            if not model:
+                continue
+            try:
+                logger.info("pinging_llm", role=role, model=model)
+
+                kwargs: dict[str, Any] = {
+                    "model": model,
+                    "messages": [{"role": "user", "content": "ping"}],
+                    "max_tokens": 5,
+                    "timeout": 10.0,
+                    "api_key": self.settings.llm__api_key,
+                }
+
+                if "ollama" in model:
+                    kwargs["api_base"] = self.settings.llm__ollama_base_url
+
+                # Simple completion to test connectivity via LiteLLM
+                await litellm.acompletion(**kwargs)
+
+                logger.info("llm_ping_success", role=role, model=model)
+                self.brain_status[role] = True
+            except Exception as e:
+                # Log as warning to ensure the Hive doesn't exit prematurely if at least one model is alive
+                logger.warning("llm_ping_failed", role=role, model=model, error=str(e))
+
+        return any(self.brain_status.values())
 
     async def think(self, context: Context, **kwargs: Any) -> AuditObservation:
         """Main entry point for BeeKeeper reasoning."""

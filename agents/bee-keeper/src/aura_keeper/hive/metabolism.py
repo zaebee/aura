@@ -41,7 +41,11 @@ class BeeMetabolism:
         try:
             # 1. Aggregator (A) - Senses the environment
             try:
-                context = await self.aggregator.perceive(None, event_name=event_name)
+                context = await self.aggregator.perceive(
+                    None,
+                    event_name=event_name,
+                    brain_status=self.transformer.brain_status,
+                )
             except Exception:
                 outcome = "aggregator_error"
                 raise

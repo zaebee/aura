@@ -6,7 +6,6 @@ from typing import Any, cast
 
 import betterproto
 import httpx
-import litellm
 from datetime import UTC, datetime
 
 import structlog
@@ -39,10 +38,13 @@ class BeeAggregator(Aggregator[Any, Context]):
         self.prometheus_url = settings.prometheus_url
         self.repo_name = settings.github_repository
         self.event_path = settings.github_event_path
+        # Reported by the Transformer, which owns the model. The senses do not
+        # touch it: an Aggregator must be resultant, and a model call is not.
         self.brain_status: dict[str, bool] = {}
 
     async def perceive(self, signal: Any, **kwargs: Any) -> Context:
         event_name = kwargs.get("event_name", "manual")
+        self.brain_status = kwargs.get("brain_status", self.brain_status)
         logger.info("bee_aggregator_perceive_started", trigger_event=event_name)
 
         error_msg = ""
@@ -253,41 +255,3 @@ class BeeAggregator(Aggregator[Any, Context]):
             except Exception as e:
                 logger.warning("event_data_load_failed", error=str(e))
         return {}
-
-    async def test_brain_connectivity(self) -> bool:
-        """Pings the LLM endpoints to verify connectivity."""
-        logger.info("testing_brain_connectivity")
-        models = {
-            "primary": self.settings.llm__model,
-            "fallback": self.settings.llm__fallback_model,
-        }
-        # Reset status and ensure we have entries for both roles
-        self.brain_status = {role: False for role in models}
-
-        for role, model in models.items():
-            if not model:
-                continue
-            try:
-                logger.info("pinging_llm", role=role, model=model)
-
-                kwargs: dict[str, Any] = {
-                    "model": model,
-                    "messages": [{"role": "user", "content": "ping"}],
-                    "max_tokens": 5,
-                    "timeout": 10.0,
-                    "api_key": self.settings.llm__api_key,
-                }
-
-                if "ollama" in model:
-                    kwargs["api_base"] = self.settings.llm__ollama_base_url
-
-                # Simple completion to test connectivity via LiteLLM
-                await litellm.acompletion(**kwargs)
-
-                logger.info("llm_ping_success", role=role, model=model)
-                self.brain_status[role] = True
-            except Exception as e:
-                # Log as warning to ensure the Hive doesn't exit prematurely if at least one model is alive
-                logger.warning("llm_ping_failed", role=role, model=model, error=str(e))
-
-        return any(self.brain_status.values())
