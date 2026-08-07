@@ -10,6 +10,7 @@ from aura_core import (
     SystemVitals,
     TelegramContext,
 )
+from aura_core.gen.aura.dna.v1 import Event as ProtoEvent
 from opentelemetry import trace
 
 logger = structlog.get_logger(__name__)
@@ -34,6 +35,26 @@ class TelegramAggregator(Aggregator[Any, TelegramContext]):
             chat_id = 0
             text = None
             callback_data = None
+
+            # Handle binary NATS events (Unified Metabolism)
+            if isinstance(signal, bytes) and kwargs.get("is_nats"):
+                try:
+                    event = ProtoEvent().parse(signal)
+                    logger.info("perceiving_nats_event", topic=event.topic)
+
+                    if event.negotiation:
+                        # Map NATS event back to context
+                        # Note: We might need a way to map session_token to chat_id
+                        # For now, we'll extract what we can
+                        context = TelegramContext(
+                            user_id=0, # Unknown from binary event
+                            chat_id=0, # Unknown from binary event
+                            message_text=f"NATS Event: {event.topic}",
+                            metadata={"event": event}
+                        )
+                        return context
+                except Exception as e:
+                    logger.error("nats_decode_failed", error=str(e))
 
             if isinstance(signal, Message):
                 user_id = signal.from_user.id if signal.from_user else 0

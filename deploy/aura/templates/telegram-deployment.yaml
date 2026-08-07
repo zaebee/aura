@@ -20,8 +20,6 @@ spec:
         - name: telegram
           image: "{{ .Values.telegram.image.repository }}:{{ .Values.telegram.image.tag }}"
           imagePullPolicy: {{ .Values.telegram.image.pullPolicy }}
-          resources:
-            {{ toYaml .Values.telegram.resources | nindent 12 }}
           env:
             - name: AURA_TG__TOKEN
               valueFrom:
@@ -29,10 +27,12 @@ spec:
                   name: "{{ .Release.Name }}-secrets"
                   key: "telegram-token"
             - name: AURA_TG__CORE_URL
-              value: "{{ .Release.Name }}-core:50051"
+              value: "{{ .Release.Name }}-core.{{ .Release.Namespace }}.svc.cluster.local:50051"
             - name: AURA_TG__NATS_URL
-              value: "nats://{{ .Release.Name }}-nats:4222"
-            - name: OTEL_EXPORTER_OTLP_ENDPOINT
-              value: {{ .Values.monitoring.jaeger.collectorUrl | default (include "aura.jaeger.collectorUrl" .) | quote }}
-            - name: LOG_LEVEL
+              value: "nats://{{ .Release.Name }}-nats.{{ .Release.Namespace }}.svc.cluster.local:4222"
+            - name: AURA_TG__LOG_LEVEL
               value: "{{ .Values.telegram.env.LOG_LEVEL }}"
+            - name: AURA_TG__OTEL_EXPORTER_OTLP_ENDPOINT
+              value: {{ .Values.monitoring.jaeger.collectorUrl | default (include "aura.jaeger.collectorUrl" .) | quote }}
+          resources:
+            {{- toYaml .Values.telegram.resources | nindent 12 }}

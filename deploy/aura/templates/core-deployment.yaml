@@ -21,50 +21,36 @@ spec:
           image: "{{ .Values.core.image.repository }}:{{ .Values.core.image.tag }}"
           imagePullPolicy: {{ .Values.core.image.pullPolicy }}
           ports:
-            - containerPort: 50051
+            - containerPort: {{ .Values.core.service.port }}
           livenessProbe:
             grpc:
-              port: 50051
+              port: {{ .Values.core.service.port }}
             initialDelaySeconds: {{ .Values.core.livenessProbe.initialDelaySeconds }}
             periodSeconds: {{ .Values.core.livenessProbe.periodSeconds }}
             timeoutSeconds: {{ .Values.core.livenessProbe.timeoutSeconds }}
             failureThreshold: {{ .Values.core.livenessProbe.failureThreshold }}
           readinessProbe:
             grpc:
-              port: 50051
+              port: {{ .Values.core.service.port }}
             initialDelaySeconds: {{ .Values.core.readinessProbe.initialDelaySeconds }}
             periodSeconds: {{ .Values.core.readinessProbe.periodSeconds }}
             timeoutSeconds: {{ .Values.core.readinessProbe.timeoutSeconds }}
             failureThreshold: {{ .Values.core.readinessProbe.failureThreshold }}
-          startupProbe:
-            grpc:
-              port: 50051
-            initialDelaySeconds: 0
-            periodSeconds: 2
-            timeoutSeconds: 5
-            failureThreshold: 60
           resources:
-            {{ toYaml .Values.core.resources | nindent 12 }}
+            {{- toYaml .Values.core.resources | nindent 12 }}
           env:
-            - name: AURA_CRYPTO__SECRET_ENCRYPTION_KEY
-              valueFrom:
-                secretKeyRef:
-                  name: "{{ .Release.Name }}-secrets"
-                  key: "secret-encryption-key"
-            - name: AURA_CRYPTO__SOLANA_PRIVATE_KEY
-              valueFrom:
-                secretKeyRef:
-                  name: "{{ .Release.Name }}-secrets"
-                  key: "solana-private-key"
+            - name: AURA_SERVER__LOG_LEVEL
+              value: "{{ .Values.core.env.AURA_SERVER__LOG_LEVEL }}"
+            - name: AURA_SERVER__PORT
+              value: "{{ .Values.core.service.port }}"
+            - name: AURA_SERVER__OTEL_EXPORTER_OTLP_ENDPOINT
+              value: "http://aura-jaeger.{{ .Release.Namespace }}.svc.cluster.local:4317"
+            - name: AURA_SERVER__NATS_URL
+              value: "nats://{{ .Release.Name }}-nats.{{ .Release.Namespace }}.svc.cluster.local:4222"
             - name: AURA_DATABASE__URL
-              value: "postgresql://{{ .Values.postgres.auth.username }}:{{ .Values.postgres.auth.password }}@{{ .Release.Name }}-postgres:5432/{{ .Values.postgres.auth.database }}"
+              value: "postgresql://{{ .Values.postgres.auth.username }}:{{ .Values.postgres.auth.password }}@{{ .Release.Name }}-postgres.{{ .Release.Namespace }}.svc.cluster.local:5432/{{ .Values.postgres.auth.database }}"
             - name: AURA_DATABASE__REDIS_URL
-              value: "redis://{{ .Release.Name }}-redis:6379/0"
-            - name: MISTRAL_API_KEY
-              valueFrom:
-                secretKeyRef:
-                  name: "{{ .Release.Name }}-secrets"
-                  key: "api-key"
+              value: "redis://{{ .Release.Name }}-redis.{{ .Release.Namespace }}.svc.cluster.local:6379/0"
             - name: AURA_LLM__API_KEY
               valueFrom:
                 secretKeyRef:
@@ -79,12 +65,17 @@ spec:
                 secretKeyRef:
                   name: "{{ .Release.Name }}-secrets"
                   key: "openai-key"
-                  optional: true  # Only required if LLM_MODEL starts with "openai/"
-            - name: AURA_SERVER__NATS_URL
-              value: "nats://{{ .Release.Name }}-nats:4222"
-            - name: AURA_SERVER__PROMETHEUS_URL
-              value: "{{ .Values.monitoring.prometheus.url }}"
-            - name: AURA_SERVER__OTEL_EXPORTER_OTLP_ENDPOINT
-              value: {{ .Values.monitoring.jaeger.collectorUrl | default (include "aura.jaeger.collectorUrl" .) | quote }}
-            - name: AURA_SERVER__OTEL_SERVICE_NAME
-              value: "{{ .Release.Name }}-core"
+            - name: AURA_CRYPTO__SECRET_ENCRYPTION_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: "{{ .Release.Name }}-secrets"
+                  key: "secret-encryption-key"
+            - name: AURA_CRYPTO__SOLANA_PRIVATE_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: "{{ .Release.Name }}-secrets"
+                  key: "solana-private-key"
+            - name: AURA_CRYPTO__SOLANA_RPC_URL
+              value: "https://api.mainnet-beta.solana.com"
+            - name: AURA_CRYPTO__SOLANA_USDC_MINT
+              value: "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v"

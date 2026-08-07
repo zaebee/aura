@@ -2,6 +2,7 @@
 __pycache__/
 .ruff_cache/
 .pytest_cache/
+.mypy_cache/
 .coverage
 .claude/
 *.py[oc]
@@ -9,6 +10,11 @@ build/
 dist/
 wheels/
 *.egg-info
+
+# Generated Protobuf files
+**/gen/
+**/proto/
+!/proto/
 
 # Virtual environments
 .venv

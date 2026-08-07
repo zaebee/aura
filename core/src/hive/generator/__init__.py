@@ -1,4 +1,3 @@
-import time
 import uuid
 
 import structlog
@@ -29,11 +28,10 @@ class HiveGenerator(Generator[Observation, Event]):
 
         Flow: Observation -> Proto Event -> .SerializeToString() -> JetStream.publish()
         """
-        events = []
-        now = time.time()
-
         # Extract trace context from observation metadata for OTel propagation
-        trace_id = observation.metadata.get("trace_id") if observation.metadata else None
+        trace_id = (
+            observation.metadata.get("trace_id") if observation.metadata else None
+        )
         span_id = observation.metadata.get("span_id") if observation.metadata else None
 
         # 1. Negotiation Event (binary proto)
@@ -70,14 +68,6 @@ class HiveGenerator(Generator[Observation, Event]):
                 },
             )
 
-            events.append(
-                Event(
-                    topic=f"aura.hive.events.negotiation_{action}",
-                    payload={"action": action, "price": price},
-                    timestamp=now,
-                )
-            )
-
         # 2. System Heartbeat (binary proto)
         await self.registry.execute(
             "pulse",
@@ -90,18 +80,11 @@ class HiveGenerator(Generator[Observation, Event]):
                 "span_id": span_id,
             },
         )
+        return []
 
-        events.append(
-            Event(
-                topic="aura.hive.heartbeat",
-                payload={"service": "core", "instance_id": self._instance_id},
-                timestamp=now,
-            )
-        )
-
-        return events
-
-    async def emit_vitals(self, cpu_usage: float, memory_usage: float, status: str = "ok") -> bool:
+    async def emit_vitals(
+        self, cpu_usage: float, memory_usage: float, status: str = "ok"
+    ) -> bool:
         """Emit system vitals as binary proto event."""
         obs = await self.registry.execute(
             "pulse",
@@ -113,9 +96,11 @@ class HiveGenerator(Generator[Observation, Event]):
                 "status": status,
             },
         )
-        return obs.success
+        return bool(obs.success)
 
-    async def emit_alert(self, severity: str, message: str, source: str = "core") -> bool:
+    async def emit_alert(
+        self, severity: str, message: str, source: str = "core"
+    ) -> bool:
         """Emit an alert as binary proto event."""
         obs = await self.registry.execute(
             "pulse",
@@ -126,4 +111,4 @@ class HiveGenerator(Generator[Observation, Event]):
                 "source": source,
             },
         )
-        return obs.success
+        return bool(obs.success)

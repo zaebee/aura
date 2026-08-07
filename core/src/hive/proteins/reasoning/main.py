@@ -24,8 +24,8 @@ class ReasoningSkill(
     def __init__(self) -> None:
         self.settings: LLMSettings | None = None
         self.provider: dict[str, Any] | None = None
-        self.negotiator = None
-        self._embed_model = None
+        self.negotiator: Any = None
+        self._embed_model: Any = None
 
     def get_name(self) -> str:
         return "reasoning"

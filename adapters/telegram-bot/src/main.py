@@ -1,4 +1,5 @@
 import asyncio
+import logging
 
 import grpc
 import nats
@@ -21,12 +22,14 @@ from opentelemetry.sdk.trace.export import BatchSpanProcessor
 from config import settings
 
 # Setup logging
+level = getattr(logging, settings.log_level.upper(), logging.INFO)
 structlog.configure(
     processors=[
         structlog.processors.TimeStamper(fmt="iso"),
         structlog.processors.add_log_level,
         structlog.processors.JSONRenderer(),
-    ]
+    ],
+    wrapper_class=structlog.make_filtering_bound_logger(level),
 )
 logger = structlog.get_logger()
 
@@ -99,6 +102,26 @@ async def main() -> None:
         core_url=settings.core_url,
     )
 
+    # --- Unified Metabolism: NATS Bloodstream Listener ---
+    async def nats_bloodstream_listener() -> None:
+        if nc:
+            try:
+                # Listen for binary events from the core
+                sub = await nc.subscribe("aura.hive.events.>")
+                logger.info("nats_bloodstream_subscribed", subject="aura.hive.events.>")
+                bot_tracer = trace.get_tracer(__name__)
+                async for msg in sub.messages:
+                    with bot_tracer.start_as_current_span("nats_event_received") as span:
+                        span.set_attribute("subject", msg.subject)
+                        logger.info("nats_event_received", subject=msg.subject)
+                        # Process via Unified Metabolism Aggregator
+                        await metabolism.execute(msg.data, is_nats=True)
+            except Exception as e:
+                logger.error("nats_bloodstream_error", error=str(e))
+
+    # Start NATS listener in background
+    nats_task = asyncio.create_task(nats_bloodstream_listener())
+
     try:
         # Pass metabolism as dependency to handlers
         await dp.start_polling(bot, metabolism=metabolism)
@@ -107,6 +130,7 @@ async def main() -> None:
     except Exception as e:
         logger.error("Bot crashed unexpectedly", error=str(e), exc_info=True)
     finally:
+        nats_task.cancel()
         await aura_protein.close()
         await bot.session.close()
         if nc:

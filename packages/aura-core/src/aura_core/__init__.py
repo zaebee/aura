@@ -14,6 +14,7 @@ from .manifest import (
     get_allowed_chambers,
     get_allowed_root_files,
     get_macro_atcg_folders,
+    resolve_brain_path,
 )
 from .metabolism import (
     BaseConnector,
@@ -37,6 +38,7 @@ from .types import (
     TelegramContext,
     UIAction,
     get_raw_key,
+    map_action,
 )
 
 __all__ = [
@@ -48,6 +50,7 @@ __all__ = [
     "get_macro_atcg_folders",
     "get_allowed_root_files",
     "get_allowed_chambers",
+    "resolve_brain_path",
     # Protocols (The Law)
     "Aggregator",
     "Transformer",
@@ -71,6 +74,7 @@ __all__ = [
     "SearchResult",
     "SystemVitals",
     "NegotiationResult",
+    "map_action",
     "BeeContext",
     "AuditObservation",
     "BeeObservation",

@@ -5,14 +5,14 @@ Provides backward-compatible access to MACRO_ATCG_FOLDERS, ALLOWED_ROOT_FILES,
 and ALLOWED_CHAMBERS from the language-agnostic YAML file.
 """
 
-import logging
 from functools import lru_cache
 from pathlib import Path
 from typing import Any
 
+import structlog
 import yaml
 
-logger = logging.getLogger(__name__)
+logger = structlog.get_logger(__name__)
 
 _DEFAULT_MANIFEST: dict[str, Any] = {
     "macro_atcg_folders": [],
@@ -91,3 +91,33 @@ def get_allowed_chambers() -> dict[str, str]:
 MACRO_ATCG_FOLDERS = get_macro_atcg_folders()
 ALLOWED_ROOT_FILES = get_allowed_root_files()
 ALLOWED_CHAMBERS = get_allowed_chambers()
+
+
+def resolve_brain_path(compiled_path: str | None = None) -> str:
+    """
+    Absolute Brain Discovery:
+    Priority: compiled_path -> /app/data/aura_brain.json -> /app/src/aura_brain.json -> {HIVE_ROOT}/data/aura_brain.json
+    """
+    root = find_hive_root()
+    search_paths = [
+        Path("/app/data/aura_brain.json"),
+        Path("/app/src/aura_brain.json"),
+        root / "data" / "aura_brain.json",
+    ]
+
+    if compiled_path:
+        p = Path(compiled_path)
+        if not p.is_absolute():
+            p = root / p
+        search_paths.insert(0, p)
+
+    for path in search_paths:
+        logger.info("checking_for_brain", path=str(path))
+        try:
+            if path.exists() and path.is_file():
+                abs_path = str(path.resolve())
+                logger.info("found_brain", path=abs_path)
+                return abs_path
+        except OSError:
+            continue
+    return "UNKNOWN"

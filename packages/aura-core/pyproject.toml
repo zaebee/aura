@@ -11,6 +11,8 @@ dependencies = [
     "pydantic>=2.0.0",
     "pyyaml>=6.0.0",
     "opentelemetry-api>=1.20.0",
+    "betterproto[compiler]>=2.0.0b7",
+    "structlog>=25.0.0",
 ]
 
 [tool.hatch.build.targets.wheel]
