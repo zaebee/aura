@@ -22,6 +22,14 @@ wheels/
 # Virtual environments
 .venv
 
+# Node dependencies. Untracked and unignored, these get swept into `git add -A`
+# and the pre-commit hooks then rewrite tens of thousands of vendored files.
+node_modules/
+.pnp.*
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
 # Environment variables (secrets)
 .env
 
