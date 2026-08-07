@@ -55,7 +55,7 @@ class EvolverGenerator:
 
             self._git(["add", "-A"])
             msg = (
-                f"feat(evolver): autonomous improvement cycle {timestamp} [skip ci]\n\n"
+                f"feat(evolver): autonomous improvement cycle {timestamp}\n\n"
                 "Co-authored-by: bee.Evolver <evolver@aura.hive>"
             )
             self._git(["commit", "-m", msg])
