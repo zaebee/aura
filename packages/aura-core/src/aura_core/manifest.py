@@ -37,7 +37,12 @@ def find_hive_root() -> Path:
 
 @lru_cache(maxsize=1)
 def _load_manifest() -> dict[str, Any]:
-    """Load and cache the hive manifest."""
+    """
+    Load and cache the hive manifest.
+
+    Callers use `.get(key) or []`: a key present in YAML with nothing under it
+    parses as None, and `.get(key, [])` would hand that None straight through.
+    """
     root = find_hive_root()
     manifest_path = root / "hive-manifest.yaml"
 
@@ -75,25 +80,25 @@ def _load_manifest() -> dict[str, Any]:
 
 def get_macro_atcg_folders() -> list[str]:
     """Get the list of macro ATCG folders."""
-    result: list[str] = _load_manifest().get("macro_atcg_folders", [])
+    result: list[str] = _load_manifest().get("macro_atcg_folders") or []
     return result
 
 
 def get_allowed_root_files() -> list[str]:
     """Get the list of allowed root files."""
-    result: list[str] = _load_manifest().get("allowed_root_files", [])
+    result: list[str] = _load_manifest().get("allowed_root_files") or []
     return result
 
 
 def get_allowed_chambers() -> list[str]:
     """Get the list of path prefixes that count as sanctioned chambers."""
-    result: list[str] = _load_manifest().get("allowed_chambers", [])
+    result: list[str] = _load_manifest().get("allowed_chambers") or []
     return result
 
 
 def get_determinism_exempt_paths() -> list[str]:
     """Path prefixes where non-determinism is allowed outside a Transformer."""
-    result: list[str] = _load_manifest().get("determinism_exempt_paths", [])
+    result: list[str] = _load_manifest().get("determinism_exempt_paths") or []
     return result
 
 

@@ -271,6 +271,35 @@ class TestDiffParsing:
         assert ("core/src/aura_hive/hive/membrane/main.py", "++x = 1") in seen
         assert ("core/src/aura_hive/hive/membrane/main.py", "import litellm") in seen
 
+    def test_content_lines_inside_a_hunk_are_not_headers(self) -> None:
+        """A deleted `-- x` renders as `--- x`, an added `++ y` as `+++ y`.
+
+        Treating those as a header pair reset the file path to garbage and
+        dropped the added line silently — a model import walked straight past.
+        """
+        diff = (
+            "--- a/core/src/aura_hive/hive/membrane/main.py\n"
+            "+++ b/core/src/aura_hive/hive/membrane/main.py\n"
+            "@@ -1,2 +1,2 @@\n"
+            "--- x\n"
+            "+++ import litellm\n"
+        )
+        assert list(iter_added_lines(diff)) == [
+            ("core/src/aura_hive/hive/membrane/main.py", "++ import litellm")
+        ]
+
+    def test_multi_file_diff_keeps_paths_straight(self) -> None:
+        diff = (
+            "diff --git a/one.py b/one.py\n--- a/one.py\n+++ b/one.py\n"
+            "@@ -0,0 +1 @@\n+import dspy\n"
+            "diff --git a/two.py b/two.py\n--- a/two.py\n+++ b/two.py\n"
+            "@@ -0,0 +1 @@\n+import random\n"
+        )
+        assert list(iter_added_lines(diff)) == [
+            ("one.py", "import dspy"),
+            ("two.py", "import random"),
+        ]
+
     def test_deleted_files_are_skipped(self) -> None:
         diff = "--- a/gone.py\n+++ /dev/null\n@@ -1 +0,0 @@\n-import dspy\n"
         assert list(iter_added_lines(diff)) == []

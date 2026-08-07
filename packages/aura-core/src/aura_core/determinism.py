@@ -134,22 +134,31 @@ def check_determinism(
 
 def iter_added_lines(diff: str) -> Iterator[tuple[str, str]]:
     """
-    Walk a unified diff, yielding (file_path, added_line) for every added line.
+        Walk a unified diff, yielding (file_path, added_line) for every added line.
 
-    A `+++ ` line counts as a header only when it follows a `--- ` line, which
-    is how unified diffs are built. Matching it anywhere would swallow an added
-    source line beginning with `++` — it appears as `+++` once the diff marker
-    is prepended — and skip it silently. Deleted files are ignored: `+++
-    /dev/null` marks a removal, and a rule has nothing to say about code that
-    is going away.
+    Header lines are only recognised outside a hunk. Inside one, `--- ` and
+        `+++ ` are content: a deleted source line `-- x` renders as `--- x` and an
+        added `++ y` as `+++ y`, so matching them as headers would reset the file
+        path to garbage and drop the added line without a trace. Hunk boundaries
+        come from `@@ ` and `diff --git `. Deleted files are ignored: `+++
+        /dev/null` marks a removal, and a rule has nothing to say about code that
+        is going away.
     """
     current = ""
     after_old_header = False
+    in_hunk = False
     for line in diff.splitlines():
-        if line.startswith("--- "):
+        if line.startswith("diff --git "):
+            in_hunk = False
+            after_old_header = False
+            continue
+        if line.startswith("@@ "):
+            in_hunk = True
+            continue
+        if not in_hunk and line.startswith("--- "):
             after_old_header = True
             continue
-        if after_old_header and line.startswith("+++ "):
+        if not in_hunk and after_old_header and line.startswith("+++ "):
             after_old_header = False
             target = line[4:].strip()
             current = "" if target == "/dev/null" else target.removeprefix("b/")

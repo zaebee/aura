@@ -99,11 +99,15 @@ def changed_files(
 
 def check_root_sprouts(files: set[str], manifest: dict[str, Any]) -> list[str]:
     """A new file at the repository root must be declared in the manifest."""
-    allowed = set(manifest.get("allowed_root_files", []))
-    macro = set(manifest.get("macro_atcg_folders", []))
+    allowed = set(manifest.get("allowed_root_files") or [])
+    macro = set(manifest.get("macro_atcg_folders") or [])
     heresies = []
     for path in sorted(files):
         if "/" in path or path.startswith("."):
+            continue
+        # A deleted or renamed-away root file still shows up in the diff. It is
+        # leaving, not sprouting.
+        if not (ROOT / path).exists():
             continue
         if path not in allowed and path not in macro:
             heresies.append(
@@ -119,10 +123,10 @@ def check_protected_surface(
     """An automated author may not edit the membrane that checks it."""
     if not author:
         return []
-    automated = {a.lower() for a in manifest.get("automated_authors", [])}
+    automated = {a.lower() for a in (manifest.get("automated_authors") or [])}
     if author.lower() not in automated:
         return []
-    protected = manifest.get("protected_paths", [])
+    protected = manifest.get("protected_paths") or []
     touched = sorted(f for f in files if any(matches(f, p) for p in protected))
     if not touched:
         return []
@@ -148,7 +152,7 @@ def main() -> int:
 
     determinism = load_determinism()
     manifest = load_manifest()
-    exempt = manifest.get("determinism_exempt_paths", [])
+    exempt = manifest.get("determinism_exempt_paths") or []
 
     diff = read_diff(args.base, args.diff_file)
     files = changed_files(args.base, args.diff_file, determinism)
@@ -164,7 +168,7 @@ def main() -> int:
     heresies.extend(check_protected_surface(files, manifest, args.author, matches))
 
     if args.github_output:
-        protected = manifest.get("protected_paths", [])
+        protected = manifest.get("protected_paths") or []
         touched = any(any(matches(f, p) for p in protected) for f in files)
         with open(args.github_output, "a", encoding="utf-8") as handle:
             handle.write(f"protected_touched={str(touched).lower()}\n")
