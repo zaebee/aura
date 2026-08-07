@@ -36,12 +36,27 @@ ENTROPY_PATTERNS: tuple[re.Pattern[str], ...] = tuple(
     for p in (
         r"\bnp\.random\b",
         r"\bnumpy\.random\b",
+        r"(?:^|[^\w.])import\s+random\b",
+        r"(?:^|[^\w.])from\s+random\s+import\b",
+        r"(?:^|[^\w.])from\s+numpy\s+import\s+random\b",
         r"\brandom\.(?:random|randint|randrange|choice|choices|shuffle|sample"
         r"|uniform|gauss|normalvariate|seed)\b",
     )
 )
 
 _COMMENT_PREFIXES = ("#", '"""', "'''", "*", "//")
+
+
+def path_matches_prefix(file_path: str, prefix: str) -> bool:
+    """
+    True when file_path is the prefix itself, or sits beneath it.
+
+    Plain startswith would let `membrane_bypass.py` match a `membrane` prefix —
+    exactly the name someone trying to slip past a guard would reach for.
+    """
+    normalised = file_path.replace("\\", "/")
+    prefix = prefix.replace("\\", "/").rstrip("/")
+    return normalised == prefix or normalised.startswith(prefix + "/")
 
 
 def is_python_source(file_path: str) -> bool:
@@ -56,21 +71,26 @@ def is_python_source(file_path: str) -> bool:
         return False
     if "/tests/" in normalised or normalised.startswith("tests/"):
         return False
-    return not normalised.rsplit("/", 1)[-1].startswith("test_")
+    name = normalised.rsplit("/", 1)[-1]
+    return not (name.startswith("test_") or name.endswith("_test.py"))
 
 
 def is_transformer_path(file_path: str) -> bool:
     """True if the path belongs to a Transformer, where non-determinism lives."""
     normalised = file_path.replace("\\", "/")
-    return "/transformer/" in normalised or normalised.endswith("/transformer.py")
+    return (
+        "/transformer/" in normalised
+        or normalised.startswith("transformer/")
+        or normalised.endswith("/transformer.py")
+        or normalised == "transformer.py"
+    )
 
 
 def is_exempt(file_path: str, exempt_paths: Sequence[str]) -> bool:
     """True if the path is a Transformer or sits under a declared exempt prefix."""
     if is_transformer_path(file_path):
         return True
-    normalised = file_path.replace("\\", "/")
-    return any(normalised.startswith(prefix) for prefix in exempt_paths)
+    return any(path_matches_prefix(file_path, prefix) for prefix in exempt_paths)
 
 
 def check_determinism(
@@ -116,16 +136,24 @@ def iter_added_lines(diff: str) -> Iterator[tuple[str, str]]:
     """
     Walk a unified diff, yielding (file_path, added_line) for every added line.
 
-    Deleted files are skipped: `+++ /dev/null` marks a removal, and a rule has
-    nothing to say about code that is going away.
+    A `+++ ` line counts as a header only when it follows a `--- ` line, which
+    is how unified diffs are built. Matching it anywhere would swallow an added
+    source line beginning with `++` — it appears as `+++` once the diff marker
+    is prepended — and skip it silently. Deleted files are ignored: `+++
+    /dev/null` marks a removal, and a rule has nothing to say about code that
+    is going away.
     """
     current = ""
+    after_old_header = False
     for line in diff.splitlines():
-        if line.startswith("+++ "):
+        if line.startswith("--- "):
+            after_old_header = True
+            continue
+        if after_old_header and line.startswith("+++ "):
+            after_old_header = False
             target = line[4:].strip()
             current = "" if target == "/dev/null" else target.removeprefix("b/")
             continue
-        if line.startswith("---") or line.startswith("+++"):
-            continue
+        after_old_header = False
         if current and line.startswith("+"):
             yield current, line[1:]

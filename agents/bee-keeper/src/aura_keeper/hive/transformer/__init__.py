@@ -16,6 +16,7 @@ from aura_core import (
     check_determinism,
     find_hive_root,
     make_struct,
+    path_matches_prefix,
 )
 from aura_core_gen.aura.core.v1 import (
     AuditObservation,
@@ -226,7 +227,7 @@ class BeeTransformer(Transformer[Context, AuditObservation]):
             # Check allowed peripheral chambers (Sanctified Infrastructure)
             is_sanctified = False
             for chamber in ALLOWED_CHAMBERS:
-                if str(p).startswith(chamber):
+                if path_matches_prefix(str(p), chamber):
                     is_sanctified = True
                     break
 

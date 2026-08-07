@@ -49,7 +49,7 @@ def load_determinism() -> Any:
 
 
 def load_manifest() -> dict[str, Any]:
-    with open(MANIFEST) as handle:
+    with open(MANIFEST, encoding="utf-8") as handle:
         data = yaml.safe_load(handle)
     return data if isinstance(data, dict) else {}
 
@@ -77,7 +77,7 @@ def _git(*args: str) -> str:
 
 def read_diff(base: str | None, diff_file: str | None) -> str:
     if diff_file:
-        return Path(diff_file).read_text()
+        return Path(diff_file).read_text(encoding="utf-8")
     if not base:
         raise SystemExit("one of --base or --diff-file is required")
     return _git("diff", "--unified=0", f"{base}...HEAD")
@@ -114,7 +114,7 @@ def check_root_sprouts(files: set[str], manifest: dict[str, Any]) -> list[str]:
 
 
 def check_protected_surface(
-    files: set[str], manifest: dict[str, Any], author: str | None
+    files: set[str], manifest: dict[str, Any], author: str | None, matches: Any
 ) -> list[str]:
     """An automated author may not edit the membrane that checks it."""
     if not author:
@@ -123,7 +123,7 @@ def check_protected_surface(
     if author.lower() not in automated:
         return []
     protected = manifest.get("protected_paths", [])
-    touched = sorted(f for f in files if any(f.startswith(p) for p in protected))
+    touched = sorted(f for f in files if any(matches(f, p) for p in protected))
     if not touched:
         return []
     listing = "\n".join(f"    - {f}" for f in touched)
@@ -160,12 +160,13 @@ def main() -> int:
             heresies.append(heresy)
 
     heresies.extend(check_root_sprouts(files, manifest))
-    heresies.extend(check_protected_surface(files, manifest, args.author))
+    matches = determinism.path_matches_prefix
+    heresies.extend(check_protected_surface(files, manifest, args.author, matches))
 
     if args.github_output:
         protected = manifest.get("protected_paths", [])
-        touched = any(any(f.startswith(p) for p in protected) for f in files)
-        with open(args.github_output, "a") as handle:
+        touched = any(any(matches(f, p) for p in protected) for f in files)
+        with open(args.github_output, "a", encoding="utf-8") as handle:
             handle.write(f"protected_touched={str(touched).lower()}\n")
 
     # Same rule reported twice adds noise without adding information.

@@ -6,8 +6,9 @@ from aura_core import (
     is_exempt,
     is_python_source,
     is_transformer_path,
+    path_matches_prefix,
 )
-from aura_core.determinism import ENTROPY_PATTERNS, LLM_PATTERNS
+from aura_core.determinism import ENTROPY_PATTERNS, LLM_PATTERNS, iter_added_lines
 
 EXEMPT = (
     "core/scripts",
@@ -76,6 +77,9 @@ class TestViolations:
             "pick = random.choice(candidates)",
             "random.shuffle(offers)",
             "jitter = random.uniform(0.0, 0.5)",
+            "import random",
+            "from random import randint",
+            "from numpy import random",
         ],
     )
     def test_statistical_randomness_flagged(self, line: str) -> None:
@@ -188,7 +192,12 @@ class TestFileTypeFilter:
 
     @pytest.mark.parametrize(
         "path",
-        ["tools/test_discovery.py", "core/tests/test_x.py", "tests/test_y.py"],
+        [
+            "tools/test_discovery.py",
+            "core/tests/test_x.py",
+            "tests/test_y.py",
+            "core/scripts/invivo_solana_test.py",
+        ],
     )
     def test_test_modules_may_mock_models(self, path: str) -> None:
         assert not is_python_source(path)
@@ -213,6 +222,62 @@ class TestFileTypeFilter:
 
     def test_ordinary_source_still_checked(self) -> None:
         assert is_python_source("core/src/aura_hive/hive/membrane/main.py")
+
+
+class TestPrefixBoundaries:
+    """A prefix must end at a directory boundary, or a guard is trivially dodged."""
+
+    @pytest.mark.parametrize(
+        "path",
+        [
+            "core/src/aura_hive/config_bypass.py",
+            "core/tests_backup/helper.py",
+            "toolshed/script.py",
+        ],
+    )
+    def test_sibling_names_are_not_exempt(self, path: str) -> None:
+        assert not is_exempt(path, EXEMPT + ("tools",))
+
+    def test_the_prefix_itself_matches(self) -> None:
+        assert path_matches_prefix("tools/membrane_check.py", "tools/membrane_check.py")
+        assert path_matches_prefix("core/tests/x.py", "core/tests")
+
+    def test_a_sibling_of_a_protected_file_does_not_match(self) -> None:
+        """`membrane_bypass.py` is the name someone dodging a guard would pick."""
+        assert not path_matches_prefix(
+            "core/src/aura_hive/hive/membrane_bypass.py",
+            "core/src/aura_hive/hive/membrane",
+        )
+        assert not path_matches_prefix(
+            "tools/membrane_check.py.bak", "tools/membrane_check.py"
+        )
+
+    def test_trailing_slash_and_backslashes_normalise(self) -> None:
+        assert path_matches_prefix("core/tests/x.py", "core/tests/")
+        assert path_matches_prefix("core\\tests\\x.py", "core/tests")
+
+
+class TestDiffParsing:
+    def test_added_line_beginning_with_plus_plus_is_not_lost(self) -> None:
+        """`++x` in the source shows up as `+++x`; it must not read as a header."""
+        diff = (
+            "--- a/core/src/aura_hive/hive/membrane/main.py\n"
+            "+++ b/core/src/aura_hive/hive/membrane/main.py\n"
+            "@@ -1,0 +2,2 @@\n"
+            "+++x = 1\n"
+            "+import litellm\n"
+        )
+        seen = list(iter_added_lines(diff))
+        assert ("core/src/aura_hive/hive/membrane/main.py", "++x = 1") in seen
+        assert ("core/src/aura_hive/hive/membrane/main.py", "import litellm") in seen
+
+    def test_deleted_files_are_skipped(self) -> None:
+        diff = "--- a/gone.py\n+++ /dev/null\n@@ -1 +0,0 @@\n-import dspy\n"
+        assert list(iter_added_lines(diff)) == []
+
+    def test_new_file_header_is_read(self) -> None:
+        diff = "--- /dev/null\n+++ b/new.py\n@@ -0,0 +1 @@\n+import dspy\n"
+        assert list(iter_added_lines(diff)) == [("new.py", "import dspy")]
 
 
 def test_patterns_are_compiled_and_non_empty() -> None:
