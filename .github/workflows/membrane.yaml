@@ -1,0 +1,65 @@
+name: Membrane
+
+# The deterministic half of the Hive audit, kept separate from bee.Keeper on
+# purpose. bee.Keeper needs a self-hosted runner, kubectl tunnels to NATS and
+# Prometheus, and an LLM; a membrane that depends on all that cannot be trusted
+# to block anything. This runs on a stock runner in seconds, needs one
+# dependency, and is meant to be a required check.
+#
+# Every value taken from the event payload is passed through `env:` and quoted,
+# never interpolated into a shell command directly.
+
+on:
+  pull_request:
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  membrane:
+    name: Structural Guard
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install PyYAML
+        run: python -m pip install --quiet pyyaml
+
+      - name: Run membrane check
+        id: check
+        env:
+          BASE_REF: ${{ github.base_ref }}
+          PR_AUTHOR: ${{ github.event.pull_request.user.login }}
+        run: |
+          python tools/membrane_check.py \
+            --base "origin/$BASE_REF" \
+            --author "$PR_AUTHOR" \
+            --github-output "$GITHUB_OUTPUT"
+
+      - name: Label protected-surface changes
+        # Runs even when the check above fails: the label is how a human learns
+        # why, so it has to survive the failure that produced it.
+        if: always() && steps.check.outputs.protected_touched == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        run: |
+          gh pr edit "$PR_NUMBER" --add-label "needs-human" \
+            || echo "could not add label; create 'needs-human' in this repo to enable it"
+
+      - name: Clear label when the surface is untouched
+        if: always() && steps.check.outputs.protected_touched == 'false'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        run: |
+          gh pr edit "$PR_NUMBER" --remove-label "needs-human" 2>/dev/null || true

@@ -9,11 +9,14 @@ import yaml  # type: ignore
 from aura_keeper.config import KeeperSettings
 from aura_core import (
     ALLOWED_CHAMBERS,
+    DETERMINISM_EXEMPT_PATHS,
     ALLOWED_ROOT_FILES,
     MACRO_ATCG_FOLDERS,
     Transformer,
+    check_determinism,
     find_hive_root,
     make_struct,
+    path_matches_prefix,
 )
 from aura_core_gen.aura.core.v1 import (
     AuditObservation,
@@ -223,8 +226,8 @@ class BeeTransformer(Transformer[Context, AuditObservation]):
 
             # Check allowed peripheral chambers (Sanctified Infrastructure)
             is_sanctified = False
-            for chamber, role in ALLOWED_CHAMBERS.items():
-                if str(p).startswith(chamber):
+            for chamber in ALLOWED_CHAMBERS:
+                if path_matches_prefix(str(p), chamber):
                     is_sanctified = True
                     break
 
@@ -308,6 +311,13 @@ class BeeTransformer(Transformer[Context, AuditObservation]):
                             heresies.append(
                                 f"Protocol Heresy: Class `{added_code}` in `{current_file}` does not implement a Generic ATCG Protocol or SkillProtocol. Architecture purity is compromised."
                             )
+
+                # 7. determinism rule (non-determinism belongs to the Transformer alone)
+                determinism_heresy = check_determinism(
+                    current_file, added_code, DETERMINISM_EXEMPT_PATHS
+                )
+                if determinism_heresy:
+                    heresies.append(determinism_heresy)
 
         return heresies
 

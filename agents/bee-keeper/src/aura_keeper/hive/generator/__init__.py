@@ -6,10 +6,7 @@ import litellm
 import structlog
 
 from aura_keeper.config import KeeperSettings
-from aura_core import (
-    ALLOWED_CHAMBERS,
-    find_hive_root,
-)
+from aura_core import find_hive_root
 from aura_core_gen.aura.core.v1 import (
     AuditObservation,
     Context,
@@ -133,14 +130,9 @@ class BeeGenerator:
         new_entry += f"> {report.narrative}\n\n"
 
         if report.heresies:
-            new_entry += "**Heresies Detected (Sacred Chambers):**\n"
+            new_entry += "**Heresies Detected:**\n"
             for h in report.heresies:
-                # Map paths to roles if present in heresy string
-                formatted_h = h
-                for path, role in ALLOWED_CHAMBERS.items():
-                    if path in h:
-                        formatted_h = h.replace(path, f"{path} ({role})")
-                new_entry += f"- {formatted_h}\n"
+                new_entry += f"- {h}\n"
 
         # Chronicle reflective findings isolated from the Transformer's deterministic logic
         reflective_heresies: list[str] = cast(
