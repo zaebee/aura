@@ -32,7 +32,7 @@ dependencies = [
     "prometheus-client>=0.21.1",
     "solana>=0.36.0",
     "solders>=0.27.0",
-    "cryptography>=43.0.0",
+    "cryptography>=50.0.0",
     "nats-py>=2.9.0",
     "redis>=5.0.0",
     "aura-core",
