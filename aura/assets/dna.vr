@@ -1,0 +1,362 @@
+// UHM-DNA: Unitary Holonomic Monism Ontology for Aura Assets
+// Translated from assets.proto
+
+import core::time::{SystemTime};
+
+// =============================================================================
+// Layer 1: Enums
+// =============================================================================
+
+type AssetDomain is
+    | Unspecified
+    | Vehicle
+    | Property
+    | Equipment
+    | Workspace;
+
+type AssetStatus is
+    | Unspecified
+    | Draft
+    | Available
+    | Booked
+    | Maintenance
+    | Archived;
+
+type AssetCondition is
+    | Unspecified
+    | New
+    | Excellent
+    | Good
+    | Fair
+    | Poor;
+
+type MaintenanceType is
+    | Unspecified
+    | Routine
+    | Seasonal
+    | Emergency;
+
+type BookingStatus is
+    | Unspecified
+    | Inquiry
+    | PendingOwnerApproval
+    | PendingRenterConfirmation
+    | Confirmed
+    | Active
+    | Completed
+    | Cancelled
+    | Dispute;
+
+// =============================================================================
+// Layer 2: Asset Records
+// =============================================================================
+
+type Asset is {
+    identifier: Text,
+    organization_id: Text,
+    name: Text,
+    description: Text,
+    images: List<Text>,
+    thumbnail_url: Text,
+    domain: AssetDomain,
+    status: AssetStatus,
+    condition: AssetCondition,
+    rental_terms: RentalTerms,
+    details: AssetDetails,
+    operations: OperationalMetadata,
+    rating_stats: RatingStats,
+    created_at: SystemTime,
+    updated_at: SystemTime,
+    stats: AssetPublicationStats,
+    is_published: Bool,
+};
+
+type AssetDetails is
+    | Vehicle(VehicleAttributes)
+    | Property(PropertyAttributes)
+    | Equipment(EquipmentAttributes)
+    | Workspace(WorkspaceAttributes);
+
+type RatingStats is {
+    average_rating: Float,
+    rating_count: Int,
+    best_rating: Float,
+    worst_rating: Float,
+};
+
+type AssetPublicationStats is {
+    completion_score: Float,
+    missing_fields_count: Int,
+    is_ready_for_publish: Bool,
+    view_count: Int,
+    booking_count: Int,
+    average_booking_duration_days: Float,
+};
+
+// =============================================================================
+// Layer 3: Rental Terms
+// =============================================================================
+
+type RentalTerms is {
+    price_tiers: List<PriceTier>,
+    cancellation_fees: List<CancellationFee>,
+    availability_windows: List<AvailabilityWindow>,
+    min_rental_duration_hours: Int,
+    max_rental_duration_hours: Int,
+    requires_approval: Bool,
+    approval_timeout_hours: Int,
+    no_response_auto_cancel_hours: Int,
+    damage_policy: Maybe<Text>, // Simplified
+    insurance_policy: Maybe<Text>, // Simplified
+    allowed_countries: List<Text>,
+    min_renter_age: Int,
+    custom_rules: Map<Text, Text>,
+};
+
+type PriceTier is {
+    min_duration_days: Int,
+    max_duration_days: Int,
+    price_per_day: Float,
+    currency_code: Text,
+    discount_percent: Float,
+};
+
+type CancellationFee is {
+    hours_before_start: Int,
+    fee_amount: Float,
+    is_percentage: Bool,
+};
+
+type AvailabilityWindow is {
+    start_time: SystemTime,
+    end_time: SystemTime,
+    is_available: Bool,
+};
+
+// =============================================================================
+// Layer 4: Operational Metadata
+// =============================================================================
+
+type OperationalMetadata is {
+    maintenance_schedule: MaintenanceSchedule,
+    last_maintenance_at: Maybe<SystemTime>,
+    next_maintenance_at: Maybe<SystemTime>,
+    total_units: Int,
+    available_units: Int,
+    current_location: Text,
+    current_occupancy_percent: Float,
+    incidents: List<IncidentLog>,
+    sla_tier: Text,
+    last_inspection_at: Maybe<SystemTime>,
+};
+
+type MaintenanceSchedule is {
+    maintenance_type: MaintenanceType,
+    frequency_days: Int,
+    description: Text,
+    scheduled_dates: List<SystemTime>,
+};
+
+type IncidentLog is {
+    identifier: Text,
+    date: SystemTime,
+    severity: Text,
+    description: Text,
+    reported_by: Text,
+    repair_cost: Float,
+    currency_code: Text,
+    status: Text,
+};
+
+// =============================================================================
+// Layer 5: Domain Attributes
+// =============================================================================
+
+type VehicleAttributes is {
+    registration_number: Text,
+    vin: Text,
+    license_plate: Text,
+    vehicle_type: Text,
+    sub_type: Text,
+    brand: Text,
+    model: Text,
+    year: Int,
+    color: Text,
+    transmission: Text,
+    fuel_type: Text,
+    fuel_capacity_liters: Float,
+    current_fuel_level_percent: Float,
+    current_battery_level_percent: Float,
+    battery_capacity_kwh: Float,
+    estimated_range_km: Float,
+    max_range_km: Float,
+    is_charging: Bool,
+    charging_speed_kw: Float,
+    engine_capacity_cc: Float,
+    mileage_km: Float,
+    max_speed_kph: Float,
+    seats: Int,
+    doors: Int,
+    max_luggage_capacity_liters: Float,
+    max_weight_kg: Float,
+    baggage_capacity_large: Int,
+    baggage_capacity_small: Int,
+    air_conditioning: Bool,
+    navigation_system: Bool,
+    bluetooth: Bool,
+    all_wheel_drive: Bool,
+    sunroof: Bool,
+    cruise_control: Bool,
+    airbags: Bool,
+    wheelchair_accessible: Bool,
+    adaptive_cruise_control: Bool,
+    lane_keeping_assist: Bool,
+    blind_spot_monitoring: Bool,
+    rear_view_camera: Bool,
+    apple_car_play: Bool,
+    android_auto: Bool,
+    heated_seats: Bool,
+    ventilated_seats: Bool,
+    massage_seats: Bool,
+    premium_audio: Bool,
+    panoramic_roof: Bool,
+    keyless_entry: Bool,
+    remote_start: Bool,
+    wireless_charging: Bool,
+    heads_up_display: Bool,
+    ambient_lighting: Bool,
+    memory_seats: Bool,
+    heated_steering_wheel: Bool,
+    power_liftgate: Bool,
+    surround_view_camera: Bool,
+    night_vision: Bool,
+    self_parking: Bool,
+    helmet_required: Bool,
+    minimum_driver_age: Int,
+    required_licenses: List<Text>,
+    charger_type: Text,
+    charging_time_hours: Float,
+    fast_charging_capable: Bool,
+    specifications: Map<Text, Text>,
+};
+
+type PropertyAttributes is {
+    street_address: Text,
+    city: Text,
+    state_province: Text,
+    postal_code: Text,
+    country: Text,
+    latitude: Float,
+    longitude: Float,
+    unit_number: Text,
+    area_sqm: Float,
+    bedrooms: Float,
+    bathrooms: Float,
+    living_areas: Float,
+    furnished: Bool,
+    kitchen_equipped: Bool,
+    wifi_included: Bool,
+    parking_included: Bool,
+    gym_access: Bool,
+    pool_access: Bool,
+    pets_allowed: Bool,
+    smoking_allowed: Bool,
+    wheelchair_accessible: Bool,
+    floor_number: Int,
+    has_elevator: Bool,
+    has_security: Bool,
+    check_in_hour: Int,
+    check_out_hour: Int,
+    max_occupants: Int,
+    max_guests_allowed: Int,
+};
+
+type EquipmentAttributes is {
+    serial_number: Text,
+    manufacturer: Text,
+    model: Text,
+    equipment_type: Text,
+    category: Text,
+    weight_kg: Float,
+    color: Text,
+    usage_count: Int,
+    wear_percentage: Float,
+    requires_training: Bool,
+    training_certification: Text,
+};
+
+type WorkspaceAttributes is {
+    street_address: Text,
+    city: Text,
+    postal_code: Text,
+    latitude: Float,
+    longitude: Float,
+    space_type: Text,
+    capacity_people: Int,
+    capacity_desks: Int,
+    wifi: Bool,
+    air_conditioning: Bool,
+    projector: Bool,
+    whiteboard: Bool,
+    video_conferencing: Bool,
+    kitchen_access: Bool,
+    parking: Bool,
+    accessible_restroom: Bool,
+    open_hour: Int,
+    close_hour: Int,
+    closed_days: List<Int>,
+    access_method: Text,
+    access_24_hours: Bool,
+};
+
+// =============================================================================
+// Layer 6: Asset Booking
+// =============================================================================
+
+type AssetBooking is {
+    identifier: Text,
+    asset_id: Text,
+    renter_id: Text,
+    owner_id: Text,
+    start_time: SystemTime,
+    end_time: SystemTime,
+    status: BookingStatus,
+    total_price: Float,
+    currency_code: Text,
+    deposit_required: Float,
+    is_paid: Bool,
+    selected_extra_option_ids: List<Text>,
+    total_extra_options_price: Float,
+    currency_code_extra: Text,
+    booking_details: Any,
+    created_at: SystemTime,
+    updated_at: SystemTime,
+};
+
+type InventoryLocation is {
+    identifier: Text,
+    name: Text,
+    address: Text,
+    stored_asset_ids: List<Text>,
+    is_active: Bool,
+    working_hours: Text,
+};
+
+type AssetCollection is {
+    assets: List<Asset>,
+    total_count: Int,
+    page_size: Int,
+    page_number: Int,
+    sort_by: Text,
+    filter_criteria: Text,
+    timestamp: SystemTime,
+};
+
+type AssetEvent is {
+    identifier: Text,
+    event_type: Text,
+    event_time: SystemTime,
+    initiated_by: Text,
+    event_data: Map<Text, Text>,
+    asset_snapshot: Maybe<Asset>,
+};
