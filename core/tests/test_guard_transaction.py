@@ -6,11 +6,10 @@ Phase B: Immune System Hardening.
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
-from hive.metabolism.math import HillDampener
-from hive.proteins.guard.engine import OutputGuard, SafetyViolation
-from hive.proteins.guard.skill import GuardSkill
-
-from config.policy import SafetySettings
+from aura_hive.config.policy import SafetySettings
+from aura_hive.hive.metabolism.math import HillDampener
+from aura_hive.hive.proteins.guard.engine import OutputGuard, SafetyViolation
+from aura_hive.hive.proteins.guard.skill import GuardSkill
 
 
 def _make_skill() -> GuardSkill:

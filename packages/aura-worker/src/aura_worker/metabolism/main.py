@@ -4,6 +4,8 @@ import json
 import logging
 from typing import Any
 
+from aura_core import make_struct
+from aura_core_gen.aura.core.v1 import Observation, Signal
 from nats.aio.client import Client as NATS
 
 logger = logging.getLogger(__name__)
@@ -89,8 +91,6 @@ class MetabolicLoop:
         try:
             # 1. Try parsing as Signal Proto (v0.3.0)
             try:
-                from aura_core_gen.aura.core.v1 import Observation, Signal
-
                 signal = Signal().parse(msg.data)
                 images_bytes = signal.perception.image_data
                 prompt = signal.perception.prompt or "Analyze this image."
@@ -128,12 +128,13 @@ class MetabolicLoop:
             result = await self.node.analyze_vision(images_bytes, prompt)
 
             if use_proto_response:
-                from aura_core_gen.aura.core.v1 import Observation
-
                 obs = Observation(success="error" not in result)
                 if "error" in result:
                     obs.error = result["error"]
-                obs.metadata.from_dict(result)
+                # Build the metadata Struct with make_struct: Struct.from_dict()
+                # yields a value that fails to serialize (`bytes(obs)` raises
+                # "string argument without an encoding").
+                obs.metadata = make_struct(result)
                 await msg.respond(bytes(obs))
             else:
                 await msg.respond(json.dumps(result).encode())

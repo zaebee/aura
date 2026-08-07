@@ -19,7 +19,16 @@ dependencies = [
 aura-core = { workspace = true }
 
 [project.scripts]
-aura-keeper = "main:main"
+aura-keeper = "aura_keeper.main:main"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+# Standard src-layout: ship the aura_keeper package (no flat top-level modules,
+# no `hive`/`config` collision with other services).
+[tool.hatch.build.targets.wheel]
+packages = ["src/aura_keeper"]
 
 [tool.uv]
 managed = true
@@ -38,4 +47,11 @@ ignore_missing_imports = true
 dev = [
     "pydantic-settings>=2.12.0",
     "types-pyyaml>=6.0.12.20250915",
+    "pytest>=8.0.0",
+    "pytest-asyncio>=0.24.0",
 ]
+
+[tool.pytest.ini_options]
+pythonpath = ["src"]
+testpaths = ["tests"]
+asyncio_mode = "auto"

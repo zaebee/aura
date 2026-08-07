@@ -15,11 +15,11 @@ from aura_core_gen.aura.core.v1 import (
     Signal,
     TelegramSignal,
 )
-from hive.aggregator.main import HiveAggregator
-from hive.proteins.perception.skill import PerceptionSkill
-from hive.proteins.persistence.skill import PersistenceSkill
-from hive.proteins.reasoning.skill import ReasoningSkill
-from hive.transformer.main import AuraTransformer
+from aura_hive.hive.aggregator.main import HiveAggregator
+from aura_hive.hive.proteins.perception.skill import PerceptionSkill
+from aura_hive.hive.proteins.persistence.skill import PersistenceSkill
+from aura_hive.hive.proteins.reasoning.skill import ReasoningSkill
+from aura_hive.hive.transformer.main import AuraTransformer
 
 
 @pytest.mark.asyncio

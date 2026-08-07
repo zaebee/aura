@@ -2,7 +2,7 @@ import hmac as hmac_module
 from typing import Any
 
 import pytest
-from src.hive.metabolism.security import AuditSigner
+from aura_hive.hive.metabolism.security import AuditSigner
 
 SUBJECT = "aura.wallet.sanctify"
 PAYLOAD = b'{"wallet": "0xDEAD"}'

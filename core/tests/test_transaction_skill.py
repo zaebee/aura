@@ -1,16 +1,15 @@
 from unittest.mock import MagicMock, patch
 
 import pytest
-from hive.proteins.transaction.engine import (
+from aura_hive.config.crypto import CryptoSettings
+from aura_hive.hive.proteins.transaction.engine import (
     PriceConverter,
     SecretEncryption,
 )
-from hive.proteins.transaction.skill import TransactionSkill
-from hive.proteins.transaction.solana_engine import SolanaProvider
+from aura_hive.hive.proteins.transaction.skill import TransactionSkill
+from aura_hive.hive.proteins.transaction.solana_engine import SolanaProvider
 from solders.keypair import Keypair
 from solders.pubkey import Pubkey
-
-from config.crypto import CryptoSettings
 
 
 @pytest.mark.asyncio
@@ -51,7 +50,7 @@ async def test_transaction_skill_calculate_tax_and_margin():
 
 
 @pytest.mark.asyncio
-@patch("hive.proteins.transaction.solana_engine.Pubkey.from_string")
+@patch("aura_hive.hive.proteins.transaction.solana_engine.Pubkey.from_string")
 async def test_transaction_skill_generate_payment_request(mock_from_string):
     # Mock Pubkey.from_string to handle the project's non-standard TOKEN_PROGRAM_ID
     # Use pre-created Pubkey objects to avoid recursion

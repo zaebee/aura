@@ -20,15 +20,22 @@ env:
     REGISTRY: ghcr.io
     IMAGE_NAME: ${{ github.repository }}
 
+# Least-privilege default for all jobs; jobs that need more override below.
+permissions:
+    contents: read
+
 jobs:
     check-changes:
         runs-on: ubuntu-latest
+        permissions:
+            contents: read
+            pull-requests: read # dorny/paths-filter reads changed files on PRs
         outputs:
             code: ${{ steps.filter.outputs.code }}
             infra: ${{ steps.filter.outputs.infra }}
         steps:
-            - uses: actions/checkout@v4
-            - uses: dorny/paths-filter@v2
+            - uses: actions/checkout@v7
+            - uses: dorny/paths-filter@v4
               id: filter
               with:
                   filters: |
@@ -47,7 +54,7 @@ jobs:
     prepare:
         runs-on: ubuntu-latest
         steps:
-            - uses: actions/checkout@v4
+            - uses: actions/checkout@v7
             - name: Install Buf
               uses: bufbuild/buf-setup-action@v1
               with:
@@ -55,7 +62,7 @@ jobs:
             - name: Generate Protos
               run: make generate
             - name: Upload Protos
-              uses: actions/upload-artifact@v4
+              uses: actions/upload-artifact@v7
               with:
                   name: proto-stubs
                   path: |
@@ -69,17 +76,17 @@ jobs:
         needs: prepare
         runs-on: ubuntu-latest
         steps:
-            - uses: actions/checkout@v4
+            - uses: actions/checkout@v7
             - name: Download Protos
-              uses: actions/download-artifact@v4
+              uses: actions/download-artifact@v8
               with:
                   name: proto-stubs
             - name: Set up Python
-              uses: actions/setup-python@v5
+              uses: actions/setup-python@v7
               with:
                   python-version: "3.12"
             - name: Install uv
-              uses: astral-sh/setup-uv@v6
+              uses: astral-sh/setup-uv@v7
               with:
                   version: "0.9.26"
                   enable-cache: true
@@ -113,19 +120,19 @@ jobs:
             packages: write
 
         steps:
-            - uses: actions/checkout@v4
+            - uses: actions/checkout@v7
 
             - name: Download Protos
-              uses: actions/download-artifact@v4
+              uses: actions/download-artifact@v8
               with:
                   name: proto-stubs
 
             - name: Set up Python
-              uses: actions/setup-python@v5
+              uses: actions/setup-python@v7
               with:
                   python-version: "3.12"
             - name: Install uv
-              uses: astral-sh/setup-uv@v6
+              uses: astral-sh/setup-uv@v7
               with:
                   version: "0.9.26"
                   enable-cache: true
@@ -141,7 +148,7 @@ jobs:
                 # make core-train
 
             - name: Log in to the Container registry
-              uses: docker/login-action@v3
+              uses: docker/login-action@v4
               with:
                   registry: ${{ env.REGISTRY }}
                   username: ${{ github.actor }}
@@ -191,7 +198,7 @@ jobs:
         env:
             KUBECONFIG: /home/runner/.kube/config
         steps:
-            - uses: actions/checkout@v4
+            - uses: actions/checkout@v7
 
             - name: Deploy to Cluster
               env:

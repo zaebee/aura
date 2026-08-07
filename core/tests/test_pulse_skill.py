@@ -1,9 +1,8 @@
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
-from hive.proteins.pulse.skill import PulseSkill
-
-from config.server import ServerSettings
+from aura_hive.config.server import ServerSettings
+from aura_hive.hive.proteins.pulse.skill import PulseSkill
 
 
 @pytest.mark.asyncio

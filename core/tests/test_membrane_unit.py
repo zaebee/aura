@@ -1,7 +1,7 @@
 from unittest.mock import MagicMock
 
 import pytest
-from src.hive.proteins.guard.engine import OutputGuard, SafetyViolation
+from aura_hive.hive.proteins.guard.engine import OutputGuard, SafetyViolation
 
 
 def test_output_guard_validate_decision_accept_above_floor():

@@ -1,432 +1,167 @@
 # CLAUDE.md
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+Guidance for Claude Code (and other agents) working in this repository.
+
+> **This document was rewritten 2026-07-24 to match the ATCG-M architecture the
+> code actually uses.** An earlier version described a pre-ATCG-M microservice
+> design (`NegotiationService` + pricing-strategy classes in flat `core/src/`);
+> those paths and framings are gone. The source of truth for the live structure
+> is `tools/distill_knowledge.py` → `docs/knowledge/hive_architecture_v2.json`.
 
 ## Project Overview
 
-Aura is a distributed microservices platform for autonomous economic negotiations between AI agents and service providers. The platform uses:
-- **API Gateway** (FastAPI): HTTP/JSON endpoints with rate limiting and signature verification
-- **Core Service** (gRPC): Business logic, pricing strategies, and semantic search
-- **Protocol Buffers**: Contract-first API design for service communication
-- **PostgreSQL with pgvector**: Vector embeddings for semantic search
-- **OpenTelemetry**: Distributed tracing with Jaeger
+Aura is a distributed platform for autonomous economic negotiation between AI
+agents and service providers. Its architecture is a **biological metaphor**: the
+whole system is modelled as a **Hive of cells**, and every unit of computation is
+expressed as cellular machinery rather than conventional "services/managers".
+
+The organizing pattern is the **ATCG-M metabolism** (see below). The canonical,
+fully-formed cell is the **Core** service; the other services are edge adapters
+("synapses"), specialized workers, or auditor agents around it.
+
+## The Living Metaphor — 4-Level Ontology
+
+| Level | Meaning | Where it lives |
+|-------|---------|----------------|
+| **Genome** | Immutable protocols + shared DNA. Never contains business logic. | `packages/aura-core` (`aura_core`) + generated protobufs (`aura_core_gen`) |
+| **Nucleus** | The sovereign brain — a complete cell running the full ATCG-M metabolism. | `core/` → `core/src/aura_hive/` (package `aura_hive`) |
+| **Organs** | Proteins — single-purpose skills (enzymes) wired into the Nucleus. | `core/src/aura_hive/hive/proteins/*` |
+| **Citizens** | Composed edge entities: synapses (protocol adapters), workers, agents. | `synapses/*`, `api-gateway/`, `agents/*`, `packages/aura-worker` |
+
+**Genome exports** (`from aura_core import ...`): the DNA protocols
+`Aggregator, Transformer, Connector, Generator, Membrane, SkillProtocol,
+BaseConnector, SkillRegistry, MetabolicLoop`; helpers `make_struct, map_action,
+get_raw_key`; and geography `find_hive_root, MACRO_ATCG_FOLDERS,
+ALLOWED_CHAMBERS, resolve_brain_path`. **Prefer importing these over
+re-implementing them** — several services currently copy `find_hive_root` /
+`MetabolicLoop` locally instead (a known drift; see "Honest state").
+
+## The ATCG-M Metabolism
+
+Every cell runs one metabolic cycle per signal. The canonical implementation is
+`core/src/aura_hive/hive/metabolism/main.py::MetabolicLoop.execute(signal)`:
+
+```
+M(in)  membrane.inspect_inbound(signal)        # guard the incoming signal
+A      context     = aggregator.perceive(...)   # A — sense the environment
+T      decision    = transformer.think(...)     # T — reason / decide
+M(out) membrane.inspect_outbound(decision, ...) # guard the outgoing decision  ← Hidden Knowledge enforced here
+C      observation = connector.act(...)         # C — act on the decision
+G                    generator.pulse(...)        # G — emit events / heartbeat
+```
+
+- **A — Aggregator** (`hive/aggregator/`): perceive/gather context.
+- **T — Transformer** (`hive/transformer/`): think/decide. The pricing brains
+  (`RuleBasedStrategy` deterministic, `LiteLLMStrategy` LLM-backed) live **inside**
+  `hive/transformer/main.py` — selected by config, not a separate service.
+- **C — Connector** (`hive/connector/`): act (persistence, external calls).
+- **G — Generator** (`hive/generator/`): pulse/emit (events, heartbeats).
+- **M — Membrane** (`hive/membrane/`): guards on both boundaries; the outbound
+  guard is where the Hidden-Knowledge invariant is enforced.
+- **Cortex** (`hive/cortex.py::HiveCell`): assembles the cell — wires the proteins
+  into a `SkillRegistry` and builds the organism (`build_organism()`).
+
+**Organ Proteins** (`hive/proteins/`): `blockchain_data` (GoldRush), `coherence`,
+`discovery`, `guard`, `kinetic`, `perception`, `persistence`, `pulse` (NATS),
+`reasoning` (embeddings/LLM), `telemetry`, `transaction` (Solana).
+
+## Core Patterns & Invariants
+
+The self-model (`distill`) declares **6 hard invariants**. Honor them:
+
+1. **Trinity pattern** — every protein implements `bind(settings, provider)` →
+   `async initialize() -> bool` → `async execute(...) -> Observation`. Wired by
+   the Cortex; never call protein internals directly.
+2. **Hidden Knowledge** — `floor_price` (and internal thresholds) must NEVER reach
+   an agent/client. Enforced by `Membrane.inspect_outbound`. Agents only ever see
+   `accepted / countered / rejected / ui_required`.
+3. **Cellular metaphor** — biological names (Genome, Nucleus, Protein, Membrane,
+   Bloodstream). `Manager/Service/Helper/Util/Controller/Adapter` are "heresy".
+4. **Ontological purity** — depend only downward on the Genome
+   (`from aura_core.dna import ...`); the Genome must never import service code.
+5. **Fractal completeness** — a full cell has all nucleotides
+   (`aggregator, transformer, connector, generator, membrane` + `cortex, metabolism`).
+6. **Contract-first APIs** — change `proto/aura/**`, run `buf generate`, then update
+   implementations. Never hand-edit generated code (`*/gen-proto/`, `aura_core_gen`).
+
+## Services Map
+
+| Service | Package | Role | Entry |
+|---------|---------|------|-------|
+| **core** | `aura_hive` | The Nucleus — full ATCG-M cell; gRPC (grpclib) on `:50051`. `NegotiationService` delegates to `MetabolicLoop`. | `python -m aura_hive.main` |
+| **api-gateway** | `api_gateway` | Synapse — HTTP/JSON edge (FastAPI); signature verification, rate-limit; forwards to core. | `uvicorn api_gateway.main:app` (`:8000`) |
+| **telegram-bot** | `telegram_bot` | Synapse — Telegram receptor/translator/effector; talks to the Hive over NATS. | `python -m telegram_bot.main` |
+| **mcp-server** | `aura_mcp` | Synapse — MCP adapter (fastmcp 3.x); embeds a `HiveCell`. | `python -m aura_mcp.main` |
+| **bee-keeper** | `aura_keeper` | Citizen agent — audits the Hive's architecture (partial cell). | `python -m aura_keeper.main` |
+| **aura-worker** | `aura_worker` | Citizen — remote Jupyter/Colab vision worker (Ollama + gradio); frpc tunnel. | (Colab / worker node) |
+
+Synapses use a **`receptor → translator → effector`** shape — a lightweight
+mini-metabolism with the ATCG-M mapping **receptor = A, translator = T,
+effector = C·G**. This is now stated explicitly in each synapse module's
+docstring and in `docs/ontology/patterns.yaml` (`synapse_pattern`). Applies to
+the NATS/MCP synapses (`telegram-bot`, `mcp-server`); `api-gateway` is an HTTP
+edge with a different shape.
 
 ## Development Commands
 
-### Setup and Dependencies
+Uses **`uv`** (not pip/poetry) and **`buf`** for protos. All Python is a single uv
+workspace; only the **root `uv.lock`** is authoritative (member locks were removed).
+
 ```bash
-# Install dependencies
-uv sync
-
-# Install development dependencies (linting, testing)
-uv sync --group dev
-
-# Generate Protocol Buffer code (MUST run after modifying .proto files)
-buf generate
+uv sync --group dev          # install dev deps
+make generate                # buf generate → gen-proto (run after editing proto/)
+make lint                    # ruff + mypy (all services) + bandit + buf lint
+make test                    # full suite (see below)
+make format                  # ruff format
+make run-core                # python -m aura_hive.main
+make run-gateway             # uvicorn api_gateway.main:app
 ```
 
-### Running Services
-
-#### Using Docker Compose (Recommended)
-```bash
-# Start all services (PostgreSQL, Core Service, API Gateway, Jaeger)
-docker-compose up --build
-
-# The services will be available on:
-# - API Gateway: http://localhost:8000
-# - Core Service gRPC: localhost:50051
-# - Jaeger UI: http://localhost:16686
-# - PostgreSQL: localhost:5432
-```
-
-#### Running Individually
-```bash
-# Core Service (from project root)
-cd core && uv run python -m src.main
-
-# API Gateway (from project root)
-cd api-gateway && uv run python -m src.main
-```
-
-### Testing
-```bash
-# Run all tests
-make test
-
-# Run with coverage report
-make test-cov
-
-# Run with verbose output
-make test-verbose
-
-# Run specific test file
-uv run pytest core/tests/test_rule_based_strategy.py -v
-```
-
-### Code Quality
-```bash
-# Lint code (using ruff)
-make lint
-
-# Format code (using ruff)
-make format
-
-# Lint Protocol Buffer definitions
-buf lint
-```
-
-### Database Operations
-```bash
-# Run migrations
-docker-compose exec core alembic upgrade head
-
-# Create new migration
-docker-compose exec core alembic revision --autogenerate -m "description"
-
-# Downgrade migration
-docker-compose exec core alembic downgrade -1
-
-# Connect to PostgreSQL
-docker-compose exec db psql -U user -d aura_db
-```
-
-### Simulators and Testing Tools
-```bash
-# Agent negotiation simulator
-python tools/agent_sim.py
-
-# Search functionality simulator
-python tools/search_sim.py
-
-# Comprehensive telemetry test
-python test_telemetry_comprehensive.py
-
-# Health check endpoints test
-python test_health_endpoints.py
-```
-
-### Health Checks
-```bash
-# Test health endpoints
-curl http://localhost:8000/healthz   # Liveness
-curl http://localhost:8000/readyz    # Readiness
-curl http://localhost:8000/health    # Detailed status
-
-# Test infrastructure monitoring
-curl http://localhost:8000/v1/system/status  # Prometheus metrics (CPU, memory)
-
-# Check Docker Compose health status
-docker-compose ps
-
-# Test gRPC health (requires grpc_health_probe)
-grpc_health_probe -addr=localhost:50051
-```
-
-## Architecture Patterns
-
-### Contract-First Design with Protocol Buffers
-
-All APIs are defined in `proto/aura/negotiation/v1/negotiation.proto`. The workflow is:
-
-1. **Modify .proto file** to add/change service definitions
-2. **Run `buf generate`** to regenerate Python code in both services
-3. **Update implementations** in core/src/main.py (gRPC handler) and api-gateway/src/main.py (HTTP endpoint)
-4. **Generated code lives in** `*/src/proto/` directories and should NEVER be manually edited
-
-### Service Communication Flow
-
-```
-HTTP Client → API Gateway (FastAPI:8000) → Core Service (gRPC:50051) → PostgreSQL/Mistral AI
-```
-
-- API Gateway converts HTTP/JSON to gRPC/Protobuf
-- Core Service handles all business logic
-- Both services are **stateless** for horizontal scalability
-- Request IDs flow through all layers for distributed tracing
-
-### Pricing Strategy Pattern
-
-The Core Service uses a pluggable strategy pattern for pricing decisions, configured via the `LLM_MODEL` environment variable:
-
-**RuleBasedStrategy** (`LLM_MODEL=rule`): Deterministic rules without LLM
-- Bid < floor_price → Counter offer
-- Bid >= floor_price → Accept
-- Bid > $1000 → Require UI confirmation
-- No API key required
-- Fastest response time
-
-**LiteLLMStrategy** (any other `LLM_MODEL` value): LLM-based intelligent negotiation
-- Supports any provider via litellm (OpenAI, Mistral, Anthropic, Ollama, etc.)
-- Uses Jinja2 prompt templates from `core/src/prompts/system.md`
-- Returns decisions with reasoning
-- Handles complex negotiation scenarios
-- Example models: `mistral/mistral-large-latest`, `openai/gpt-4o`, `ollama/mistral`
-
-Implementation:
-- Strategy factory: `core/src/main.py:create_strategy()`
-- Rule-based: `core/src/llm_strategy.py:RuleBasedStrategy`
-- LiteLLM: `core/src/llm/strategy.py:LiteLLMStrategy`
-- LLM engine: `core/src/llm/engine.py:LLMEngine`
-
-### Vector Embeddings and Semantic Search
-
-The Search endpoint (`/v1/search`) uses pgvector for semantic search:
-
-1. **Query text** → `generate_embedding()` → **vector embedding**
-2. **Vector similarity search** in PostgreSQL using cosine distance
-3. **Results ranked by similarity** with configurable thresholds
-
-Implementation: `core/src/embeddings.py` generates embeddings, `core/src/main.py:105-167` handles search logic.
-
-### Hidden Knowledge Pattern
-
-**Floor prices are never exposed to clients**. This prevents agents from gaming the system:
-- The API Gateway never sees floor prices
-- Core Service enforces floor price logic internally
-- Agents only receive accept/counter/reject responses
-- Database schema includes both `base_price` (public) and `floor_price` (hidden)
-
-### Request ID Propagation
-
-Request IDs flow through the entire system for distributed tracing:
-1. API Gateway generates request_id
-2. Passed as gRPC metadata (`x-request-id`)
-3. Core Service extracts and binds to logging context
-4. All logs and traces include the request_id
-
-Implementation: `logging_config.py` provides `bind_request_id()` and `clear_request_context()` helpers.
-
-### Infrastructure Monitoring ("The Eyes")
-
-The Core Service can query its own infrastructure health from Prometheus:
-- Endpoint: `GET /v1/system/status` (API Gateway) → `GetSystemStatus` RPC (Core Service)
-- Metrics: CPU usage (%), Memory usage (MB), timestamp, cached status
-- Caching: 30-second TTL to reduce Prometheus load
-- Graceful degradation: Returns cached data or error dict on failure
-
-Implementation:
-- Prometheus client: `core/src/monitor.py:get_hive_metrics()`
-- Cache layer: `core/src/monitor.py:MetricsCache`
-- gRPC handler: `core/src/main.py:GetSystemStatus()`
-- HTTP endpoint: `api-gateway/src/main.py:/v1/system/status`
-
-## Critical Code Locations
-
-### Protocol Buffer Definitions
-- **Service contracts**: `proto/aura/negotiation/v1/negotiation.proto`
-- **Generated Python code**: `api-gateway/src/proto/` and `core/src/proto/`
-
-### Core Service (gRPC)
-- **Main service**: `core/src/main.py`
-  - `NegotiationService.Negotiate()` handler
-  - `NegotiationService.Search()` handler
-  - `NegotiationService.GetSystemStatus()` handler
-  - `create_strategy()` factory for pricing strategy selection
-- **Pricing strategies**:
-  - `RuleBasedStrategy`: `core/src/llm_strategy.py`
-  - `LiteLLMStrategy`: `core/src/llm/strategy.py`
-  - `LLMEngine`: `core/src/llm/engine.py`
-- **Infrastructure monitoring**: `core/src/monitor.py`
-- **Prompt templates**: `core/src/prompts/system.md`
-- **Database models**: `core/src/db.py`
-- **Embeddings**: `core/src/embeddings.py`
-
-### API Gateway (FastAPI)
-- **HTTP endpoints**: `api-gateway/src/main.py`
-- **Configuration**: `api-gateway/src/config.py`
-
-### Tests
-- **Rule-based strategy tests**: `core/tests/test_rule_based_strategy.py`
-- **LiteLLM strategy tests**: `core/tests/test_litellm_strategy.py`
-- **Test fixtures**: `core/tests/conftest.py`
-
-## Configuration and Environment
-
-### Required Environment Variables
-```bash
-# Core Service
-DATABASE_URL=postgresql://user:password@localhost:5432/aura_db
-OTEL_SERVICE_NAME=aura-core
-OTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:4317
-
-# LLM Configuration (choose one strategy)
-LLM_MODEL=rule                              # No LLM, no API key needed
-# OR
-LLM_MODEL=mistral/mistral-large-latest      # Requires MISTRAL_API_KEY
-MISTRAL_API_KEY=sk-xxx
-# OR
-LLM_MODEL=openai/gpt-4o                     # Requires OPENAI_API_KEY
-OPENAI_API_KEY=sk-proj-xxx
-# OR
-LLM_MODEL=anthropic/claude-3-5-sonnet-20241022  # Requires ANTHROPIC_API_KEY
-ANTHROPIC_API_KEY=sk-ant-xxx
-# OR
-LLM_MODEL=ollama/mistral                    # No API key (assumes Ollama running locally)
-
-# Infrastructure Monitoring
-PROMETHEUS_URL=http://monitoring-kube-prometheus-prometheus.monitoring.svc.cluster.local:9090
-
-# API Gateway
-CORE_SERVICE_HOST=localhost:50051
-OTEL_SERVICE_NAME=aura-gateway
-OTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:4317
-```
-
-### Configuration Files
-- **Python dependencies**: `pyproject.toml` (uses uv package manager)
-- **Docker services**: `compose.yml`
-- **Protocol Buffer config**: `buf.yaml` and `buf.gen.yaml`
-- **Ruff linting**: Configured in `pyproject.toml` (excludes `**/proto/**`)
-
-## Common Development Workflows
-
-### Adding a New API Endpoint
-
-1. Define in `proto/aura/negotiation/v1/negotiation.proto`:
-   ```proto
-   service NegotiationService {
-       rpc NewEndpoint (NewRequest) returns (NewResponse);
-   }
-   ```
-2. Run `buf generate` to regenerate code
-3. Implement gRPC handler in `core/src/main.py`
-4. Add HTTP endpoint in `api-gateway/src/main.py`
-5. Add tests in `core/tests/`
-
-### Changing LLM Models
-
-To switch between LLM providers or use rule-based strategy:
-
-**Via Environment Variable** (Recommended):
-```bash
-# Rule-based (no LLM)
-export LLM_MODEL=rule
-
-# Mistral (backward compatible)
-export LLM_MODEL=mistral/mistral-large-latest
-export MISTRAL_API_KEY=sk-xxx
-
-# OpenAI
-export LLM_MODEL=openai/gpt-4o
-export OPENAI_API_KEY=sk-proj-xxx
-
-# Ollama (local)
-export LLM_MODEL=ollama/mistral
-
-# Then restart services
-docker-compose restart core
-```
-
-**Via Helm** (Kubernetes deployment):
-```bash
-# Deploy with OpenAI
-helm install aura deploy/aura \
-  --set core.env.LLM_MODEL="openai/gpt-4o" \
-  --set secrets.openaiApiKey="sk-proj-xxx"
-
-# Deploy with rule-based (no LLM)
-helm install aura deploy/aura \
-  --set core.env.LLM_MODEL="rule"
-```
-
-### Modifying Pricing Strategy
-
-To add a new pricing strategy:
-1. Create new class in `core/src/llm/` or `core/src/llm_strategy.py`
-2. Implement `PricingStrategy` protocol with `evaluate()` method
-3. Return `negotiation_pb2.NegotiateResponse` with one of: `accepted`, `countered`, `rejected`, or `ui_required`
-4. Update `core/src/main.py:create_strategy()` factory to instantiate your strategy
-5. Add tests in `core/tests/test_<strategy_name>.py`
-
-### Customizing Prompt Templates
-
-To modify LLM prompts:
-1. Edit `core/src/prompts/system.md` (Jinja2 template)
-2. Available variables: `business_type`, `item_name`, `base_price`, `floor_price`, `market_load`, `trigger_price`, `bid`, `reputation`
-3. Test changes: `docker-compose restart core`
-
-### Database Schema Changes
-
-1. Modify models in `core/src/db.py`
-2. Create migration: `docker-compose exec core alembic revision --autogenerate -m "description"`
-3. Review generated migration in `core/migrations/versions/`
-4. Apply migration: `docker-compose exec core alembic upgrade head`
-
-## Observability
-
-### Distributed Tracing
-- **Jaeger UI**: http://localhost:16686
-- **Instrumented components**: FastAPI, gRPC, SQLAlchemy, LangChain
-- **Trace propagation**: Request IDs flow through all services
-
-### Logging
-- **Format**: Structured JSON logs with `structlog`
-- **Request correlation**: All logs include `request_id`
-- **Log levels**: Configured in `*_config.py` files
-
-### Viewing Traces
-```bash
-# Follow logs for specific service
-docker-compose logs -f core
-docker-compose logs -f api-gateway
-
-# View all logs
-docker-compose logs -f
-```
-
-## Migration Guide
-
-### Upgrading from Hardcoded Mistral to LiteLLM
-
-If you're upgrading from the old hardcoded `MistralStrategy`:
-
-**Before** (hardcoded Mistral):
-```python
-# core/src/main.py
-from llm_strategy import MistralStrategy
-strategy = MistralStrategy()
-
-# .env
-MISTRAL_API_KEY=sk-xxx
-```
-
-**After** (flexible litellm):
-```bash
-# .env - Option 1: Keep using Mistral (backward compatible)
-LLM_MODEL=mistral/mistral-large-latest
-MISTRAL_API_KEY=sk-xxx
-
-# .env - Option 2: Switch to OpenAI
-LLM_MODEL=openai/gpt-4o
-OPENAI_API_KEY=sk-proj-xxx
-
-# .env - Option 3: Use local Ollama (no API key)
-LLM_MODEL=ollama/mistral
-
-# .env - Option 4: No LLM (rule-based only)
-LLM_MODEL=rule
-```
-
-**Code changes required**: **None** - Configuration-driven via environment variables.
-
-**Test changes**: If you have custom tests importing `MistralStrategy`, update imports:
-```python
-# Before
-from llm_strategy import MistralStrategy
-
-# After
-from llm.strategy import LiteLLMStrategy
-```
-
-**Backward compatibility**: Default `LLM_MODEL=mistral/mistral-large-latest` maintains identical behavior to the old `MistralStrategy`.
+## Testing
+
+`make test` runs each service's suite on its own `PYTHONPATH` (188 tests total):
+
+- **core** (114): `PYTHONPATH=$(CORE_PATH) pytest core/tests/`
+- **api-gateway** (1): env supplied by `api-gateway/tests/conftest.py`
+- **telegram-bot** (6): isolated `TG_PATH`
+- **mcp-server** (14): needs fastmcp → `uv sync --package aura-mcp --inexact` first
+- **aura-worker** (53): needs gradio → `uv sync --package aura-worker --inexact` (the
+  `ml`/torch group is intentionally NOT synced)
+
+Tests mock heavy deps (NATS, httpx, subprocess, torch/gradio) — no live services
+required. Per-service config uses pydantic-settings with `env_prefix` (`AURA_` for
+core, `AURA_GATEWAY__` for api-gateway) and nested `__` delimiter.
+
+## Self-Model (the Hive's own map)
+
+`make tools-distill` scans the codebase and emits
+`docs/knowledge/hive_architecture_v2.{bin,json}` — the Genome/Nucleus/Organs/
+Citizens/invariants extracted from the actual code. Run it to get the current,
+authoritative structural snapshot. `bee-keeper` audits these invariants.
+
+## Honest state (drift to be aware of)
+
+The ATCG-M pattern is **fully realized only in `core`**. Around it:
+
+- **Docs lagged the code** by a paradigm (this file's rewrite closes that gap).
+- **Naming heresy persists** in real symbols: `NegotiationService`, `MarketService`,
+  `WorkerController`, `NatsAdapter`, `GrpcAdapter` — against invariant #3.
+- **Fractal-by-copy-paste**: `find_hive_root` (and similar) are re-implemented per
+  service instead of imported from the Genome, which already exports them.
+- **Partial cells**: `bee-keeper`, `bee-evolver`, and even `frontend` each carry a
+  *different subset* of nucleotides (usually missing `membrane`); synapses have none.
+- **God-proteins**: `PersistenceSkill` / `TransactionSkill` have accreted many
+  responsibilities — drifting from "one enzyme, one reaction".
+
+When adding code, push toward the invariants (import the Genome, keep proteins
+single-purpose, use biological names) rather than reinforcing the drift.
 
 ## Important Notes
 
-- **Auto-generated code**: Never edit files in `*/src/proto/` directories - regenerate with `buf generate`
-- **Python version**: Requires Python 3.12+ (see `pyproject.toml:6`)
-- **Package manager**: Uses `uv`, not pip or poetry
-- **Stateless design**: Both services are stateless and horizontally scalable
-- **gRPC port**: Core Service runs on 50051 (configurable)
-- **HTTP port**: API Gateway runs on 8000 (configurable)
-- **Database**: PostgreSQL with pgvector extension is required for vector search
-- **LLM flexibility**: Supports 100+ models via litellm (OpenAI, Anthropic, Mistral, Ollama, etc.)
+- Python **3.12+**, package manager **`uv`**.
+- gRPC uses **grpclib** (async), not grpcio, in core.
+- Never edit generated protobuf code (`*/gen-proto/`, `aura_core_gen`); regenerate.
+- Compose file is `compose.yml`; k8s/Helm live under `deploy/aura/`.
+- The optional geography config `hive-manifest.yaml` (repo root; k8s configmap at
+  `/app/hive-manifest.yaml`) feeds the Membrane's folder/chamber rules — absent →
+  safe empty defaults.

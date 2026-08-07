@@ -17,7 +17,8 @@ logger = structlog.get_logger(__name__)
 _DEFAULT_MANIFEST: dict[str, Any] = {
     "macro_atcg_folders": [],
     "allowed_root_files": [],
-    "allowed_chambers": {},
+    "allowed_chambers": [],
+    "determinism_exempt_paths": [],
 }
 
 
@@ -36,12 +37,20 @@ def find_hive_root() -> Path:
 
 @lru_cache(maxsize=1)
 def _load_manifest() -> dict[str, Any]:
-    """Load and cache the hive manifest."""
+    """
+    Load and cache the hive manifest.
+
+    Callers use `.get(key) or []`: a key present in YAML with nothing under it
+    parses as None, and `.get(key, [])` would hand that None straight through.
+    """
     root = find_hive_root()
     manifest_path = root / "hive-manifest.yaml"
 
     if not manifest_path.exists():
-        logger.warning("hive-manifest.yaml not found at %s, using defaults", root)
+        # Optional config: absence is normal (e.g. standalone container runs
+        # without the k8s configmap mount). Genuine problems — a manifest that
+        # exists but is empty/malformed — still warn below.
+        logger.debug("hive-manifest.yaml not found at %s, using defaults", root)
         return _DEFAULT_MANIFEST
 
     try:
@@ -69,28 +78,52 @@ def _load_manifest() -> dict[str, Any]:
         return _DEFAULT_MANIFEST
 
 
+def _str_list(key: str) -> list[str]:
+    """
+    Read a list-of-strings key, refusing anything else.
+
+    A guard must not quietly drop entries it cannot read: a `protected_paths`
+    item that parses as None would silently stop protecting that path, and
+    nobody would learn about it. Fail where it can be seen.
+    """
+    value = _load_manifest().get(key) or []
+    if not isinstance(value, list):
+        raise ValueError(
+            f"hive-manifest.yaml: `{key}` must be a list, got {type(value).__name__}"
+        )
+    bad = [item for item in value if not isinstance(item, str)]
+    if bad:
+        raise ValueError(
+            f"hive-manifest.yaml: `{key}` contains non-string entries: {bad!r}"
+        )
+    return value
+
+
 def get_macro_atcg_folders() -> list[str]:
     """Get the list of macro ATCG folders."""
-    result: list[str] = _load_manifest().get("macro_atcg_folders", [])
-    return result
+    return _str_list("macro_atcg_folders")
 
 
 def get_allowed_root_files() -> list[str]:
     """Get the list of allowed root files."""
-    result: list[str] = _load_manifest().get("allowed_root_files", [])
-    return result
+    return _str_list("allowed_root_files")
 
 
-def get_allowed_chambers() -> dict[str, str]:
-    """Get the mapping of paths to chamber names."""
-    result: dict[str, str] = _load_manifest().get("allowed_chambers", {})
-    return result
+def get_allowed_chambers() -> list[str]:
+    """Get the list of path prefixes that count as sanctioned chambers."""
+    return _str_list("allowed_chambers")
+
+
+def get_determinism_exempt_paths() -> list[str]:
+    """Path prefixes where non-determinism is allowed outside a Transformer."""
+    return _str_list("determinism_exempt_paths")
 
 
 # Backward-compatible aliases (call functions to get values)
 MACRO_ATCG_FOLDERS = get_macro_atcg_folders()
 ALLOWED_ROOT_FILES = get_allowed_root_files()
 ALLOWED_CHAMBERS = get_allowed_chambers()
+DETERMINISM_EXEMPT_PATHS = get_determinism_exempt_paths()
 
 
 def resolve_brain_path(compiled_path: str | None = None) -> str:

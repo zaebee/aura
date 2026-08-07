@@ -46,6 +46,13 @@ class EvolutionPlan:
     token_usage: int = 0
     # True if the LLM determined no improvements are needed
     hive_is_optimal: bool = False
+    # Metabolism instrumentation (Gate 0). None means "unknown", never 0.
+    prompt_tokens: int | None = None
+    completion_tokens: int | None = None
+    usd: float | None = None
+    model_used: str | None = None
+    llm_calls: int = 0
+    llm_failed: bool = False
 
 
 @dataclass

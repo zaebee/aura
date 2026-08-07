@@ -12,10 +12,10 @@ from aura_core_gen.aura.core.v1 import (
     RWAComplianceScore,
     RWAVaultIntent,
 )
-from hive.membrane import HiveMembrane
-from hive.proteins.reasoning.engine import AuraRWANegotiator
-from hive.transformer import AuraTransformer
-from hive.transformer.signatures import AppraiseAndVerifyRWA
+from aura_hive.hive.membrane import HiveMembrane
+from aura_hive.hive.proteins.reasoning.engine import AuraRWANegotiator
+from aura_hive.hive.transformer import AuraTransformer
+from aura_hive.hive.transformer.signatures import AppraiseAndVerifyRWA
 
 # ---------------------------------------------------------------------------
 # Helpers

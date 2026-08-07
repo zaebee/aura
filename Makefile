@@ -1,4 +1,4 @@
-.PHONY: lint mypy test test-cov test-verbose build generate push install-dev format test-health \
+.PHONY: lint mypy test test-cov test-verbose build generate push install-dev format test-health keeper-audit \
        run-core run-gateway run-frontend prepare-bun
 
 # Makefile for Aura Project
@@ -33,6 +33,8 @@ lint: $(PROTO_SENTINEL)
 	MYPYPATH=$(DNA_PATH) uv run mypy packages/aura-core/src
 	# Security Audit (Bandit)
 	uv run bandit -r . -c pyproject.toml
+	# Fractal Completeness (ATCG-M baseline-lock gate)
+	uv run python tools/check_fractal_completeness.py
 	# Frontend Lint
 	# cd frontend && bun run lint
 
@@ -49,13 +51,37 @@ setup-hooks:
 	uv run pre-commit install
 
 # Run tests
+keeper-audit: $(PROTO_SENTINEL)
+	# One bee.Keeper cycle, then exit. Without --once main.py is a NATS daemon.
+	PYTHONPATH=$(KEEPER_PATH) uv run python -m aura_keeper.main --once
+
 test: $(PROTO_SENTINEL)
 	# Run core tests
 	PYTHONPATH=$(CORE_PATH) uv run pytest core/tests/ -v
+	# Run api-gateway tests (env is provided by api-gateway/tests/conftest.py)
+	PYTHONPATH=$(GATEWAY_PATH) uv run pytest api-gateway/tests/ -v
 	# Run telegram-bot tests with isolated path to avoid 'src' collision
 	PYTHONPATH=$(TG_PATH) uv run pytest synapses/telegram-bot/tests/ -v
-	# Run mcp-server tests if they exist
-	if [ -d "synapses/mcp-server/tests" ]; then PYTHONPATH=$(MCP_PATH):$(CORE_PATH) uv run pytest synapses/mcp-server/tests/ -v; fi
+	# Run bee.Keeper tests from the root env: its transformer imports dspy, which
+	# is declared in the root pyproject rather than the agent's own.
+	PYTHONPATH=$(KEEPER_PATH) uv run pytest agents/bee-keeper/tests/ -v
+	# Run bee.Evolver tests in its own env — it deliberately has no aura-core dep.
+	cd agents/bee-evolver && uv run --group dev pytest tests/ -v
+	# Run mcp-server tests if they exist.
+	# aura-mcp's runtime deps (fastmcp) aren't in the root dev group, so add them
+	# additively (--inexact keeps the already-synced dev deps, avoids aura-worker's
+	# heavy torch stack); --no-sync stops `uv run` from reverting that.
+	if [ -d "synapses/mcp-server/tests" ]; then \
+		uv sync --package aura-mcp --inexact; \
+		PYTHONPATH=$(MCP_PATH):$(CORE_PATH) uv run --no-sync pytest synapses/mcp-server/tests/ -v; \
+	fi
+	# Run aura-worker tests if they exist. Its runtime deps (gradio) aren't in
+	# the root dev group; add them additively (--inexact). The `ml` group with
+	# torch is NOT synced, so no heavy CUDA stack; --no-sync keeps the install.
+	if [ -d "packages/aura-worker/tests" ]; then \
+		uv sync --package aura-worker --inexact; \
+		PYTHONPATH=packages/aura-worker/src:$(DNA_PATH) uv run --no-sync pytest packages/aura-worker/tests/ -v; \
+	fi
 
 # Run tests with coverage report
 test-cov:
@@ -122,11 +148,11 @@ format:
 # --- 6. RUN SERVICES (auto-generates protos if needed) ---
 run-core: $(PROTO_SENTINEL)
 	# Run Core gRPC service
-	PYTHONPATH=$(TOOL_PATH) uv run python -m core.src.main
+	PYTHONPATH=$(TOOL_PATH) uv run python -m aura_hive.main
 
 run-gateway: $(PROTO_SENTINEL)
 	# Run API Gateway
-	PYTHONPATH=$(GATEWAY_PATH):$(DNA_PATH) uv run uvicorn main:app --host 0.0.0.0 --port 8000 --app-dir api-gateway/src
+	PYTHONPATH=$(GATEWAY_PATH):$(DNA_PATH) uv run uvicorn api_gateway.main:app --host 0.0.0.0 --port 8000 --app-dir api-gateway/src
 
 prepare-bun:
 	# Install frontend dependencies via bun

@@ -134,6 +134,7 @@ module = [
     "opentelemetry.*",
     "litellm.*",
     "redis.*",
+    "fastmcp.*",
 ]
 ignore_missing_imports = true
 

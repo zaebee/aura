@@ -11,6 +11,11 @@ on:
         required: false
         default: ''
         type: string
+      dry_run:
+        description: 'Run the full cycle but open no PR or Issues (for cost-baseline collection)'
+        required: false
+        default: false
+        type: boolean
 
 jobs:
   evolve:
@@ -23,13 +28,13 @@ jobs:
 
     steps:
       - name: Checkout Hive
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           fetch-depth: 0
           token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Install uv
-        uses: astral-sh/setup-uv@v5
+        uses: astral-sh/setup-uv@v7
         with:
           enable-cache: true
 
@@ -59,5 +64,28 @@ jobs:
           AURA_BEE_EVOLVER__MAX_TOKENS: "2000"
           MISTRAL_API_KEY: ${{ secrets.MISTRAL_API_KEY }}
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          AURA_METABOLISM_LOG: "${{ github.workspace }}/.hive/metabolism.jsonl"
+          GITHUB_SHA: ${{ github.sha }}
+          # Empty on scheduled runs, so the fallback keeps the default off.
+          EVOLVER_DRY_RUN: ${{ inputs.dry_run || false }}
         run: |
           uv run --directory agents/bee-evolver python main.py
+
+      # The writer swallows its own failures so it can never crash the bee.
+      # This step is where a silent failure becomes loud instead.
+      - name: Assert metabolic record was written
+        if: always()
+        run: |
+          if [ ! -s .hive/metabolism.jsonl ]; then
+            echo "::error::No metabolic record written — instrumentation is broken."
+            exit 1
+          fi
+          wc -l .hive/metabolism.jsonl
+
+      - name: Upload metabolic record
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: metabolism-evolver-${{ github.run_id }}
+          path: .hive/metabolism.jsonl
+          retention-days: 90

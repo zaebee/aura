@@ -1,9 +1,8 @@
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
-from hive.proteins.persistence.skill import PersistenceSkill
-
-from config.database import DatabaseSettings
+from aura_hive.config.database import DatabaseSettings
+from aura_hive.hive.proteins.persistence.skill import PersistenceSkill
 
 
 @pytest.mark.asyncio

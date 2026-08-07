@@ -1,3 +1,12 @@
+from .determinism import (
+    check_determinism,
+    is_exempt,
+    is_python_source,
+    is_transformer_path,
+    iter_added_lines,
+    iter_changed_files,
+    path_matches_prefix,
+)
 from .dna import (
     Aggregator,
     Connector,
@@ -9,10 +18,12 @@ from .dna import (
 from .manifest import (
     ALLOWED_CHAMBERS,
     ALLOWED_ROOT_FILES,
+    DETERMINISM_EXEMPT_PATHS,
     MACRO_ATCG_FOLDERS,
     find_hive_root,
     get_allowed_chambers,
     get_allowed_root_files,
+    get_determinism_exempt_paths,
     get_macro_atcg_folders,
     resolve_brain_path,
 )
@@ -35,6 +46,16 @@ __all__ = [
     "get_allowed_root_files",
     "get_allowed_chambers",
     "resolve_brain_path",
+    # determinism rule (determinism)
+    "DETERMINISM_EXEMPT_PATHS",
+    "get_determinism_exempt_paths",
+    "check_determinism",
+    "is_exempt",
+    "is_python_source",
+    "is_transformer_path",
+    "iter_added_lines",
+    "iter_changed_files",
+    "path_matches_prefix",
     # Protocols (The Law)
     "Aggregator",
     "Transformer",

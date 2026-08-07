@@ -39,4 +39,4 @@ ENV PYTHONPATH=/app/synapses/telegram-bot/src
 EXPOSE 8080
 
 # Command to run the bot
-CMD ["python", "src/main.py"]
+CMD ["python", "-m", "telegram_bot.main"]
