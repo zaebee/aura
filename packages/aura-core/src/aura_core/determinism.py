@@ -1,14 +1,10 @@
 """
-The Javana Law: non-determinism belongs to the Transformer alone.
+The Determinism Rule: non-determinism belongs to the Transformer alone.
 
 Every other nucleotide — Aggregator, Connector, Generator, Membrane — must be
 resultant or functional. Given the same context it must produce the same
 decision, every time. A guarantee that can vary between runs is not a
 guarantee, so entropy leaking into the Membrane silently voids it.
-
-(The rule is named for the javana phase of the Abhidhamma's seventeen-moment
-cognitive process: the single stage that is ethically determinate, surrounded
-by stages that are purely automatic. The name is a label, nothing more.)
 
 Deliberately NOT treated as entropy: uuid4, datetime.now, time.time and the
 secrets module. The Pollen envelope requires an event id and a timestamp, and
@@ -77,7 +73,7 @@ def is_exempt(file_path: str, exempt_paths: Sequence[str]) -> bool:
     return any(normalised.startswith(prefix) for prefix in exempt_paths)
 
 
-def check_javana(
+def check_determinism(
     file_path: str, added_line: str, exempt_paths: Sequence[str] = ()
 ) -> str | None:
     """
@@ -98,17 +94,17 @@ def check_javana(
         match = pattern.search(code)
         if match:
             return (
-                f"Javana Heresy: model invocation `{match.group(0)}` added in "
+                f"Determinism Heresy: model invocation `{match.group(0)}` added in "
                 f"`{file_path}`, outside a Transformer: `{code}`. Reasoning belongs "
                 f"to T alone; call it through the skill registry, or declare the "
-                f"path in `javana_exempt_paths`."
+                f"path in `determinism_exempt_paths`."
             )
 
     for pattern in ENTROPY_PATTERNS:
         match = pattern.search(code)
         if match:
             return (
-                f"Javana Heresy: statistical randomness `{match.group(0)}` added in "
+                f"Determinism Heresy: statistical randomness `{match.group(0)}` added in "
                 f"`{file_path}`, outside a Transformer: `{code}`. A nucleotide that "
                 f"varies between runs cannot carry a guarantee."
             )

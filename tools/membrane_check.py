@@ -7,7 +7,7 @@ rules, and an LLM reading the diff for architectural opinions. Only the first
 can carry a guarantee, so only the first belongs in a blocking check.
 
 This script runs that half and nothing else. It deliberately depends on no
-project code: it loads `javana.py` straight off disk and parses the manifest
+project code: it loads `determinism.py` straight off disk and parses the manifest
 with PyYAML. A guard that has to import the runtime it guards is not a guard —
 it fails whenever the thing it is checking fails to build.
 
@@ -35,14 +35,14 @@ import yaml
 
 ROOT = Path(__file__).resolve().parent.parent
 MANIFEST = ROOT / "hive-manifest.yaml"
-JAVANA = ROOT / "packages" / "aura-core" / "src" / "aura_core" / "javana.py"
+DETERMINISM = ROOT / "packages" / "aura-core" / "src" / "aura_core" / "determinism.py"
 
 
-def load_javana() -> Any:
-    """Load javana.py directly, without importing the aura_core package."""
-    spec = importlib.util.spec_from_file_location("_javana", JAVANA)
+def load_determinism() -> Any:
+    """Load determinism.py directly, without importing the aura_core package."""
+    spec = importlib.util.spec_from_file_location("_determinism", DETERMINISM)
     if spec is None or spec.loader is None:  # pragma: no cover - defensive
-        raise RuntimeError(f"cannot load {JAVANA}")
+        raise RuntimeError(f"cannot load {DETERMINISM}")
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
     return module
@@ -83,10 +83,13 @@ def read_diff(base: str | None, diff_file: str | None) -> str:
     return _git("diff", "--unified=0", f"{base}...HEAD")
 
 
-def changed_files(base: str | None, diff_file: str | None, javana: Any) -> set[str]:
+def changed_files(
+    base: str | None, diff_file: str | None, determinism: Any
+) -> set[str]:
     if diff_file:
         return {
-            path for path, _ in javana.iter_added_lines(Path(diff_file).read_text())
+            path
+            for path, _ in determinism.iter_added_lines(Path(diff_file).read_text())
         }
     if not base:
         raise SystemExit("one of --base or --diff-file is required")
@@ -143,16 +146,16 @@ def main() -> int:
     )
     args = parser.parse_args()
 
-    javana = load_javana()
+    determinism = load_determinism()
     manifest = load_manifest()
-    exempt = manifest.get("javana_exempt_paths", [])
+    exempt = manifest.get("determinism_exempt_paths", [])
 
     diff = read_diff(args.base, args.diff_file)
-    files = changed_files(args.base, args.diff_file, javana)
+    files = changed_files(args.base, args.diff_file, determinism)
 
     heresies: list[str] = []
-    for path, line in javana.iter_added_lines(diff):
-        heresy = javana.check_javana(path, line, exempt)
+    for path, line in determinism.iter_added_lines(diff):
+        heresy = determinism.check_determinism(path, line, exempt)
         if heresy:
             heresies.append(heresy)
 

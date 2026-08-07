@@ -54,10 +54,10 @@ allowed_chambers:
   - synapses
   - tools
 
-# Paths where non-determinism is permitted outside a Transformer (the Javana Law).
+# Paths where non-determinism is permitted outside a Transformer (the determinism rule).
 # Config, scripts, the composition root, and the two proteins whose whole purpose
 # is to call a model.
-javana_exempt_paths:
+determinism_exempt_paths:
   - core/scripts
   - core/tests
   - tests
@@ -74,7 +74,7 @@ javana_exempt_paths:
 protected_paths:
   - hive-manifest.yaml
   - packages/aura-core/src/aura_core/dna.py
-  - packages/aura-core/src/aura_core/javana.py
+  - packages/aura-core/src/aura_core/determinism.py
   - packages/aura-core/src/aura_core/manifest.py
   - core/src/aura_hive/hive/membrane
   - tools/membrane_check.py

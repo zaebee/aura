@@ -9,11 +9,11 @@ import yaml  # type: ignore
 from aura_keeper.config import KeeperSettings
 from aura_core import (
     ALLOWED_CHAMBERS,
-    JAVANA_EXEMPT_PATHS,
+    DETERMINISM_EXEMPT_PATHS,
     ALLOWED_ROOT_FILES,
     MACRO_ATCG_FOLDERS,
     Transformer,
-    check_javana,
+    check_determinism,
     find_hive_root,
     make_struct,
 )
@@ -311,12 +311,12 @@ class BeeTransformer(Transformer[Context, AuditObservation]):
                                 f"Protocol Heresy: Class `{added_code}` in `{current_file}` does not implement a Generic ATCG Protocol or SkillProtocol. Architecture purity is compromised."
                             )
 
-                # 7. Javana Law (non-determinism belongs to the Transformer alone)
-                javana_heresy = check_javana(
-                    current_file, added_code, JAVANA_EXEMPT_PATHS
+                # 7. determinism rule (non-determinism belongs to the Transformer alone)
+                determinism_heresy = check_determinism(
+                    current_file, added_code, DETERMINISM_EXEMPT_PATHS
                 )
-                if javana_heresy:
-                    heresies.append(javana_heresy)
+                if determinism_heresy:
+                    heresies.append(determinism_heresy)
 
         return heresies
 
