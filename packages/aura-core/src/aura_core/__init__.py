@@ -6,13 +6,22 @@ from .dna import (
     SkillProtocol,
     Transformer,
 )
+from .javana import (
+    check_javana,
+    is_exempt,
+    is_python_source,
+    is_transformer_path,
+    iter_added_lines,
+)
 from .manifest import (
     ALLOWED_CHAMBERS,
     ALLOWED_ROOT_FILES,
+    JAVANA_EXEMPT_PATHS,
     MACRO_ATCG_FOLDERS,
     find_hive_root,
     get_allowed_chambers,
     get_allowed_root_files,
+    get_javana_exempt_paths,
     get_macro_atcg_folders,
     resolve_brain_path,
 )
@@ -35,6 +44,14 @@ __all__ = [
     "get_allowed_root_files",
     "get_allowed_chambers",
     "resolve_brain_path",
+    # Javana Law (determinism)
+    "JAVANA_EXEMPT_PATHS",
+    "get_javana_exempt_paths",
+    "check_javana",
+    "is_exempt",
+    "is_python_source",
+    "is_transformer_path",
+    "iter_added_lines",
     # Protocols (The Law)
     "Aggregator",
     "Transformer",

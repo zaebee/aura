@@ -18,6 +18,7 @@ _DEFAULT_MANIFEST: dict[str, Any] = {
     "macro_atcg_folders": [],
     "allowed_root_files": [],
     "allowed_chambers": [],
+    "javana_exempt_paths": [],
 }
 
 
@@ -90,10 +91,17 @@ def get_allowed_chambers() -> list[str]:
     return result
 
 
+def get_javana_exempt_paths() -> list[str]:
+    """Path prefixes where non-determinism is allowed outside a Transformer."""
+    result: list[str] = _load_manifest().get("javana_exempt_paths", [])
+    return result
+
+
 # Backward-compatible aliases (call functions to get values)
 MACRO_ATCG_FOLDERS = get_macro_atcg_folders()
 ALLOWED_ROOT_FILES = get_allowed_root_files()
 ALLOWED_CHAMBERS = get_allowed_chambers()
+JAVANA_EXEMPT_PATHS = get_javana_exempt_paths()
 
 
 def resolve_brain_path(compiled_path: str | None = None) -> str:

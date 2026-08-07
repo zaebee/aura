@@ -53,3 +53,17 @@ allowed_chambers:
   - proto
   - synapses
   - tools
+
+# Paths where non-determinism is permitted outside a Transformer (the Javana Law).
+# Config, scripts, the composition root, and the two proteins whose whole purpose
+# is to call a model.
+javana_exempt_paths:
+  - core/scripts
+  - core/tests
+  - tests
+  - tools
+  - core/src/aura_hive/config
+  - core/src/aura_hive/hive/cortex.py
+  - core/src/aura_hive/hive/proteins/discovery
+  - core/src/aura_hive/hive/proteins/reasoning
+  - agents/bee-evolver/src/config.py
