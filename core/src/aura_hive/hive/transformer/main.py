@@ -394,6 +394,44 @@ class AuraTransformer(Transformer[Context, Intent]):
             trade=trade_intent,
         )
 
+    async def _load_history(self, context: Context) -> list[dict[str, Any]]:
+        """
+        Prior turns of this conversation, oldest first.
+
+        Empty is a valid answer and must never be fatal: a cold cache, an
+        unreachable Redis or a first contact all mean the same thing to the
+        model — no history — and none of them should fail a negotiation.
+        """
+        try:
+            # Inside the try: a context shaped differently than expected must
+            # degrade to no history, not fail the negotiation.
+            hive = _get_hive(context)
+            if not hive:
+                return []
+            item_id = getattr(hive, "item_identifier", "")
+            offer = getattr(hive, "offer", None)
+            agent_did = getattr(offer, "agent_did", "") if offer else ""
+            if not item_id or not agent_did:
+                return []
+            obs = await self.registry.execute(
+                "persistence",
+                "get_negotiation_history",
+                {"agent_did": agent_did, "item_id": item_id},
+            )
+            if not obs.success:
+                return []
+            # `.to_dict()`, not `_as_dict`: a betterproto Struct is not a dict,
+            # so the isinstance check there returns {} and the history silently
+            # stays empty. Same call the RWA and trade paths already use.
+            meta: dict[str, Any] = obs.metadata.to_dict() if obs.metadata else {}
+            history: Any = meta.get("history", [])
+            return (
+                cast(list[dict[str, Any]], history) if isinstance(history, list) else []
+            )
+        except Exception as e:
+            logger.warning("negotiation_history_unavailable", error=str(e))
+            return []
+
     async def think(self, context: Context, **kwargs: Any) -> Intent:
         """Reason about the negotiation by calling the Reasoning Protein."""
 
@@ -432,7 +470,7 @@ class AuraTransformer(Transformer[Context, Intent]):
                 {
                     "bid": bid,
                     "context": self._build_economic_context(context),
-                    "history": [],
+                    "history": await self._load_history(context),
                 },
             )
 

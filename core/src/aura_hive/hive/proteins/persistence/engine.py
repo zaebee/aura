@@ -1,10 +1,12 @@
 import enum
+import hashlib
 import json
 import uuid
 from datetime import UTC, datetime
 from typing import TYPE_CHECKING, Any, cast
 
 import redis.asyncio as redis
+import structlog
 from pgvector.sqlalchemy import Vector
 from sqlalchemy import (
     Boolean,
@@ -114,6 +116,22 @@ class MetabolicCost(Base):
     )
 
 
+logger = structlog.get_logger(__name__)
+
+
+def negotiation_history_key(agent_did: str, item_id: str) -> str:
+    """
+    Stable key for one (agent, item) conversation.
+
+    Hashed rather than interpolated: a DID or item id may contain the delimiter,
+    so `a:b` + `c` and `a` + `b:c` would otherwise collide, and either can be
+    long enough to make an awkward key. The plain values are stored inside each
+    turn, so a key can still be traced back.
+    """
+    digest = hashlib.sha256(f"{agent_did}\x00{item_id}".encode()).hexdigest()
+    return f"negotiation:history:{digest[:32]}"
+
+
 class RedisCache:
     """Redis-based caching and excited state storage."""
 
@@ -147,6 +165,55 @@ class RedisCache:
         if data:
             return cast(dict[str, Any], json.loads(data))
         return None
+
+    # ------------------------------------------------------------------
+    # Negotiation history
+    #
+    # Turns are grouped by (agent_did, item_id) because the wire protocol
+    # carries no conversation identifier: NegotiateRequest has request_id,
+    # item_id, bid_amount, currency_code and agent, and session_token is
+    # derived per request. Two independent negotiations by the same agent over
+    # the same item therefore merge into one history; the TTL bounds how long.
+    # Fixing that properly means adding a conversation_id to the proto.
+    # ------------------------------------------------------------------
+
+    async def append_negotiation_turn(
+        self,
+        agent_did: str,
+        item_id: str,
+        turn: dict[str, Any],
+        ttl: int = 3600,
+        cap: int = 20,
+    ) -> None:
+        """
+        Append one turn, keeping the most recent `cap`.
+
+        A Redis list rather than a JSON blob: RPUSH is atomic, so concurrent
+        turns cannot lose each other the way read-modify-write would, and LTRIM
+        bounds the prompt this history will end up in.
+        """
+        key = negotiation_history_key(agent_did, item_id)
+        pipe = self.redis.pipeline()
+        pipe.rpush(key, json.dumps(turn))
+        pipe.ltrim(key, -cap, -1)
+        pipe.expire(key, ttl)
+        await pipe.execute()
+
+    async def get_negotiation_history(
+        self, agent_did: str, item_id: str
+    ) -> list[dict[str, Any]]:
+        """Turns oldest first. A malformed entry is skipped, never fatal."""
+        key = negotiation_history_key(agent_did, item_id)
+        # redis-py types lrange as sync-or-async; the asyncio client always
+        # returns an awaitable.
+        raw = cast(list[Any], await self.redis.lrange(key, 0, -1))  # type: ignore[misc]
+        history: list[dict[str, Any]] = []
+        for entry in raw:
+            try:
+                history.append(json.loads(entry))
+            except (TypeError, ValueError):
+                logger.warning("negotiation_history_entry_unreadable", key=key)
+        return history
 
     async def delete_excited_state(self, deal_id: str) -> None:
         """Remove deal from 'Excited' state."""

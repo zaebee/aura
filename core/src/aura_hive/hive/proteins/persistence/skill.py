@@ -49,6 +49,8 @@ class PersistenceSkill(
             "read_item": self._read_item_handler,
             "create_deal": self._create_deal,
             "set_excited_state": self._set_excited_state,
+            "append_negotiation_turn": self._append_negotiation_turn,
+            "get_negotiation_history": self._get_negotiation_history,
             "confirm_ground_state": self._confirm_ground_state,
             "get_deal_by_memo": self._get_deal_by_memo_handler,
             "get_deal_by_id": self._get_deal_by_id_handler,
@@ -176,6 +178,39 @@ class PersistenceSkill(
                 str(deal_id), params, ttl=params.get("ttl", 3600)
             )
             return Observation(success=True)
+        except Exception as e:
+            return Observation(success=False, error=str(e))
+
+    async def _append_negotiation_turn(self, params: dict[str, Any]) -> Observation:
+        if not self.cache:
+            return Observation(success=False, error="cache_not_initialized")
+        agent_did = str(params.get("agent_did", ""))
+        item_id = str(params.get("item_id", ""))
+        turn = params.get("turn")
+        if not agent_did or not item_id or not isinstance(turn, dict):
+            return Observation(
+                success=False, error="agent_did, item_id and turn are required"
+            )
+        try:
+            await self.cache.append_negotiation_turn(
+                agent_did, item_id, turn, ttl=int(params.get("ttl", 3600))
+            )
+            return Observation(success=True)
+        except Exception as e:
+            return Observation(success=False, error=str(e))
+
+    async def _get_negotiation_history(self, params: dict[str, Any]) -> Observation:
+        if not self.cache:
+            return Observation(success=False, error="cache_not_initialized")
+        agent_did = str(params.get("agent_did", ""))
+        item_id = str(params.get("item_id", ""))
+        if not agent_did or not item_id:
+            return Observation(
+                success=False, error="agent_did and item_id are required"
+            )
+        try:
+            history = await self.cache.get_negotiation_history(agent_did, item_id)
+            return Observation(success=True, metadata=make_struct({"history": history}))
         except Exception as e:
             return Observation(success=False, error=str(e))
 

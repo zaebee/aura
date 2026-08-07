@@ -108,6 +108,8 @@ class HiveConnector(BaseConnector):
             logger.error("unknown_action_type", action=action_type)
             neg_obs.rejected = OfferRejected(reason_code="INTERNAL_ERROR")
 
+        await self._record_turn(action, context, neg_intent, event_type)
+
         obs_meta = _get_metadata_dict(context)
         obs_meta.update(
             {
@@ -126,6 +128,61 @@ class HiveConnector(BaseConnector):
             trace=context.trace,
             metadata=make_struct(obs_meta),
         )
+
+    async def _record_turn(
+        self,
+        action: Intent,
+        context: Context,
+        neg_intent: Any,
+        event_type: str,
+    ) -> None:
+        """
+        Append this round to the conversation, so the next one can see it.
+
+        Recorded here rather than in the Transformer because this is the
+        decision that actually went out — post-Membrane. A history of what the
+        model wanted would teach it nothing about what the guard allowed, and
+        the override rate is precisely what we want to be able to read later.
+        """
+        try:
+            hive = _get_hive(context)
+            offer = getattr(hive, "offer", None) if hive else None
+            agent_did = getattr(offer, "agent_did", "") if offer else ""
+            item_id = getattr(hive, "item_identifier", "") if hive else ""
+            if not agent_did or not item_id:
+                return
+        except Exception:
+            return
+
+        reasoning = action.reasoning or ""
+        turn = {
+            "action": event_type,
+            "bid": float(getattr(offer, "bid_amount", 0.0) or 0.0),
+            "price": float(getattr(neg_intent, "price", 0.0) or 0.0)
+            if neg_intent
+            else 0.0,
+            "message": str(getattr(neg_intent, "message", "") or "")[:280],
+            # The guard leaves this marker when it replaces a decision. Carrying
+            # it forward is what makes the override rate measurable per round.
+            "membrane_override": "Membrane Override" in reasoning,
+            "agent_did": agent_did,
+            "item_id": item_id,
+        }
+
+        try:
+            obs = await self.registry.execute(
+                "persistence",
+                "append_negotiation_turn",
+                {"agent_did": agent_did, "item_id": item_id, "turn": turn},
+            )
+            # The registry reports a skill failure by returning success=False,
+            # not by raising, so an except block alone would swallow it.
+            if not obs.success:
+                logger.warning("negotiation_turn_not_recorded", error=obs.error)
+        except Exception as e:
+            # A negotiation must not fail because its transcript could not be
+            # written. Losing a turn degrades the next prompt; raising loses the deal.
+            logger.warning("negotiation_turn_not_recorded", error=str(e))
 
     async def _handle_crypto_lock(
         self,
