@@ -67,3 +67,22 @@ javana_exempt_paths:
   - core/src/aura_hive/hive/proteins/discovery
   - core/src/aura_hive/hive/proteins/reasoning
   - agents/bee-evolver/src/config.py
+
+# The membrane's own surface. A pull request from an automated author may not
+# touch these: the loop must not be able to widen its permissions or weaken the
+# guard that checks it. Human authors are labelled, not blocked.
+protected_paths:
+  - hive-manifest.yaml
+  - packages/aura-core/src/aura_core/dna.py
+  - packages/aura-core/src/aura_core/javana.py
+  - packages/aura-core/src/aura_core/manifest.py
+  - core/src/aura_hive/hive/membrane
+  - tools/membrane_check.py
+  - .github/workflows
+
+# Git authors treated as automated. Their pull requests are held for review
+# whenever they touch protected_paths.
+automated_authors:
+  - bee.Evolver
+  - bee.Keeper
+  - github-actions[bot]
