@@ -35,7 +35,7 @@ async def audit_once() -> None:
     """
     settings = KeeperSettings()
     event_name = settings.github_event_name or "manual"
-    logger.info("bee_keeper_audit_once", event=event_name)
+    logger.info("bee_keeper_audit_once", trigger_event=event_name)
 
     metabolism = BeeMetabolism(settings)
     try:
