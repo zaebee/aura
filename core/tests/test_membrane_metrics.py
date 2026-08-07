@@ -9,6 +9,7 @@ broken, and without a counter you cannot tell which.
 """
 
 from typing import Any
+from unittest.mock import patch
 
 import pytest
 from aura_core import SkillRegistry
@@ -133,6 +134,28 @@ class TestOutbound:
         assert count("outbound", "DLP_BLOCK") == before + 1
 
 
+class TestFailSafe:
+    @pytest.mark.asyncio
+    async def test_a_broken_metric_does_not_take_the_guard_down(self) -> None:
+        """
+        Accounting must never cost a guarantee.
+
+        The decision this call accompanies has already been made. Losing a count
+        degrades observability; raising here would lose the negotiation, which is
+        strictly worse and buys no safety.
+        """
+        membrane = guarded_membrane()
+
+        with patch("aura_hive.hive.membrane.main.membrane_interventions_total") as m:
+            m.labels.side_effect = RuntimeError("registry corrupted")
+            decision = await membrane.inspect_outbound(
+                counter_intent(price=500.0), negotiation_context(floor_price=1000.0)
+            )
+
+        assert "Membrane Override" in decision.reasoning
+        assert decision.negotiation.price == 1050.0
+
+
 class TestSeriesShape:
     def test_direction_and_reason_are_separate_labels(self) -> None:
         """Aggregating by reason alone would merge an inbound and outbound rate."""
@@ -140,8 +163,17 @@ class TestSeriesShape:
         assert set(sample.labels) == {"direction", "reason"}
 
     def test_registering_twice_reuses_the_same_collector(self) -> None:
-        """Tests import this module repeatedly; a duplicate name raises."""
+        """Tests import this module repeatedly; a duplicate name would raise."""
         from aura_hive.hive.membrane.main import _get_counter
 
-        again = _get_counter("membrane_interventions_total", "ignored", ["x"])
+        again = _get_counter(
+            "membrane_interventions_total", "ignored", ["direction", "reason"]
+        )
         assert again is membrane_interventions_total
+
+    def test_the_same_name_with_different_labels_raises(self) -> None:
+        """Otherwise the mismatch surfaces inside .labels(), far from its cause."""
+        from aura_hive.hive.membrane.main import _get_counter
+
+        with pytest.raises(ValueError, match="already registered with labels"):
+            _get_counter("membrane_interventions_total", "ignored", ["something_else"])

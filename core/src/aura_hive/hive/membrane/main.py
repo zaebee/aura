@@ -27,8 +27,18 @@ def _get_counter(name: str, documentation: str, labelnames: list[str]) -> Counte
     is a nucleus organ and proteins sit a level below it. Four lines of
     duplication beat an upward dependency.
     """
-    if name in REGISTRY._names_to_collectors:
-        return cast(Counter, REGISTRY._names_to_collectors[name])
+    existing = REGISTRY._names_to_collectors.get(name)
+    if existing is not None:
+        # Same name, different labels is a mistake that would otherwise surface
+        # far from its cause — as a ValueError inside .labels() at the first
+        # intervention. Raise where the mismatch was introduced.
+        registered = getattr(existing, "_labelnames", None)
+        if registered is not None and tuple(registered) != tuple(labelnames):
+            raise ValueError(
+                f"collector {name!r} is already registered with labels "
+                f"{tuple(registered)!r}, not {tuple(labelnames)!r}"
+            )
+        return cast(Counter, existing)
     return Counter(name, documentation, labelnames)
 
 
@@ -45,7 +55,15 @@ membrane_interventions_total = _get_counter(
 
 def _record_intervention(direction: str, reason: str, **fields: Any) -> None:
     """Count it and say so. An intervention that leaves no trace cannot be measured."""
-    membrane_interventions_total.labels(direction=direction, reason=reason).inc()
+    try:
+        membrane_interventions_total.labels(direction=direction, reason=reason).inc()
+    except Exception as e:
+        # Accounting must never take the guarantee down with it. The decision
+        # this call accompanies has already been made and still stands; losing a
+        # count degrades observability, raising here would lose the negotiation.
+        logger.error(
+            "membrane_metric_failed", direction=direction, reason=reason, error=str(e)
+        )
     logger.warning(
         "membrane_intervention", direction=direction, reason=reason, **fields
     )
