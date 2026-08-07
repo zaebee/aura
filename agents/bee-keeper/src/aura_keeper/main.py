@@ -37,14 +37,18 @@ async def audit_once() -> None:
     event_name = settings.github_event_name or "manual"
     logger.info("bee_keeper_audit_once", trigger_event=event_name)
 
-    metabolism = BeeMetabolism(settings)
+    metabolism = None
     try:
+        # Construction inside the try: a failure here — bad settings, a broken
+        # sub-component — would otherwise skip the structured log and surface as
+        # a bare traceback. main() below already does it this way.
+        metabolism = BeeMetabolism(settings)
         await metabolism.execute(event_name=event_name)
     except Exception as e:
         logger.error("bee_keeper_audit_failed", error=str(e), exc_info=True)
         sys.exit(1)
     finally:
-        if metabolism.connector:
+        if metabolism and metabolism.connector:
             await metabolism.connector.close()
 
 

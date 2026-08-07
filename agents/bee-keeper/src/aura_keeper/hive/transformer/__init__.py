@@ -2,6 +2,8 @@ from pathlib import Path
 from typing import Any, cast
 
 import json
+import asyncio
+
 import litellm
 import structlog
 import yaml  # type: ignore
@@ -144,9 +146,7 @@ class BeeTransformer(Transformer[Context, AuditObservation]):
         # Reset status and ensure we have entries for both roles
         self.brain_status = {role: False for role in models}
 
-        for role, model in models.items():
-            if not model:
-                continue
+        async def ping(role: str, model: str) -> None:
             try:
                 logger.info("pinging_llm", role=role, model=model)
 
@@ -161,14 +161,16 @@ class BeeTransformer(Transformer[Context, AuditObservation]):
                 if "ollama" in model:
                     kwargs["api_base"] = self.settings.llm__ollama_base_url
 
-                # Simple completion to test connectivity via LiteLLM
                 await litellm.acompletion(**kwargs)
 
                 logger.info("llm_ping_success", role=role, model=model)
                 self.brain_status[role] = True
             except Exception as e:
-                # Log as warning to ensure the Hive doesn't exit prematurely if at least one model is alive
+                # A warning, not an error: one live model is enough to proceed.
                 logger.warning("llm_ping_failed", role=role, model=model, error=str(e))
+
+        # Concurrently: sequentially, two hanging endpoints cost two timeouts.
+        await asyncio.gather(*(ping(r, m) for r, m in models.items() if m))
 
         return any(self.brain_status.values())
 
