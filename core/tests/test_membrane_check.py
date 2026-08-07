@@ -60,6 +60,23 @@ class TestRootSprouts:
         assert membrane.check_root_sprouts({"core/src/x.py"}, manifest) == []
 
 
+class TestManifestValidation:
+    """A guard must not silently drop entries it cannot read."""
+
+    def test_non_string_entries_raise_loudly(self, membrane: Any) -> None:
+        with pytest.raises(SystemExit) as exc:
+            membrane.str_list({"protected_paths": ["ok", None]}, "protected_paths")
+        assert "non-string" in str(exc.value)
+
+    def test_a_scalar_instead_of_a_list_raises(self, membrane: Any) -> None:
+        with pytest.raises(SystemExit):
+            membrane.str_list({"protected_paths": "oops"}, "protected_paths")
+
+    def test_absent_and_empty_keys_are_both_empty_lists(self, membrane: Any) -> None:
+        assert membrane.str_list({}, "protected_paths") == []
+        assert membrane.str_list({"protected_paths": None}, "protected_paths") == []
+
+
 class TestProtectedSurface:
     MANIFEST = {
         "automated_authors": ["bee.Evolver", "github-actions[bot]"],
@@ -136,7 +153,7 @@ class TestProtectedSurface:
         manifest: dict[str, Any] = {
             "automated_authors": None,
             "protected_paths": None,
-        }
+        }  # both absent-equivalent: no author is automated, so nothing is checked
         assert (
             membrane.check_protected_surface(
                 {"hive-manifest.yaml"}, manifest, "bee.Evolver", path_matches_prefix

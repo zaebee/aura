@@ -39,8 +39,11 @@ ENTROPY_PATTERNS: tuple[re.Pattern[str], ...] = tuple(
         r"(?:^|[^\w.])import\s+random\b",
         r"(?:^|[^\w.])from\s+random\s+import\b",
         r"(?:^|[^\w.])from\s+numpy\s+import\s+random\b",
-        r"\brandom\.(?:random|randint|randrange|choice|choices|shuffle|sample"
-        r"|uniform|gauss|normalvariate|seed)\b",
+        # Any attribute on the module, not a list of names: `random` exposes 27
+        # public callables and an enumeration was missing 16 of them, including
+        # getrandbits, randbytes, SystemRandom and Random. The leading class
+        # keeps `self.random.foo` and `np.random` out of this branch.
+        r"(?:^|[^\w.])random\.\w",
     )
 )
 
@@ -166,3 +169,34 @@ def iter_added_lines(diff: str) -> Iterator[tuple[str, str]]:
         after_old_header = False
         if current and line.startswith("+"):
             yield current, line[1:]
+
+
+def iter_changed_files(diff: str) -> set[str]:
+    """
+    Every file a unified diff touches — added to, modified, or deleted.
+
+    `iter_added_lines` only reports files that gained a line, which is not the
+    same question. Removing a guard is a change to it, and a rule that only
+    watches additions would let an automated author delete the thing checking
+    it. Header prefixes are stripped when present rather than required, so this
+    survives `diff.noprefix` and custom --src-prefix/--dst-prefix.
+    """
+    files: set[str] = set()
+    in_hunk = False
+    for line in diff.splitlines():
+        if line.startswith("diff --git "):
+            in_hunk = False
+            continue
+        if line.startswith("@@ "):
+            in_hunk = True
+            continue
+        if in_hunk or not (line.startswith("--- ") or line.startswith("+++ ")):
+            continue
+        target = line[4:].strip()
+        if target == "/dev/null":
+            continue
+        if target.startswith(("a/", "b/")):
+            target = target[2:]
+        if target:
+            files.add(target)
+    return files

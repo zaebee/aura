@@ -48,6 +48,23 @@ def load_determinism() -> Any:
     return module
 
 
+def str_list(manifest: dict[str, Any], key: str) -> list[str]:
+    """
+    Read a list-of-strings key, refusing anything else.
+
+    Silently skipping an unreadable entry is the wrong failure for a guard: a
+    `protected_paths` item that parses as None would stop protecting that path
+    and say nothing. Fail where someone will see it.
+    """
+    value = manifest.get(key) or []
+    if not isinstance(value, list):
+        raise SystemExit(f"hive-manifest.yaml: `{key}` must be a list")
+    bad = [item for item in value if not isinstance(item, str)]
+    if bad:
+        raise SystemExit(f"hive-manifest.yaml: `{key}` has non-string entries: {bad!r}")
+    return value
+
+
 def load_manifest() -> dict[str, Any]:
     with open(MANIFEST, encoding="utf-8") as handle:
         data = yaml.safe_load(handle)
@@ -87,10 +104,10 @@ def changed_files(
     base: str | None, diff_file: str | None, determinism: Any
 ) -> set[str]:
     if diff_file:
-        return {
-            path
-            for path, _ in determinism.iter_added_lines(Path(diff_file).read_text())
-        }
+        diff = Path(diff_file).read_text(encoding="utf-8")
+        # Every touched file, not only those that gained a line: deleting the
+        # guard is a change to it.
+        return determinism.iter_changed_files(diff)
     if not base:
         raise SystemExit("one of --base or --diff-file is required")
     listing = _git("diff", "--name-only", f"{base}...HEAD")
@@ -99,8 +116,8 @@ def changed_files(
 
 def check_root_sprouts(files: set[str], manifest: dict[str, Any]) -> list[str]:
     """A new file at the repository root must be declared in the manifest."""
-    allowed = set(manifest.get("allowed_root_files") or [])
-    macro = set(manifest.get("macro_atcg_folders") or [])
+    allowed = set(str_list(manifest, "allowed_root_files"))
+    macro = set(str_list(manifest, "macro_atcg_folders"))
     heresies = []
     for path in sorted(files):
         if "/" in path or path.startswith("."):
@@ -123,10 +140,10 @@ def check_protected_surface(
     """An automated author may not edit the membrane that checks it."""
     if not author:
         return []
-    automated = {a.lower() for a in (manifest.get("automated_authors") or [])}
+    automated = {a.lower() for a in str_list(manifest, "automated_authors")}
     if author.lower() not in automated:
         return []
-    protected = manifest.get("protected_paths") or []
+    protected = str_list(manifest, "protected_paths")
     touched = sorted(f for f in files if any(matches(f, p) for p in protected))
     if not touched:
         return []
@@ -152,7 +169,7 @@ def main() -> int:
 
     determinism = load_determinism()
     manifest = load_manifest()
-    exempt = manifest.get("determinism_exempt_paths") or []
+    exempt = str_list(manifest, "determinism_exempt_paths")
 
     diff = read_diff(args.base, args.diff_file)
     files = changed_files(args.base, args.diff_file, determinism)
@@ -168,7 +185,7 @@ def main() -> int:
     heresies.extend(check_protected_surface(files, manifest, args.author, matches))
 
     if args.github_output:
-        protected = manifest.get("protected_paths") or []
+        protected = str_list(manifest, "protected_paths")
         touched = any(any(matches(f, p) for p in protected) for f in files)
         with open(args.github_output, "a", encoding="utf-8") as handle:
             handle.write(f"protected_touched={str(touched).lower()}\n")

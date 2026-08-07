@@ -8,7 +8,12 @@ from aura_core import (
     is_transformer_path,
     path_matches_prefix,
 )
-from aura_core.determinism import ENTROPY_PATTERNS, LLM_PATTERNS, iter_added_lines
+from aura_core.determinism import (
+    ENTROPY_PATTERNS,
+    LLM_PATTERNS,
+    iter_added_lines,
+    iter_changed_files,
+)
 
 EXEMPT = (
     "core/scripts",
@@ -307,6 +312,73 @@ class TestDiffParsing:
     def test_new_file_header_is_read(self) -> None:
         diff = "--- /dev/null\n+++ b/new.py\n@@ -0,0 +1 @@\n+import dspy\n"
         assert list(iter_added_lines(diff)) == [("new.py", "import dspy")]
+
+
+class TestChangedFiles:
+    """Deleting the guard is a change to it; additions alone are the wrong question."""
+
+    def test_a_pure_deletion_is_reported(self) -> None:
+        diff = (
+            "diff --git a/hive-manifest.yaml b/hive-manifest.yaml\n"
+            "--- a/hive-manifest.yaml\n"
+            "+++ b/hive-manifest.yaml\n"
+            "@@ -1,3 +1,2 @@\n"
+            ' version: "1.0"\n'
+            "-protected_paths:\n"
+            "-  - hive-manifest.yaml\n"
+        )
+        assert iter_changed_files(diff) == {"hive-manifest.yaml"}
+        assert list(iter_added_lines(diff)) == []
+
+    def test_a_removed_file_is_reported(self) -> None:
+        diff = "diff --git a/x.py b/x.py\n--- a/x.py\n+++ /dev/null\n@@ -1 +0,0 @@\n-import dspy\n"
+        assert iter_changed_files(diff) == {"x.py"}
+
+    def test_prefixless_diffs_work(self) -> None:
+        """diff.noprefix drops the a/ and b/, so they are stripped, not required."""
+        diff = "--- one.py\n+++ one.py\n@@ -0,0 +1 @@\n+x = 1\n"
+        assert iter_changed_files(diff) == {"one.py"}
+
+    def test_hunk_content_is_not_mistaken_for_a_header(self) -> None:
+        diff = (
+            "--- a/m.py\n+++ b/m.py\n@@ -1,2 +1,2 @@\n"
+            "--- not/a/path\n+++ neither/is/this\n"
+        )
+        assert iter_changed_files(diff) == {"m.py"}
+
+
+class TestEntropyCoverage:
+    @pytest.mark.parametrize(
+        "call",
+        [
+            "random.getrandbits(32)",
+            "random.randbytes(16)",
+            "rng = random.SystemRandom()",
+            "rng = random.Random(0)",
+            "x = random.betavariate(1, 2)",
+            "x = random.triangular(0, 1)",
+            "state = random.getstate()",
+        ],
+    )
+    def test_any_attribute_on_the_module_counts(self, call: str) -> None:
+        """An enumeration of names missed 16 of 27 public callables."""
+        assert check_determinism("core/src/aura_hive/hive/membrane/main.py", call, ())
+
+    @pytest.mark.parametrize(
+        "line",
+        [
+            "self.random.choice(x)",
+            "obj.random.seed(1)",
+            "randomiser.apply()",
+        ],
+    )
+    def test_an_attribute_named_random_on_something_else_does_not(
+        self, line: str
+    ) -> None:
+        assert (
+            check_determinism("core/src/aura_hive/hive/membrane/main.py", line, ())
+            is None
+        )
 
 
 def test_patterns_are_compiled_and_non_empty() -> None:

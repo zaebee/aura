@@ -78,28 +78,45 @@ def _load_manifest() -> dict[str, Any]:
         return _DEFAULT_MANIFEST
 
 
+def _str_list(key: str) -> list[str]:
+    """
+    Read a list-of-strings key, refusing anything else.
+
+    A guard must not quietly drop entries it cannot read: a `protected_paths`
+    item that parses as None would silently stop protecting that path, and
+    nobody would learn about it. Fail where it can be seen.
+    """
+    value = _load_manifest().get(key) or []
+    if not isinstance(value, list):
+        raise ValueError(
+            f"hive-manifest.yaml: `{key}` must be a list, got {type(value).__name__}"
+        )
+    bad = [item for item in value if not isinstance(item, str)]
+    if bad:
+        raise ValueError(
+            f"hive-manifest.yaml: `{key}` contains non-string entries: {bad!r}"
+        )
+    return value
+
+
 def get_macro_atcg_folders() -> list[str]:
     """Get the list of macro ATCG folders."""
-    result: list[str] = _load_manifest().get("macro_atcg_folders") or []
-    return result
+    return _str_list("macro_atcg_folders")
 
 
 def get_allowed_root_files() -> list[str]:
     """Get the list of allowed root files."""
-    result: list[str] = _load_manifest().get("allowed_root_files") or []
-    return result
+    return _str_list("allowed_root_files")
 
 
 def get_allowed_chambers() -> list[str]:
     """Get the list of path prefixes that count as sanctioned chambers."""
-    result: list[str] = _load_manifest().get("allowed_chambers") or []
-    return result
+    return _str_list("allowed_chambers")
 
 
 def get_determinism_exempt_paths() -> list[str]:
     """Path prefixes where non-determinism is allowed outside a Transformer."""
-    result: list[str] = _load_manifest().get("determinism_exempt_paths") or []
-    return result
+    return _str_list("determinism_exempt_paths")
 
 
 # Backward-compatible aliases (call functions to get values)

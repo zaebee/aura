@@ -4,6 +4,7 @@ from .determinism import (
     is_python_source,
     is_transformer_path,
     iter_added_lines,
+    iter_changed_files,
     path_matches_prefix,
 )
 from .dna import (
@@ -53,6 +54,7 @@ __all__ = [
     "is_python_source",
     "is_transformer_path",
     "iter_added_lines",
+    "iter_changed_files",
     "path_matches_prefix",
     # Protocols (The Law)
     "Aggregator",
