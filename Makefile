@@ -1,4 +1,4 @@
-.PHONY: lint mypy test test-cov test-verbose build generate push install-dev format test-health \
+.PHONY: lint mypy test test-cov test-verbose build generate push install-dev format test-health keeper-audit \
        run-core run-gateway run-frontend prepare-bun
 
 # Makefile for Aura Project
@@ -51,6 +51,10 @@ setup-hooks:
 	uv run pre-commit install
 
 # Run tests
+keeper-audit: $(PROTO_SENTINEL)
+	# One bee.Keeper cycle, then exit. Without --once main.py is a NATS daemon.
+	PYTHONPATH=$(KEEPER_PATH) uv run python -m aura_keeper.main --once
+
 test: $(PROTO_SENTINEL)
 	# Run core tests
 	PYTHONPATH=$(CORE_PATH) uv run pytest core/tests/ -v

@@ -19,6 +19,39 @@ structlog.configure(
 logger = structlog.get_logger(__name__)
 
 
+async def audit_once() -> None:
+    """
+    Run a single metabolic cycle and exit.
+
+    CI needs an audit, not a daemon: `main()` below subscribes to NATS and
+    blocks in `async for msg in sub.messages` forever, so a workflow calling it
+    would hang until the job timeout. One cycle is A -> T -> C -> G and touches
+    no message bus.
+
+    The event name comes from settings rather than the environment directly —
+    bee.Keeper flags raw environment reads as a Pattern Heresy, and it should
+    not break its own rule. `execute()` skips the LLM audit for `schedule`,
+    which keeps heartbeat runs from spending honey.
+    """
+    settings = KeeperSettings()
+    event_name = settings.github_event_name or "manual"
+    logger.info("bee_keeper_audit_once", trigger_event=event_name)
+
+    metabolism = None
+    try:
+        # Construction inside the try: a failure here — bad settings, a broken
+        # sub-component — would otherwise skip the structured log and surface as
+        # a bare traceback. main() below already does it this way.
+        metabolism = BeeMetabolism(settings)
+        await metabolism.execute(event_name=event_name)
+    except Exception as e:
+        logger.error("bee_keeper_audit_failed", error=str(e), exc_info=True)
+        sys.exit(1)
+    finally:
+        if metabolism and metabolism.connector:
+            await metabolism.connector.close()
+
+
 async def main() -> None:
     logger.info("bee_keeper_agent_starting")
 
@@ -33,7 +66,7 @@ async def main() -> None:
         metabolism = BeeMetabolism(settings)
 
         # 1.5 Sanity Check: Test Brain Connectivity
-        if not await metabolism.aggregator.test_brain_connectivity():
+        if not await metabolism.transformer.test_brain_connectivity():
             logger.error("Brain connectivity test failed. Check AURA_LLM__API_KEY.")
             # We don't exit here to allow for intermittent connectivity
             # sys.exit(1)
@@ -78,4 +111,7 @@ async def main() -> None:
 
 
 if __name__ == "__main__":
-    asyncio.run(main())
+    if "--once" in sys.argv:
+        asyncio.run(audit_once())
+    else:
+        asyncio.run(main())
