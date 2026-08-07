@@ -17,7 +17,7 @@ logger = structlog.get_logger(__name__)
 _DEFAULT_MANIFEST: dict[str, Any] = {
     "macro_atcg_folders": [],
     "allowed_root_files": [],
-    "allowed_chambers": {},
+    "allowed_chambers": [],
 }
 
 
@@ -84,9 +84,9 @@ def get_allowed_root_files() -> list[str]:
     return result
 
 
-def get_allowed_chambers() -> dict[str, str]:
-    """Get the mapping of paths to chamber names."""
-    result: dict[str, str] = _load_manifest().get("allowed_chambers", {})
+def get_allowed_chambers() -> list[str]:
+    """Get the list of path prefixes that count as sanctioned chambers."""
+    result: list[str] = _load_manifest().get("allowed_chambers", [])
     return result
 
 

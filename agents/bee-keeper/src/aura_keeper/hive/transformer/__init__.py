@@ -223,7 +223,7 @@ class BeeTransformer(Transformer[Context, AuditObservation]):
 
             # Check allowed peripheral chambers (Sanctified Infrastructure)
             is_sanctified = False
-            for chamber, role in ALLOWED_CHAMBERS.items():
+            for chamber in ALLOWED_CHAMBERS:
                 if str(p).startswith(chamber):
                     is_sanctified = True
                     break
