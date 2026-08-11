@@ -63,7 +63,7 @@ class HiveConnector(BaseConnector):
         # forgets. The chain out to the client re-assembles each message field
         # by field rather than passing it along, and the receipt died here —
         # NegotiationObservation had nowhere to put it.
-        if action.receipt is not None:
+        if action.receipt is not None and action.receipt.version:
             neg_obs.receipt = action.receipt
 
         action_type = action.action

@@ -108,7 +108,7 @@ class NegotiationService:
                 # Connector copies it ahead of its own: this response is built
                 # field by field, and a receipt attached inside one branch is a
                 # receipt the other branches drop.
-                if neg.receipt is not None:
+                if neg.receipt is not None and neg.receipt.version:
                     response.receipt = neg.receipt
 
                 res_name, res_val = betterproto.which_one_of(neg, "result")

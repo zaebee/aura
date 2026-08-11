@@ -125,5 +125,47 @@ class TestNothingHiddenNothingInvented:
 
         assert receipt_to_json(bare)["derivation"] is None
 
-    def test_an_absent_receipt_renders_as_nothing(self) -> None:
+    def test_an_explicit_none_renders_as_nothing(self) -> None:
+        """
+        The defensive case, not the real one. betterproto never hands back None
+        for a message field — see TestAnUnsetReceiptIsAbsence for the shape an
+        actual receipt-less response has, which is what this test originally
+        claimed to cover and did not.
+        """
         assert receipt_to_json(None) is None
+
+
+class TestAnUnsetReceiptIsAbsence:
+    """
+    betterproto default-constructs a message field on access rather than
+    returning None, so `response.receipt` is a DecisionReceipt of blanks when
+    the core never set one — never `None`.
+
+    The first cut checked `receipt is None`, which therefore never fired, and
+    the test that covered it passed `None` explicitly: it verified a case the
+    real path does not produce and missed the one it does. Emptiness here is a
+    property of the value, not of the reference.
+    """
+
+    def test_a_default_constructed_receipt_renders_as_nothing(self) -> None:
+        assert receipt_to_json(DecisionReceipt()) is None
+
+    def test_the_response_of_a_deployment_that_minted_nothing_carries_no_receipt(
+        self,
+    ) -> None:
+        """The shape a client sees, taken off an actual response object."""
+        from aura_core_gen.aura.negotiation.v1 import NegotiateResponse
+
+        assert receipt_to_json(NegotiateResponse().receipt) is None
+
+    def test_a_receipt_with_a_version_is_still_rendered(self) -> None:
+        """The check must not swallow a real receipt that happens to be sparse."""
+        sparse = DecisionReceipt(
+            version="AURA-RECEIPT-V0-UNSIGNED",
+            outcome=DecisionOutcome.DECISION_OUTCOME_EMIT,
+        )
+
+        rendered = receipt_to_json(sparse)
+
+        assert rendered is not None
+        assert rendered["version"] == "AURA-RECEIPT-V0-UNSIGNED"

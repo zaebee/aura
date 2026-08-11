@@ -220,7 +220,15 @@ def receipt_to_json(receipt: DecisionReceipt | None) -> dict[str, Any] | None:
     signature object invites a reader to check its fields and find blanks; an
     empty derivation asserts gates that never ran.
     """
-    if receipt is None:
+    # By value, not by reference. betterproto default-constructs a message
+    # field on access rather than returning None, so `response.receipt` is a
+    # DecisionReceipt of blanks when the core never set one. An identity check
+    # here never fires, and every receipt-less response would render an object
+    # full of empty strings — the opposite of the rule this function follows.
+    #
+    # `version` is the sentinel because `mint` always sets it: a receipt that
+    # exists has one, and a default-constructed one does not.
+    if receipt is None or not receipt.version:
         return None
 
     signature = receipt.signature
