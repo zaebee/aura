@@ -201,6 +201,65 @@ class TestSafePriceNeverUndercutsTheFloor:
         ) == pytest.approx(2000.0)
 
 
+class TestUnusableInputsStillNameAGate:
+    """
+    A null or unparseable number must not cost the decision its gate.
+
+    Nothing crashes today: the predicate raises TypeError, `skill.py` catches it
+    into a generic Observation, and `SkillRegistry.execute` would catch it even
+    if that did not. But the Observation carries no `error_code`, so the Membrane
+    falls back to SAFETY_VIOLATION and the audit trail stops naming which rule
+    refused the decision — which is the whole point of the gate codes.
+
+    Unreachable from the Membrane, which coerces every value to float before the
+    guard sees it. Reachable from `guard__validate_safety`, declared as an LLM
+    tool in manifest.yaml, where a model emitting `"price": null` is ordinary.
+    """
+
+    @pytest.mark.parametrize("price", [None, "not a number"])
+    def test_an_unusable_price_is_an_invalid_price(self, price: object) -> None:
+        with pytest.raises(SafetyViolation) as caught:
+            guard(_Safety()).validate_decision(
+                {"action": "counter", "price": price}, context()
+            )
+
+        assert caught.value.code == "INVALID_PRICE"
+
+    def test_an_unusable_floor_is_treated_as_an_absent_one(self) -> None:
+        """
+        Matches what a missing key already does rather than inventing a stricter
+        rule here: `floor_price` defaults to 0.0 throughout, so a null reads the
+        same as no floor supplied. That default is permissive, and deliberately
+        left alone — see the note on #258.
+        """
+        assert guard(_Safety()).validate_decision(
+            {"action": "counter", "price": 2000.0},
+            {"floor_price": None, "internal_cost": 500.0},
+        )
+
+    def test_an_unusable_cost_is_judged_rather_than_exploding(self) -> None:
+        """
+        Cost reads as 0.0, so the margin computes to 1.0 and G4 passes. The
+        property under test is that the gate reached a verdict at all: before,
+        the comparison raised past every gate and the decision came back with no
+        code attached.
+        """
+        assert guard(_Safety()).validate_decision(
+            {"action": "counter", "price": 1000.0},
+            {"floor_price": 1000.0, "internal_cost": "unknown"},
+        )
+
+    def test_a_null_floor_still_yields_a_safe_price(self) -> None:
+        """
+        Reached from inside `skill.py`'s SafetyViolation handler, which is a
+        sibling of its generic `except Exception` rather than nested inside it.
+        A raise here escapes the skill entirely.
+        """
+        assert guard(_Safety()).calculate_safe_price(
+            {"floor_price": None}, "FLOOR_PRICE_VIOLATION"
+        ) == pytest.approx(0.0)
+
+
 class TestFailClosedOnIncompleteSettings:
     def test_a_settings_object_without_the_margin_is_misconfiguration(self) -> None:
         """

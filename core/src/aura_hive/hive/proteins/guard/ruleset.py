@@ -107,9 +107,21 @@ def ruleset_from_mapping(mapping: dict[str, Any]) -> Ruleset:
     gates: list[Gate] = []
     seen: set[str] = set()
     for position, raw in enumerate(raw_gates):
+        # Shape is checked before anything is read out of it, so a malformed
+        # file reads as a bad rule set rather than a TypeError from somewhere
+        # deeper — the caller has one exception type to handle either way.
+        if not isinstance(raw, dict):
+            raise RulesetError(f"gate at position {position} must be a mapping")
+
         for key in ("id", "code", "consumes", "safe_price"):
             if key not in raw:
                 raise RulesetError(f"gate at position {position} is missing {key!r}")
+
+        if not isinstance(raw["consumes"], list):
+            raise RulesetError(
+                f"gate at position {position} declares 'consumes' as "
+                f"{type(raw['consumes']).__name__}, expected a list"
+            )
 
         gate_id = str(raw["id"])
         if gate_id in seen:

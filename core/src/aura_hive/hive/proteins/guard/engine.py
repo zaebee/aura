@@ -20,6 +20,31 @@ _FLOOR_MARKUP = 1.05
 _DEFAULT_MARGIN = 0.1
 
 
+def _numeric(mapping: dict, key: str, default: float = 0.0) -> float:
+    """
+    Read a number that a caller may not have supplied as one.
+
+    Coerced once at the boundary rather than guarded inside each predicate, so
+    the gates stay readable and no two of them can disagree about what a null
+    means.
+
+    Nothing crashes without this — the predicate raises, `skill.py` catches it
+    into a generic Observation, and `SkillRegistry.execute` would catch it even
+    if that did not. What is lost is the `error_code`, so the Membrane falls
+    back to SAFETY_VIOLATION and the receipt stops naming which rule refused
+    the decision. A null price reads as 0.0 and is refused by G1 as the invalid
+    price it is, under its own code.
+    """
+    value = mapping.get(key, default)
+    if value is None:
+        return default
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        logger.warning("guard_unusable_numeric_input", key=key, value=repr(value))
+        return default
+
+
 class SafetyViolation(Exception):
     """
     Raised when a negotiation decision violates safety guardrails.
@@ -65,15 +90,15 @@ class OutputGuard:
     # mean this table also encodes which premises each gate reads — and that is
     # already declared, once, as `consumes` in the rule set.
     def _gate_price_positive(self, decision: dict, context: dict) -> bool:
-        price = decision.get("price", 0.0)
+        price = _numeric(decision, "price")
         if price <= 0:
             logger.warning("invalid_offered_price", price=price)
             return False
         return True
 
     def _gate_floor_violation(self, decision: dict, context: dict) -> bool:
-        price = decision.get("price", 0.0)
-        floor_price = context.get("floor_price", 0.0)
+        price = _numeric(decision, "price")
+        floor_price = _numeric(context, "floor_price")
         if price < floor_price:
             logger.warning(
                 "safety_floor_violation",
@@ -100,8 +125,8 @@ class OutputGuard:
         return True
 
     def _gate_margin_violation(self, decision: dict, context: dict) -> bool:
-        price = decision.get("price", 0.0)
-        internal_cost = context.get("internal_cost", 0.0)
+        price = _numeric(decision, "price")
+        internal_cost = _numeric(context, "internal_cost")
         margin = (price - internal_cost) / price if price > 0 else 0
 
         # Reached only after G3_SETTINGS_PRESENT passed, so settings are here.
@@ -198,7 +223,7 @@ class OutputGuard:
         passes FAILURE_RECOVERY when the Transformer itself blew up, and no gate
         was involved. Anything the rule set does not name gets the floor markup.
         """
-        floor = float(context.get("floor_price", 0.0))
+        floor = _numeric(context, "floor_price")
         strategy = self._safe_price_strategies.get(reason, "floor_markup")
 
         if strategy == "margin":

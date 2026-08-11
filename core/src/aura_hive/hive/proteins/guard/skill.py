@@ -68,7 +68,14 @@ class GuardSkill(
             code = e.code
 
             assert self.provider is not None
-            safe_p = self.provider.calculate_safe_price(params.get("context", {}), code)
+            # `or {}` rather than a default: a caller that passed an explicit
+            # None gets the same treatment as one that passed nothing. This runs
+            # inside the SafetyViolation handler, a sibling of the generic
+            # `except Exception` below rather than nested in it, so a raise here
+            # escapes the skill entirely.
+            safe_p = self.provider.calculate_safe_price(
+                params.get("context") or {}, code
+            )
             return Observation(
                 success=False,
                 error=err_msg,

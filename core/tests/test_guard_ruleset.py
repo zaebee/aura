@@ -173,6 +173,21 @@ class TestMalformedSource:
         with pytest.raises(RulesetError, match="not found"):
             load_ruleset(tmp_path / "absent.yaml")
 
+    def test_a_gate_that_is_not_a_mapping_is_a_ruleset_error(self) -> None:
+        """A malformed entry should read as a bad rule set, not a TypeError."""
+        bad = json.loads(json.dumps(MINIMAL))
+        bad["gates"][0] = "G1_A"
+
+        with pytest.raises(RulesetError, match="mapping"):
+            ruleset_from_mapping(bad)
+
+    def test_a_consumes_that_is_not_a_list_is_a_ruleset_error(self) -> None:
+        bad = json.loads(json.dumps(MINIMAL))
+        bad["gates"][0]["consumes"] = "price"
+
+        with pytest.raises(RulesetError, match="consumes"):
+            ruleset_from_mapping(bad)
+
     def test_a_file_that_is_not_a_mapping_is_a_ruleset_error(
         self, tmp_path: Path
     ) -> None:
