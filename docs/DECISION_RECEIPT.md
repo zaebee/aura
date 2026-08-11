@@ -107,8 +107,9 @@ downgrade from VISION's Layer 1 and the main thing that would have to be built t
 
 **That downgrade has a compensating side, and it is worth stating because it explains why the rest
 of this document was cheap to build.** Tuan & Sanyal (2026), *Ontology-Constrained Neural Reasoning
-in Enterprise Agentic Systems* (arXiv:2604.00555), survey enterprise agent platforms and find that
-they constrain agent **inputs** — context assembly, tool discovery, governance gates — but do not
+in Enterprise Agentic Systems* ([arXiv:2604.00555](https://arxiv.org/abs/2604.00555)), survey
+enterprise agent platforms and find that they constrain agent **inputs** — context assembly, tool
+discovery, governance gates — but do not
 validate **outputs** against the same definitions, so an agent can receive perfect context and still
 emit a constraint-violating answer. They call this *asymmetric neurosymbolic coupling* and rank it
 on a maturity scale:
