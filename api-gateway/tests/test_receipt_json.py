@@ -1,14 +1,23 @@
 """
-The shape a machine consumer actually receives.
+The two audiences a decision receipt has, and what each sees.
 
-The receipt exists to be checked by someone outside this process, so the JSON
-has to carry enough for them to recover the signer themselves rather than
-calling our code. Two properties do most of that work: the signature block is
-self-describing, and the fields that make up the signed content appear exactly
-as they were signed.
+`receipt_to_json` is what the HTTP response gives a negotiating counterparty:
+a handle they can cite in a dispute, and nothing that lets them reconstruct
+the hidden floor price. `outcome_gate` names the rule that fired, the rule set
+maps that gate to a substitute-price strategy, and the price is already in the
+response — together that recovers the floor, so none of it, nor the binding
+fields (`issued_at`, `decision_id`, `request_id`, `override_scope`), reach the
+counterparty.
+
+`receipt_to_json_full` is for the auditor the receipt is actually addressed
+to. It carries everything, and the reasons for its shape are the same as
+before the split: the signature block is self-describing, so a consumer
+rebuilds the EIP-712 domain and calls `ecrecover` without knowing how we are
+configured, and `outcome` travels as the name that was signed rather than its
+protobuf integer.
 """
 
-from api_gateway.main import receipt_to_json
+from api_gateway.main import receipt_to_json, receipt_to_json_full
 from aura_core_gen.aura.core.v1 import (
     DecisionDerivation,
     DecisionOutcome,
@@ -38,68 +47,41 @@ SIGNED = DecisionReceipt(
 )
 
 
-class TestTheOutcomeIsNamed:
-    def test_it_travels_as_the_string_that_was_signed(self) -> None:
+def a_signed_override_receipt() -> DecisionReceipt:
+    """
+    A fully populated receipt, so a field surviving the trim is visible as a
+    key that should not be there rather than as an empty string nobody notices.
+    """
+    return DecisionReceipt(
+        version="AURA-RECEIPT-V2",
+        canonical_prefix="c0ffee1234abcd56",
+        claim_hash="a" * 64,
+        emission_hash="b" * 64,
+        ruleset_version="guard/negotiation@2.0.0+46cc0e38ca4f895c",
+        outcome=DecisionOutcome.DECISION_OUTCOME_OVERRIDE,
+        outcome_gate="FLOOR_PRICE_VIOLATION",
+        override_scope="value",
+        issued_at="2026-08-11T10:00:00Z",
+        decision_id="d-1",
+        request_id="r-1",
+    )
+
+
+class TestTheClientSeesAHandleAndNothingElse:
+    """What `receipt_to_json` gives the counterparty over HTTP."""
+
+    def test_only_the_version_and_the_prefix_are_rendered(self) -> None:
         """
-        Not the protobuf integer. The signature covers this name, so publishing
-        the number would leave a consumer to map it back — and a mapping step
-        inside a signature reconstruction is where they get it wrong.
+        The receipt is addressed to an auditor. Nothing in it means anything to
+        the counterparty, and `outcome_gate` plus the price they received is
+        most of the way to inverting the floor.
         """
-        assert receipt_to_json(SIGNED)["outcome"] == "override"
+        rendered = receipt_to_json(a_signed_override_receipt())
+        assert set(rendered) == {"version", "canonical_prefix"}
 
-
-class TestTheSignatureIsSelfDescribing:
-    def test_the_domain_travels_with_the_signature(self) -> None:
-        """
-        A consumer rebuilds the EIP-712 domain from these fields alone. Without
-        them they would need to know how we are configured, and a receipt only
-        checkable by someone who already knows that is not much of a receipt.
-        """
-        signature = receipt_to_json(SIGNED)["signature"]
-
-        assert signature["domain"] == "AuraDecisionReceipt"
-        assert signature["domain_version"] == "1"
-        assert signature["chain_id"] == 84532
-        assert signature["scheme"] == "eip712"
-        assert signature["signer"] == "0xabc"
-
-
-class TestAnUnsignedReceiptCannotPassForASignedOne:
-    def test_the_version_says_so(self) -> None:
-        unsigned = DecisionReceipt(
-            version="AURA-RECEIPT-V2-UNSIGNED",
-            outcome=DecisionOutcome.DECISION_OUTCOME_EMIT,
-            canonical_prefix="0123456789abcdef",
-        )
-
-        assert receipt_to_json(unsigned)["version"] == "AURA-RECEIPT-V2-UNSIGNED"
-
-    def test_the_signature_is_null_rather_than_an_empty_shape(self) -> None:
-        """
-        An empty signature object invites a consumer to check its fields and
-        find blanks. `null` cannot be misread as an attestation that happened to
-        have no content.
-        """
-        unsigned = DecisionReceipt(
-            version="AURA-RECEIPT-V2-UNSIGNED",
-            outcome=DecisionOutcome.DECISION_OUTCOME_EMIT,
-        )
-
-        assert receipt_to_json(unsigned)["signature"] is None
-
-
-class TestTheReceiptIsNested:
-    def test_it_is_one_object_rather_than_spread_across_keys(self) -> None:
-        """
-        Deferred step 4 adds a premise hash and a policy stamp to this same
-        message. Nesting keeps that open; flattening would make each new field a
-        separate decision about the endpoint's top-level shape.
-        """
-        rendered = receipt_to_json(SIGNED)
-
-        assert set(rendered) == {
-            "version",
-            "canonical_prefix",
+    def test_the_hashes_and_the_gate_are_absent(self) -> None:
+        rendered = receipt_to_json(a_signed_override_receipt())
+        for gone in (
             "outcome",
             "outcome_gate",
             "claim_hash",
@@ -107,48 +89,33 @@ class TestTheReceiptIsNested:
             "ruleset_version",
             "derivation",
             "signature",
-        }
-        assert rendered["derivation"]["gate_sequence"].startswith("G1_")
+        ):
+            assert gone not in rendered
 
-
-class TestNothingHiddenNothingInvented:
-    def test_a_receipt_with_no_derivation_reports_none(self) -> None:
+    def test_the_binding_fields_are_absent(self) -> None:
         """
-        Membrane-level refusals consult no rule set, so they have no derivation.
-        An empty object would assert one that never ran.
+        `override_scope` in particular tells a counterparty whether the
+        substitution touched the price or only the wording — exactly the kind
+        of inference the trim exists to stop.
         """
-        bare = DecisionReceipt(
-            version="AURA-RECEIPT-V2-UNSIGNED",
-            outcome=DecisionOutcome.DECISION_OUTCOME_REFUSE,
-            outcome_gate="KYC_FAILURE",
-        )
+        rendered = receipt_to_json(a_signed_override_receipt())
+        for gone in ("issued_at", "decision_id", "request_id", "override_scope"):
+            assert gone not in rendered
 
-        assert receipt_to_json(bare)["derivation"] is None
+    def test_a_receiptless_response_renders_null(self) -> None:
+        """
+        betterproto default-constructs a message field on access, so
+        `receipt is None` is dead code — the check is by value.
+        """
+        assert receipt_to_json(DecisionReceipt()) is None
 
     def test_an_explicit_none_renders_as_nothing(self) -> None:
         """
         The defensive case, not the real one. betterproto never hands back None
-        for a message field — see TestAnUnsetReceiptIsAbsence for the shape an
-        actual receipt-less response has, which is what this test originally
-        claimed to cover and did not.
+        for a message field — see test_a_receiptless_response_renders_null for
+        the shape an actual receipt-less response has.
         """
         assert receipt_to_json(None) is None
-
-
-class TestAnUnsetReceiptIsAbsence:
-    """
-    betterproto default-constructs a message field on access rather than
-    returning None, so `response.receipt` is a DecisionReceipt of blanks when
-    the core never set one — never `None`.
-
-    The first cut checked `receipt is None`, which therefore never fired, and
-    the test that covered it passed `None` explicitly: it verified a case the
-    real path does not produce and missed the one it does. Emptiness here is a
-    property of the value, not of the reference.
-    """
-
-    def test_a_default_constructed_receipt_renders_as_nothing(self) -> None:
-        assert receipt_to_json(DecisionReceipt()) is None
 
     def test_the_response_of_a_deployment_that_minted_nothing_carries_no_receipt(
         self,
@@ -169,3 +136,109 @@ class TestAnUnsetReceiptIsAbsence:
 
         assert rendered is not None
         assert rendered["version"] == "AURA-RECEIPT-V2-UNSIGNED"
+
+
+class TestTheFullRendererKeepsEverything:
+    """
+    What `receipt_to_json_full` renders — for the log line an auditor's
+    tooling reads, never for the HTTP response.
+    """
+
+    def test_it_carries_the_binding_fields(self) -> None:
+        rendered = receipt_to_json_full(a_signed_override_receipt())
+        for field in (
+            "issued_at",
+            "decision_id",
+            "request_id",
+            "override_scope",
+            "outcome_gate",
+            "claim_hash",
+            "emission_hash",
+        ):
+            assert field in rendered
+
+    def test_it_is_one_nested_object_with_the_full_shape(self) -> None:
+        """
+        Deferred step 4 [core] adds a premise hash and a policy stamp to this
+        same message. Nesting keeps that open; flattening would make each new
+        field a separate decision about the shape of whatever renders this.
+        """
+        rendered = receipt_to_json_full(SIGNED)
+
+        assert set(rendered) == {
+            "version",
+            "canonical_prefix",
+            "issued_at",
+            "decision_id",
+            "request_id",
+            "override_scope",
+            "outcome",
+            "outcome_gate",
+            "claim_hash",
+            "emission_hash",
+            "ruleset_version",
+            "derivation",
+            "signature",
+        }
+        assert rendered["derivation"]["gate_sequence"].startswith("G1_")
+
+    def test_the_outcome_travels_as_the_string_that_was_signed(self) -> None:
+        """
+        Not the protobuf integer. The signature covers this name, so publishing
+        the number would leave a consumer to map it back — and a mapping step
+        inside a signature reconstruction is where they get it wrong.
+        """
+        assert receipt_to_json_full(SIGNED)["outcome"] == "override"
+
+    def test_the_signature_is_self_describing(self) -> None:
+        """
+        A consumer rebuilds the EIP-712 domain from these fields alone. Without
+        them they would need to know how we are configured, and a receipt only
+        checkable by someone who already knows that is not much of a receipt.
+        """
+        signature = receipt_to_json_full(SIGNED)["signature"]
+
+        assert signature["domain"] == "AuraDecisionReceipt"
+        assert signature["domain_version"] == "1"
+        assert signature["chain_id"] == 84532
+        assert signature["scheme"] == "eip712"
+        assert signature["signer"] == "0xabc"
+
+    def test_the_signature_is_null_rather_than_an_empty_shape_when_unsigned(
+        self,
+    ) -> None:
+        """
+        An empty signature object invites a consumer to check its fields and
+        find blanks. `null` cannot be misread as an attestation that happened to
+        have no content.
+        """
+        unsigned = DecisionReceipt(
+            version="AURA-RECEIPT-V2-UNSIGNED",
+            outcome=DecisionOutcome.DECISION_OUTCOME_EMIT,
+        )
+
+        assert receipt_to_json_full(unsigned)["signature"] is None
+
+    def test_a_receipt_with_no_derivation_reports_none(self) -> None:
+        """
+        Membrane-level refusals consult no rule set, so they have no derivation.
+        An empty object would assert one that never ran.
+        """
+        bare = DecisionReceipt(
+            version="AURA-RECEIPT-V2-UNSIGNED",
+            outcome=DecisionOutcome.DECISION_OUTCOME_REFUSE,
+            outcome_gate="KYC_FAILURE",
+        )
+
+        assert receipt_to_json_full(bare)["derivation"] is None
+
+    def test_a_default_constructed_receipt_renders_as_nothing(self) -> None:
+        """
+        Same guard, same reasoning as the public renderer: betterproto
+        default-constructs a message field on access rather than returning
+        None, so the check is by value (`version`) and not by identity.
+        """
+        assert receipt_to_json_full(DecisionReceipt()) is None
+
+    def test_an_explicit_none_renders_as_nothing(self) -> None:
+        assert receipt_to_json_full(None) is None

@@ -200,14 +200,23 @@ class NegotiationRequestHTTP(BaseModel):
     agent_did: str
 
 
-def receipt_to_json(receipt: DecisionReceipt | None) -> dict[str, Any] | None:
+def receipt_to_json_full(receipt: DecisionReceipt | None) -> dict[str, Any] | None:
     """
-    Render a decision receipt for a machine consumer.
+    Render a decision receipt for an auditor, keeping everything.
 
-    Nested as one object rather than spread across the response's top-level
-    keys: the deferred premise hash and policy stamp land in this same message,
-    and flattening would make each of them a separate decision about the shape
-    of this endpoint.
+    This is NOT what reaches the HTTP response. The receipt is addressed to
+    someone auditing the decision after the fact, not to the counterparty we
+    negotiated against: `outcome_gate` names which rule fired, the rule set
+    maps that gate to a substitute-price strategy, and the price is already in
+    the response, so handing this whole shape to the counterparty is most of
+    the way to inverting the floor price the Membrane exists to keep hidden.
+    `receipt_to_json` is the trimmed view that actually goes out over HTTP;
+    this one is for the log line an auditor's tooling reads.
+
+    Nested as one object rather than spread across the caller's top-level
+    keys: the deferred premise hash and policy stamp land in this same
+    message, and flattening would make each of them a separate decision about
+    the shape of whatever renders this.
 
     Two properties are what make the result usable by someone who does not run
     our code. The signature block carries its own EIP-712 domain, so a consumer
@@ -237,6 +246,10 @@ def receipt_to_json(receipt: DecisionReceipt | None) -> dict[str, Any] | None:
     return {
         "version": receipt.version,
         "canonical_prefix": receipt.canonical_prefix,
+        "issued_at": receipt.issued_at,
+        "decision_id": receipt.decision_id,
+        "request_id": receipt.request_id,
+        "override_scope": receipt.override_scope,
         "outcome": decision_outcome_name(receipt.outcome),
         "outcome_gate": receipt.outcome_gate,
         "claim_hash": receipt.claim_hash,
@@ -262,6 +275,28 @@ def receipt_to_json(receipt: DecisionReceipt | None) -> dict[str, Any] | None:
             if signature is not None and signature.signature
             else None
         ),
+    }
+
+
+def receipt_to_json(receipt: DecisionReceipt | None) -> dict[str, Any] | None:
+    """
+    What a negotiating counterparty gets: a handle, and nothing to invert.
+
+    The receipt is addressed to an auditor. `outcome_gate` names which rule
+    fired, the rule set maps that to a substitute strategy, and the price is
+    already in the response — together that recovers the hidden floor. The
+    prefix lets them cite this decision in a dispute; the auditor resolves it.
+
+    `version` is the sentinel because `mint` always sets it: a receipt that
+    never got minted has an empty one, and betterproto default-constructs the
+    field on access rather than returning None.
+    """
+    if receipt is None or not receipt.version:
+        return None
+
+    return {
+        "version": receipt.version,
+        "canonical_prefix": receipt.canonical_prefix,
     }
 
 
