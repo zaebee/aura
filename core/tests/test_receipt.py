@@ -22,6 +22,7 @@ everything a reader might want.
 import hashlib
 
 import pytest
+from aura_core import decision_outcome_name
 from aura_core_gen.aura.core.v1 import (
     ActionType,
     AssetIntent,
@@ -619,3 +620,79 @@ class TestSigning:
         assert attested.signature.chain_id == 84532
         assert attested.signature.domain == RECEIPT_EIP712_DOMAIN
         assert verify(attested).ok
+
+
+class TestTheSignedPayloadIsReadable:
+    """
+    A consumer reconstructs the signed content to recover the signer, so every
+    field in it needs exactly one representation on the wire.
+
+    `outcome` used to be signed as its protobuf integer. That forces a JSON API
+    either to publish an opaque number, or to publish the name and leave the
+    consumer to map it back — and a mapping step in the middle of a signature
+    reconstruction is where they get it wrong. The name is signed instead, so
+    what travels and what was signed are the same string.
+    """
+
+    def test_the_outcome_is_signed_by_name_not_by_number(self) -> None:
+        receipt = mint(
+            claim=counter(price=92.0),
+            emission=counter(price=105.0),
+            outcome=DecisionOutcome.DECISION_OUTCOME_OVERRIDE,
+            outcome_gate="FLOOR_PRICE_VIOLATION",
+        )
+
+        content = signing_payload(receipt, chain_id=1)["message"]["content"]
+
+        assert "override" in content.split("\n")
+        assert "2" not in content.split("\n")
+
+    def test_every_outcome_has_a_distinct_name_in_the_payload(self) -> None:
+        """Two outcomes that rendered alike would make the digest ambiguous."""
+        names = set()
+        for outcome in (
+            DecisionOutcome.DECISION_OUTCOME_EMIT,
+            DecisionOutcome.DECISION_OUTCOME_OVERRIDE,
+            DecisionOutcome.DECISION_OUTCOME_REFUSE,
+        ):
+            receipt = mint(
+                claim=counter(price=105.0),
+                emission=counter(price=105.0),
+                outcome=outcome,
+                outcome_gate="DLP_BLOCK",
+            )
+            names.add(signing_payload(receipt, chain_id=1)["message"]["content"])
+
+        assert len(names) == 3
+
+
+class TestTheOutcomeNamesMatchTheEnum:
+    """
+    `decision_outcome_name` keeps its own table rather than reading the
+    generated enum, so the Genome stays free of generated code. That buys
+    purity at the cost of a table that can drift — and this one is signed, so a
+    drift would silently change what every signature covers.
+
+    Cross-checked here for the same reason the rule set cross-checks its gates
+    against the engine: a mapping nothing verifies is a mapping that will
+    eventually be wrong.
+    """
+
+    def test_every_declared_outcome_has_a_name(self) -> None:
+        for outcome in DecisionOutcome:
+            rendered = decision_outcome_name(outcome)
+
+            assert not rendered.startswith("outcome_"), (
+                f"{outcome.name} has no entry in decision_outcome_name; "
+                "adding an outcome to the proto means adding it there too"
+            )
+
+    def test_the_names_are_distinct(self) -> None:
+        """Two outcomes rendering alike would make a signed payload ambiguous."""
+        names = [decision_outcome_name(o) for o in DecisionOutcome]
+
+        assert len(set(names)) == len(names)
+
+    def test_an_unknown_number_renders_distinctly(self) -> None:
+        """It must not be mistakable for a known outcome."""
+        assert decision_outcome_name(99) == "outcome_99"

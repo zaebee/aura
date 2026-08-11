@@ -35,8 +35,10 @@ from .metabolism import (
     map_action,
 )
 from .struct_utils import make_struct
+from .wire_names import decision_outcome_name
 
 __all__ = [
+    "decision_outcome_name",
     # Manifest (Geography)
     "find_hive_root",
     "MACRO_ATCG_FOLDERS",

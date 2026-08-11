@@ -23,7 +23,7 @@ message NegotiateRequest {
   string item_id = 2;         // Identifier of the item being negotiated.
   double bid_amount = 3;      // The proposed bid amount.
   string currency_code = 4;   // Currency code, e.g., "USD".
-  
+
   // Metadata for the agent identity.
   AgentIdentity agent = 5;
 
@@ -47,6 +47,15 @@ message NegotiateResponse {
     OfferRejected rejected = 5;
     JitUiRequest ui_required = 6;
   }
+
+  // What the Membrane attests about the decision behind this response: which
+  // rules judged it, how they were applied, whether the price is the model's or
+  // the guard's, and who signed that.
+  //
+  // Present but UNSIGNED when the deployment has no key configured. A consumer
+  // must read `version` rather than assume — treating an unsigned receipt as a
+  // signed one is the downgrade the two version names exist to prevent.
+  aura.core.v1.DecisionReceipt receipt = 7;
 }
 
 message OfferAccepted {

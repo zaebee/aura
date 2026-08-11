@@ -104,6 +104,13 @@ class NegotiationService:
                 neg = obs_val
                 response.valid_until_timestamp = neg.valid_until_timestamp
 
+                # Copied ahead of the result branches for the same reason the
+                # Connector copies it ahead of its own: this response is built
+                # field by field, and a receipt attached inside one branch is a
+                # receipt the other branches drop.
+                if neg.receipt is not None and neg.receipt.version:
+                    response.receipt = neg.receipt
+
                 res_name, res_val = betterproto.which_one_of(neg, "result")
                 if res_name == "accepted" and res_val:
                     from aura_core_gen.aura.negotiation.v1 import OfferAccepted

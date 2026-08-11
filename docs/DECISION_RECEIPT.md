@@ -341,6 +341,103 @@ What the counterparty learns: a rule fired, at gate 4, consuming their offered p
 they cannot see; the price they received is the Membrane's, not the model's; our thresholds were
 committed beforehand. What they do not learn: the floor, the margin, the cost.
 
+## 7. Checking a receipt without our code
+
+A receipt a consumer cannot check independently is a receipt they have to trust, which is the thing
+it exists to replace. `/v1/negotiate` returns it nested under `receipt`:
+
+```json
+{
+  "session_token": "sess_…",
+  "status": "countered",
+  "receipt": {
+    "version": "AURA-RECEIPT-V1",
+    "canonical_prefix": "c0ffee1234abcd56",
+    "outcome": "override",
+    "outcome_gate": "FLOOR_PRICE_VIOLATION",
+    "claim_hash": "<hex64>",
+    "emission_hash": "<hex64>",
+    "ruleset_version": "guard/negotiation@1.0.0+46cc0e38ca4f895c",
+    "derivation": {"gate_sequence": "G1_PRICE_POSITIVE:pass:price␟…", "derivation_hash": "<hex64>"},
+    "signature": {
+      "scheme": "eip712",
+      "domain": "AuraDecisionReceipt",
+      "domain_version": "1",
+      "chain_id": 84532,
+      "signer": "0x…",
+      "signature": "0x…"
+    }
+  }
+}
+```
+
+**Read `version` first.** `AURA-RECEIPT-V0-UNSIGNED` means the deployment had no key configured and
+`signature` is `null`. Everything else in the receipt is still true and still checkable, but nobody
+has vouched for it. Treating one as the other is the downgrade the two names exist to prevent.
+
+### Recovering the signer
+
+The signature covers a single string: the content fields, joined by `\n`, in this exact order.
+
+```
+version
+claim_hash
+ruleset_version
+derivation.derivation_hash      ← empty string when derivation is null
+emission_hash
+outcome                         ← the name, e.g. "override" — not a number
+outcome_gate
+```
+
+That string is the `content` member of an EIP-712 message, under a domain rebuilt from the receipt's
+own `signature` block:
+
+```python
+payload = {
+    "types": {
+        "EIP712Domain": [
+            {"name": "name", "type": "string"},
+            {"name": "version", "type": "string"},
+            {"name": "chainId", "type": "uint256"},
+        ],
+        "DecisionReceipt": [{"name": "content", "type": "string"}],
+    },
+    "domain": {
+        "name": sig["domain"],           # AuraDecisionReceipt
+        "version": sig["domain_version"],
+        "chainId": sig["chain_id"],
+    },
+    "primaryType": "DecisionReceipt",
+    "message": {"content": content},
+}
+recovered = Account.recover_message(encode_typed_data(full_message=payload), signature=sig["signature"])
+assert recovered.lower() == sig["signer"].lower()
+```
+
+Note there is **no `verifyingContract`** — a receipt has no contract, and its absence is part of what
+makes this domain structurally different from the one `TradeIntent` is signed under. Adding a zeroed
+one produces a different domain separator and the recovery fails.
+
+The recovered address is then resolved against the ERC-8004 identity registry to learn whether it is
+ours. That step is the point of using the EVM key: the address means something because it is already
+published, not because we assert it.
+
+### What the fields tell you
+
+- **`claim_hash` ≠ `emission_hash`** — the Membrane substituted a value. The price you received is
+  the guard's, not the model's. Equal hashes with `outcome: "override"` are legitimate only for a
+  prose-only gate (`DLP_BLOCK`); under any other gate that combination is a receipt describing
+  something that did not happen.
+- **`ruleset_version`** — which rules judged it. The digest changes when the gate list changes;
+  empty means no rule set was consulted, which is the case for Membrane-level refusals.
+- **`derivation.gate_sequence`** — every gate that ran, in order, with its verdict, naming the
+  premise *keys* each consulted. It never carries a value, so it cannot be probed for the floor.
+- **`canonical_prefix`** — a handle for correlating with our logs. Not a commitment; the signature is.
+
+Our own implementation of all of this is `verify()` in `core/src/aura_hive/hive/membrane/receipt.py`.
+It needs no key and no configuration, so it is usable directly by anyone who can import it — but the
+format above is the contract, and a consumer reimplementing it owes us nothing.
+
 ## 5. Honest gaps
 
 1. **No constraint graph.** §3.2 substitutes a flat canonical claim. We are building *attested

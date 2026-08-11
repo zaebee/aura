@@ -21,9 +21,11 @@ from aura_core_gen.aura.core.v1 import (
     ActionType,
     Context,
     DecisionOutcome,
+    DecisionReceipt,
     Intent,
     NegotiationIntent,
     Observation,
+    ReceiptSignature,
     RWAComplianceScore,
     RWAVaultIntent,
     TradeIntent,
@@ -655,3 +657,69 @@ class TestNothingInAttestationCanCostTheDecision:
         assert decision.receipt.outcome == DecisionOutcome.DECISION_OUTCOME_OVERRIDE
         assert decision.negotiation.price != 500.0
         assert decision.receipt.canonical_prefix != ""
+
+
+class TestTheReceiptLogClaimsOnlyWhatItKnows:
+    """
+    `attested` is a word `verify` owns: it means the signature recovered to the
+    signer the receipt claims. The log line never recovers anything — it knows
+    only whether a signature is attached — so it says `signed`.
+
+    Using the stronger word for the weaker fact is the conflation
+    `VerificationResult` separates `ok` from `attested` to avoid, and a log
+    asserting attestation nobody performed is the same overstatement in a
+    cheaper place.
+    """
+
+    def logged(self, calls: list) -> dict:
+        return next(kw for _, kw in calls if _ and _[0] == "membrane_receipt")
+
+    @pytest.mark.asyncio
+    async def test_an_unsigned_decision_is_not_reported_as_signed(self) -> None:
+        calls: list = []
+        membrane = guarded_membrane()
+
+        with patch(
+            "aura_hive.hive.membrane.main.logger.info",
+            side_effect=lambda *a, **kw: calls.append((a, kw)),
+        ):
+            await membrane.inspect_outbound(
+                counter_intent(price=500.0), negotiation_context()
+            )
+
+        assert self.logged(calls)["signed"] is False
+
+    @pytest.mark.asyncio
+    async def test_a_signed_decision_is(self) -> None:
+        calls: list = []
+        account = Account.create()
+        registry = SkillRegistry()
+        guard = GuardSkill()
+        guard.bind(_Safety(), OutputGuard(safety_settings=_Safety()))
+        registry.register(guard.get_name(), guard)
+        registry.register("transaction", TestSigningTheReceipt._Signer(account))
+        membrane = HiveMembrane(registry=registry)
+
+        with patch(
+            "aura_hive.hive.membrane.main.logger.info",
+            side_effect=lambda *a, **kw: calls.append((a, kw)),
+        ):
+            await membrane.inspect_outbound(
+                counter_intent(price=500.0), negotiation_context()
+            )
+
+        assert self.logged(calls)["signed"] is True
+
+    def test_a_signature_block_with_no_signature_is_not_signed(self) -> None:
+        """
+        Narrow, and unreachable through `signed()` which fills every field at
+        once — but the log's notion of signed should not be weaker than
+        `verify`'s, which already checks the value rather than the object.
+        """
+        from aura_hive.hive.membrane.main import _is_signed
+
+        assert not _is_signed(
+            DecisionReceipt(
+                version="AURA-RECEIPT-V1", signature=ReceiptSignature(scheme="eip712")
+            )
+        )
