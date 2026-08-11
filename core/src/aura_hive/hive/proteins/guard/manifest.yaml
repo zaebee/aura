@@ -1,6 +1,6 @@
 # Internal Metadata (For Cortex)
 skill_name: "guard"
-version: "1.1.0"
+version: "1.2.0"
 description: "Safety validation and safe price calculation protein"
 capabilities:
   - "validate_decision"

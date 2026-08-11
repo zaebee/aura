@@ -1,16 +1,34 @@
+from collections.abc import Callable
 from typing import Any
 
 import structlog
 
 from aura_hive.hive.metabolism.math import HillDampener
 
+from .ruleset import Ruleset, load_ruleset
+
 logger = structlog.get_logger(__name__)
+
+# Markup applied to the floor when a gate asks for the `floor_markup` strategy.
+# Not operator-tunable: unlike min_profit_margin this is the shape of the
+# fallback rather than a policy dial, so it belongs with the rules.
+_FLOOR_MARKUP = 1.05
 
 
 class SafetyViolation(Exception):
-    """Raised when a negotiation decision violates safety guardrails."""
+    """
+    Raised when a negotiation decision violates safety guardrails.
 
-    pass
+    `code` is the gate's declared code from ruleset.yaml. It exists because the
+    caller used to recover the same information by searching this exception's
+    message for "margin" or "floor" — which relabelled an audit trail whenever
+    someone reworded a string, and which already misreported the fail-closed
+    branch ("Cannot validate margin: ...") as a margin violation.
+    """
+
+    def __init__(self, message: str, code: str = "SAFETY_VIOLATION") -> None:
+        super().__init__(message)
+        self.code = code
 
 
 class OutputGuard:
@@ -20,71 +38,134 @@ class OutputGuard:
     (The "Greedy Merchant" fix)
     """
 
-    def __init__(self, safety_settings: Any = None):
+    def __init__(self, safety_settings: Any = None, ruleset: Ruleset | None = None):
         self.settings = safety_settings
+        self.ruleset = ruleset or load_ruleset()
 
-    def validate_decision(self, decision: dict, context: dict) -> bool:
-        action = decision.get("action")
-        offered_price = decision.get("price", 0.0)
+        # Refuse to run against a rule set that does not describe this engine.
+        # Doing it here rather than at import time means a bad rule set fails
+        # where it can be attributed, and a test can supply its own.
+        self.ruleset.validate_against(set(self.gate_ids()))
+
+        self._safe_price_strategies = {
+            gate.code: gate.safe_price for gate in self.ruleset.gates
+        }
+
+    # Gate id -> the predicate that decides it. The ids are the contract with
+    # ruleset.yaml: `Ruleset.validate_against(gate_ids())` refuses to run if the
+    # two ever drift, in either direction.
+    #
+    # A predicate returns True when the gate passes. It receives the decision
+    # and context untouched rather than a narrowed view, because narrowing would
+    # mean this table also encodes which premises each gate reads — and that is
+    # already declared, once, as `consumes` in the rule set.
+    def _gate_price_positive(self, decision: dict, context: dict) -> bool:
+        price = decision.get("price", 0.0)
+        if price <= 0:
+            logger.warning("invalid_offered_price", price=price)
+            return False
+        return True
+
+    def _gate_floor_violation(self, decision: dict, context: dict) -> bool:
+        price = decision.get("price", 0.0)
         floor_price = context.get("floor_price", 0.0)
-        internal_cost = context.get("internal_cost", 0.0)
-
-        if action not in ["accept", "counter"]:
-            return True
-
-        # 1. Price non-positive check
-        if offered_price <= 0:
-            logger.warning("invalid_offered_price", price=offered_price)
-            raise SafetyViolation("Invalid offered price")
-
-        # 2. Floor price violation (Metabolic Leakage Protection)
-        if offered_price < floor_price:
+        if price < floor_price:
             logger.warning(
                 "safety_floor_violation",
-                action=action,
-                offered_price=offered_price,
+                action=decision.get("action"),
+                offered_price=price,
                 floor_price=floor_price,
             )
-            raise SafetyViolation("Metabolic Leakage: Amount below floor price")
+            return False
+        return True
 
-        # 3. Margin violation
-        if offered_price > 0:
-            margin = (offered_price - internal_cost) / offered_price
-        else:
-            margin = 0
-
+    def _gate_settings_present(self, decision: dict, context: dict) -> bool:
         # DNA Rule: Safety Guard must "Fail-Closed" if misconfigured.
         if not self.settings:
             logger.error("guard_settings_missing_fail_closed")
-            raise SafetyViolation(
-                "Cannot validate margin: safety settings not provided."
-            )
+            return False
+        return True
 
+    def _gate_margin_violation(self, decision: dict, context: dict) -> bool:
+        price = decision.get("price", 0.0)
+        internal_cost = context.get("internal_cost", 0.0)
+        margin = (price - internal_cost) / price if price > 0 else 0
+
+        # Reached only after G3_SETTINGS_PRESENT passed, so settings are here.
         min_margin = self.settings.min_profit_margin
         if margin < min_margin:
             logger.warning(
                 "safety_margin_violation",
-                offered_price=offered_price,
+                offered_price=price,
                 internal_cost=internal_cost,
                 margin=margin,
                 min_margin=min_margin,
             )
-            raise SafetyViolation("Minimum profit margin violation")
+            return False
+        return True
+
+    _MESSAGES = {
+        "G1_PRICE_POSITIVE": "Invalid offered price",
+        "G2_FLOOR_VIOLATION": "Metabolic Leakage: Amount below floor price",
+        "G3_SETTINGS_PRESENT": "Cannot validate margin: safety settings not provided.",
+        "G4_MARGIN_VIOLATION": "Minimum profit margin violation",
+    }
+
+    @classmethod
+    def gate_ids(cls) -> tuple[str, ...]:
+        """The gates this engine can evaluate, for cross-checking the rule set."""
+        return tuple(cls._MESSAGES)
+
+    def _predicate(self, gate_id: str) -> Callable[[dict, dict], bool]:
+        return {
+            "G1_PRICE_POSITIVE": self._gate_price_positive,
+            "G2_FLOOR_VIOLATION": self._gate_floor_violation,
+            "G3_SETTINGS_PRESENT": self._gate_settings_present,
+            "G4_MARGIN_VIOLATION": self._gate_margin_violation,
+        }[gate_id]
+
+    def validate_decision(self, decision: dict, context: dict) -> bool:
+        """
+        Walk the declared gates in order and raise on the first that fails.
+
+        Only accept and counter are judged: those are the actions that put a
+        price on the wire. A reject carrying a nonsense price is not a safety
+        failure, and refusing it would turn the guard into a validator of
+        decisions nobody acts on.
+        """
+        if decision.get("action") not in ["accept", "counter"]:
+            return True
+
+        for gate in self.ruleset.gates:
+            if not self._predicate(gate.id)(decision, context):
+                raise SafetyViolation(self._MESSAGES[gate.id], code=gate.code)
 
         return True
 
     def calculate_safe_price(self, context: dict, reason: str) -> float:
-        """Deterministic safe price calculation for override."""
+        """
+        Deterministic substitute price, by the strategy the firing gate declared.
+
+        `reason` is a gate code where one fired, but not always: the Membrane
+        passes FAILURE_RECOVERY when the Transformer itself blew up, and no gate
+        was involved. Anything the rule set does not name gets the floor markup.
+        """
         floor = float(context.get("floor_price", 0.0))
-        if "margin" in reason.lower():
+        strategy = self._safe_price_strategies.get(reason, "floor_markup")
+
+        if strategy == "margin":
             min_m = 0.1
             if self.settings:
                 min_m = float(self.settings.min_profit_margin)
 
+            # A margin at or above 1.0 makes floor/(1-m) undefined or negative.
+            # Falling back to the default keeps a misconfigured deployment
+            # answering with a real price rather than a nonsensical one.
             if min_m >= 1.0:
                 min_m = 0.1
             return float(round(floor / (1 - min_m), 2))
-        return float(round(floor * 1.05, 2))
+
+        return float(round(floor * _FLOOR_MARKUP, 2))
 
     def validate_transaction(
         self,

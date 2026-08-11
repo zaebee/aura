@@ -60,12 +60,12 @@ class GuardSkill(
         try:
             return await handler(params)
         except SafetyViolation as e:
+            # The gate's own code, carried on the exception. This used to be
+            # recovered by searching the message for "margin" or "floor", which
+            # relabelled the audit trail on any rewording and already misfiled
+            # the fail-closed branch as a margin violation.
             err_msg = str(e)
-            code = "SAFETY_VIOLATION"
-            if "margin" in err_msg.lower():
-                code = "MIN_MARGIN_VIOLATION"
-            elif "floor" in err_msg.lower():
-                code = "FLOOR_PRICE_VIOLATION"
+            code = e.code
 
             assert self.provider is not None
             safe_p = self.provider.calculate_safe_price(params.get("context", {}), code)

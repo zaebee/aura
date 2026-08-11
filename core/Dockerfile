@@ -65,6 +65,11 @@ ENV PYTHONPATH=/app/core/src:/app/core/gen-proto
 # Verify critical packages installed
 RUN python -c "import grpc_health.v1.health_pb2"
 
+# The guard's rules are a data file beside its code, not Python, so nothing in
+# the build would otherwise notice it missing — and the failure would surface
+# at runtime as a guard that refuses every decision. Load it here instead.
+RUN python -c "from aura_hive.hive.proteins.guard.ruleset import load_ruleset; print(load_ruleset().version_string)"
+
 EXPOSE 50051
 EXPOSE 9091
 

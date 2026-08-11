@@ -92,27 +92,70 @@ downgrade from VISION's Layer 1 and the main thing that would have to be built t
 
 ### 3.3 `ruleset-version`
 
-`guard/negotiation@1.0.0+<hex16>` where the suffix is `SHA256` of the **declarative** rule table.
+**Implemented.** `guard/negotiation@1.0.0+46cc0e38ca4f895c` — family, semver, and a digest over the
+declared rules in `proteins/guard/ruleset.yaml`.
 
-This forces a prerequisite refactor: today the rules live as Python control flow in
-`proteins/guard/engine.py` and thresholds hang off `settings.safety`. A version identifier over
-Python source is brittle (a comment change bumps it). The rules need to be extracted into a
-content-addressable artefact — `proteins/guard/ruleset.yaml` — with the engine as its interpreter:
+The digest is taken over the **parsed structure**, not the file bytes. Hashing the source was the
+obvious implementation and the wrong one: a reflowed comment would mint a new rule-set version, and
+a version that changes without the rules changing is noise a verifier learns to ignore — which is
+precisely when it stops catching the change that mattered. Keys are sorted; list order is preserved,
+because gate order decides which reason a decision is refused under and is therefore part of the
+rules.
+
+> **Correction to an earlier draft of this document.** The first sketch put a `thresholds:` block
+> inside `ruleset.yaml`. That is wrong on VISION's own terms: §4.2.3 makes the threshold "a
+> configurable predicate on the receipt, not a property of the layer", and operator-tunable values
+> belong in the **policy stamp** (§3.5), not the rule set. Folding them in would mean every operator
+> who turns a knob forks the rule set, and two deployments running identical rules would cite
+> different versions. `min_profit_margin` and friends stay in `SafetySettings`. The practical
+> benefit is that extracting the rules changed no configuration semantics — the env override still
+> works.
+
+What the rule set does hold is the gate list, in evaluation order, each with the code it emits, the
+premise keys it consumes, and the safe-price strategy that applies when it fires:
 
 ```yaml
 family: guard/negotiation
 version: 1.0.0
 gates:
-  - id: G1_DLP_DISCLOSURE      # forbids floor_price in outbound message
-  - id: G2_ACTION_SCOPE        # only accept/counter are validated further
-  - id: G3_PRICE_POSITIVE
-  - id: G4_FLOOR_VIOLATION
-  - id: G5_MARGIN_VIOLATION
-  - id: G6_SETTINGS_PRESENT    # fail-closed if misconfigured
-thresholds:
-  min_profit_margin: 0.10
-  safe_price_multiplier: 1.05
+  - id: G1_PRICE_POSITIVE
+    code: INVALID_PRICE
+    consumes: [price]
+    safe_price: floor_markup
+  - id: G2_FLOOR_VIOLATION
+    code: FLOOR_PRICE_VIOLATION
+    consumes: [price, floor_price]
+    safe_price: floor_markup
+  - id: G3_SETTINGS_PRESENT      # fail-closed if misconfigured
+    code: SETTINGS_MISSING
+    consumes: []
+    safe_price: margin
+  - id: G4_MARGIN_VIOLATION
+    code: MIN_MARGIN_VIOLATION
+    consumes: [price, internal_cost]
+    safe_price: margin
 ```
+
+Two properties keep the version honest rather than decorative:
+
+- **The declaration and the implementation cross-check, both ways.** `OutputGuard.__init__` calls
+  `Ruleset.validate_against(gate_ids())` and refuses to construct on a mismatch. A declared gate with
+  no predicate would never fire while the rule set advertises it; a predicate that is not declared
+  runs outside anything a receipt can account for.
+- **The shipped digest is pinned in a test.** Editing `ruleset.yaml` fails `test_guard_ruleset.py`
+  until the pin is updated in the same commit — which is the moment to ask whether `version` should
+  be bumped too.
+
+The gate order shipped here is not a preference; it reproduces the order the if-chain applied, so
+decisions already in flight keep the reason they were refused under. Note `G1_DLP_DISCLOSURE` and
+`G2_ACTION_SCOPE` from the earlier sketch are absent: DLP lives in the Membrane rather than the
+guard engine, and action scope is a precondition for judging at all rather than a gate that can
+fail. Both would need a second family to be declared honestly.
+
+**Still a partial content-address.** The digest covers the gate list, not the predicate bodies —
+those are still Python. A change to what `_gate_margin_violation` computes does not move the digest,
+so predicate edits require a manual `version` bump that nothing enforces. VISION §4.2.4 wants the
+implementation content-addressed by the rule-set hash; we are not there.
 
 `trade` and `rwa_vault` params get sibling families (`guard/trade@…`, `guard/rwa@…`) with their own
 gate lists (`KYC_PASSED`, `RISK_THRESHOLD`, `HILL_CEILING`, `WALLET_SANCTIFIED`).
@@ -239,7 +282,11 @@ committed beforehand. What they do not learn: the floor, the margin, the cost.
    `proto/aura/core/v1/metabolism.proto`; stamped by `_stamp()` / `_settle()` in
    `membrane/main.py`; covered by `core/tests/test_membrane_outcome.py`. First-gate-wins is
    implemented and tested. No crypto, no wire format yet.
-2. Extract `ruleset.yaml`; make `engine.py` its interpreter; derive `ruleset-version`.
+2. ~~Extract `ruleset.yaml`; make `engine.py` its interpreter; derive `ruleset-version`.~~ **DONE.**
+   `proteins/guard/ruleset.{yaml,py}`; the engine walks the declared gates and `SafetyViolation`
+   carries the gate's code, replacing the substring match on the exception message. Covered by
+   `core/tests/test_guard_{ruleset,gates}.py`. Caveat in §3.3: predicate bodies are still outside
+   the digest.
 3. Emit `gate-sequence` + `derivation-hash`; add a replay test asserting byte-stability across runs.
 4. Add hashes, salt, split policy stamp.
 5. Sign with the identity key; wire `canonical-prefix` into logs and frontend.
