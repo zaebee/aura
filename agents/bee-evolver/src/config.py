@@ -1,4 +1,8 @@
-from pydantic import AliasChoices, Field
+import json
+from typing import Annotated
+
+from pydantic import AliasChoices, Field, field_validator
+from pydantic_settings import NoDecode
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -37,8 +41,8 @@ class EvolverSettings(BaseSettings):
     max_improvements: int = Field(3, alias="EVOLVER_MAX_IMPROVEMENTS")
     max_tokens: int = Field(2000, alias="AURA_BEE_EVOLVER__MAX_TOKENS")
 
-    # Filesystem scan: directories to exclude (comma-separated)
-    exclude_dirs: list[str] = Field(
+    # Filesystem scan: directories to exclude (comma-separated, or a JSON array)
+    exclude_dirs: Annotated[list[str], NoDecode] = Field(
         default=[
             ".git",
             ".venv",
@@ -53,6 +57,41 @@ class EvolverSettings(BaseSettings):
     )
     # GitHub Issues pagination limit
     issues_per_page: int = Field(20, alias="EVOLVER_ISSUES_PER_PAGE")
+
+    @field_validator("exclude_dirs", mode="before")
+    @classmethod
+    def _split_comma_separated(cls, value: object) -> object:
+        """
+        Accept `.git,.venv` as well as `[".git", ".venv"]`.
+
+        pydantic-settings JSON-decodes env values for a list field inside the
+        env source, *before* field validation — so the comma-separated form the
+        comment above promised failed at startup, and a validator alone would
+        never have seen the raw string. `NoDecode` on the annotation is what
+        hands it here intact. Nobody wants to write a JSON array in a shell for
+        a list of directory names.
+
+        Split here rather than at each use: the api-gateway spells its own
+        comma-separated settings as `str` and calls `.split(",")` wherever it
+        needs them, which duplicates the stripping and the empty-entry filter
+        across call sites. Doing it once at the boundary keeps the field typed
+        as what it is.
+
+        An empty string yields an empty list — a deliberate "exclude nothing",
+        distinct from the variable being unset, which keeps the defaults.
+        """
+        if not isinstance(value, str):
+            return value
+
+        text = value.strip()
+        # `NoDecode` means nothing decodes JSON for us any more, so anything
+        # already deployed with an array has to be handled here or it would
+        # break — the one format that used to work must keep working.
+        if text.startswith("["):
+            return json.loads(text)
+
+        return [part.strip() for part in text.split(",") if part.strip()]
+
     # Max chars of issue body passed to the LLM
     issue_body_limit: int = Field(500, alias="EVOLVER_ISSUE_BODY_LIMIT")
 
