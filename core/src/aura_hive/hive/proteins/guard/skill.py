@@ -6,10 +6,26 @@ from aura_core_gen.aura.core.v1 import Observation
 
 from aura_hive.config.policy import SafetySettings
 
-from .engine import OutputGuard, SafetyViolation
+from .engine import Derivation, OutputGuard, SafetyViolation
 from .schema import SafePriceParams, ValidationParams, VisionValidationParams
 
 logger = logging.getLogger(__name__)
+
+
+def _derivation_fields(derivation: "Derivation | None") -> dict[str, str]:
+    """
+    The record, flattened for Observation metadata.
+
+    Empty strings when nothing was derived rather than omitted keys, so the
+    Membrane reads the same two names on every path and cannot mistake "no gate
+    ran" for "the skill forgot to say".
+    """
+    if derivation is None:
+        return {"gate_sequence": "", "derivation_hash": ""}
+    return {
+        "gate_sequence": derivation.canonical,
+        "derivation_hash": derivation.digest,
+    }
 
 
 class GuardSkill(
@@ -79,7 +95,13 @@ class GuardSkill(
             return Observation(
                 success=False,
                 error=err_msg,
-                metadata=make_struct({"error_code": code, "safe_price": str(safe_p)}),
+                metadata=make_struct(
+                    {
+                        "error_code": code,
+                        "safe_price": str(safe_p),
+                        **_derivation_fields(e.derivation),
+                    }
+                ),
             )
         except Exception as e:
             logger.error(f"Guard skill error: {e}")
@@ -88,8 +110,16 @@ class GuardSkill(
     async def _validate_decision(self, params: dict[str, Any]) -> Observation:
         assert self.provider is not None
         p = ValidationParams(**params)
-        self.provider.validate_decision(p.decision, p.context)
-        return Observation(success=True)
+        # Walked once. The record is wanted on both paths, and re-running the
+        # gates for the failing one would rest on the two runs agreeing.
+        derivation = self.provider.evaluate(p.decision, p.context)
+
+        if derivation.failed_gate is not None:
+            raise self.provider.violation_for(derivation)
+
+        return Observation(
+            success=True, metadata=make_struct(_derivation_fields(derivation))
+        )
 
     async def _get_safe_price(self, params: dict[str, Any]) -> Observation:
         assert self.provider is not None

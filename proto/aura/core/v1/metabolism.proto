@@ -197,6 +197,35 @@ enum DecisionOutcome {
   DECISION_OUTCOME_REFUSE = 3;     // a gate fired; the action was rejected
 }
 
+// The ordered record of how the guard reached its verdict, and a digest over it.
+//
+// `outcome_gate` names the rule that refused a decision but not the rules
+// consulted before it, so on its own it cannot be replayed: two deployments
+// could report the same failing gate having evaluated different sets on the way
+// there. This is that record.
+//
+// Grouped in a message rather than added as two more scalars on Intent so the
+// remaining receipt fields (premise hash, policy stamp, signature) have
+// somewhere to land without spreading across Intent's number space. See
+// docs/DECISION_RECEIPT.md §3.4.
+message DecisionDerivation {
+  // Gate records in evaluation order, separated by ASCII unit separator (0x1F).
+  // Each record is `<gate-id>:<pass|fail>:<comma-separated premise keys>`.
+  //
+  // Premise KEYS, never their values. This field is meant to be publishable,
+  // and recording a value would hand the counterparty the floor price in the
+  // one place designed to be read by them — undoing the invariant the Membrane
+  // spends its entire outbound path enforcing.
+  string gate_sequence = 1;
+
+  // SHA-256 over gate_sequence, lowercase hex. Empty when no gate ran: hashing
+  // an empty sequence would assert a derivation that never happened.
+  //
+  // Redundant with gate_sequence by design. A reader confirms the two agree
+  // with one constant-time compare, and only then pays to replay the steps.
+  string derivation_hash = 2;
+}
+
 message Intent {
   string identifier = 1;  // Schema.org compliant
   ActionType action = 2;
@@ -217,6 +246,9 @@ message Intent {
   // read back which invariants answered, and the shape of the hidden floor
   // falls out. This constrains only what is recorded — every gate still runs.
   string outcome_gate = 8;
+
+  // How the Membrane reached that verdict. Absent when no declared gate ran.
+  DecisionDerivation derivation = 9;
 
   // Strictly typed action params
   oneof params {

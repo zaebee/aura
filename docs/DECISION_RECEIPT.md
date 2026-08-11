@@ -162,23 +162,48 @@ gate lists (`KYC_PASSED`, `RISK_THRESHOLD`, `HILL_CEILING`, `WALLET_SANCTIFIED`)
 
 ### 3.4 `derivation-hash` and `gate-sequence`
 
-Our derivation *is* the ordered gate evaluation. Each record:
+**Implemented**, as `Intent.derivation` (`DecisionDerivation`). Our derivation *is* the ordered gate
+evaluation. Each record:
 
 ```
-<gate-id>:<verdict>:<premise-keys-consumed>
+<gate-id>:<pass|fail>:<premise-keys-consumed>
 ```
 
-e.g. `G4_FLOOR_VIOLATION:pass:bid,floor_price` — note it names the *keys*, never the values.
+Records are joined by ASCII unit separator `0x1F` — it cannot occur in a gate id or a premise key, so
+the canonical form needs no escaping rule. A real sequence, for a price below floor:
 
-`derivation-hash = SHA256(canon(gate-sequence))`. The two fields are redundant by design (VISION
-§5.1.6bis): a verifier does one constant-time hash compare for structural integrity, and only then
-pays for replay. This is the part of the spec that fits us best — commit #250 already made the
-structural guard deterministic, so replay is genuinely reproducible today.
+```
+G1_PRICE_POSITIVE:pass:price␟G2_FLOOR_VIOLATION:fail:price,floor_price
+```
 
-**Gates short-circuit, and only the first failing gate is recorded.** Not a convenience — VISION
-§4.3.5's reasoning applies to us directly: enumerating every gate that *would* have fired gives an
-adversary an oracle over our policy configuration. They probe until they map the boundary, and the
-boundary is `floor_price`.
+`derivation-hash = SHA256(gate-sequence)`, lowercase hex64. The two fields are redundant by design
+(VISION §5.1.6bis): a reader does one hash compare for structural integrity, and only then pays for
+replay.
+
+**The record names premise keys, never values.** This is the property that makes it publishable, and
+it is asserted directly — `test_no_hidden_number_appears_in_the_sequence` checks that neither the
+floor, the internal cost, nor the price appears anywhere in the sequence that reaches the Intent.
+Two consequences worth stating as properties, both tested:
+
+- Two decisions differing only in price derive **identically**. Distinguishing them is the emission
+  digest's job (§3.6). Keeping values out of this field is what stops the digest being a value
+  oracle — you cannot probe it for the floor.
+- The digest moves when the *steps* move: raising the floor so that `G2` fails where it passed
+  changes it, but changing the floor while every gate still passes does not.
+
+**Gates short-circuit, and the sequence ends where evaluation did.** A reader can see that the gates
+after the failure were never consulted. This pairs with §4.3.5's reasoning behind `outcome_gate`
+recording only the first failure: enumerating every gate that *would* have fired gives an adversary
+an oracle over the policy configuration, and the boundary they would map is `floor_price`.
+
+**Nothing derived is not an empty derivation.** When no declared gate ran — a decision outside the
+guard's scope, an unwired Membrane, or one of the Membrane's own checks — the field is left unset
+rather than carrying the hash of an empty string. Hashing nothing would assert a derivation that
+never happened, and a verifier could reproduce that digest and conclude, falsely, that gates ran.
+
+Note this covers the *guard's declared gates only*. KYC, trade-risk and DLP are Membrane-level checks
+that no rule set declares, so they cannot be recorded as gates without inventing ids nothing versions
+(§3.3). Those paths refuse with an `outcome_gate` and no derivation, which is the honest report.
 
 ### 3.5 `policy-stamp`
 
@@ -287,7 +312,11 @@ committed beforehand. What they do not learn: the floor, the margin, the cost.
    carries the gate's code, replacing the substring match on the exception message. Covered by
    `core/tests/test_guard_{ruleset,gates}.py`. Caveat in §3.3: predicate bodies are still outside
    the digest.
-3. Emit `gate-sequence` + `derivation-hash`; add a replay test asserting byte-stability across runs.
+3. ~~Emit `gate-sequence` + `derivation-hash`; add a replay test asserting byte-stability across
+   runs.~~ **DONE.** `DecisionDerivation` on `Intent`; `OutputGuard.evaluate()` walks the gates once
+   and returns the record, which travels on `SafetyViolation` for the failing path. Replay tests
+   build a fresh Membrane, registry and guard per run, since anything surviving between them is
+   state a verifier does not have. Covered by `core/tests/test_{guard,membrane}_derivation.py`.
 4. Add hashes, salt, split policy stamp.
 5. Sign with the identity key; wire `canonical-prefix` into logs and frontend.
 6. Typed `DecisionReceipt` proto message; bee-keeper verifies receipts in CI audit.
