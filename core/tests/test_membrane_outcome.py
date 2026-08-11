@@ -75,8 +75,8 @@ class TestEmit:
             counter_intent(price=2000.0), negotiation_context(floor_price=1000.0)
         )
 
-        assert decision.outcome == DecisionOutcome.DECISION_OUTCOME_EMIT
-        assert decision.outcome_gate == ""
+        assert decision.receipt.outcome == DecisionOutcome.DECISION_OUTCOME_EMIT
+        assert decision.receipt.outcome_gate == ""
 
     @pytest.mark.asyncio
     async def test_a_decision_the_guard_never_saw_is_still_marked_emit(self) -> None:
@@ -91,7 +91,7 @@ class TestEmit:
             counter_intent(price=2000.0), negotiation_context(floor_price=1000.0)
         )
 
-        assert decision.outcome == DecisionOutcome.DECISION_OUTCOME_EMIT
+        assert decision.receipt.outcome == DecisionOutcome.DECISION_OUTCOME_EMIT
 
 
 class TestOverride:
@@ -103,8 +103,8 @@ class TestOverride:
             counter_intent(price=500.0), negotiation_context(floor_price=1000.0)
         )
 
-        assert decision.outcome == DecisionOutcome.DECISION_OUTCOME_OVERRIDE
-        assert decision.outcome_gate == "FLOOR_PRICE_VIOLATION"
+        assert decision.receipt.outcome == DecisionOutcome.DECISION_OUTCOME_OVERRIDE
+        assert decision.receipt.outcome_gate == "FLOOR_PRICE_VIOLATION"
 
     @pytest.mark.asyncio
     async def test_the_substituted_price_travels_with_the_override_mark(self) -> None:
@@ -115,7 +115,7 @@ class TestOverride:
             counter_intent(price=500.0), negotiation_context(floor_price=1000.0)
         )
 
-        assert decision.outcome == DecisionOutcome.DECISION_OUTCOME_OVERRIDE
+        assert decision.receipt.outcome == DecisionOutcome.DECISION_OUTCOME_OVERRIDE
         assert decision.negotiation.price != 500.0
 
     @pytest.mark.asyncio
@@ -131,8 +131,8 @@ class TestOverride:
             negotiation_context(floor_price=1000.0),
         )
 
-        assert decision.outcome == DecisionOutcome.DECISION_OUTCOME_OVERRIDE
-        assert decision.outcome_gate == "DLP_BLOCK"
+        assert decision.receipt.outcome == DecisionOutcome.DECISION_OUTCOME_OVERRIDE
+        assert decision.receipt.outcome_gate == "DLP_BLOCK"
 
     @pytest.mark.asyncio
     async def test_the_first_gate_to_fire_is_the_one_recorded(self) -> None:
@@ -155,7 +155,7 @@ class TestOverride:
             negotiation_context(floor_price=1000.0),
         )
 
-        assert decision.outcome_gate == "DLP_BLOCK"
+        assert decision.receipt.outcome_gate == "DLP_BLOCK"
         # The later gate still ran: the price was replaced, not merely flagged.
         assert decision.negotiation.price != 500.0
 
@@ -176,8 +176,8 @@ class TestRefuse:
 
         decision = await membrane.inspect_outbound(intent, negotiation_context())
 
-        assert decision.outcome == DecisionOutcome.DECISION_OUTCOME_REFUSE
-        assert decision.outcome_gate == "KYC_FAILURE"
+        assert decision.receipt.outcome == DecisionOutcome.DECISION_OUTCOME_REFUSE
+        assert decision.receipt.outcome_gate == "KYC_FAILURE"
         assert decision.action == ActionType.ACTION_TYPE_REJECT
 
     @pytest.mark.asyncio
@@ -194,8 +194,8 @@ class TestRefuse:
 
         decision = await membrane.inspect_outbound(intent, negotiation_context())
 
-        assert decision.outcome == DecisionOutcome.DECISION_OUTCOME_REFUSE
-        assert decision.outcome_gate == "HIGH_RISK_TRADE"
+        assert decision.receipt.outcome == DecisionOutcome.DECISION_OUTCOME_REFUSE
+        assert decision.receipt.outcome_gate == "HIGH_RISK_TRADE"
         assert decision.action == ActionType.ACTION_TYPE_REJECT
 
     @pytest.mark.asyncio
@@ -210,8 +210,8 @@ class TestRefuse:
 
         decision = await membrane.inspect_outbound(intent, negotiation_context())
 
-        assert decision.outcome == DecisionOutcome.DECISION_OUTCOME_EMIT
-        assert decision.outcome_gate == ""
+        assert decision.receipt.outcome == DecisionOutcome.DECISION_OUTCOME_EMIT
+        assert decision.receipt.outcome_gate == ""
 
 
 class TestFailureRecovery:
@@ -229,8 +229,8 @@ class TestFailureRecovery:
             negotiation_context(floor_price=1000.0),
         )
 
-        assert decision.outcome == DecisionOutcome.DECISION_OUTCOME_OVERRIDE
-        assert decision.outcome_gate == "FAILURE_RECOVERY"
+        assert decision.receipt.outcome == DecisionOutcome.DECISION_OUTCOME_OVERRIDE
+        assert decision.receipt.outcome_gate == "FAILURE_RECOVERY"
 
 
 class TestReplacementPreservesIdentity:
@@ -260,7 +260,7 @@ class TestReplacementPreservesIdentity:
             original, negotiation_context(floor_price=1000.0)
         )
 
-        assert decision.outcome == DecisionOutcome.DECISION_OUTCOME_OVERRIDE
+        assert decision.receipt.outcome == DecisionOutcome.DECISION_OUTCOME_OVERRIDE
         assert decision.identifier == "decision-42"
         assert decision.trace.trace_id == "0af7651916cd43dd"
 
@@ -279,7 +279,7 @@ class TestReplacementPreservesIdentity:
 
         decision = await membrane.inspect_outbound(original, negotiation_context())
 
-        assert decision.outcome == DecisionOutcome.DECISION_OUTCOME_REFUSE
+        assert decision.receipt.outcome == DecisionOutcome.DECISION_OUTCOME_REFUSE
         assert decision.identifier == "decision-43"
         assert decision.trace.trace_id == "0af7651916cd43dd"
 
@@ -301,7 +301,7 @@ class TestReplacementPreservesIdentity:
 
         decision = await membrane.inspect_outbound(original, negotiation_context())
 
-        assert decision.outcome == DecisionOutcome.DECISION_OUTCOME_REFUSE
+        assert decision.receipt.outcome == DecisionOutcome.DECISION_OUTCOME_REFUSE
         assert decision.identifier == "decision-44"
         assert decision.trace.trace_id == "0af7651916cd43dd"
 
@@ -326,5 +326,5 @@ class TestPassThrough:
             negotiation_context(floor_price=1000.0),
         )
 
-        assert decision.outcome == DecisionOutcome.DECISION_OUTCOME_EMIT
-        assert decision.outcome_gate == ""
+        assert decision.receipt.outcome == DecisionOutcome.DECISION_OUTCOME_EMIT
+        assert decision.receipt.outcome_gate == ""

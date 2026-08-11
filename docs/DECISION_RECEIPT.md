@@ -244,13 +244,22 @@ The fix is not to remove the override. It is to **stop hiding it**:
 | `override` | a gate fired; Membrane substituted a deterministic safe value | differ |
 | `refuse` | a gate fired; no emission (KYC failure, high-risk trade) | emission is the reason |
 
-Today the override is recorded only in `_record_intervention()` telemetry and a `[MEMBRANE: …]`
-suffix appended to free-text `reasoning`. Under this design it becomes a typed, signed,
-counterparty-visible fact. That is the single highest-value change in this document and it is
-independently useful even if the rest is never built.
+**Implemented.** The override used to be recorded only in `_record_intervention()` telemetry and a
+`[MEMBRANE: …]` suffix on free-text `reasoning`; it is now a typed, counterparty-visible fact —
+though not yet a signed one.
 
-`refuse` receipts carry a real `derivation-hash` (the hash of the refusal-reason record), not a
-placeholder — a refusal is a closed derivation onto the refusal symbol (VISION §5.1.4).
+Two limits worth stating rather than discovering later:
+
+- **A prose-only override shows equal hashes.** The DLP gate rewrites the message and nothing else,
+  and prose is deliberately outside the claim (§3.2). So a DLP-only override is visible through
+  `outcome` but not through the digests. Bringing prose into the hash would cost determinism on
+  every decision to catch this one case, so `verify` special-cases the gate instead: an override
+  under a non-prose gate whose hashes agree is a receipt describing something that did not happen,
+  and is reported as a failure.
+- **`refuse` receipts carry no derivation.** VISION §5.1.4 wants a real digest there, since a
+  refusal is a closed derivation onto the refusal symbol. Ours are Membrane-level checks (KYC,
+  trade risk) that no rule set declares, so there are no gate ids to record (§3.3). They carry an
+  `outcome_gate` and an empty derivation, which is honest but is a gap against the spec.
 
 ### 3.7 `verifier` and `canonical-prefix`
 
@@ -317,9 +326,25 @@ committed beforehand. What they do not learn: the floor, the margin, the cost.
    and returns the record, which travels on `SafetyViolation` for the failing path. Replay tests
    build a fresh Membrane, registry and guard per run, since anything surviving between them is
    state a verifier does not have. Covered by `core/tests/test_{guard,membrane}_derivation.py`.
-4. Add hashes, salt, split policy stamp.
-5. Sign with the identity key; wire `canonical-prefix` into logs and frontend.
-6. Typed `DecisionReceipt` proto message; bee-keeper verifies receipts in CI audit.
+4. Add `premise-hash` + salt, and split the policy stamp. **Blocked on a decision, not on code**:
+   who holds the salt and how it rotates. Without that the premise hash is either brute-forceable
+   (§3.1) or unverifiable by anyone but us.
+5. Sign with the identity key; wire `canonical-prefix` into logs and frontend. **Blocked on a
+   decision**: which key signs. The wallet-sanctification key is the obvious candidate, since it
+   would bind receipts to the ERC-8004 identity work.
+6. ~~Typed `DecisionReceipt` proto message; bee-keeper verifies receipts in CI audit.~~
+   **PARTLY DONE.** `DecisionReceipt` exists and `Intent.receipt` replaces the three fields that
+   accumulated on `Intent` (7, 8 and 9 are reserved). It adds `claim_hash` / `emission_hash`, so an
+   override is visible as two differing digests rather than a claim to be trusted, and
+   `canonical_prefix`. `membrane/receipt.py` mints and verifies; covered by
+   `core/tests/test_receipt.py`.
 
-Steps 1–3 are the ones that pay for themselves regardless of whether the cryptographic layer ever
-lands.
+   **The bee-keeper half was mis-specified and is not built.** bee.Keeper audits *architecture* —
+   it reads the codebase through an LLM and the VCS protein, and never sees an emitted `Intent`.
+   There are no persisted receipts in CI for it to verify, so "verifies receipts in CI audit" had
+   nothing to run against. Receipt checking is a library function (`verify`) exercised by tests
+   instead. Wiring it into a real audit needs decisions persisted somewhere an auditor can read,
+   which is its own piece of work and not obviously worth doing before the receipts are signed.
+
+Steps 1–3 and 6 pay for themselves regardless of whether the cryptographic layer ever lands. Steps
+4 and 5 each need an answer before any code is worth writing.

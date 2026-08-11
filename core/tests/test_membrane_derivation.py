@@ -28,6 +28,7 @@ from aura_core_gen.aura.core.v1 import (
     ValidationScore,
 )
 from aura_hive.hive.membrane.main import HiveMembrane
+from aura_hive.hive.membrane.receipt import verify
 from aura_hive.hive.proteins.guard import GuardSkill
 from aura_hive.hive.proteins.guard.engine import OutputGuard
 
@@ -73,10 +74,12 @@ class TestTheDerivationReachesTheIntent:
             counter_intent(price=2000.0), negotiation_context()
         )
 
-        assert decision.outcome == DecisionOutcome.DECISION_OUTCOME_EMIT
-        assert decision.derivation.gate_sequence.startswith("G1_PRICE_POSITIVE:pass:")
-        assert "G4_MARGIN_VIOLATION:pass:" in decision.derivation.gate_sequence
-        assert len(decision.derivation.derivation_hash) == 64
+        assert decision.receipt.outcome == DecisionOutcome.DECISION_OUTCOME_EMIT
+        assert decision.receipt.derivation.gate_sequence.startswith(
+            "G1_PRICE_POSITIVE:pass:"
+        )
+        assert "G4_MARGIN_VIOLATION:pass:" in decision.receipt.derivation.gate_sequence
+        assert len(decision.receipt.derivation.derivation_hash) == 64
 
     @pytest.mark.asyncio
     async def test_an_overridden_decision_carries_the_gate_that_stopped_it(
@@ -92,11 +95,11 @@ class TestTheDerivationReachesTheIntent:
             counter_intent(price=500.0), negotiation_context()
         )
 
-        assert decision.outcome == DecisionOutcome.DECISION_OUTCOME_OVERRIDE
-        assert decision.derivation.gate_sequence == (
+        assert decision.receipt.outcome == DecisionOutcome.DECISION_OUTCOME_OVERRIDE
+        assert decision.receipt.derivation.gate_sequence == (
             "G1_PRICE_POSITIVE:pass:price\x1fG2_FLOOR_VIOLATION:fail:price,floor_price"
         )
-        assert len(decision.derivation.derivation_hash) == 64
+        assert len(decision.receipt.derivation.derivation_hash) == 64
 
     @pytest.mark.asyncio
     async def test_the_hash_matches_the_sequence_that_travelled(self) -> None:
@@ -113,9 +116,9 @@ class TestTheDerivationReachesTheIntent:
         )
 
         assert (
-            decision.derivation.derivation_hash
+            decision.receipt.derivation.derivation_hash
             == hashlib.sha256(
-                decision.derivation.gate_sequence.encode("utf-8")
+                decision.receipt.derivation.gate_sequence.encode("utf-8")
             ).hexdigest()
         )
 
@@ -143,8 +146,14 @@ class TestReplay:
             counter_intent(price=price), negotiation_context()
         )
 
-        assert first.derivation.gate_sequence == second.derivation.gate_sequence
-        assert first.derivation.derivation_hash == second.derivation.derivation_hash
+        assert (
+            first.receipt.derivation.gate_sequence
+            == second.receipt.derivation.gate_sequence
+        )
+        assert (
+            first.receipt.derivation.derivation_hash
+            == second.receipt.derivation.derivation_hash
+        )
 
     @pytest.mark.asyncio
     async def test_a_different_floor_changing_the_verdict_changes_the_digest(
@@ -161,7 +170,10 @@ class TestReplay:
             counter_intent(price=1500.0), negotiation_context(floor_price=9000.0)
         )
 
-        assert passing.derivation.derivation_hash != failing.derivation.derivation_hash
+        assert (
+            passing.receipt.derivation.derivation_hash
+            != failing.receipt.derivation.derivation_hash
+        )
 
     @pytest.mark.asyncio
     async def test_a_different_floor_leaving_the_verdict_alone_does_not(self) -> None:
@@ -177,7 +189,10 @@ class TestReplay:
             counter_intent(price=5000.0), negotiation_context(floor_price=2000.0)
         )
 
-        assert low.derivation.derivation_hash == high.derivation.derivation_hash
+        assert (
+            low.receipt.derivation.derivation_hash
+            == high.receipt.derivation.derivation_hash
+        )
 
 
 class TestTheIntentNeverCarriesAValue:
@@ -195,7 +210,7 @@ class TestTheIntentNeverCarriesAValue:
             counter_intent(price=price), negotiation_context(floor_price=FLOOR)
         )
 
-        sequence = decision.derivation.gate_sequence
+        sequence = decision.receipt.derivation.gate_sequence
         for secret in ("1000", "777", str(price), str(int(price))):
             assert secret not in sequence
 
@@ -244,8 +259,8 @@ class TestAGuardThatReportsNothingUsable:
             counter_intent(price=2000.0), negotiation_context()
         )
 
-        assert decision.outcome == DecisionOutcome.DECISION_OUTCOME_EMIT
-        assert decision.derivation.derivation_hash == ""
+        assert decision.receipt.outcome == DecisionOutcome.DECISION_OUTCOME_EMIT
+        assert decision.receipt.derivation.derivation_hash == ""
 
     @pytest.mark.asyncio
     async def test_a_null_valued_record_is_not_attached_as_the_word_none(self) -> None:
@@ -265,8 +280,8 @@ class TestAGuardThatReportsNothingUsable:
             counter_intent(price=2000.0), negotiation_context()
         )
 
-        assert decision.derivation.gate_sequence == ""
-        assert decision.derivation.derivation_hash == ""
+        assert decision.receipt.derivation.gate_sequence == ""
+        assert decision.receipt.derivation.derivation_hash == ""
 
 
 class TestNoDeclaredGateRan:
@@ -293,9 +308,9 @@ class TestNoDeclaredGateRan:
 
         decision = await membrane.inspect_outbound(intent, negotiation_context())
 
-        assert decision.outcome == DecisionOutcome.DECISION_OUTCOME_REFUSE
-        assert decision.derivation.gate_sequence == ""
-        assert decision.derivation.derivation_hash == ""
+        assert decision.receipt.outcome == DecisionOutcome.DECISION_OUTCOME_REFUSE
+        assert decision.receipt.derivation.gate_sequence == ""
+        assert decision.receipt.derivation.derivation_hash == ""
 
     @pytest.mark.asyncio
     async def test_a_high_risk_trade_refusal_shows_no_derivation(self) -> None:
@@ -311,7 +326,7 @@ class TestNoDeclaredGateRan:
 
         decision = await membrane.inspect_outbound(intent, negotiation_context())
 
-        assert decision.derivation.derivation_hash == ""
+        assert decision.receipt.derivation.derivation_hash == ""
 
     @pytest.mark.asyncio
     async def test_a_model_reject_shows_no_derivation(self) -> None:
@@ -326,8 +341,8 @@ class TestNoDeclaredGateRan:
             negotiation_context(),
         )
 
-        assert decision.outcome == DecisionOutcome.DECISION_OUTCOME_EMIT
-        assert decision.derivation.derivation_hash == ""
+        assert decision.receipt.outcome == DecisionOutcome.DECISION_OUTCOME_EMIT
+        assert decision.receipt.derivation.derivation_hash == ""
 
     @pytest.mark.asyncio
     async def test_an_unwired_membrane_shows_no_derivation(self) -> None:
@@ -342,5 +357,143 @@ class TestNoDeclaredGateRan:
             counter_intent(price=2000.0), negotiation_context()
         )
 
-        assert decision.outcome == DecisionOutcome.DECISION_OUTCOME_EMIT
-        assert decision.derivation.derivation_hash == ""
+        assert decision.receipt.outcome == DecisionOutcome.DECISION_OUTCOME_EMIT
+        assert decision.receipt.derivation.derivation_hash == ""
+
+
+class TestTheReceiptTheMembraneMints:
+    """
+    End-to-end: the receipt on a real emitted Intent should survive the
+    verifier, which is the only claim any of this makes.
+    """
+
+    @pytest.mark.asyncio
+    async def test_it_names_the_rule_set_that_judged_the_decision(self) -> None:
+        decision = await guarded_membrane().inspect_outbound(
+            counter_intent(price=2000.0), negotiation_context()
+        )
+
+        assert decision.receipt.ruleset_version.startswith("guard/negotiation@")
+
+    @pytest.mark.asyncio
+    async def test_a_decision_no_rule_set_judged_names_none(self) -> None:
+        """
+        An empty version rather than a plausible-looking default: the KYC path
+        consults no rule set, and naming one would be a claim about how the
+        decision was reached that is simply untrue.
+        """
+        decision = await guarded_membrane().inspect_outbound(
+            Intent(
+                action=ActionType.ACTION_TYPE_APPROVE,
+                rwa_vault=RWAVaultIntent(
+                    wallet_address="0xdead",
+                    compliance=RWAComplianceScore(kyc_passed=False),
+                ),
+            ),
+            negotiation_context(),
+        )
+
+        assert decision.receipt.ruleset_version == ""
+        assert decision.receipt.outcome_gate == "KYC_FAILURE"
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("price", [500.0, 2000.0])
+    async def test_the_minted_receipt_verifies(self, price: float) -> None:
+        decision = await guarded_membrane().inspect_outbound(
+            counter_intent(price=price), negotiation_context()
+        )
+
+        result = verify(decision.receipt)
+
+        assert result.ok, result.failures
+
+    @pytest.mark.asyncio
+    async def test_an_override_is_visible_as_two_differing_hashes(self) -> None:
+        """
+        The property the claim/emission pair exists for. A reader compares two
+        hex strings and knows the price they were given is the guard's, not the
+        model's — without being told, and without trusting the telling.
+        """
+        decision = await guarded_membrane().inspect_outbound(
+            counter_intent(price=500.0), negotiation_context()
+        )
+
+        assert decision.receipt.outcome == DecisionOutcome.DECISION_OUTCOME_OVERRIDE
+        assert decision.receipt.claim_hash != decision.receipt.emission_hash
+
+    @pytest.mark.asyncio
+    async def test_an_untouched_decision_shows_two_matching_hashes(self) -> None:
+        decision = await guarded_membrane().inspect_outbound(
+            counter_intent(price=2000.0), negotiation_context()
+        )
+
+        assert decision.receipt.claim_hash == decision.receipt.emission_hash
+
+    @pytest.mark.asyncio
+    async def test_the_receipt_never_carries_a_hidden_number(self) -> None:
+        """
+        Every field at once, not just the gate sequence: the receipt is the
+        artefact meant to leave the building.
+        """
+        decision = await guarded_membrane().inspect_outbound(
+            counter_intent(price=500.0), negotiation_context(floor_price=FLOOR)
+        )
+        r = decision.receipt
+        rendered = " ".join(
+            [
+                r.version,
+                r.claim_hash,
+                r.ruleset_version,
+                r.emission_hash,
+                r.outcome_gate,
+                r.canonical_prefix,
+                r.derivation.gate_sequence,
+                r.derivation.derivation_hash,
+            ]
+        )
+
+        for secret in ("1000", "777", "500", "1050"):
+            assert secret not in rendered
+
+
+class TestAContextWithNullNumbers:
+    """
+    A Struct round-trips a JSON null back as None, and the outbound path read
+    `float(str(ctx_meta.get(...)))` — so `float("None")` raised ValueError.
+
+    Nothing catches it. `MetabolicLoop.execute` wraps neither membrane call, so
+    the exception leaves the cycle entirely and the negotiation is lost. That is
+    the wrong failure for the component whose whole job is to be the thing that
+    does not let a bad decision out: refusing safely is its business, crashing
+    is not.
+    """
+
+    @pytest.mark.asyncio
+    async def test_a_null_floor_does_not_crash_the_outbound_path(self) -> None:
+        decision = await guarded_membrane().inspect_outbound(
+            counter_intent(price=2000.0),
+            Context(metadata=make_struct({"floor_price": None})),
+        )
+
+        assert decision.receipt.outcome == DecisionOutcome.DECISION_OUTCOME_EMIT
+
+    @pytest.mark.asyncio
+    async def test_a_null_cost_does_not_crash_the_outbound_path(self) -> None:
+        decision = await guarded_membrane().inspect_outbound(
+            counter_intent(price=2000.0),
+            Context(
+                metadata=make_struct({"floor_price": "1000.0", "internal_cost": None})
+            ),
+        )
+
+        assert decision.receipt.derivation.derivation_hash != ""
+
+    @pytest.mark.asyncio
+    async def test_an_unparseable_floor_does_not_crash_either(self) -> None:
+        """Same failure, different input: the guard is not a parser."""
+        decision = await guarded_membrane().inspect_outbound(
+            counter_intent(price=2000.0),
+            Context(metadata=make_struct({"floor_price": "not a number"})),
+        )
+
+        assert decision.receipt.outcome == DecisionOutcome.DECISION_OUTCOME_EMIT

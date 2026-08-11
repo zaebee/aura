@@ -12,19 +12,30 @@ from .schema import SafePriceParams, ValidationParams, VisionValidationParams
 logger = logging.getLogger(__name__)
 
 
-def _derivation_fields(derivation: "Derivation | None") -> dict[str, str]:
+def _derivation_fields(
+    derivation: "Derivation | None", ruleset_version: str = ""
+) -> dict[str, str]:
     """
     The record, flattened for Observation metadata.
 
     Empty strings when nothing was derived rather than omitted keys, so the
-    Membrane reads the same two names on every path and cannot mistake "no gate
-    ran" for "the skill forgot to say".
+    Membrane reads the same names on every path and cannot mistake "no gate ran"
+    for "the skill forgot to say".
+
+    `ruleset_version` rides along because it answers the question the record
+    raises: a sequence of gate ids means nothing without saying which rule set
+    those ids belong to.
     """
     if derivation is None:
-        return {"gate_sequence": "", "derivation_hash": ""}
+        return {
+            "gate_sequence": "",
+            "derivation_hash": "",
+            "ruleset_version": ruleset_version,
+        }
     return {
         "gate_sequence": derivation.canonical,
         "derivation_hash": derivation.digest,
+        "ruleset_version": ruleset_version,
     }
 
 
@@ -99,7 +110,9 @@ class GuardSkill(
                     {
                         "error_code": code,
                         "safe_price": str(safe_p),
-                        **_derivation_fields(e.derivation),
+                        **_derivation_fields(
+                            e.derivation, self.provider.ruleset.version_string
+                        ),
                     }
                 ),
             )
@@ -118,7 +131,10 @@ class GuardSkill(
             raise self.provider.violation_for(derivation)
 
         return Observation(
-            success=True, metadata=make_struct(_derivation_fields(derivation))
+            success=True,
+            metadata=make_struct(
+                _derivation_fields(derivation, self.provider.ruleset.version_string)
+            ),
         )
 
     async def _get_safe_price(self, params: dict[str, Any]) -> Observation:
