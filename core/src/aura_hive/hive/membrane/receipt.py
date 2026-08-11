@@ -1,22 +1,28 @@
 """
 Mints and checks what the Membrane can attest about a decision.
 
-This is not a receipt in the sense VISION means. §5.1.7 holds that a receipt
-without a valid verifier signature is not a receipt regardless of any other
-field, and neither the signature (§3.7) nor the premise hash (§3.1) is built —
-both wait on decisions this code cannot make for itself: who holds the salt, and
-what key signs.
+Two formats, and the difference is the point. `AURA-RECEIPT-V1` carries an
+EIP-712 signature over its content fields and can be attributed to the agent
+that produced it. `AURA-RECEIPT-V0-UNSIGNED` carries everything else and says in
+its own name that it carries no attestation, which is what a deployment with no
+key configured honestly produces.
 
-So the format calls itself UNSIGNED and `verify` reports what it could not
-check. A verifier that answers "valid" while silently skipping the integrity
-check is worse than no verifier: it teaches its consumer to rely on a guarantee
-nobody made.
+They are separate names rather than one name and a flag, so a consumer written
+against the signed format cannot be satisfied by a downgrade, and `verify`
+refuses a version it does not recognise instead of best-effort checking one.
+
+`verify` also reports what it could not check. The premise hash (§3.1) is still
+unbuilt — and on our premises it can only ever be a commitment opened to a
+trusted party, never a counterparty-verifiable field, because they are
+low-entropy enough that anyone holding the salt can recover them. A verifier
+answering "valid" while silently skipping a check teaches its consumer to rely
+on a guarantee nobody made.
 
 See docs/DECISION_RECEIPT.md §3 for the field-by-field design.
 """
 
 import hashlib
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from typing import Any
 
 import betterproto
@@ -28,13 +34,30 @@ from aura_core_gen.aura.core.v1 import (
     DecisionReceipt,
     Intent,
     NegotiationIntent,
+    ReceiptSignature,
     RWAVaultIntent,
     TradeIntent,
 )
+from eth_account import Account
+from eth_account.messages import encode_typed_data
 
-# The signed format will take its own name rather than flipping a flag on this
-# one, so that a consumer written against it cannot be satisfied by a downgrade.
+# The signed format takes its own name rather than flipping a flag on the
+# unsigned one, so a consumer written against it cannot be satisfied by a
+# downgrade. A deployment with no key configured produces the unsigned format
+# and says so — that is the honest report, not an error.
 RECEIPT_VERSION = "AURA-RECEIPT-V0-UNSIGNED"
+SIGNED_VERSION = "AURA-RECEIPT-V1"
+
+# Kept DISTINCT from the domain TradeIntent signs under (`HackathonRiskRouter`).
+#
+# This is the whole reason reusing the agent's spending key is acceptable: with
+# separate domain separators a receipt signature is not a valid trade
+# authorisation and a trade authorisation is not a valid receipt. `signing_payload`
+# also omits `verifyingContract` — a receipt has no contract — which makes the
+# domain structurally different rather than merely differently named.
+RECEIPT_EIP712_DOMAIN = "AuraDecisionReceipt"
+RECEIPT_EIP712_VERSION = "1"
+_SIGNATURE_SCHEME = "eip712"
 
 # Width of the human-legible handle, in hex characters. Enough to be distinctive
 # in a log line, and not a commitment — nothing is bound until something signs.
@@ -221,6 +244,90 @@ def mint(
     return receipt
 
 
+def signing_payload(receipt: DecisionReceipt, chain_id: int) -> dict[str, Any]:
+    """
+    EIP-712 structured data for a receipt, as it will read once signed.
+
+    Computed against the signed form's content fields — `version` is one of
+    them, so signing the unsigned form would produce an attestation over a
+    document that no longer exists the moment the version is bumped.
+    """
+    probe = replace(receipt, version=SIGNED_VERSION)
+    return {
+        "types": {
+            "EIP712Domain": [
+                {"name": "name", "type": "string"},
+                {"name": "version", "type": "string"},
+                {"name": "chainId", "type": "uint256"},
+            ],
+            "DecisionReceipt": [{"name": "content", "type": "string"}],
+        },
+        "domain": {
+            "name": RECEIPT_EIP712_DOMAIN,
+            "version": RECEIPT_EIP712_VERSION,
+            "chainId": chain_id,
+        },
+        "primaryType": "DecisionReceipt",
+        "message": {"content": _content_fields(probe)},
+    }
+
+
+def signed(
+    receipt: DecisionReceipt, signer: str, signature: str, chain_id: int
+) -> DecisionReceipt:
+    """
+    A copy of the receipt bearing the attestation, at the signed version.
+
+    Returns a new receipt rather than mutating: the version and the prefix both
+    change, and a half-updated receipt in a caller's hand is a document that
+    verifies as neither format.
+    """
+    attested = replace(
+        receipt,
+        version=SIGNED_VERSION,
+        signature=ReceiptSignature(
+            scheme=_SIGNATURE_SCHEME,
+            domain=RECEIPT_EIP712_DOMAIN,
+            domain_version=RECEIPT_EIP712_VERSION,
+            chain_id=chain_id,
+            signer=signer,
+            signature=signature if signature.startswith("0x") else f"0x{signature}",
+        ),
+    )
+    attested.canonical_prefix = _prefix(attested)
+    return attested
+
+
+def _check_signature(receipt: DecisionReceipt) -> list[str]:
+    """
+    Recover the signer from the attestation and confirm it is who is claimed.
+
+    Needs no key material — verification is public by construction, which is
+    why it lives here rather than behind the protein that holds the private
+    key. The domain is rebuilt from the receipt's own fields, so a reader needs
+    no out-of-band configuration.
+    """
+    signature = receipt.signature
+    if signature is None or not signature.signature:
+        return ["receipt claims the signed format but carries no signature"]
+
+    payload = signing_payload(receipt, chain_id=signature.chain_id)
+    try:
+        recovered = Account.recover_message(
+            encode_typed_data(full_message=payload), signature=signature.signature
+        )
+    except Exception as exc:
+        return [f"signature could not be recovered: {exc}"]
+
+    if recovered.lower() != signature.signer.lower():
+        return [
+            f"signature recovers to {recovered}, not the signer "
+            f"{signature.signer} the receipt claims"
+        ]
+
+    return []
+
+
 def verify(receipt: DecisionReceipt) -> VerificationResult:
     """
     Re-derive everything checkable without a key, and say what was skipped.
@@ -230,16 +337,17 @@ def verify(receipt: DecisionReceipt) -> VerificationResult:
     signature ignored, and answering `ok` on it is exactly the downgrade the
     version string exists to prevent.
     """
-    if receipt.version != RECEIPT_VERSION:
+    if receipt.version not in (RECEIPT_VERSION, SIGNED_VERSION):
         return VerificationResult(
             ok=False,
             failures=(
                 f"unknown receipt version {receipt.version!r}; "
-                f"this verifier only reads {RECEIPT_VERSION}",
+                f"this verifier reads {RECEIPT_VERSION} and {SIGNED_VERSION}",
             ),
         )
 
-    failures: list[str] = []
+    attested = receipt.version == SIGNED_VERSION
+    failures: list[str] = _check_signature(receipt) if attested else []
 
     if receipt.canonical_prefix != _prefix(receipt):
         failures.append("canonical prefix does not match the content fields")
@@ -271,11 +379,20 @@ def verify(receipt: DecisionReceipt) -> VerificationResult:
     if receipt.outcome == DecisionOutcome.DECISION_OUTCOME_EMIT and changed:
         failures.append("emit recorded but the emission does not match the claim")
 
+    # Named rather than counted, so a caller reads what is missing instead of a
+    # number they have to look up. The premise hash and the policy stamp are
+    # still unbuilt, so they stay listed even on a signed receipt: a signature
+    # attests to what the receipt says, not to everything a reader might want.
+    unverifiable = ["premises", "policy"]
+    if not attested:
+        unverifiable.insert(0, "signature")
+
     return VerificationResult(
         ok=not failures,
         failures=tuple(failures),
-        # Named rather than counted, so a caller reads what is missing instead
-        # of a number they have to look up.
-        unverifiable=("signature", "premises", "policy"),
-        attested=False,
+        unverifiable=tuple(unverifiable),
+        # Only when a signature was present AND recovered to the claimed signer.
+        # A failed check leaves this False rather than True-with-failures, so a
+        # caller reading one field cannot get the wrong answer.
+        attested=attested and not failures,
     )

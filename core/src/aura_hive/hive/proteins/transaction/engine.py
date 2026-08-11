@@ -200,6 +200,28 @@ class EVMProvider:
             "structured_data": structured_data,
         }
 
+    async def sign_receipt(self, payload: dict[str, Any]) -> dict[str, str]:
+        """
+        Sign an EIP-712 payload the Membrane built for a decision receipt.
+
+        The payload arrives fully formed rather than being assembled here: the
+        Membrane owns what a receipt says, this protein owns the key, and having
+        one build a document the other signs blind is how the two drift into
+        signing different things.
+
+        Domain separation is what makes reusing the agent's spending key
+        acceptable — the receipt domain is not `HackathonRiskRouter`, so a
+        receipt signature is not a valid trade authorisation and vice versa.
+        That property lives in the payload, so this method must not second-guess
+        the domain it was handed.
+        """
+        signed_msg = encode_typed_data(full_message=payload)
+        signature = self.account.sign_message(signed_msg)
+        return {
+            "signer": self.account.address,
+            "signature": signature.signature.hex(),
+        }
+
     async def close(self) -> None:
         # AsyncWeb3 doesn't strictly need close for HTTP provider, but good practice
         pass

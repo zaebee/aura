@@ -8,11 +8,15 @@ model proposed and a digest of what was actually sent. Those two differing IS
 the override, stated as a fact a reader can verify rather than a claim they must
 take on trust.
 
-It is deliberately not called a receipt in the spec's sense. VISION §5.1.7 holds
-that an unsigned receipt is not a receipt regardless of any other field, and
-neither the signature nor the premise hash exists yet. The format identifier says
-UNSIGNED so nothing can mistake this for the attested article, and `verify` is
-explicit about which checks it did not perform.
+There are two formats. `AURA-RECEIPT-V1` carries an EIP-712 signature and can be
+attributed to the agent that produced it; `AURA-RECEIPT-V0-UNSIGNED` carries
+everything else and says in its own name that it carries no attestation. Separate
+names rather than one name and a flag, so a consumer written against the signed
+format cannot be satisfied by a downgrade.
+
+`verify` stays explicit about what it did not check — the premise hash is still
+unbuilt, and a signature attests to what the receipt says rather than to
+everything a reader might want.
 """
 
 import hashlib
@@ -29,13 +33,20 @@ from aura_core_gen.aura.core.v1 import (
     TradeIntent,
 )
 from aura_hive.hive.membrane.receipt import (
+    RECEIPT_EIP712_DOMAIN,
     RECEIPT_VERSION,
+    SIGNED_VERSION,
     _prefix,
     canonical_claim,
     claim_digest,
     mint,
+    signed,
+    signing_payload,
     verify,
 )
+from aura_hive.hive.proteins.transaction.engine import EIP712_DOMAIN_NAME
+from eth_account import Account
+from eth_account.messages import encode_typed_data
 
 
 def counter(price: float, item: str = "htl-9931", message: str = "an offer") -> Intent:
@@ -429,7 +440,7 @@ class TestVerifyIsHonestAboutWhatItCannotCheck:
         the downgrade the version string exists to prevent.
         """
         receipt = self.base_receipt()
-        receipt.version = "AURA-RECEIPT-V1"
+        receipt.version = "AURA-RECEIPT-V9-WITH-SOMETHING-NEW"
 
         result = verify(receipt)
 
@@ -483,3 +494,128 @@ class TestTheAssetClaimAlsoNamesItsDecision:
         assert canonical_claim(intent) == (
             "action=approve;params=asset;asset=a-1;domain=lodging;asset_action=accept"
         )
+
+
+class TestSigning:
+    """
+    A signature is what turns this from a record into an attestation.
+
+    It is signed with the same EVM key the agent already uses on-chain, under a
+    domain of its own. Not for convenience: a signature under a key nobody can
+    attribute is decoration, and key distribution is the hard part. The EVM
+    identity already has an answer — a counterparty resolves the recovered
+    address against the ERC-8004 registry — where a fresh signing key would have
+    none.
+    """
+
+    def receipt(self) -> object:
+        return mint(
+            claim=counter(price=92.0),
+            emission=counter(price=105.0),
+            ruleset_version="guard/negotiation@1.0.0+46cc0e38ca4f895c",
+            outcome=DecisionOutcome.DECISION_OUTCOME_OVERRIDE,
+            outcome_gate="FLOOR_PRICE_VIOLATION",
+        )
+
+    def sign_with(self, receipt: object, account: object) -> object:
+        payload = signing_payload(receipt, chain_id=84532)
+        signature = account.sign_message(encode_typed_data(full_message=payload))
+        return signed(
+            receipt,
+            signer=account.address,
+            signature=signature.signature.hex(),
+            chain_id=84532,
+        )
+
+    def test_the_domain_is_not_the_one_trades_are_signed_under(self) -> None:
+        """
+        The whole reason reusing the spending key is acceptable. Different
+        domain separator means a receipt signature cannot be replayed as a trade
+        authorisation, nor a trade authorisation as a receipt.
+        """
+        payload = signing_payload(self.receipt(), chain_id=84532)
+
+        assert payload["domain"]["name"] == RECEIPT_EIP712_DOMAIN
+        assert payload["domain"]["name"] != EIP712_DOMAIN_NAME
+        # A receipt has no contract, so the field is absent rather than zeroed —
+        # which makes the domain structurally different, not merely renamed.
+        assert "verifyingContract" not in payload["domain"]
+
+    def test_signing_bumps_the_version_out_of_unsigned(self) -> None:
+        account = Account.create()
+
+        attested = self.sign_with(self.receipt(), account)
+
+        assert attested.version == SIGNED_VERSION
+        assert "UNSIGNED" not in attested.version
+        assert attested.signature.signer == account.address
+
+    def test_a_signed_receipt_verifies_and_is_attested(self) -> None:
+        account = Account.create()
+
+        result = verify(self.sign_with(self.receipt(), account))
+
+        assert result.ok, result.failures
+        assert result.attested
+        assert "signature" not in result.unverifiable
+
+    def test_an_unsigned_receipt_is_still_not_attested(self) -> None:
+        result = verify(self.receipt())
+
+        assert result.ok
+        assert not result.attested
+        assert "signature" in result.unverifiable
+
+    def test_a_tampered_content_field_breaks_the_signature(self) -> None:
+        """
+        The point of signing at all: altering what the receipt says must make it
+        stop verifying, not merely mismatch a prefix anyone could recompute.
+        """
+        account = Account.create()
+        attested = self.sign_with(self.receipt(), account)
+
+        attested.outcome_gate = "MIN_MARGIN_VIOLATION"
+        attested.canonical_prefix = _prefix(attested)  # a forger would fix this
+
+        result = verify(attested)
+
+        assert not result.ok
+        assert any("signature" in failure for failure in result.failures)
+
+    def test_a_signature_from_another_key_does_not_pass_as_ours(self) -> None:
+        """The recovered address is compared to the one the receipt claims."""
+        mine = Account.create()
+        theirs = Account.create()
+        attested = self.sign_with(self.receipt(), theirs)
+        attested.signature.signer = mine.address
+
+        result = verify(attested)
+
+        assert not result.ok
+        assert any("signer" in failure for failure in result.failures)
+
+    def test_a_signed_version_with_no_signature_is_refused(self) -> None:
+        """
+        Claiming the signed format while carrying nothing to check is the
+        downgrade the version string exists to prevent, arrived at from inside.
+        """
+        bare = self.receipt()
+        bare.version = SIGNED_VERSION
+        bare.canonical_prefix = _prefix(bare)
+
+        result = verify(bare)
+
+        assert not result.ok
+        assert any("signature" in failure for failure in result.failures)
+
+    def test_the_verifier_rebuilds_the_domain_from_the_receipt_alone(self) -> None:
+        """
+        No out-of-band configuration. A receipt only checkable by someone who
+        already knows how we are configured is not much of a receipt.
+        """
+        account = Account.create()
+        attested = self.sign_with(self.receipt(), account)
+
+        assert attested.signature.chain_id == 84532
+        assert attested.signature.domain == RECEIPT_EIP712_DOMAIN
+        assert verify(attested).ok

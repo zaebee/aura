@@ -270,12 +270,50 @@ message DecisionReceipt {
   // is bound until something signs it.
   string canonical_prefix = 8;
 
-  // Reserved for the fields that need keys or a salt, so nothing reuses these
-  // numbers meanwhile. premise_hash (§3.1) needs the salt decision;
-  // policy_stamp (§3.5) needs the public/committed split; verifier (§3.7) needs
-  // a signing identity.
-  reserved 9, 10, 11;
-  reserved "premise_hash", "policy_stamp", "verifier";
+  // Who signed, and how. Absent on an unsigned receipt, which is the honest
+  // report rather than an error: a deployment with no key configured produces
+  // AURA-RECEIPT-V0-UNSIGNED and says so in `version`.
+  ReceiptSignature signature = 11;
+
+  // Reserved for the two fields still blocked on a decision rather than on
+  // code. premise_hash (§3.1) waits on who holds the salt — and on the finding
+  // that our premises are low-entropy enough that anyone holding it can recover
+  // them, so it can only ever be a commitment we open to a trusted party, not a
+  // counterparty-verifiable field. policy_stamp (§3.5) waits on the
+  // public/committed split.
+  reserved 9, 10;
+  reserved "premise_hash", "policy_stamp";
+}
+
+// The attestation over a receipt's content fields.
+//
+// Self-describing on purpose: a verifier rebuilds the EIP-712 domain from these
+// fields alone and needs no out-of-band configuration to check the signature.
+// A receipt that can only be verified by someone who already knows how we are
+// configured is not much of a receipt.
+message ReceiptSignature {
+  // Signature scheme. `eip712` today.
+  string scheme = 1;
+
+  // EIP-712 domain, kept DISTINCT from the one TradeIntent signs under
+  // (`HackathonRiskRouter`). Domain separation is the standard answer to
+  // signing two kinds of thing with one key: a receipt signature is not a valid
+  // trade authorisation and a trade authorisation is not a valid receipt.
+  //
+  // `verifyingContract` is deliberately absent from the domain — a receipt has
+  // no contract — which makes the domain structurally different from the trade
+  // one, not merely differently named.
+  string domain = 2;
+  string domain_version = 3;
+  uint64 chain_id = 4;
+
+  // The address recovered from a valid signature. A counterparty resolves this
+  // against the ERC-8004 identity registry to learn whether it is ours —
+  // which is the part a fresh signing key would have no answer for.
+  string signer = 5;
+
+  // 0x-prefixed hex.
+  string signature = 6;
 }
 
 message Intent {

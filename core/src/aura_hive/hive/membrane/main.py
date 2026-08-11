@@ -9,6 +9,7 @@ from aura_core_gen.aura.core.v1 import (
     Context,
     DecisionDerivation,
     DecisionOutcome,
+    DecisionReceipt,
     Intent,
     NegotiationIntent,
     RWAVaultIntent,
@@ -18,7 +19,7 @@ from prometheus_client import REGISTRY, Counter
 
 from aura_hive.config import get_settings
 
-from .receipt import mint
+from .receipt import mint, signed, signing_payload
 
 logger = structlog.get_logger(__name__)
 
@@ -134,15 +135,13 @@ class _Verdict:
             )
 
 
-def _finish(claim: Intent, emission: Intent, verdict: _Verdict) -> Intent:
+def _mint_for(claim: Intent, emission: Intent, verdict: _Verdict) -> DecisionReceipt:
     """
-    Attach the receipt and hand back the Intent that will actually be sent.
-
     `claim` is what the Transformer proposed and `emission` is what is going
     out; they are the same object when the Membrane changed nothing, and the two
     hashes agreeing is then a fact a reader can check rather than an assumption.
     """
-    emission.receipt = mint(
+    return mint(
         claim=claim,
         emission=emission,
         outcome=verdict.outcome,
@@ -150,7 +149,6 @@ def _finish(claim: Intent, emission: Intent, verdict: _Verdict) -> Intent:
         ruleset_version=verdict.ruleset_version,
         derivation=verdict.derivation,
     )
-    return emission
 
 
 def _replacing(original: Intent, replacement: Intent) -> Intent:
@@ -199,13 +197,22 @@ def _context_number(ctx_meta: dict[str, Any], key: str, default: float) -> float
         return default
 
 
+def _outcome_label(outcome: Any) -> str:
+    """`override`, not `2` — the log line is read by people."""
+    try:
+        name = DecisionOutcome(int(outcome)).name or ""
+    except (ValueError, TypeError, AttributeError):
+        return f"outcome_{outcome}"
+    return name.removeprefix("DECISION_OUTCOME_").lower()
+
+
 def _action_label(action: Any) -> str:
     """Safely convert ActionType or raw int to a lowercase name string."""
     try:
         name = ActionType(int(action)).name
         return name.lower() if name else f"action_{int(action)}"
-    except (ValueError, AttributeError):
-        return f"action_{int(action)}"
+    except (ValueError, TypeError, AttributeError):
+        return f"action_{action}"
 
 
 class HiveMembrane(Membrane[Any, Intent, Context]):
@@ -214,6 +221,78 @@ class HiveMembrane(Membrane[Any, Intent, Context]):
     def __init__(self, registry: SkillRegistry | None = None) -> None:
         self.settings = get_settings()
         self.registry = registry
+
+    async def _finish(
+        self, claim: Intent, emission: Intent, verdict: _Verdict
+    ) -> Intent:
+        """
+        Attach the receipt to the Intent that will actually be sent, asking
+        whoever holds the key to attest it.
+
+        A receipt that cannot be signed is still emitted, unsigned. The decision
+        it accompanies has already been made and is already safe by this point,
+        so losing it because a key was unreachable would trade the guarantee for
+        the attestation — the wrong way round. The version name carries that
+        distinction rather than leaving a reader to infer it.
+        """
+        receipt = _mint_for(claim, emission, verdict)
+        emission.receipt = await self._attest(receipt)
+
+        try:
+            logger.info(
+                "membrane_receipt",
+                prefix=emission.receipt.canonical_prefix,
+                outcome=_outcome_label(emission.receipt.outcome),
+                gate=emission.receipt.outcome_gate or None,
+                ruleset=emission.receipt.ruleset_version or None,
+                attested=bool(emission.receipt.signature),
+            )
+        except Exception as e:  # nosec B110
+            # The same rule `_record_intervention` follows, and for the same
+            # reason: reporting on a decision must never take that decision
+            # down. Losing a negotiation over a sentence nobody was going to
+            # read at the time is the worst trade in the file.
+            logger.error("membrane_receipt_log_failed", error=str(e))
+
+        return emission
+
+    async def _attest(self, receipt: DecisionReceipt) -> DecisionReceipt:
+        """Ask the protein that holds the key to sign, or return it unsigned."""
+        if not self.registry:
+            return receipt
+
+        try:
+            # Looked up rather than accessed: settings with no crypto section
+            # is a configuration a deployment may legitimately have, and an
+            # expected absence should not be discovered by throwing. The try
+            # still wraps it, because the promise that nothing here costs the
+            # decision should hold from where the code sits rather than from
+            # someone having checked each line.
+            crypto = getattr(self.settings, "crypto", None)
+            chain_id = int(getattr(crypto, "evm_chain_id", 0) or 0)
+            obs = await self.registry.execute(
+                "transaction",
+                "sign_receipt",
+                {"payload": signing_payload(receipt, chain_id=chain_id)},
+            )
+        except Exception as e:
+            # Caught for the same reason the metric counter is: an attestation
+            # failure must not take down the decision it describes.
+            logger.warning("membrane_receipt_unsigned", error=str(e))
+            return receipt
+
+        if not obs.success:
+            logger.warning("membrane_receipt_unsigned", error=obs.error)
+            return receipt
+
+        meta = obs.metadata.to_dict() if obs.metadata is not None else {}
+        signer = str(meta.get("signer") or "")
+        signature = str(meta.get("signature") or "")
+        if not signer or not signature:
+            logger.warning("membrane_receipt_unsigned", error="signer reported neither")
+            return receipt
+
+        return signed(receipt, signer=signer, signature=signature, chain_id=chain_id)
 
     async def inspect_inbound(self, signal: Any) -> Any:
         from aura_core_gen.aura.core.v1 import Signal
@@ -325,7 +404,7 @@ class HiveMembrane(Membrane[Any, Intent, Context]):
                     wallet_address=rwa_intent.wallet_address,
                 )
                 verdict.record(_REFUSE, "KYC_FAILURE")
-                return _finish(
+                return await self._finish(
                     decision,
                     _replacing(
                         decision,
@@ -338,7 +417,7 @@ class HiveMembrane(Membrane[Any, Intent, Context]):
                     ),
                     verdict,
                 )
-            return _finish(decision, decision, verdict)
+            return await self._finish(decision, decision, verdict)
 
         # Trade intent guard: backstop for high-risk trades that slipped through
         if params_name == "trade" and params_value is not None:
@@ -353,7 +432,7 @@ class HiveMembrane(Membrane[Any, Intent, Context]):
                     risk_category=trade_intent.validation_score.risk_category,
                 )
                 verdict.record(_REFUSE, "HIGH_RISK_TRADE")
-                return _finish(
+                return await self._finish(
                     decision,
                     _replacing(
                         decision,
@@ -366,7 +445,7 @@ class HiveMembrane(Membrane[Any, Intent, Context]):
                     ),
                     verdict,
                 )
-            return _finish(decision, decision, verdict)
+            return await self._finish(decision, decision, verdict)
 
         neg_intent = params_value if params_name == "negotiation" else None
 
@@ -387,7 +466,7 @@ class HiveMembrane(Membrane[Any, Intent, Context]):
                         str(obs_safe.metadata.to_dict().get("safe_price", safe_price))
                     )
 
-            return self._override_with_safe_offer(
+            return await self._override_with_safe_offer(
                 decision, safe_price, "FAILURE_RECOVERY", verdict
             )
 
@@ -404,11 +483,11 @@ class HiveMembrane(Membrane[Any, Intent, Context]):
             ActionType.ACTION_TYPE_ACCEPT,
             ActionType.ACTION_TYPE_COUNTER,
         ]:
-            return _finish(decision, decision, verdict)
+            return await self._finish(decision, decision, verdict)
 
         # 3. Call Guard Protein for validation
         if not self.registry:
-            return _finish(decision, decision, verdict)
+            return await self._finish(decision, decision, verdict)
 
         internal_cost = _context_number(ctx_meta, "internal_cost", floor_price)
         guard_context = {"floor_price": floor_price, "internal_cost": internal_cost}
@@ -449,11 +528,13 @@ class HiveMembrane(Membrane[Any, Intent, Context]):
             reason = str(obs_meta.get("error_code", "SAFETY_VIOLATION"))
             safe_price = float(str(obs_meta.get("safe_price", safe_price)))
 
-            return self._override_with_safe_offer(decision, safe_price, reason, verdict)
+            return await self._override_with_safe_offer(
+                decision, safe_price, reason, verdict
+            )
 
-        return _finish(decision, decision, verdict)
+        return await self._finish(decision, decision, verdict)
 
-    def _override_with_safe_offer(
+    async def _override_with_safe_offer(
         self, original: Intent, safe_price: float, reason: str, verdict: _Verdict
     ) -> Intent:
         _record_intervention("outbound", reason, safe_price=round(safe_price, 2))
@@ -481,4 +562,4 @@ class HiveMembrane(Membrane[Any, Intent, Context]):
             ),
         )
         verdict.record(_OVERRIDE, reason)
-        return _finish(original, _replacing(original, replacement), verdict)
+        return await self._finish(original, _replacing(original, replacement), verdict)

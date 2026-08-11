@@ -12,6 +12,8 @@ Nothing here is worth having if the record leaks a number, so that is asserted
 against the Intent itself rather than only against the engine that built it.
 """
 
+from unittest.mock import patch
+
 import pytest
 from aura_core import SkillRegistry
 from aura_core.struct_utils import make_struct
@@ -31,6 +33,8 @@ from aura_hive.hive.membrane.main import HiveMembrane
 from aura_hive.hive.membrane.receipt import verify
 from aura_hive.hive.proteins.guard import GuardSkill
 from aura_hive.hive.proteins.guard.engine import OutputGuard
+from eth_account import Account
+from eth_account.messages import encode_typed_data
 
 FLOOR = 1000.0
 
@@ -497,3 +501,157 @@ class TestAContextWithNullNumbers:
         )
 
         assert decision.receipt.outcome == DecisionOutcome.DECISION_OUTCOME_EMIT
+
+
+class TestSigningTheReceipt:
+    """
+    The Membrane asks whoever holds the key to attest the receipt it just
+    minted. Everything here is about what happens when that does not work.
+    """
+
+    class _Signer:
+        """Stands in for the transaction protein, which owns the EVM key."""
+
+        def __init__(self, account: object | None = None, fail: bool = False) -> None:
+            self.account = account
+            self.fail = fail
+
+        def get_name(self) -> str:
+            return "transaction"
+
+        async def execute(self, intent: str, params: dict) -> Observation:
+            if self.fail:
+                raise RuntimeError("hardware wallet unplugged")
+            payload = params["payload"]
+            sig = self.account.sign_message(encode_typed_data(full_message=payload))
+            return Observation(
+                success=True,
+                metadata=make_struct(
+                    {"signer": self.account.address, "signature": sig.signature.hex()}
+                ),
+            )
+
+    def membrane_with(self, signer: object | None) -> HiveMembrane:
+        registry = SkillRegistry()
+        guard = GuardSkill()
+        guard.bind(_Safety(), OutputGuard(safety_settings=_Safety()))
+        registry.register(guard.get_name(), guard)
+        if signer is not None:
+            registry.register(signer.get_name(), signer)
+        return HiveMembrane(registry=registry)
+
+    @pytest.mark.asyncio
+    async def test_a_signed_receipt_verifies_and_is_attested(self) -> None:
+        account = Account.create()
+        membrane = self.membrane_with(self._Signer(account))
+
+        decision = await membrane.inspect_outbound(
+            counter_intent(price=500.0), negotiation_context()
+        )
+
+        result = verify(decision.receipt)
+        assert result.ok, result.failures
+        assert result.attested
+        assert decision.receipt.signature.signer == account.address
+
+    @pytest.mark.asyncio
+    async def test_no_signer_means_an_unsigned_receipt_that_says_so(self) -> None:
+        """
+        Not an error. A deployment with no key still produces a usable record;
+        it just cannot be attributed, and the version name is where that is
+        stated rather than left for the reader to infer.
+        """
+        decision = await self.membrane_with(None).inspect_outbound(
+            counter_intent(price=500.0), negotiation_context()
+        )
+
+        result = verify(decision.receipt)
+        assert result.ok
+        assert not result.attested
+        assert "UNSIGNED" in decision.receipt.version
+
+    @pytest.mark.asyncio
+    async def test_a_failing_signer_does_not_cost_the_decision(self) -> None:
+        """
+        The decision has already been made and is safe by the time signing is
+        attempted. Losing it because a key was unreachable would trade the
+        guarantee for the attestation, which is the wrong way round.
+        """
+        membrane = self.membrane_with(self._Signer(fail=True))
+
+        decision = await membrane.inspect_outbound(
+            counter_intent(price=500.0), negotiation_context()
+        )
+
+        assert decision.receipt.outcome == DecisionOutcome.DECISION_OUTCOME_OVERRIDE
+        assert decision.negotiation.price != 500.0
+        assert "UNSIGNED" in decision.receipt.version
+
+    @pytest.mark.asyncio
+    async def test_signing_covers_the_emitted_price_not_the_proposed_one(self) -> None:
+        """
+        The attestation has to be over what was sent. Signing the model's
+        proposal would attest to a document the counterparty never received.
+        """
+        account = Account.create()
+        membrane = self.membrane_with(self._Signer(account))
+
+        decision = await membrane.inspect_outbound(
+            counter_intent(price=500.0), negotiation_context()
+        )
+
+        assert verify(decision.receipt).attested
+        assert decision.receipt.claim_hash != decision.receipt.emission_hash
+
+
+class TestNothingInAttestationCanCostTheDecision:
+    """
+    `_attest` promises that a decision survives any failure to sign it. That
+    promise should hold structurally, not because someone audited each line.
+
+    The chain id was read outside the try block. It could not actually raise —
+    `Settings.crypto` is a pydantic field with a default factory, so it is never
+    absent, and `getattr(None, ..., 0)` returns the default rather than raising.
+    But a property that holds only under analysis stops holding the moment
+    someone edits the line, and there is nothing to catch that.
+    """
+
+    @pytest.mark.asyncio
+    async def test_settings_without_crypto_still_emit_the_decision(self) -> None:
+        membrane = guarded_membrane()
+
+        class _NoCrypto:
+            """Settings as a stub might supply them: no crypto section at all."""
+
+            safety = _Safety()
+
+        membrane.settings = _NoCrypto()
+
+        decision = await membrane.inspect_outbound(
+            counter_intent(price=500.0), negotiation_context()
+        )
+
+        assert decision.receipt.outcome == DecisionOutcome.DECISION_OUTCOME_OVERRIDE
+        assert decision.negotiation.price != 500.0
+
+    @pytest.mark.asyncio
+    async def test_a_broken_logger_does_not_cost_the_decision(self) -> None:
+        """
+        The same rule `_record_intervention` already follows, applied to the
+        receipt log line: reporting on a decision must never take that decision
+        down. A log call that raises would lose the negotiation for a sentence
+        nobody was going to read at the time.
+        """
+        membrane = guarded_membrane()
+
+        with patch(
+            "aura_hive.hive.membrane.main.logger.info",
+            side_effect=RuntimeError("log sink is gone"),
+        ):
+            decision = await membrane.inspect_outbound(
+                counter_intent(price=500.0), negotiation_context()
+            )
+
+        assert decision.receipt.outcome == DecisionOutcome.DECISION_OUTCOME_OVERRIDE
+        assert decision.negotiation.price != 500.0
+        assert decision.receipt.canonical_prefix != ""
