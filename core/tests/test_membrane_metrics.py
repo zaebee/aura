@@ -153,7 +153,9 @@ class TestFailSafe:
             )
 
         assert "Membrane Override" in decision.reasoning
-        assert decision.negotiation.price == 1050.0
+        # 1000 / (1 - 0.1): the guard's single substitute-price formula,
+        # transitional until Task 3 replaces it with the real `safe_offer`.
+        assert decision.negotiation.price == pytest.approx(1111.11)
 
 
 class TestSeriesShape:

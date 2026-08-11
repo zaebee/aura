@@ -140,11 +140,7 @@ class OutputGuard:
         # Refuse to run against a rule set that does not describe this engine.
         # Doing it here rather than at import time means a bad rule set fails
         # where it can be attributed, and a test can supply its own.
-        self.ruleset.validate_against(set(self.gate_ids()))
-
-        self._safe_price_strategies = {
-            gate.code: gate.safe_price for gate in self.ruleset.gates
-        }
+        self.ruleset.validate_against(set(self.gate_ids()), set(self.clause_ids()))
 
     # Gate id -> the predicate that decides it. The ids are the contract with
     # ruleset.yaml: `Ruleset.validate_against(gate_ids())` refuses to run if the
@@ -218,6 +214,11 @@ class OutputGuard:
     def gate_ids(cls) -> tuple[str, ...]:
         """The gates this engine can evaluate, for cross-checking the rule set."""
         return tuple(cls._MESSAGES)
+
+    @classmethod
+    def clause_ids(cls) -> tuple[str, ...]:
+        """The post-condition clauses this engine can evaluate."""
+        return ("PSI_PRICE_POSITIVE", "PSI_ABOVE_FLOOR", "PSI_MIN_MARGIN")
 
     def _predicate(self, gate_id: str) -> Callable[[dict, dict], bool]:
         return {
@@ -313,20 +314,18 @@ class OutputGuard:
 
     def calculate_safe_price(self, context: dict, reason: str) -> float:
         """
-        Deterministic substitute price, by the strategy the firing gate declared.
+        Deterministic substitute price for the one strategy the rule set declares.
 
         `reason` is a gate code where one fired, but not always: the Membrane
         passes FAILURE_RECOVERY when the Transformer itself blew up, and no gate
-        was involved. Anything the rule set does not name gets the floor markup.
+        was involved. It is unused here — transitionally: this restores the old
+        margin-only formula so the module keeps compiling after the strategy
+        collapse. Task 3 replaces this body with the real `safe_offer`
+        computation (Decimal, ceiling, cost floor, jitter).
         """
         floor = _numeric(context, "floor_price")
-        strategy = self._safe_price_strategies.get(reason, "floor_markup")
-
-        if strategy == "margin":
-            min_m = self._configured_margin()
-            return float(round(floor / (1 - min_m), 2))
-
-        return float(round(floor * _FLOOR_MARKUP, 2))
+        min_m = self._configured_margin()
+        return float(round(floor / (1 - min_m), 2))
 
     def validate_transaction(
         self,

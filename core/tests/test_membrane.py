@@ -20,7 +20,11 @@ from aura_hive.hive.proteins.guard import GuardSkill
 @pytest.mark.asyncio
 async def test_membrane_rule1_floor_price_override():
     """
-    Rule 1: If price < floor_price, override to counter-offer at floor_price + 5%.
+    Rule 1: If price < floor_price, override to a guard-computed counter-offer.
+
+    The substitute price is currently floor / (1 - min_profit_margin) — the
+    single, transitional formula every gate shares since the strategy
+    collapse (Task 3 replaces this with the real `safe_offer` computation).
     """
     from aura_hive.config.policy import SafetySettings
     from aura_hive.hive.proteins.guard.engine import OutputGuard
@@ -51,7 +55,7 @@ async def test_membrane_rule1_floor_price_override():
     safe_decision = await membrane.inspect_outbound(decision, context)
 
     assert safe_decision.action == ActionType.ACTION_TYPE_COUNTER
-    assert safe_decision.negotiation.price == 105.0  # 100 * 1.05
+    assert safe_decision.negotiation.price == pytest.approx(111.11)  # 100 / (1 - 0.1)
     assert "FLOOR_PRICE_VIOLATION" in safe_decision.reasoning
     assert safe_decision.metadata.to_dict()["original_price"] == "95.0"
 
@@ -134,7 +138,7 @@ async def test_membrane_combined_violations():
     safe_decision = await membrane.inspect_outbound(decision, context)
 
     assert safe_decision.action == ActionType.ACTION_TYPE_COUNTER
-    assert safe_decision.negotiation.price == 105.0
+    assert safe_decision.negotiation.price == pytest.approx(111.11)  # 100 / (1 - 0.1)
     assert "floor_price" not in safe_decision.negotiation.message.lower()
     assert "FLOOR_PRICE_VIOLATION" in safe_decision.reasoning
     assert "DLP block" in safe_decision.reasoning

@@ -27,18 +27,23 @@ from aura_hive.hive.proteins.guard.ruleset import (
 MINIMAL = {
     "family": "guard/negotiation",
     "version": "1.0.0",
+    "safe_price": "safe_offer",
+    "postcondition": {
+        "id": "PSI_TEST",
+        "clauses": [
+            {"id": "C1", "expr": "price > 0", "consumes": ["price"]},
+        ],
+    },
     "gates": [
         {
             "id": "G1_A",
             "code": "A_FAILED",
             "consumes": ["price"],
-            "safe_price": "margin",
         },
         {
             "id": "G2_B",
             "code": "B_FAILED",
             "consumes": ["price"],
-            "safe_price": "floor_markup",
         },
     ],
 }
@@ -116,7 +121,7 @@ class TestFailClosed:
         ruleset = ruleset_from_mapping(MINIMAL)
 
         with pytest.raises(RulesetError, match="G2_B"):
-            ruleset.validate_against({"G1_A"})
+            ruleset.validate_against({"G1_A"}, {"C1"})
 
     def test_an_implemented_gate_the_ruleset_omits_is_rejected(self) -> None:
         """
@@ -126,11 +131,11 @@ class TestFailClosed:
         ruleset = ruleset_from_mapping(MINIMAL)
 
         with pytest.raises(RulesetError, match="G3_C"):
-            ruleset.validate_against({"G1_A", "G2_B", "G3_C"})
+            ruleset.validate_against({"G1_A", "G2_B", "G3_C"}, {"C1"})
 
     def test_a_matching_set_is_accepted(self) -> None:
         ruleset = ruleset_from_mapping(MINIMAL)
-        ruleset.validate_against({"G1_A", "G2_B"})
+        ruleset.validate_against({"G1_A", "G2_B"}, {"C1"})
 
     def test_a_duplicate_gate_id_is_rejected(self) -> None:
         """Two gates with one id make the recorded reason ambiguous."""
@@ -139,13 +144,6 @@ class TestFailClosed:
 
         with pytest.raises(RulesetError, match="G1_A"):
             ruleset_from_mapping(dupe)
-
-    def test_an_unknown_safe_price_strategy_is_rejected(self) -> None:
-        bad = json.loads(json.dumps(MINIMAL))
-        bad["gates"][0]["safe_price"] = "guess"
-
-        with pytest.raises(RulesetError, match="guess"):
-            ruleset_from_mapping(bad)
 
     @pytest.mark.parametrize("missing", ["family", "version", "gates"])
     def test_a_missing_top_level_key_is_rejected(self, missing: str) -> None:
@@ -221,16 +219,6 @@ class TestShippedRuleset:
 
         assert ids.index("G2_FLOOR_VIOLATION") < ids.index("G3_SETTINGS_PRESENT")
 
-    def test_the_fail_closed_gate_asks_for_the_conservative_safe_price(self) -> None:
-        """
-        A deployment that cannot read its own margin setting should not answer
-        with the cheaper of the two formulas. `margin` yields floor/(1-m),
-        above the floor markup, so misconfiguration errs toward the seller.
-        """
-        gate = {g.id: g for g in load_ruleset().gates}["G3_SETTINGS_PRESENT"]
-
-        assert gate.safe_price == "margin"
-
     def test_the_shipped_version_string_is_the_pinned_one(self) -> None:
         """
         A change detector, deliberately.
@@ -242,7 +230,7 @@ class TestShippedRuleset:
         semver and only notice the digest afterwards.
         """
         assert (
-            load_ruleset().version_string == "guard/negotiation@1.0.0+46cc0e38ca4f895c"
+            load_ruleset().version_string == "guard/negotiation@2.0.0+6b8b5d6db3e6e351"
         )
 
     def test_every_shipped_gate_declares_what_it_consumes(self) -> None:
@@ -252,3 +240,140 @@ class TestShippedRuleset:
         """
         for gate in load_ruleset().gates:
             assert isinstance(gate.consumes, tuple)
+
+
+class TestPostcondition:
+    """
+    What the rule set guarantees, as opposed to which rules it applies.
+
+    The gates say what was checked; psi says what the checking was for. Without
+    it `ruleset_version` names a set of rules and nobody has stated what holds
+    when they pass — which is how a below-margin override price shipped under a
+    receipt that verified.
+    """
+
+    def test_the_postcondition_is_parsed_with_its_clauses(self) -> None:
+        ruleset = load_ruleset()
+        assert ruleset.postcondition.id == "PSI_NEGOTIATION_V1"
+        assert [c.id for c in ruleset.postcondition.clauses] == [
+            "PSI_PRICE_POSITIVE",
+            "PSI_ABOVE_FLOOR",
+            "PSI_MIN_MARGIN",
+        ]
+
+    def test_the_margin_clause_is_multiplicative(self) -> None:
+        """
+        The ratio form is not decidable in binary floats on money: where the
+        price is exactly right, (price - cost)/price evaluates to
+        0.09999999999999995 against 0.1. psi is fail-closed, so that artefact
+        costs a live negotiation.
+        """
+        ruleset = load_ruleset()
+        clause = next(
+            c for c in ruleset.postcondition.clauses if c.id == "PSI_MIN_MARGIN"
+        )
+        assert "/" not in clause.expr
+        assert clause.expr == "price * (1 - min_profit_margin) >= internal_cost"
+
+    def test_editing_a_clause_changes_the_digest(self) -> None:
+        """
+        psi is part of what the rule set promises, so a receipt citing a version
+        must cite a different one when the promise changes.
+        """
+        base = load_ruleset()
+        edited = {
+            "family": base.family,
+            "version": base.version,
+            "safe_price": base.safe_price,
+            "postcondition": {
+                "id": base.postcondition.id,
+                "clauses": [
+                    {"id": c.id, "expr": c.expr + " ", "consumes": list(c.consumes)}
+                    for c in base.postcondition.clauses
+                ],
+            },
+            "gates": [
+                {"id": g.id, "code": g.code, "consumes": list(g.consumes)}
+                for g in base.gates
+            ],
+        }
+        assert ruleset_from_mapping(edited).digest != base.digest
+
+    def test_a_missing_postcondition_is_refused(self) -> None:
+        without = {
+            "family": "guard/negotiation",
+            "version": "2.0.0",
+            "safe_price": "safe_offer",
+            "gates": [{"id": "G1", "code": "C1", "consumes": []}],
+        }
+        with pytest.raises(RulesetError, match="postcondition"):
+            ruleset_from_mapping(without)
+
+
+class TestStrategyCollapse:
+    """
+    One substitute strategy, declared once for the set.
+
+    Two strategies whose guarantees are indistinguishable is the crack the
+    below-margin price came through: G2 fired, short-circuited G4, and the
+    floor-markup substitute was never judged against the margin rule.
+    """
+
+    def test_the_strategy_is_declared_once_for_the_set(self) -> None:
+        ruleset = load_ruleset()
+        assert ruleset.safe_price == "safe_offer"
+        assert not any(hasattr(gate, "safe_price") for gate in ruleset.gates)
+
+    def test_a_per_gate_strategy_is_refused_not_ignored(self) -> None:
+        """
+        Rejected rather than ignored on purpose: a per-gate `safe_price` key is
+        exactly what a stale pre-collapse ruleset.yaml still carries, and
+        ignoring it would load a file describing two strategies into an engine
+        that implements one.
+        """
+        stale = {
+            "family": "guard/negotiation",
+            "version": "2.0.0",
+            "safe_price": "safe_offer",
+            "postcondition": {
+                "id": "P",
+                "clauses": [{"id": "C", "expr": "x", "consumes": []}],
+            },
+            "gates": [
+                {"id": "G1", "code": "C1", "consumes": [], "safe_price": "margin"}
+            ],
+        }
+        with pytest.raises(RulesetError, match="safe_price"):
+            ruleset_from_mapping(stale)
+
+    def test_an_unknown_set_strategy_is_refused(self) -> None:
+        unknown = {
+            "family": "guard/negotiation",
+            "version": "2.0.0",
+            "safe_price": "floor_markup",
+            "postcondition": {
+                "id": "P",
+                "clauses": [{"id": "C", "expr": "x", "consumes": []}],
+            },
+            "gates": [{"id": "G1", "code": "C1", "consumes": []}],
+        }
+        with pytest.raises(RulesetError, match="safe_offer"):
+            ruleset_from_mapping(unknown)
+
+
+class TestClauseCrossCheck:
+    def test_an_undeclared_clause_predicate_is_refused(self) -> None:
+        ruleset = load_ruleset()
+        declared = {c.id for c in ruleset.postcondition.clauses}
+        with pytest.raises(RulesetError, match="not declared"):
+            ruleset.validate_against(
+                {g.id for g in ruleset.gates}, declared | {"PSI_INVENTED"}
+            )
+
+    def test_a_clause_with_no_predicate_is_refused(self) -> None:
+        ruleset = load_ruleset()
+        declared = {c.id for c in ruleset.postcondition.clauses}
+        with pytest.raises(RulesetError, match="not implemented"):
+            ruleset.validate_against(
+                {g.id for g in ruleset.gates}, declared - {"PSI_MIN_MARGIN"}
+            )

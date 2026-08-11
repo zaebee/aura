@@ -110,32 +110,39 @@ class TestDeclarationMatchesImplementation:
         but not implemented never fires while the rule set says it does; one
         implemented but not declared runs outside anything a receipt records.
         """
-        load_ruleset().validate_against(set(OutputGuard.gate_ids()))
+        load_ruleset().validate_against(
+            set(OutputGuard.gate_ids()), set(OutputGuard.clause_ids())
+        )
 
     def test_an_engine_missing_a_declared_gate_is_rejected(self) -> None:
         with pytest.raises(RulesetError, match="G4_MARGIN_VIOLATION"):
             load_ruleset().validate_against(
-                set(OutputGuard.gate_ids()) - {"G4_MARGIN_VIOLATION"}
+                set(OutputGuard.gate_ids()) - {"G4_MARGIN_VIOLATION"},
+                set(OutputGuard.clause_ids()),
             )
 
 
 class TestSafePriceStrategy:
-    def test_the_margin_gate_prices_above_the_floor_markup(self) -> None:
+    def test_the_reason_no_longer_selects_a_formula(self) -> None:
         """
-        floor/(1-m) against floor*1.05: the two formulas are not interchangeable,
-        which is why the gate declares which one applies.
+        The strategy is declared once for the set now (ruleset.yaml
+        `safe_price: safe_offer`), not per gate, so which gate fired no longer
+        changes which formula prices the substitute. Transitional: this is the
+        old `margin` formula standing in for every reason until Task 3 replaces
+        it with the real `safe_offer` computation.
         """
         engine = guard(_Safety())
 
         margin_price = engine.calculate_safe_price(context(), "MIN_MARGIN_VIOLATION")
         markup_price = engine.calculate_safe_price(context(), "FLOOR_PRICE_VIOLATION")
 
-        assert margin_price > markup_price
+        assert margin_price == markup_price
 
-    def test_missing_settings_gets_the_conservative_formula(self) -> None:
+    def test_missing_settings_gets_the_same_formula(self) -> None:
         """
-        G3 declares `safe_price: margin` precisely so a misconfigured deployment
-        does not answer with the cheaper number.
+        Every reason prices the same way now that the strategy is set-wide, so
+        a misconfigured deployment does not answer with a cheaper number by
+        virtue of which gate happened to fire.
         """
         engine = guard(_Safety())
 
@@ -143,14 +150,16 @@ class TestSafePriceStrategy:
             context(), "SETTINGS_MISSING"
         ) == engine.calculate_safe_price(context(), "MIN_MARGIN_VIOLATION")
 
-    def test_an_unrecognised_reason_falls_back_to_the_floor_markup(self) -> None:
+    def test_an_unrecognised_reason_still_yields_a_price(self) -> None:
         """
         Callers pass reasons the rule set does not name — FAILURE_RECOVERY comes
-        from the Membrane, not from a gate — and those still need a price.
+        from the Membrane, not from a gate — and those still need a price. There
+        is one formula now, so an unrecognised reason gets the same answer as
+        every other.
         """
         assert guard(_Safety()).calculate_safe_price(
             context(), "FAILURE_RECOVERY"
-        ) == pytest.approx(1050.0)
+        ) == pytest.approx(1111.11)
 
 
 class TestSafePriceNeverUndercutsTheFloor:
