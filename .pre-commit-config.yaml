@@ -13,15 +13,33 @@ repos:
         exclude: ^deploy/.*/templates/.*\.yaml$  # Exclude Helm templates
       - id: check-added-large-files
 
-  - repo: https://github.com/astral-sh/ruff-pre-commit
-    rev: v0.8.0
-    hooks:
-      - id: ruff
-        args: [--fix, --exit-non-zero-on-fix]
-      - id: ruff-format
-
   - repo: local
     hooks:
+      # The workspace's ruff, not a second copy pinned here.
+      #
+      # This used to be the upstream hook at rev v0.8.0 while `make format` and
+      # `make lint` ran whatever `ruff>=0.8.0` resolved to — 0.14 — and the two
+      # format the same code differently. They took turns rewriting each other:
+      # formatting locally then committing made the hook revert those lines and
+      # abort, and a `ruff format` run reached files the author had not touched,
+      # dragging unrelated churn into feature branches. CI never noticed,
+      # because `make lint` checked lint rules and not formatting.
+      #
+      # One ruff, resolved from the lockfile, so there is no second version to
+      # remember to bump and nothing for it to disagree with. Same reasoning as
+      # the mypy hook below, which is `language: system` for its own reasons.
+      - id: ruff
+        name: ruff
+        language: system
+        entry: uv run ruff check --fix --exit-non-zero-on-fix
+        types: [python]
+
+      - id: ruff-format
+        name: ruff-format
+        language: system
+        entry: uv run ruff format
+        types: [python]
+
       - id: mypy
         name: mypy
         # Each package needs its own isolated MYPYPATH (see Makefile mypy target).
