@@ -1,4 +1,5 @@
 import json
+from pathlib import Path
 
 from config import EvolverSettings
 from hive.connector import EvolverConnector
@@ -39,7 +40,7 @@ def test_writer_appends_and_creates_parent_dir(tmp_path):
     connector.write_metabolic_record(_record("cycle-1"))
     connector.write_metabolic_record(_record("cycle-2"))
 
-    lines = open(settings.metabolism_log, encoding="utf-8").read().splitlines()
+    lines = Path(settings.metabolism_log).read_text(encoding="utf-8").splitlines()
     assert len(lines) == 2
     assert json.loads(lines[0])["cycle_id"] == "cycle-1"
     assert json.loads(lines[1])["cycle_id"] == "cycle-2"

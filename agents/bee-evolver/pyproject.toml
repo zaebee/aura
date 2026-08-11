@@ -37,3 +37,19 @@ dev = [
 pythonpath = ["src"]
 testpaths = ["tests"]
 asyncio_mode = "auto"
+
+# An unclosed file is a test failure here, not a warning nobody reads.
+#
+# These suites read their fixtures with bare `open(...)`, which CPython's
+# refcounting closed promptly enough that nothing ever noticed — a correctness
+# that rests on an implementation detail rather than on the language. Both
+# suites are clean, so this costs nothing today and catches the next one.
+filterwarnings = [
+    "error::ResourceWarning",
+    # The one that actually bites. A ResourceWarning is raised during garbage
+    # collection, where an exception cannot propagate, so pytest converts it
+    # into this instead — and erroring on ResourceWarning alone leaves the run
+    # green with a warning nobody reads. Verified by reintroducing a bare
+    # `open(...)` and watching it fail.
+    "error::pytest.PytestUnraisableExceptionWarning",
+]
