@@ -1,4 +1,5 @@
 import json
+from pathlib import Path
 from types import SimpleNamespace
 
 from aura_keeper.config import KeeperSettings
@@ -78,6 +79,6 @@ def test_cycle_writes_a_record(tmp_path):
         )
     )
 
-    record = json.loads(open(settings.metabolism_log, encoding="utf-8").read())
+    record = json.loads(Path(settings.metabolism_log).read_text(encoding="utf-8"))
     assert record["bee"] == "keeper"
     assert record["git_sha"] == "abc1234"

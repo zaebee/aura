@@ -1,4 +1,5 @@
 import json
+from pathlib import Path
 
 import pytest
 
@@ -18,13 +19,13 @@ def _settings(tmp_path) -> EvolverSettings:
 
 
 def _read_record(path):
-    lines = open(path, encoding="utf-8").read().splitlines()
+    lines = Path(path).read_text(encoding="utf-8").splitlines()
     assert len(lines) == 1
     return json.loads(lines[0])
 
 
 def _read_records(path):
-    return [json.loads(x) for x in open(path, encoding="utf-8").read().splitlines()]
+    return [json.loads(x) for x in Path(path).read_text(encoding="utf-8").splitlines()]
 
 
 async def test_transformer_failure_still_writes_a_record(tmp_path, monkeypatch):
