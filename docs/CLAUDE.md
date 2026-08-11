@@ -156,6 +156,50 @@ The ATCG-M pattern is **fully realized only in `core`**. Around it:
 When adding code, push toward the invariants (import the Genome, keep proteins
 single-purpose, use biological names) rather than reinforcing the drift.
 
+## betterproto: absence is not `None`
+
+Generated messages (`aura_core_gen`) use betterproto, whose treatment of unset
+fields catches everyone — one real bug and four false alarms in a single
+afternoon of reviews. **Three kinds of field behave three different ways, and
+the two obvious tests for absence disagree with each other.** Verified against
+the version in this workspace; re-check before trusting it after an upgrade.
+
+```python
+Observation().metadata is None    # False — default-constructed on ACCESS
+bool(Observation().metadata)      # False — Message defines __bool__
+Observation(metadata=None).metadata is None   # True — explicit None really is None
+```
+
+| what you write | what happens |
+|---|---|
+| `if msg.field is not None:` | **always true** for a message field — dead code |
+| `if msg.field:` | works: an all-default message is falsy |
+| `msg.field.to_dict()` | safe unless someone passed `field=None` explicitly |
+
+**Rules of thumb:**
+
+- **Test absence by value, never by identity.** `if not receipt.version`, not
+  `if receipt is None`. An identity check on a message field never fires, and
+  the failure is silent — in #265 every receipt-less response rendered a JSON
+  object full of empty strings because `if receipt is None` was dead code.
+- **Oneof members behave differently again — they raise.** Reading one that is
+  not the member currently set is an `AttributeError`, not `None`:
+
+  ```python
+  Intent().negotiation            # AttributeError: 'params' is set to None, not 'negotiation'
+  intent_with_negotiation.audit   # AttributeError: 'params' is set to 'negotiation', not 'audit'
+  betterproto.which_one_of(Intent(), "params")   # ('', None) — the safe read
+  ```
+
+  So `which_one_of()` is mandatory rather than idiomatic. Reading a member
+  directly is fine only where you have already established it is the one set.
+- **A truthiness check is not a value check.** `bool(receipt.signature)` is
+  `False` for an unset signature but `True` for one carrying a scheme and no
+  signature. If the field has a load-bearing member, check that member.
+- Guarding a `.to_dict()` against `None` is defensible on a shared helper, but
+  say in a comment that it cannot currently fire — otherwise the next reader
+  takes it for a fix to a live fault.
+
 ## Important Notes
 
 - Python **3.12+**, package manager **`uv`**.
