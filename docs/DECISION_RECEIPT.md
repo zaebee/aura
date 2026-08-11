@@ -105,6 +105,47 @@ stripped — they are prose and must not enter the hash, or determinism dies. Th
 downgrade from VISION's Layer 1 and the main thing that would have to be built to claim the
 "neuro-symbolic" label rather than "attested guard".
 
+**That downgrade has a compensating side, and it is worth stating because it explains why the rest
+of this document was cheap to build.** Tuan & Sanyal (2026), *Ontology-Constrained Neural Reasoning
+in Enterprise Agentic Systems* (arXiv:2604.00555), survey enterprise agent platforms and find that
+they constrain agent **inputs** — context assembly, tool discovery, governance gates — but do not
+validate **outputs** against the same definitions, so an agent can receive perfect context and still
+emit a constraint-violating answer. They call this *asymmetric neurosymbolic coupling* and rank it
+on a maturity scale:
+
+| level | what the ontology does |
+|---|---|
+| L1 | supplies prompt context (input side) |
+| L2 | filters which tools are available |
+| L3 | gates approvals during execution |
+| **L4** | **validates the output after generation** |
+| L5 | closed loop: also evolves from experience |
+
+Their own production platform — 650+ agents across 22 verticals — runs at L2–L3. L4 is described as
+"the primary research frontier and is not yet implemented".
+
+The Membrane is L4: `inspect_outbound` judges what the Transformer produced, after it produced it.
+The receipt goes a step past their L4 sketch by recording *which* rules judged it and signing that.
+
+**Why it was tractable here and is a research problem there** is the interesting part, and it is the
+flip side of not having a constraint graph. Their proposed L4 validates *free text* — checking that
+terms, metrics and regulatory claims in a natural-language answer are defined in the ontology — and
+their own threats-to-validity section concedes the difficulty: it "requires translating free-text LLM
+outputs into OWL-compatible representations — itself an error-prone process".
+
+Our Transformer does not emit prose to be judged. It emits a typed `Intent`, and the canonical form
+above deliberately strips the prose it does carry. **There is no translation step to get wrong**, so
+the validation that paper positions as a frontier is, in this shape, ordinary work. That is a
+property of the domain rather than a cleverness: a negotiation decision reduces to an action and a
+price, where a clinical or regulatory answer does not.
+
+One of their empirical findings points the same way. Ontological grounding helps most where the
+model's parametric knowledge is weakest — they measure roughly double the lift on
+Vietnamese-localised domains versus English ones. Hidden floor prices, our own rule set and the
+receipt format are all things no model can know from its weights, which is the regime where this
+kind of layer earns its keep. Caveat on their numbers: 1,800 runs across three models with large
+effect sizes, but scored by an LLM judge rather than domain experts, and measured on one platform.
+
 ### 3.3 `ruleset-version`
 
 **Implemented.** `guard/negotiation@1.0.0+46cc0e38ca4f895c` — family, semver, and a digest over the
