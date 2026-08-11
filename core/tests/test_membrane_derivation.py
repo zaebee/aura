@@ -244,6 +244,16 @@ class TestAGuardThatReportsNothingUsable:
             return "guard"
 
         async def execute(self, intent: str, params: dict) -> Observation:
+            # The Membrane also asks this double to check the post-condition on
+            # what it is about to emit. These tests are about validate_decision
+            # reporting metadata the Membrane cannot use, not about psi, so
+            # report a clean hold here rather than have that second question
+            # decide an outcome these tests were not written to describe.
+            if intent == "check_postcondition":
+                return Observation(
+                    success=True,
+                    metadata=make_struct({"holds": True, "failed_clause": ""}),
+                )
             return self._observation
 
     def membrane_reporting(self, observation: Observation) -> HiveMembrane:

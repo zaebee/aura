@@ -89,6 +89,7 @@ def _record_intervention(direction: str, reason: str, **fields: Any) -> None:
 _EMIT = cast(DecisionOutcome, DecisionOutcome.DECISION_OUTCOME_EMIT)
 _OVERRIDE = cast(DecisionOutcome, DecisionOutcome.DECISION_OUTCOME_OVERRIDE)
 _REFUSE = cast(DecisionOutcome, DecisionOutcome.DECISION_OUTCOME_REFUSE)
+_UNAVAILABLE = cast(DecisionOutcome, DecisionOutcome.DECISION_OUTCOME_UNAVAILABLE)
 
 
 @dataclass
@@ -198,6 +199,21 @@ def _replacing(original: Intent, replacement: Intent) -> Intent:
         replacement.metadata = make_struct(merged)
 
     return replacement
+
+
+def _rejection() -> Intent:
+    """
+    What leaves when the post-condition did not hold.
+
+    Deliberately carries no price and no reason the counterparty can read: the
+    decision was stopped because we could not establish our own guarantee, and
+    saying which clause failed would describe the policy boundary to the party
+    the policy exists to hold at arm's length.
+    """
+    return Intent(
+        action=cast(ActionType, ActionType.ACTION_TYPE_REJECT),
+        reasoning="Membrane: post-condition not established",
+    )
 
 
 def _is_signed(receipt: DecisionReceipt) -> bool:
@@ -331,6 +347,51 @@ class HiveMembrane(Membrane[Any, Intent, Context]):
             return receipt
 
         return signed(receipt, signer=signer, signature=signature, chain_id=chain_id)
+
+    async def _postcondition_holds(
+        self, price: float, guard_context: dict[str, Any], verdict: _Verdict
+    ) -> bool:
+        """
+        Whether the value about to be sent satisfies what the rule set promises.
+
+        Fails closed on every path that is not an explicit pass, including a
+        guard that could not be reached: a post-condition nobody evaluated has
+        not been established, and this is the last checkpoint before the wire.
+
+        Deliberately no `if not self.registry: return True` early exit. An
+        unwired Membrane is exactly the unreachable-guard case this fails
+        closed on, not an exemption from it — the fallback that motivated this
+        method (`floor_price * 1.05` at the two `_override_with_safe_offer`
+        call sites) is reached precisely when the guard could not be asked, and
+        letting an unjudged price through there is the bug this closes.
+        """
+        if self.registry is None:
+            logger.error("membrane_postcondition_unreachable", error="no guard wired")
+            verdict.record(_UNAVAILABLE, "POSTCONDITION_VIOLATION")
+            return False
+
+        try:
+            obs = await self.registry.execute(
+                "guard",
+                "check_postcondition",
+                {"emission": {"price": price}, "context": guard_context},
+            )
+        except Exception as exc:
+            logger.error("membrane_postcondition_unreachable", error=str(exc))
+            verdict.record(_UNAVAILABLE, "POSTCONDITION_VIOLATION")
+            return False
+
+        meta = obs.metadata.to_dict() if obs.metadata is not None else {}
+        if obs.success and bool(meta.get("holds")):
+            return True
+
+        logger.error(
+            "membrane_postcondition_violated",
+            clause=str(meta.get("failed_clause") or ""),
+            price=price,
+        )
+        verdict.record(_UNAVAILABLE, "POSTCONDITION_VIOLATION")
+        return False
 
     async def inspect_inbound(self, signal: Any) -> Any:
         from aura_core_gen.aura.core.v1 import Signal
@@ -513,6 +574,12 @@ class HiveMembrane(Membrane[Any, Intent, Context]):
 
         # 1. Handle explicit failures
         if decision.action == ActionType.ACTION_TYPE_ERROR:
+            # Same default as the guard block below: an unspecified cost reads
+            # as the floor rather than as free, so a context that never
+            # supplied one does not vacuously satisfy the margin clause.
+            internal_cost = _context_number(ctx_meta, "internal_cost", floor_price)
+            guard_context = {"floor_price": floor_price, "internal_cost": internal_cost}
+
             safe_price = floor_price * 1.05
             if self.registry:
                 obs_safe = await self.registry.execute(
@@ -529,7 +596,7 @@ class HiveMembrane(Membrane[Any, Intent, Context]):
                     )
 
             return await self._override_with_safe_offer(
-                decision, safe_price, "FAILURE_RECOVERY", verdict, claim
+                decision, safe_price, "FAILURE_RECOVERY", verdict, guard_context, claim
             )
 
         # 2. DLP Check
@@ -618,7 +685,12 @@ class HiveMembrane(Membrane[Any, Intent, Context]):
             safe_price = float(str(obs_meta.get("safe_price", safe_price)))
 
             return await self._override_with_safe_offer(
-                decision, safe_price, reason, verdict, claim
+                decision, safe_price, reason, verdict, guard_context, claim
+            )
+
+        if not await self._postcondition_holds(price, guard_context, verdict):
+            return await self._finish(
+                claim, _replacing(decision, _rejection()), verdict
             )
 
         return await self._finish(claim, decision, verdict)
@@ -629,10 +701,16 @@ class HiveMembrane(Membrane[Any, Intent, Context]):
         safe_price: float,
         reason: str,
         verdict: _Verdict,
+        guard_context: dict[str, Any],
         claim: Intent | None = None,
     ) -> Intent:
         _record_intervention("outbound", reason, safe_price=round(safe_price, 2))
         rounded_price = round(safe_price, 2)
+
+        if not await self._postcondition_holds(rounded_price, guard_context, verdict):
+            return await self._finish(
+                claim or original, _replacing(original, _rejection()), verdict
+            )
         params_name, params_value = betterproto.which_one_of(original, "params")
         neg_intent = params_value if params_name == "negotiation" else None
         orig_price = neg_intent.price if neg_intent else 0.0
