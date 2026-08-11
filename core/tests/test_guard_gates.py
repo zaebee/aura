@@ -151,3 +151,79 @@ class TestSafePriceStrategy:
         assert guard(_Safety()).calculate_safe_price(
             context(), "FAILURE_RECOVERY"
         ) == pytest.approx(1050.0)
+
+
+class TestSafePriceNeverUndercutsTheFloor:
+    """
+    The substitute price exists to be safe, so producing one below the floor is
+    the one outcome it must never have.
+
+    `min_profit_margin` is env-configurable and carries no `ge=0` bound, so a
+    negative value is an operator typo away: floor/(1-(-0.5)) is floor/1.5, and
+    a floor of 1000 came back as 666.67. The old guard only rejected margins at
+    or above 1.0, which catches the undefined case and misses this one.
+    """
+
+    @pytest.mark.parametrize("margin", [-0.5, -0.01, 1.0, 1.5])
+    def test_a_margin_outside_the_valid_range_never_prices_below_the_floor(
+        self, margin: float
+    ) -> None:
+        class _Configured:
+            min_profit_margin = margin
+
+        price = guard(_Configured()).calculate_safe_price(
+            context(), "MIN_MARGIN_VIOLATION"
+        )
+
+        assert price >= 1000.0
+
+    def test_a_margin_that_is_not_a_number_still_yields_a_price(self) -> None:
+        """
+        Reached without a gate having run: the Membrane calls this directly on
+        FAILURE_RECOVERY, so a bad setting cannot be assumed already caught.
+        """
+
+        class _Broken:
+            min_profit_margin = None
+
+        price = guard(_Broken()).calculate_safe_price(context(), "SETTINGS_MISSING")
+
+        assert price >= 1000.0
+
+    def test_a_valid_margin_is_still_honoured(self) -> None:
+        """The clamp must not flatten every deployment onto the default."""
+
+        class _Configured:
+            min_profit_margin = 0.50
+
+        assert guard(_Configured()).calculate_safe_price(
+            context(), "MIN_MARGIN_VIOLATION"
+        ) == pytest.approx(2000.0)
+
+
+class TestFailClosedOnIncompleteSettings:
+    def test_a_settings_object_without_the_margin_is_misconfiguration(self) -> None:
+        """
+        G3 exists to catch a deployment that cannot read its own settings, and
+        "present but incomplete" is that case. Before, only `settings is None`
+        counted, so an object missing the field slipped through to G4 and raised
+        AttributeError — which the skill swallowed into a generic
+        SAFETY_VIOLATION, losing the fail-closed reason the gate was for.
+        """
+
+        class _Incomplete:
+            pass
+
+        with pytest.raises(SafetyViolation) as caught:
+            guard(_Incomplete()).validate_decision(decision(price=2000.0), context())
+
+        assert caught.value.code == "SETTINGS_MISSING"
+
+    def test_a_settings_object_with_a_null_margin_is_misconfiguration(self) -> None:
+        class _Null:
+            min_profit_margin = None
+
+        with pytest.raises(SafetyViolation) as caught:
+            guard(_Null()).validate_decision(decision(price=2000.0), context())
+
+        assert caught.value.code == "SETTINGS_MISSING"

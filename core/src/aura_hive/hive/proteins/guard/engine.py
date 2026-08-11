@@ -14,6 +14,11 @@ logger = structlog.get_logger(__name__)
 # fallback rather than a policy dial, so it belongs with the rules.
 _FLOOR_MARKUP = 1.05
 
+# Used when the configured margin cannot be read or is out of range. Matches
+# the default on SafetySettings, so a deployment that loses its setting behaves
+# like one that never overrode it.
+_DEFAULT_MARGIN = 0.1
+
 
 class SafetyViolation(Exception):
     """
@@ -81,8 +86,16 @@ class OutputGuard:
 
     def _gate_settings_present(self, decision: dict, context: dict) -> bool:
         # DNA Rule: Safety Guard must "Fail-Closed" if misconfigured.
+        #
+        # "Present but incomplete" is misconfiguration too. Checking only that
+        # settings exist let an object without the field through to G4, where
+        # the AttributeError was swallowed into a generic SAFETY_VIOLATION —
+        # losing the fail-closed reason this gate exists to report.
         if not self.settings:
             logger.error("guard_settings_missing_fail_closed")
+            return False
+        if getattr(self.settings, "min_profit_margin", None) is None:
+            logger.error("guard_margin_setting_missing_fail_closed")
             return False
         return True
 
@@ -142,6 +155,41 @@ class OutputGuard:
 
         return True
 
+    def _configured_margin(self) -> float:
+        """
+        The configured minimum margin, clamped to a range that keeps
+        floor/(1-m) at or above the floor.
+
+        A margin at or above 1.0 makes the formula undefined or negative. A
+        margin below 0.0 is worse and was not caught before: floor/(1-(-0.5))
+        is floor/1.5, so a floor of 1000 came back as a "safe" price of 666.67.
+        `min_profit_margin` is env-configurable with no lower bound declared, so
+        that is one operator typo away, and the substitute price exists
+        precisely to be the thing that cannot undercut the floor.
+
+        This is also reached without any gate having run — the Membrane calls
+        `calculate_safe_price` directly on FAILURE_RECOVERY — so a bad setting
+        cannot be assumed to have been caught upstream.
+        """
+        if self.settings is None:
+            return _DEFAULT_MARGIN
+
+        raw = getattr(self.settings, "min_profit_margin", None)
+        if raw is None:
+            return _DEFAULT_MARGIN
+
+        try:
+            margin = float(raw)
+        except (TypeError, ValueError):
+            logger.error("guard_margin_setting_unreadable_using_default", raw=raw)
+            return _DEFAULT_MARGIN
+
+        if not 0.0 <= margin < 1.0:
+            logger.error("guard_margin_setting_out_of_range", margin=margin)
+            return _DEFAULT_MARGIN
+
+        return margin
+
     def calculate_safe_price(self, context: dict, reason: str) -> float:
         """
         Deterministic substitute price, by the strategy the firing gate declared.
@@ -154,15 +202,7 @@ class OutputGuard:
         strategy = self._safe_price_strategies.get(reason, "floor_markup")
 
         if strategy == "margin":
-            min_m = 0.1
-            if self.settings:
-                min_m = float(self.settings.min_profit_margin)
-
-            # A margin at or above 1.0 makes floor/(1-m) undefined or negative.
-            # Falling back to the default keeps a misconfigured deployment
-            # answering with a real price rather than a nonsensical one.
-            if min_m >= 1.0:
-                min_m = 0.1
+            min_m = self._configured_margin()
             return float(round(floor / (1 - min_m), 2))
 
         return float(round(floor * _FLOOR_MARKUP, 2))

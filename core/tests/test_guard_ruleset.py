@@ -14,6 +14,7 @@ reformatting the file does not invent a new version while any semantic edit does
 """
 
 import json
+from pathlib import Path
 
 import pytest
 import yaml
@@ -83,6 +84,20 @@ class TestDigest:
             ruleset_from_mapping(swapped).digest != ruleset_from_mapping(MINIMAL).digest
         )
 
+    def test_a_non_semantic_top_level_key_does_not_change_the_digest(self) -> None:
+        """
+        Same argument as hashing bytes, one level up: a `description:` added for
+        readers is not a rule, and minting a new version for it teaches everyone
+        that a changed version means nothing.
+        """
+        annotated = json.loads(json.dumps(MINIMAL))
+        annotated["description"] = "notes for whoever reads this next"
+
+        assert (
+            ruleset_from_mapping(annotated).digest
+            == ruleset_from_mapping(MINIMAL).digest
+        )
+
     def test_changing_a_code_changes_the_digest(self) -> None:
         edited = json.loads(json.dumps(MINIMAL))
         edited["gates"][0]["code"] = "SOMETHING_ELSE"
@@ -139,6 +154,33 @@ class TestFailClosed:
 
         with pytest.raises(RulesetError, match=missing):
             ruleset_from_mapping(incomplete)
+
+
+class TestMalformedSource:
+    def test_unparseable_yaml_is_a_ruleset_error(self, tmp_path: Path) -> None:
+        """
+        Every other way of failing to get rules raises RulesetError; a syntax
+        error should not be the one case that surfaces a yaml exception the
+        caller has no reason to catch.
+        """
+        broken = tmp_path / "ruleset.yaml"
+        broken.write_text("gates: [\n  - id: unterminated\n", encoding="utf-8")
+
+        with pytest.raises(RulesetError, match="valid YAML"):
+            load_ruleset(broken)
+
+    def test_a_missing_file_is_a_ruleset_error(self, tmp_path: Path) -> None:
+        with pytest.raises(RulesetError, match="not found"):
+            load_ruleset(tmp_path / "absent.yaml")
+
+    def test_a_file_that_is_not_a_mapping_is_a_ruleset_error(
+        self, tmp_path: Path
+    ) -> None:
+        listed = tmp_path / "ruleset.yaml"
+        listed.write_text("- just\n- a\n- list\n", encoding="utf-8")
+
+        with pytest.raises(RulesetError, match="mapping"):
+            load_ruleset(listed)
 
 
 class TestShippedRuleset:

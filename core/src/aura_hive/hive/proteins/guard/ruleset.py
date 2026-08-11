@@ -132,13 +132,31 @@ def ruleset_from_mapping(mapping: dict[str, Any]) -> Ruleset:
             )
         )
 
-    digest = hashlib.sha256(_canonical(mapping)).hexdigest()[:_DIGEST_CHARS]
+    # Rebuilt from the validated fields rather than hashed off the raw mapping.
+    # Same argument as not hashing the file bytes, one level up: a `description:`
+    # someone adds for readers is not a rule, and minting a new version for it
+    # teaches everyone that a changed version means nothing.
+    family = str(mapping["family"])
+    version = str(mapping["version"])
+    canonical = {
+        "family": family,
+        "version": version,
+        "gates": [
+            {
+                "id": gate.id,
+                "code": gate.code,
+                "consumes": list(gate.consumes),
+                "safe_price": gate.safe_price,
+            }
+            for gate in gates
+        ],
+    }
 
     return Ruleset(
-        family=str(mapping["family"]),
-        version=str(mapping["version"]),
+        family=family,
+        version=version,
         gates=tuple(gates),
-        digest=digest,
+        digest=hashlib.sha256(_canonical(canonical)).hexdigest()[:_DIGEST_CHARS],
     )
 
 
@@ -151,6 +169,11 @@ def load_ruleset(path: Path | None = None) -> Ruleset:
         # Fail closed and loudly. A guard with no rules is not a permissive
         # guard, it is a guard whose absence nobody would notice at runtime.
         raise RulesetError(f"ruleset not found at {source}") from exc
+    except yaml.YAMLError as exc:
+        # Every other way of failing to get rules raises RulesetError; a syntax
+        # error should not be the one case that surfaces an exception type the
+        # caller has no reason to be catching.
+        raise RulesetError(f"ruleset at {source} is not valid YAML: {exc}") from exc
 
     if not isinstance(parsed, dict):
         raise RulesetError(f"ruleset at {source} did not parse to a mapping")
