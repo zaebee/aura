@@ -91,30 +91,39 @@ class GuardSkill(
             # recovered by searching the message for "margin" or "floor", which
             # relabelled the audit trail on any rewording and already misfiled
             # the fail-closed branch as a margin violation.
-            err_msg = str(e)
-            code = e.code
-
             assert self.provider is not None
-            # `or {}` rather than a default: a caller that passed an explicit
-            # None gets the same treatment as one that passed nothing. This runs
-            # inside the SafetyViolation handler, a sibling of the generic
-            # `except Exception` below rather than nested in it, so a raise here
-            # escapes the skill entirely.
-            safe_p = self.provider.calculate_safe_price(
-                params.get("context") or {}, code
-            )
+
+            # A violation from `validate_decision` carries the derivation that
+            # produced it; nothing else does. That is the signal for whether the
+            # negotiation-shaped extras apply.
+            #
+            # They do not apply to a wallet check. There is no safe price for
+            # "we could not establish whether this wallet is sanctified", and a
+            # consumer reading `safe_price: 0.0` could act on it; and citing the
+            # negotiation rule set would claim an audit trail for a decision it
+            # never judged. Report the code and the message, and nothing the
+            # surrounding shape merely expects.
+            report = {"error_code": e.code}
+
+            if e.derivation is not None:
+                # `or {}` rather than a default: a caller that passed an
+                # explicit None gets the same treatment as one that passed
+                # nothing. This runs inside the SafetyViolation handler, a
+                # sibling of the generic `except Exception` below rather than
+                # nested in it, so a raise here escapes the skill entirely.
+                report["safe_price"] = str(
+                    self.provider.calculate_safe_price(
+                        params.get("context") or {}, e.code
+                    )
+                )
+                report.update(
+                    _derivation_fields(
+                        e.derivation, self.provider.ruleset.version_string
+                    )
+                )
+
             return Observation(
-                success=False,
-                error=err_msg,
-                metadata=make_struct(
-                    {
-                        "error_code": code,
-                        "safe_price": str(safe_p),
-                        **_derivation_fields(
-                            e.derivation, self.provider.ruleset.version_string
-                        ),
-                    }
-                ),
+                success=False, error=str(e), metadata=make_struct(report)
             )
         except Exception as e:
             logger.error(f"Guard skill error: {e}")
@@ -152,16 +161,49 @@ class GuardSkill(
         self.provider.validate_vision(p.vision_result)
         return Observation(success=True)
 
+    async def _wallet_is_sanctified(self, wallet_address: str) -> bool:
+        """
+        Ask persistence whether a wallet is sanctified.
+
+        Raises when the question could not be answered, rather than returning
+        False. Both outcomes refuse — a wallet whose sanctification cannot be
+        established must not transact — but they refuse for different reasons,
+        and reporting a lookup failure as "not sanctified" sends an operator to
+        look at the wallet when the fault is that persistence is down.
+
+        This is the distinction the receipt work drew between `ok` and
+        `attested`: nothing was wrong versus something was established. Both
+        call sites go through here so the same fault cannot produce two
+        different stories from one protein.
+        """
+        assert self._registry is not None, (
+            "registry not injected — call inject_registry() first"
+        )
+        observation = await self._registry.execute(
+            "persistence", "is_wallet_sanctified", {"wallet_address": wallet_address}
+        )
+
+        if not observation.success:
+            logger.error(
+                "sanctification_lookup_failed wallet=%s error=%s",
+                wallet_address,
+                observation.error,
+            )
+            raise SafetyViolation(
+                f"Could not establish whether wallet {wallet_address!r} is "
+                f"sanctified: {observation.error}",
+                code="SANCTIFICATION_UNAVAILABLE",
+            )
+
+        return bool(observation.metadata.to_dict().get("sanctified", False))
+
     async def _validate_transaction(self, params: dict[str, Any]) -> Observation:
         assert self.provider is not None
         assert self._registry is not None, (
             "registry not injected — call inject_registry() first"
         )
         wallet_address = params.get("wallet_address", "")
-        sanct_obs = await self._registry.execute(
-            "persistence", "is_wallet_sanctified", {"wallet_address": wallet_address}
-        )
-        is_sanctified = bool(sanct_obs.metadata.to_dict().get("sanctified", False))
+        is_sanctified = await self._wallet_is_sanctified(wallet_address)
         safe_price = self.provider.validate_transaction(
             wallet_address=wallet_address,
             llm_price=params.get("llm_price", 0.0),
@@ -181,20 +223,7 @@ class GuardSkill(
         )
         wallet_address = params.get("wallet_address", "")
         amount = float(params.get("amount", 0.0))
-        sanct_obs = await self._registry.execute(
-            "persistence", "is_wallet_sanctified", {"wallet_address": wallet_address}
-        )
-        if not sanct_obs.success:
-            logger.error(
-                "x402_wallet_verification_failed wallet=%s error=%s",
-                wallet_address,
-                sanct_obs.error,
-            )
-            return Observation(
-                success=False,
-                error=f"Wallet verification failed: {sanct_obs.error}",
-            )
-        is_sanctified = bool(sanct_obs.metadata.to_dict().get("sanctified", False))
+        is_sanctified = await self._wallet_is_sanctified(wallet_address)
         self.provider.validate_x402_payment(
             wallet_address=wallet_address,
             amount=amount,
