@@ -195,6 +195,14 @@ enum DecisionOutcome {
   DECISION_OUTCOME_EMIT = 1;       // passed every gate unaltered
   DECISION_OUTCOME_OVERRIDE = 2;   // a gate fired; a safe value was substituted
   DECISION_OUTCOME_REFUSE = 3;     // a gate fired; the action was rejected
+
+  // No verdict could be established: the guard's own post-condition did not
+  // hold, or a fact it needed could not be looked up. Distinct from REFUSE
+  // because a rule judging against a decision and a judgment that never
+  // happened send an operator to different places — one to the offer, one to
+  // the dependency that is down. AR4SI calls this tier "none"; its -1 is
+  // "a verifier malfunction occurred".
+  DECISION_OUTCOME_UNAVAILABLE = 4;
 }
 
 // The ordered record of how the guard reached its verdict, and a digest over it.
@@ -274,6 +282,27 @@ message DecisionReceipt {
   // report rather than an error: a deployment with no key configured produces
   // AURA-RECEIPT-V0-UNSIGNED and says so in `version`.
   ReceiptSignature signature = 11;
+
+  // When the Membrane settled this decision, RFC3339 UTC. Freshness by the
+  // synchronized-clock route of RFC 9334 §10. It is our clock and means nothing
+  // to a party that does not trust us — which the audience decision says is not
+  // the reader this is for.
+  string issued_at = 12;
+
+  // The Intent this receipt describes, and the negotiation session it belongs
+  // to. Without them a receipt is about a shape of decision rather than one
+  // decision: two deals for the same item at the same price produced a
+  // byte-identical receipt, signature included, and an auditor could not
+  // reconcile either against anything.
+  string decision_id = 13;
+  string request_id = 14;
+
+  // Why claim and emission hash alike under an override: "prose" when the
+  // substitution touched only free text, "value" when it touched the decidable
+  // content. Empty unless outcome is OVERRIDE. Lets a verifier check the
+  // pairing in both directions without a hardcoded list of gates that goes
+  // stale the moment a prose-only gate is added.
+  string override_scope = 15;
 
   // Reserved for the two fields still blocked on a decision rather than on
   // code. premise_hash (§3.1) waits on who holds the salt — and on the finding
