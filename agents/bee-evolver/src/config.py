@@ -87,8 +87,19 @@ class EvolverSettings(BaseSettings):
         # `NoDecode` means nothing decodes JSON for us any more, so anything
         # already deployed with an array has to be handled here or it would
         # break — the one format that used to work must keep working.
+        #
+        # Tried rather than assumed: `[` opens a JSON array and is also a legal
+        # first character for a directory name, so `[archived]` would otherwise
+        # crash startup — the failure this whole validator exists to remove,
+        # one branch over. Falling back is safe here because this is an
+        # *exclude* list: a misparsed entry names a directory that does not
+        # exist and excludes nothing, where refusing to start costs the
+        # deployment.
         if text.startswith("["):
-            return json.loads(text)
+            try:
+                return json.loads(text)
+            except json.JSONDecodeError:
+                pass
 
         return [part.strip() for part in text.split(",") if part.strip()]
 

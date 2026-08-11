@@ -90,3 +90,39 @@ class TestNothingElseBreaks:
 
         for expected in DEFAULTS:
             assert expected in settings.exclude_dirs
+
+
+class TestABracketIsNotAlwaysJson:
+    """
+    `[` starts a JSON array and is also a legal first character for a directory
+    name. Guessing by the bracket alone and calling `json.loads` on the result
+    turns `[archived]` into a crash at startup — the same failure this whole
+    change exists to remove, reintroduced one branch over.
+
+    Falling back to comma-splitting is safe here in a way it would not be
+    everywhere: this is an *exclude* list, so a misparsed entry names a
+    directory that does not exist and excludes nothing. Failing open costs a
+    wrong entry; failing closed costs the deployment.
+    """
+
+    def test_a_directory_named_like_an_array_is_not_json(self, clean_env: None) -> None:
+        assert with_value("[archived]") == ["[archived]"]
+
+    def test_such_a_name_inside_a_comma_separated_list(self, clean_env: None) -> None:
+        assert with_value("[archived],.git") == ["[archived]", ".git"]
+
+    def test_a_real_array_is_still_read_as_json(self, clean_env: None) -> None:
+        """The fallback must not swallow the format it is there to preserve."""
+        assert with_value('[".git", ".venv"]') == [".git", ".venv"]
+
+    def test_a_malformed_array_does_not_take_the_service_down(
+        self, clean_env: None
+    ) -> None:
+        """
+        Entries come out odd, and that is the right trade: they name
+        directories that do not exist, so nothing is excluded that should not
+        be. Refusing to start would be worse for a list of things to skip.
+        """
+        result = with_value('[".git", ".venv"')
+
+        assert isinstance(result, list)
