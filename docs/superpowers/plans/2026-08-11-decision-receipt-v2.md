@@ -1207,7 +1207,9 @@ Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>"
 
 - [ ] **Step 1: Write the failing test**
 
-Create `core/tests/test_membrane_postcondition.py`. Copy the Membrane construction helpers from `core/tests/test_membrane_derivation.py` — build a fresh Membrane, registry and guard per test, because anything surviving between them is state a verifier does not have.
+Create `core/tests/test_membrane_postcondition.py`.
+
+> The helpers below are **module-level factories, not pytest fixtures** — that is the style `core/tests/test_membrane_derivation.py` uses, and the registry keys skills by name (`registry.register(skill.get_name(), skill)`), so there is no `membrane.registry.guard` attribute to reach through. A test that needs a stubbed predicate builds the `OutputGuard` itself and passes it to `bind`. Each test gets a fresh Membrane, registry and guard, because anything surviving between them is state a verifier does not have.
 
 ```python
 """
@@ -1217,45 +1219,125 @@ Gates judge the model's proposal. Before this, nothing judged the Membrane's
 substitute, so a below-margin override shipped under a receipt that verified.
 """
 
-from aura_core_gen.aura.core.v1 import ActionType, DecisionOutcome
+import pytest
+from aura_core import SkillRegistry, make_struct
+from aura_core_gen.aura.core.v1 import (
+    ActionType,
+    Context,
+    DecisionOutcome,
+    HiveContextData,
+    Intent,
+    NegotiationIntent,
+)
+from aura_hive.hive.membrane.main import HiveMembrane
+from aura_hive.hive.proteins.guard.engine import OutputGuard
+from aura_hive.hive.proteins.guard.skill import GuardSkill
+
+FLOOR = 1000.0
+COST = 777.0
+
+
+class _Safety:
+    min_profit_margin = 0.10
+    ui_trigger_price = 100000.0
+    trade_risk_threshold = 0.10
+
+
+def guarded_membrane(guard: OutputGuard | None = None) -> HiveMembrane:
+    """A Membrane over a real guard, optionally one the caller has tampered with."""
+    registry = SkillRegistry()
+    skill = GuardSkill()
+    skill.bind(_Safety(), guard or OutputGuard(safety_settings=_Safety()))
+    registry.register(skill.get_name(), skill)
+    return HiveMembrane(registry=registry)
+
+
+def negotiation_context(request_id: str = "") -> Context:
+    """
+    Floor and cost live in metadata, as the Membrane reads them.
+
+    The `hive` oneof is populated because the substitute price keys its jitter
+    on `request_id`, and the existing helpers in test_membrane_derivation.py
+    build a metadata-only Context where that field does not exist.
+    """
+    return Context(
+        metadata=make_struct(
+            {"floor_price": str(FLOOR), "internal_cost": str(COST)}
+        ),
+        hive=HiveContextData(request_id=request_id),
+    )
+
+
+def counter_intent(price: float) -> Intent:
+    return Intent(
+        action=ActionType.ACTION_TYPE_COUNTER,
+        reasoning="LLM reasoning",
+        negotiation=NegotiationIntent(price=price, message="Here is my offer"),
+    )
 
 
 class TestBothPaths:
-    async def test_a_passing_decision_is_checked_too(self, membrane, context) -> None:
+    @pytest.mark.asyncio
+    async def test_a_passing_decision_is_checked_too(self) -> None:
         """
         Checking only the override path would miss a broken gate on the pass
         path: a predicate stubbed to True lets a bad proposal through untouched,
         and psi is the only thing left that would notice.
         """
-        membrane.registry.guard._gate_floor_violation = lambda d, c: True
-        result = await membrane.inspect_outbound(counter(price=1.0), context)
+        guard = OutputGuard(safety_settings=_Safety())
+        guard._gate_floor_violation = lambda decision, context: True  # type: ignore[method-assign]
+        membrane = guarded_membrane(guard)
+
+        result = await membrane.inspect_outbound(
+            counter_intent(price=1.0), negotiation_context()
+        )
+
         assert result.receipt.outcome == DecisionOutcome.DECISION_OUTCOME_UNAVAILABLE
         assert result.receipt.outcome_gate == "POSTCONDITION_VIOLATION"
 
-    async def test_the_override_substitute_is_checked(self, membrane, context) -> None:
+    @pytest.mark.asyncio
+    async def test_the_override_substitute_is_checked(self) -> None:
         """
         The regression for the found bug. A substitute that breaches the margin
-        rule must not leave, even though the gates approved of stopping the
-        proposal that caused it.
+        rule must not leave, even though the gates were right to stop the
+        proposal that caused it. 1050.00 is floor * 1.05 — what the old strategy
+        produced, and 0.26 below the margin rule at a cost of 777.
         """
-        membrane.registry.guard.calculate_safe_price = lambda *a, **k: 105.0
-        result = await membrane.inspect_outbound(counter(price=92.0), context)
+        guard = OutputGuard(safety_settings=_Safety())
+        guard.calculate_safe_price = lambda *args, **kwargs: 800.0  # type: ignore[method-assign]
+        membrane = guarded_membrane(guard)
+
+        result = await membrane.inspect_outbound(
+            counter_intent(price=500.0), negotiation_context()
+        )
+
         assert result.receipt.outcome == DecisionOutcome.DECISION_OUTCOME_UNAVAILABLE
         assert result.action == ActionType.ACTION_TYPE_REJECT
 
-    async def test_a_satisfying_override_still_emits(self, membrane, context) -> None:
-        result = await membrane.inspect_outbound(counter(price=92.0), context)
+    @pytest.mark.asyncio
+    async def test_a_satisfying_override_still_emits(self) -> None:
+        membrane = guarded_membrane()
+
+        result = await membrane.inspect_outbound(
+            counter_intent(price=500.0), negotiation_context()
+        )
+
         assert result.receipt.outcome == DecisionOutcome.DECISION_OUTCOME_OVERRIDE
-        assert result.negotiation.price >= 111.12
+        assert result.negotiation.price >= 1111.12
 
 
 class TestNothingLeaks:
-    async def test_the_offending_price_never_reaches_the_emission(
-        self, membrane, context
-    ) -> None:
-        membrane.registry.guard.calculate_safe_price = lambda *a, **k: 105.0
-        result = await membrane.inspect_outbound(counter(price=92.0), context)
-        assert "105" not in str(result.to_dict())
+    @pytest.mark.asyncio
+    async def test_the_offending_price_never_reaches_the_emission(self) -> None:
+        guard = OutputGuard(safety_settings=_Safety())
+        guard.calculate_safe_price = lambda *args, **kwargs: 800.0  # type: ignore[method-assign]
+        membrane = guarded_membrane(guard)
+
+        result = await membrane.inspect_outbound(
+            counter_intent(price=500.0), negotiation_context()
+        )
+
+        assert "800" not in str(result.to_dict())
 ```
 
 - [ ] **Step 2: Run and watch it fail**
@@ -1405,50 +1487,69 @@ and the substitute price is a function of the hidden floor. The message is one
 half of that; the jitter in the price is the other.
 """
 
+import pytest
+from aura_hive.hive.membrane.main import HiveMembrane
+
+from .test_membrane_postcondition import (
+    counter_intent,
+    guarded_membrane,
+    negotiation_context,
+)
+
 
 class TestTheMessageDoesNotAnnounceTheGuard:
-    async def test_no_finality_language(self, membrane, context) -> None:
-        result = await membrane.inspect_outbound(counter(price=92.0), context)
+    @pytest.mark.asyncio
+    async def test_no_finality_language(self) -> None:
+        membrane = guarded_membrane()
+        result = await membrane.inspect_outbound(
+            counter_intent(price=500.0), negotiation_context()
+        )
         message = result.negotiation.message.lower()
-        for tell in ("final limit", "my best offer", "cannot disclose", "membrane"):
+        for tell in ("final limit", "best offer", "cannot disclose", "membrane"):
             assert tell not in message
 
-    async def test_a_price_is_still_stated(self, membrane, context) -> None:
+    @pytest.mark.asyncio
+    async def test_a_price_is_still_stated(self) -> None:
         """
         Neutral is not silent. The counterparty needs the number; what they must
-        not get is a label saying it came from the guard.
+        not get is a label saying which rule produced it.
         """
-        result = await membrane.inspect_outbound(counter(price=92.0), context)
+        membrane = guarded_membrane()
+        result = await membrane.inspect_outbound(
+            counter_intent(price=500.0), negotiation_context()
+        )
         assert f"{result.negotiation.price:.2f}" in result.negotiation.message
 
 
 class TestJitterIsSessionStable:
-    async def test_repeated_rounds_return_the_same_price(self, membrane, context) -> None:
+    @pytest.mark.asyncio
+    async def test_repeated_rounds_return_the_same_price(self) -> None:
         """
         Redrawn per decision, a counterparty averages the noise away over rounds
         and recovers the floor anyway.
         """
         prices = set()
         for _ in range(5):
-            result = await membrane.inspect_outbound(counter(price=92.0), context)
+            membrane = guarded_membrane()
+            result = await membrane.inspect_outbound(
+                counter_intent(price=500.0), negotiation_context(request_id="sess-abc")
+            )
             prices.add(result.negotiation.price)
         assert len(prices) == 1
 
-    async def test_a_different_session_returns_a_different_price(
-        self, membrane, context_factory
-    ) -> None:
-        prices = {
-            (
-                await membrane.inspect_outbound(
-                    counter(price=92.0), context_factory(request_id=f"r-{n}")
-                )
-            ).negotiation.price
-            for n in range(20)
-        }
+    @pytest.mark.asyncio
+    async def test_a_different_session_returns_a_different_price(self) -> None:
+        prices = set()
+        for n in range(20):
+            membrane = guarded_membrane()
+            result = await membrane.inspect_outbound(
+                counter_intent(price=500.0), negotiation_context(request_id=f"r-{n}")
+            )
+            prices.add(result.negotiation.price)
         assert len(prices) > 1
 ```
 
-`context_factory` is a fixture building a `Context` with `hive=HiveContextData(request_id=...)`. Add it beside the `context` fixture.
+The helpers are imported from `test_membrane_postcondition.py` rather than duplicated. If `core/tests/` has no `__init__.py`, add the three factories to a shared `core/tests/membrane_helpers.py` and import from there instead — do not copy them into both files, or the two copies drift.
 
 - [ ] **Step 2: Run and watch it fail**
 
@@ -1931,7 +2032,11 @@ Run: `make generate`
 
 - [ ] **Step 4: Carry it through the aggregator**
 
-At each of the four `HiveContextData(` construction sites in `core/src/aura_hive/hive/aggregator/main.py`, pass `currency_code` through to the `NegotiationOffer` it builds, reading it from the same source the bid comes from. Where a site has no currency available, pass `""` — that is the honest report, and Step 6 renders it as such.
+At each of the four `HiveContextData(` construction sites in `core/src/aura_hive/hive/aggregator/main.py`, pass `currency_code` through to the `NegotiationOffer` it builds.
+
+The source is real and already reaches core: `NegotiationSignal.currency_code` is field 3 of `proto/aura/dna/v1/dna.proto`, and `core/src/aura_hive/main.py:73,91` forwards it from the gRPC request onto the signal. The aggregator is where it is dropped. So the typed sites read `payload.currency_code`, and the `getattr` fallback site reads `str(getattr(signal, "currency_code", ""))`.
+
+Where a site genuinely has no currency — the vision-discovery path, if the signal it was built from carries none — pass `""`. Step 6 renders that as an empty currency rather than inventing one.
 
 - [ ] **Step 5: Stamp it in the Membrane**
 
