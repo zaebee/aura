@@ -73,12 +73,6 @@ _SIGNATURE_SCHEME = "eip712"
 # in a log line, and not a commitment — nothing is bound until something signs.
 _PREFIX_CHARS = 16
 
-# Gates that alter prose and nothing else, so an override under one of them
-# leaves claim and emission hashing alike. Naming them is what lets `verify`
-# distinguish that legitimate case from a receipt claiming a substitution that
-# did not happen.
-_PROSE_ONLY_GATES = frozenset({"DLP_BLOCK"})
-
 
 @dataclass(frozen=True)
 class VerificationResult:
@@ -389,26 +383,50 @@ def verify(receipt: DecisionReceipt) -> VerificationResult:
 
     changed = receipt.claim_hash != receipt.emission_hash
 
-    if receipt.outcome == DecisionOutcome.DECISION_OUTCOME_OVERRIDE and not changed:
-        # A prose-only gate legitimately leaves the two equal, because prose is
-        # outside the claim. Any other gate claiming a substitution that left no
-        # trace is a receipt describing something that did not happen.
-        if receipt.outcome_gate not in _PROSE_ONLY_GATES:
+    if receipt.outcome == DecisionOutcome.DECISION_OUTCOME_OVERRIDE:
+        # Checked in both directions. A value-scoped override that left the
+        # digests alike describes a substitution that did not happen; a
+        # prose-scoped one whose digests differ describes prose reaching the
+        # decidable content, which prose is defined not to do.
+        if receipt.override_scope == "prose" and changed:
             failures.append(
-                "override recorded but claim and emission hash alike, and "
-                f"{receipt.outcome_gate!r} is not a prose-only gate"
+                "override scoped to prose but the claim and emission digests differ"
+            )
+        elif receipt.override_scope != "prose" and not changed:
+            failures.append(
+                "override recorded but claim and emission hash alike, and the "
+                f"scope is {receipt.override_scope or 'unset'!r} rather than 'prose'"
             )
 
     if receipt.outcome == DecisionOutcome.DECISION_OUTCOME_EMIT and changed:
         failures.append("emit recorded but the emission does not match the claim")
 
-    # Named rather than counted, so a caller reads what is missing instead of a
-    # number they have to look up. The premise hash and the policy stamp are
-    # still unbuilt, so they stay listed even on a signed receipt: a signature
-    # attests to what the receipt says, not to everything a reader might want.
-    unverifiable = ["premises", "policy"]
+    # A rule set judged this decision, so it must say how. The witness used to
+    # be optional: a receipt could name the rules and record nothing about their
+    # application, and verify would pass it.
+    derivation_missing = not (derivation.gate_sequence or derivation.derivation_hash)
+    judged = receipt.outcome in (
+        DecisionOutcome.DECISION_OUTCOME_EMIT,
+        DecisionOutcome.DECISION_OUTCOME_OVERRIDE,
+    )
+    if judged and receipt.ruleset_version and derivation_missing:
+        failures.append(
+            f"receipt cites rule set {receipt.ruleset_version!r} but carries no derivation"
+        )
+
+    # Computed, not a constant. A caller reads what this verifier could not
+    # establish about THIS receipt, so the list stays true as fields land.
+    unverifiable: list[str] = []
     if not attested:
-        unverifiable.insert(0, "signature")
+        unverifiable.append("signature")
+    # Always. verify() is handed the receipt and never the Intent, so it cannot
+    # establish that claim_hash digests the decision the model actually made.
+    # Naming it is the difference between a verifier and a rubber stamp.
+    unverifiable.append("emission_content")
+    if not receipt.issued_at:
+        unverifiable.append("freshness")
+    # Still unbuilt; see DECISION_RECEIPT.md §3.1 and §3.5.
+    unverifiable.extend(["premises", "policy"])
 
     return VerificationResult(
         ok=not failures,

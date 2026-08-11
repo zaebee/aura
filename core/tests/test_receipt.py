@@ -404,6 +404,7 @@ class TestVerifyIsHonestAboutWhatItCannotCheck:
             emission=counter(price=105.0),
             outcome=DecisionOutcome.DECISION_OUTCOME_OVERRIDE,
             outcome_gate="DLP_BLOCK",
+            override_scope="prose",
         )
 
         assert verify(receipt).ok
@@ -449,6 +450,88 @@ class TestVerifyIsHonestAboutWhatItCannotCheck:
 
         assert not result.ok
         assert any("version" in failure for failure in result.failures)
+
+
+class TestVerifyNamesWhatItCannotCheck:
+    def test_emission_content_is_always_unverifiable(self) -> None:
+        """
+        verify() receives the receipt and never the Intent, so it cannot learn
+        that claim_hash digests anything real. Saying so is the honest report;
+        a verifier answering "ok" while silently skipping teaches its consumer
+        to rely on a guarantee nobody made.
+        """
+        receipt = mint(
+            counter(100.0), counter(100.0), DecisionOutcome.DECISION_OUTCOME_EMIT
+        )
+        result = verify(receipt)
+        assert result.ok
+        assert "emission_content" in result.unverifiable
+
+    def test_signature_is_listed_only_when_absent(self) -> None:
+        unsigned = mint(
+            counter(100.0), counter(100.0), DecisionOutcome.DECISION_OUTCOME_EMIT
+        )
+        assert "signature" in verify(unsigned).unverifiable
+
+
+class TestOverrideScope:
+    def test_a_value_override_with_equal_hashes_fails(self) -> None:
+        receipt = mint(
+            counter(100.0),
+            counter(100.0),
+            DecisionOutcome.DECISION_OUTCOME_OVERRIDE,
+            override_scope="value",
+        )
+        assert not verify(receipt).ok
+
+    def test_a_prose_override_with_equal_hashes_passes(self) -> None:
+        receipt = mint(
+            counter(100.0),
+            counter(100.0),
+            DecisionOutcome.DECISION_OUTCOME_OVERRIDE,
+            override_scope="prose",
+        )
+        assert verify(receipt).ok
+
+    def test_a_prose_override_with_differing_hashes_fails(self) -> None:
+        """
+        Prose is defined not to reach the decidable content, so a prose-scoped
+        override whose digests differ describes something that cannot happen.
+        This direction was never checked.
+        """
+        receipt = mint(
+            counter(100.0),
+            counter(105.0),
+            DecisionOutcome.DECISION_OUTCOME_OVERRIDE,
+            override_scope="prose",
+        )
+        assert not verify(receipt).ok
+
+
+class TestDerivationIsRequired:
+    def test_a_judged_decision_must_carry_its_derivation(self) -> None:
+        """
+        The witness was optional and unenforced: a receipt could claim a rule set
+        judged it and record nothing about how.
+        """
+        receipt = mint(
+            counter(100.0),
+            counter(100.0),
+            DecisionOutcome.DECISION_OUTCOME_EMIT,
+            ruleset_version="guard/negotiation@2.0.0+abcdef0123456789",
+        )
+        result = verify(receipt)
+        assert not result.ok
+        assert any("derivation" in f for f in result.failures)
+
+    def test_an_unavailable_outcome_needs_none(self) -> None:
+        receipt = mint(
+            counter(100.0),
+            counter(100.0),
+            DecisionOutcome.DECISION_OUTCOME_UNAVAILABLE,
+            outcome_gate="POSTCONDITION_VIOLATION",
+        )
+        assert verify(receipt).ok
 
 
 class TestTheAssetClaimAlsoNamesItsDecision:
@@ -516,8 +599,15 @@ class TestSigning:
             claim=counter(price=92.0),
             emission=counter(price=105.0),
             ruleset_version="guard/negotiation@1.0.0+46cc0e38ca4f895c",
+            derivation=DecisionDerivation(
+                gate_sequence="G1_FLOOR_PRICE:fail:price",
+                derivation_hash=hashlib.sha256(
+                    b"G1_FLOOR_PRICE:fail:price"
+                ).hexdigest(),
+            ),
             outcome=DecisionOutcome.DECISION_OUTCOME_OVERRIDE,
             outcome_gate="FLOOR_PRICE_VIOLATION",
+            override_scope="value",
         )
 
     def sign_with(self, receipt: object, account: object) -> object:
