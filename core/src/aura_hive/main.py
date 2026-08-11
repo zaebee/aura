@@ -19,7 +19,7 @@ from grpclib.health.service import Health
 from grpclib.server import Server
 from opentelemetry import trace
 
-from aura_hive.config import settings
+from aura_hive.config import get_settings
 from aura_hive.hive.cortex import HiveCell
 from aura_hive.hive.metabolism import MetabolicLoop
 from aura_hive.hive.metabolism.logging_config import (
@@ -33,6 +33,11 @@ from aura_hive.nats_gateway import NatsSignalGateway
 tracer = trace.get_tracer(__name__)
 
 # 1. Configure structured logging
+#
+# Reading settings at module scope is right *here* and nowhere else: this is the
+# entrypoint, so importing it reasonably requires the deployment to be
+# configured. `aura_hive.config` no longer does the same on everyone's behalf.
+settings = get_settings()
 configure_logging(log_level=settings.server.log_level)
 logger = get_logger("core")
 

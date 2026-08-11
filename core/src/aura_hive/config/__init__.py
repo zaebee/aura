@@ -42,7 +42,18 @@ class Settings(BaseSettings):
 
 @lru_cache
 def get_settings() -> Settings:
+    """
+    The settings, built once and cached.
+
+    Deliberately NOT evaluated at import. This module used to end with
+    `settings = get_settings()`, which meant importing anything under
+    `aura_hive` read the environment and demanded a database URL — a module
+    whose own imports are hashlib, json and yaml could not be loaded without
+    Postgres configured. It failed a Docker build (#258) where a one-line check
+    that the guard's rule set loads could not run at all.
+
+    The check has moved rather than gone: a deployment missing its database URL
+    is still told, at the point something actually asks for settings, which is
+    the point where the answer matters.
+    """
     return Settings()
-
-
-settings = get_settings()
