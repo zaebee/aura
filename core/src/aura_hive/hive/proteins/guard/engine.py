@@ -1,16 +1,64 @@
+from collections.abc import Callable
 from typing import Any
 
 import structlog
 
 from aura_hive.hive.metabolism.math import HillDampener
 
+from .ruleset import Ruleset, load_ruleset
+
 logger = structlog.get_logger(__name__)
+
+# Markup applied to the floor when a gate asks for the `floor_markup` strategy.
+# Not operator-tunable: unlike min_profit_margin this is the shape of the
+# fallback rather than a policy dial, so it belongs with the rules.
+_FLOOR_MARKUP = 1.05
+
+# Used when the configured margin cannot be read or is out of range. Matches
+# the default on SafetySettings, so a deployment that loses its setting behaves
+# like one that never overrode it.
+_DEFAULT_MARGIN = 0.1
+
+
+def _numeric(mapping: dict, key: str, default: float = 0.0) -> float:
+    """
+    Read a number that a caller may not have supplied as one.
+
+    Coerced once at the boundary rather than guarded inside each predicate, so
+    the gates stay readable and no two of them can disagree about what a null
+    means.
+
+    Nothing crashes without this — the predicate raises, `skill.py` catches it
+    into a generic Observation, and `SkillRegistry.execute` would catch it even
+    if that did not. What is lost is the `error_code`, so the Membrane falls
+    back to SAFETY_VIOLATION and the receipt stops naming which rule refused
+    the decision. A null price reads as 0.0 and is refused by G1 as the invalid
+    price it is, under its own code.
+    """
+    value = mapping.get(key, default)
+    if value is None:
+        return default
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        logger.warning("guard_unusable_numeric_input", key=key, value=repr(value))
+        return default
 
 
 class SafetyViolation(Exception):
-    """Raised when a negotiation decision violates safety guardrails."""
+    """
+    Raised when a negotiation decision violates safety guardrails.
 
-    pass
+    `code` is the gate's declared code from ruleset.yaml. It exists because the
+    caller used to recover the same information by searching this exception's
+    message for "margin" or "floor" — which relabelled an audit trail whenever
+    someone reworded a string, and which already misreported the fail-closed
+    branch ("Cannot validate margin: ...") as a margin violation.
+    """
+
+    def __init__(self, message: str, code: str = "SAFETY_VIOLATION") -> None:
+        super().__init__(message)
+        self.code = code
 
 
 class OutputGuard:
@@ -20,71 +68,169 @@ class OutputGuard:
     (The "Greedy Merchant" fix)
     """
 
-    def __init__(self, safety_settings: Any = None):
+    def __init__(self, safety_settings: Any = None, ruleset: Ruleset | None = None):
         self.settings = safety_settings
+        self.ruleset = ruleset or load_ruleset()
 
-    def validate_decision(self, decision: dict, context: dict) -> bool:
-        action = decision.get("action")
-        offered_price = decision.get("price", 0.0)
-        floor_price = context.get("floor_price", 0.0)
-        internal_cost = context.get("internal_cost", 0.0)
+        # Refuse to run against a rule set that does not describe this engine.
+        # Doing it here rather than at import time means a bad rule set fails
+        # where it can be attributed, and a test can supply its own.
+        self.ruleset.validate_against(set(self.gate_ids()))
 
-        if action not in ["accept", "counter"]:
-            return True
+        self._safe_price_strategies = {
+            gate.code: gate.safe_price for gate in self.ruleset.gates
+        }
 
-        # 1. Price non-positive check
-        if offered_price <= 0:
-            logger.warning("invalid_offered_price", price=offered_price)
-            raise SafetyViolation("Invalid offered price")
+    # Gate id -> the predicate that decides it. The ids are the contract with
+    # ruleset.yaml: `Ruleset.validate_against(gate_ids())` refuses to run if the
+    # two ever drift, in either direction.
+    #
+    # A predicate returns True when the gate passes. It receives the decision
+    # and context untouched rather than a narrowed view, because narrowing would
+    # mean this table also encodes which premises each gate reads — and that is
+    # already declared, once, as `consumes` in the rule set.
+    def _gate_price_positive(self, decision: dict, context: dict) -> bool:
+        price = _numeric(decision, "price")
+        if price <= 0:
+            logger.warning("invalid_offered_price", price=price)
+            return False
+        return True
 
-        # 2. Floor price violation (Metabolic Leakage Protection)
-        if offered_price < floor_price:
+    def _gate_floor_violation(self, decision: dict, context: dict) -> bool:
+        price = _numeric(decision, "price")
+        floor_price = _numeric(context, "floor_price")
+        if price < floor_price:
             logger.warning(
                 "safety_floor_violation",
-                action=action,
-                offered_price=offered_price,
+                action=decision.get("action"),
+                offered_price=price,
                 floor_price=floor_price,
             )
-            raise SafetyViolation("Metabolic Leakage: Amount below floor price")
+            return False
+        return True
 
-        # 3. Margin violation
-        if offered_price > 0:
-            margin = (offered_price - internal_cost) / offered_price
-        else:
-            margin = 0
-
+    def _gate_settings_present(self, decision: dict, context: dict) -> bool:
         # DNA Rule: Safety Guard must "Fail-Closed" if misconfigured.
+        #
+        # "Present but incomplete" is misconfiguration too. Checking only that
+        # settings exist let an object without the field through to G4, where
+        # the AttributeError was swallowed into a generic SAFETY_VIOLATION —
+        # losing the fail-closed reason this gate exists to report.
         if not self.settings:
             logger.error("guard_settings_missing_fail_closed")
-            raise SafetyViolation(
-                "Cannot validate margin: safety settings not provided."
-            )
+            return False
+        if getattr(self.settings, "min_profit_margin", None) is None:
+            logger.error("guard_margin_setting_missing_fail_closed")
+            return False
+        return True
 
+    def _gate_margin_violation(self, decision: dict, context: dict) -> bool:
+        price = _numeric(decision, "price")
+        internal_cost = _numeric(context, "internal_cost")
+        margin = (price - internal_cost) / price if price > 0 else 0
+
+        # Reached only after G3_SETTINGS_PRESENT passed, so settings are here.
         min_margin = self.settings.min_profit_margin
         if margin < min_margin:
             logger.warning(
                 "safety_margin_violation",
-                offered_price=offered_price,
+                offered_price=price,
                 internal_cost=internal_cost,
                 margin=margin,
                 min_margin=min_margin,
             )
-            raise SafetyViolation("Minimum profit margin violation")
+            return False
+        return True
+
+    _MESSAGES = {
+        "G1_PRICE_POSITIVE": "Invalid offered price",
+        "G2_FLOOR_VIOLATION": "Metabolic Leakage: Amount below floor price",
+        "G3_SETTINGS_PRESENT": "Cannot validate margin: safety settings not provided.",
+        "G4_MARGIN_VIOLATION": "Minimum profit margin violation",
+    }
+
+    @classmethod
+    def gate_ids(cls) -> tuple[str, ...]:
+        """The gates this engine can evaluate, for cross-checking the rule set."""
+        return tuple(cls._MESSAGES)
+
+    def _predicate(self, gate_id: str) -> Callable[[dict, dict], bool]:
+        return {
+            "G1_PRICE_POSITIVE": self._gate_price_positive,
+            "G2_FLOOR_VIOLATION": self._gate_floor_violation,
+            "G3_SETTINGS_PRESENT": self._gate_settings_present,
+            "G4_MARGIN_VIOLATION": self._gate_margin_violation,
+        }[gate_id]
+
+    def validate_decision(self, decision: dict, context: dict) -> bool:
+        """
+        Walk the declared gates in order and raise on the first that fails.
+
+        Only accept and counter are judged: those are the actions that put a
+        price on the wire. A reject carrying a nonsense price is not a safety
+        failure, and refusing it would turn the guard into a validator of
+        decisions nobody acts on.
+        """
+        if decision.get("action") not in ["accept", "counter"]:
+            return True
+
+        for gate in self.ruleset.gates:
+            if not self._predicate(gate.id)(decision, context):
+                raise SafetyViolation(self._MESSAGES[gate.id], code=gate.code)
 
         return True
 
-    def calculate_safe_price(self, context: dict, reason: str) -> float:
-        """Deterministic safe price calculation for override."""
-        floor = float(context.get("floor_price", 0.0))
-        if "margin" in reason.lower():
-            min_m = 0.1
-            if self.settings:
-                min_m = float(self.settings.min_profit_margin)
+    def _configured_margin(self) -> float:
+        """
+        The configured minimum margin, clamped to a range that keeps
+        floor/(1-m) at or above the floor.
 
-            if min_m >= 1.0:
-                min_m = 0.1
+        A margin at or above 1.0 makes the formula undefined or negative. A
+        margin below 0.0 is worse and was not caught before: floor/(1-(-0.5))
+        is floor/1.5, so a floor of 1000 came back as a "safe" price of 666.67.
+        `min_profit_margin` is env-configurable with no lower bound declared, so
+        that is one operator typo away, and the substitute price exists
+        precisely to be the thing that cannot undercut the floor.
+
+        This is also reached without any gate having run — the Membrane calls
+        `calculate_safe_price` directly on FAILURE_RECOVERY — so a bad setting
+        cannot be assumed to have been caught upstream.
+        """
+        if self.settings is None:
+            return _DEFAULT_MARGIN
+
+        raw = getattr(self.settings, "min_profit_margin", None)
+        if raw is None:
+            return _DEFAULT_MARGIN
+
+        try:
+            margin = float(raw)
+        except (TypeError, ValueError):
+            logger.error("guard_margin_setting_unreadable_using_default", raw=raw)
+            return _DEFAULT_MARGIN
+
+        if not 0.0 <= margin < 1.0:
+            logger.error("guard_margin_setting_out_of_range", margin=margin)
+            return _DEFAULT_MARGIN
+
+        return margin
+
+    def calculate_safe_price(self, context: dict, reason: str) -> float:
+        """
+        Deterministic substitute price, by the strategy the firing gate declared.
+
+        `reason` is a gate code where one fired, but not always: the Membrane
+        passes FAILURE_RECOVERY when the Transformer itself blew up, and no gate
+        was involved. Anything the rule set does not name gets the floor markup.
+        """
+        floor = _numeric(context, "floor_price")
+        strategy = self._safe_price_strategies.get(reason, "floor_markup")
+
+        if strategy == "margin":
+            min_m = self._configured_margin()
             return float(round(floor / (1 - min_m), 2))
-        return float(round(floor * 1.05, 2))
+
+        return float(round(floor * _FLOOR_MARKUP, 2))
 
     def validate_transaction(
         self,

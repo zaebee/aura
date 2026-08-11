@@ -1,0 +1,55 @@
+# The rules the outbound guard applies to a negotiation decision.
+#
+# Declared here rather than left implicit in the control flow of
+# `OutputGuard.validate_decision`, so the set can be hashed and named. A receipt
+# has to say which rules a decision was judged under, and that name is only
+# worth something if it changes when the rules do
+# (docs/DECISION_RECEIPT.md §3.3).
+#
+# What does NOT belong here: operator-tunable thresholds. `min_profit_margin`
+# and friends stay in SafetySettings and are recorded in the policy stamp
+# instead — a threshold an operator may turn is a property of the deployment,
+# not of the rules (VISION §4.2.3). Putting them here would mean every operator
+# who tunes a knob forks the rule set.
+
+family: guard/negotiation
+version: 1.0.0
+
+# Evaluated in this order. The first gate to fail is the binding reason, and it
+# is the one recorded on Intent.outcome_gate; the rest are not evaluated.
+#
+# The order is not a preference. It is the behaviour that shipped before the
+# rules were extracted: the floor check ran ahead of the fail-closed settings
+# check, so a below-floor price on a misconfigured deployment was refused for
+# the floor. Reordering these changes which reason real decisions carry.
+#
+# `consumes` names premise keys, never their values. It is what the receipt's
+# step sequence will record (§3.4), and recording a value there would leak the
+# floor the DLP gate exists to protect.
+#
+# `safe_price` selects the substitute the Membrane offers when the gate fires:
+#   margin       — floor / (1 - min_profit_margin), the higher of the two
+#   floor_markup — floor * safe_price_multiplier
+gates:
+  - id: G1_PRICE_POSITIVE
+    code: INVALID_PRICE
+    consumes: [price]
+    safe_price: floor_markup
+
+  - id: G2_FLOOR_VIOLATION
+    code: FLOOR_PRICE_VIOLATION
+    consumes: [price, floor_price]
+    safe_price: floor_markup
+
+  # Fail-closed: a deployment that cannot read its own margin setting must not
+  # answer with the cheaper formula, so this gate asks for `margin` — which
+  # yields a price above the floor markup and errs toward the seller.
+  - id: G3_SETTINGS_PRESENT
+    code: SETTINGS_MISSING
+    consumes: []
+    safe_price: margin
+
+  - id: G4_MARGIN_VIOLATION
+    code: MIN_MARGIN_VIOLATION
+    consumes: [price, internal_cost]
+    safe_price: margin

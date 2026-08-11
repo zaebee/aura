@@ -60,15 +60,22 @@ class GuardSkill(
         try:
             return await handler(params)
         except SafetyViolation as e:
+            # The gate's own code, carried on the exception. This used to be
+            # recovered by searching the message for "margin" or "floor", which
+            # relabelled the audit trail on any rewording and already misfiled
+            # the fail-closed branch as a margin violation.
             err_msg = str(e)
-            code = "SAFETY_VIOLATION"
-            if "margin" in err_msg.lower():
-                code = "MIN_MARGIN_VIOLATION"
-            elif "floor" in err_msg.lower():
-                code = "FLOOR_PRICE_VIOLATION"
+            code = e.code
 
             assert self.provider is not None
-            safe_p = self.provider.calculate_safe_price(params.get("context", {}), code)
+            # `or {}` rather than a default: a caller that passed an explicit
+            # None gets the same treatment as one that passed nothing. This runs
+            # inside the SafetyViolation handler, a sibling of the generic
+            # `except Exception` below rather than nested in it, so a raise here
+            # escapes the skill entirely.
+            safe_p = self.provider.calculate_safe_price(
+                params.get("context") or {}, code
+            )
             return Observation(
                 success=False,
                 error=err_msg,
