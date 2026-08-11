@@ -162,9 +162,9 @@ def _replacing(original: Intent, replacement: Intent) -> Intent:
     Intent starts blank. It still stands for the same point in the metabolic
     cycle, so identity and trace belong to it as much as to what it replaced.
 
-    `outcome_gate` travels for a sharper reason: without it a decision that
-    tripped DLP and was then overridden by the floor check would report the
-    floor as the first gate, losing the earlier one.
+    The verdict does not travel here any more: it is accumulated in a `_Verdict`
+    and minted onto the emission, which is what stopped a decision that tripped
+    DLP and was then overridden from reporting the floor as its first gate.
 
     Nothing reads `Intent.trace` today — the trace that reaches the Observation
     comes from `Context.trace` by way of the Connector. Carrying it is cheap and
@@ -173,6 +173,30 @@ def _replacing(original: Intent, replacement: Intent) -> Intent:
     replacement.identifier = original.identifier
     replacement.trace = original.trace
     return replacement
+
+
+def _context_number(ctx_meta: dict[str, Any], key: str, default: float) -> float:
+    """
+    Read a number out of Context.metadata that may not be one.
+
+    A Struct round-trips a JSON null back as None, and the previous read was
+    `float(str(ctx_meta.get(key, default)))` — so a null became `float("None")`
+    and a ValueError. Nothing catches it: `MetabolicLoop.execute` wraps neither
+    membrane call, so the exception leaves the cycle and the negotiation is lost.
+
+    That is the wrong failure for the component whose job is to be the thing
+    that does not let a bad decision out. Refusing safely is its business;
+    crashing on its own input is not. An unusable value reads as absent, which
+    is what the default already meant.
+    """
+    value = ctx_meta.get(key, default)
+    if value is None:
+        return default
+    try:
+        return float(str(value))
+    except (TypeError, ValueError):
+        logger.warning("membrane_unusable_context_number", key=key, value=repr(value))
+        return default
 
 
 def _action_label(action: Any) -> str:
@@ -281,7 +305,7 @@ class HiveMembrane(Membrane[Any, Intent, Context]):
 
     async def inspect_outbound(self, decision: Intent, context: Context) -> Intent:
         ctx_meta = context.metadata.to_dict()
-        floor_price = float(str(ctx_meta.get("floor_price", 0.0)))
+        floor_price = _context_number(ctx_meta, "floor_price", 0.0)
 
         # Accumulated as the path proceeds and minted once, at whichever return
         # is taken. `decision` is the claim throughout: the only edit before the
@@ -386,7 +410,7 @@ class HiveMembrane(Membrane[Any, Intent, Context]):
         if not self.registry:
             return _finish(decision, decision, verdict)
 
-        internal_cost = float(str(ctx_meta.get("internal_cost", floor_price)))
+        internal_cost = _context_number(ctx_meta, "internal_cost", floor_price)
         guard_context = {"floor_price": floor_price, "internal_cost": internal_cost}
 
         price = neg_intent.price if neg_intent else 0.0

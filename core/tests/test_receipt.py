@@ -20,6 +20,7 @@ import hashlib
 import pytest
 from aura_core_gen.aura.core.v1 import (
     ActionType,
+    AssetIntent,
     DecisionDerivation,
     DecisionOutcome,
     Intent,
@@ -434,3 +435,51 @@ class TestVerifyIsHonestAboutWhatItCannotCheck:
 
         assert not result.ok
         assert any("version" in failure for failure in result.failures)
+
+
+class TestTheAssetClaimAlsoNamesItsDecision:
+    """
+    The same collision `trade` and `rwa_vault` had. Fixing two of the three
+    params types that carry outward-facing content and leaving the third is
+    worse than not having noticed: it reads as a decision rather than an
+    oversight.
+    """
+
+    def test_two_different_asset_decisions_do_not_hash_alike(self) -> None:
+        one = Intent(
+            action=ActionType.ACTION_TYPE_APPROVE,
+            asset=AssetIntent(asset_identifier="a-1", asset_domain="lodging"),
+        )
+        other = Intent(
+            action=ActionType.ACTION_TYPE_APPROVE,
+            asset=AssetIntent(asset_identifier="a-2", asset_domain="lodging"),
+        )
+
+        assert claim_digest(one) != claim_digest(other)
+
+    def test_the_asset_domain_is_part_of_the_claim(self) -> None:
+        """The same identifier in two domains is not the same asset."""
+        lodging = Intent(
+            action=ActionType.ACTION_TYPE_APPROVE,
+            asset=AssetIntent(asset_identifier="a-1", asset_domain="lodging"),
+        )
+        vehicles = Intent(
+            action=ActionType.ACTION_TYPE_APPROVE,
+            asset=AssetIntent(asset_identifier="a-1", asset_domain="vehicles"),
+        )
+
+        assert claim_digest(lodging) != claim_digest(vehicles)
+
+    def test_it_names_the_asset_it_decided(self) -> None:
+        intent = Intent(
+            action=ActionType.ACTION_TYPE_APPROVE,
+            asset=AssetIntent(
+                asset_identifier="a-1",
+                asset_domain="lodging",
+                action_type=ActionType.ACTION_TYPE_ACCEPT,
+            ),
+        )
+
+        assert canonical_claim(intent) == (
+            "action=approve;params=asset;asset=a-1;domain=lodging;asset_action=accept"
+        )

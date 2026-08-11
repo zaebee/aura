@@ -454,3 +454,46 @@ class TestTheReceiptTheMembraneMints:
 
         for secret in ("1000", "777", "500", "1050"):
             assert secret not in rendered
+
+
+class TestAContextWithNullNumbers:
+    """
+    A Struct round-trips a JSON null back as None, and the outbound path read
+    `float(str(ctx_meta.get(...)))` — so `float("None")` raised ValueError.
+
+    Nothing catches it. `MetabolicLoop.execute` wraps neither membrane call, so
+    the exception leaves the cycle entirely and the negotiation is lost. That is
+    the wrong failure for the component whose whole job is to be the thing that
+    does not let a bad decision out: refusing safely is its business, crashing
+    is not.
+    """
+
+    @pytest.mark.asyncio
+    async def test_a_null_floor_does_not_crash_the_outbound_path(self) -> None:
+        decision = await guarded_membrane().inspect_outbound(
+            counter_intent(price=2000.0),
+            Context(metadata=make_struct({"floor_price": None})),
+        )
+
+        assert decision.receipt.outcome == DecisionOutcome.DECISION_OUTCOME_EMIT
+
+    @pytest.mark.asyncio
+    async def test_a_null_cost_does_not_crash_the_outbound_path(self) -> None:
+        decision = await guarded_membrane().inspect_outbound(
+            counter_intent(price=2000.0),
+            Context(
+                metadata=make_struct({"floor_price": "1000.0", "internal_cost": None})
+            ),
+        )
+
+        assert decision.receipt.derivation.derivation_hash != ""
+
+    @pytest.mark.asyncio
+    async def test_an_unparseable_floor_does_not_crash_either(self) -> None:
+        """Same failure, different input: the guard is not a parser."""
+        decision = await guarded_membrane().inspect_outbound(
+            counter_intent(price=2000.0),
+            Context(metadata=make_struct({"floor_price": "not a number"})),
+        )
+
+        assert decision.receipt.outcome == DecisionOutcome.DECISION_OUTCOME_EMIT

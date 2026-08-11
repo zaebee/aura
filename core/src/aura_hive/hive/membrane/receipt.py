@@ -22,6 +22,7 @@ from typing import Any
 import betterproto
 from aura_core_gen.aura.core.v1 import (
     ActionType,
+    AssetIntent,
     DecisionDerivation,
     DecisionOutcome,
     DecisionReceipt,
@@ -136,8 +137,24 @@ def canonical_claim(intent: Intent) -> str:
             f"wallet={vault.wallet_address}"
         )
 
-    # Anything else — including the bare ERROR Intent the FAILURE_RECOVERY path
-    # arrives with — has no decidable content beyond its shape.
+    if params_name == "asset" and params_value is not None:
+        asset: AssetIntent = params_value
+        # The domain is part of the claim: the same identifier in two domains is
+        # not the same asset.
+        return (
+            f"{shape};"
+            f"asset={asset.asset_identifier};"
+            f"domain={asset.asset_domain};"
+            f"asset_action={_action_name(asset.action_type)}"
+        )
+
+    # Anything else has no decidable content beyond its shape, and the fallback
+    # is a stated boundary rather than an oversight. It covers the bare ERROR
+    # Intent the FAILURE_RECOVERY path arrives with, and `audit` / `ui`, which
+    # are internal control intents whose content is mostly prose — narratives
+    # and rendering instructions. Their receipts identify a shape, not a
+    # decision. Any params type that grows outward-facing content needs a branch
+    # above, or it inherits the collision this fallback carries.
     return shape
 
 
