@@ -21,6 +21,7 @@ from aura_core_gen.aura.core.v1 import (
     DecisionOutcome,
     Intent,
     NegotiationIntent,
+    Observation,
     RWAComplianceScore,
     RWAVaultIntent,
     TradeIntent,
@@ -197,6 +198,75 @@ class TestTheIntentNeverCarriesAValue:
         sequence = decision.derivation.gate_sequence
         for secret in ("1000", "777", str(price), str(int(price))):
             assert secret not in sequence
+
+
+class TestAGuardThatReportsNothingUsable:
+    """
+    The Membrane reads the record out of whatever the guard skill reported, and
+    a skill is free to report an Observation it did not fill in.
+
+    Neither case below is reachable from `GuardSkill` today, which always
+    returns both keys as strings. They are guarded because this PR moved
+    `metadata.to_dict()` onto the passing path, where it had never run before —
+    the failure path was the only caller until now — and because attaching a
+    derivation built from junk is the exact thing the empty-record rule exists
+    to prevent.
+    """
+
+    class _SilentGuard:
+        """A guard protein that answers without filling in its metadata."""
+
+        def __init__(self, observation: Observation) -> None:
+            self._observation = observation
+
+        def get_name(self) -> str:
+            return "guard"
+
+        async def execute(self, intent: str, params: dict) -> Observation:
+            return self._observation
+
+    def membrane_reporting(self, observation: Observation) -> HiveMembrane:
+        registry = SkillRegistry()
+        registry.register("guard", self._SilentGuard(observation))
+        return HiveMembrane(registry=registry)
+
+    @pytest.mark.asyncio
+    async def test_an_observation_without_metadata_does_not_take_the_guard_down(
+        self,
+    ) -> None:
+        """
+        A crash here would lose the negotiation, and it would do so inside the
+        one component whose job is to never let a bad decision out.
+        """
+        membrane = self.membrane_reporting(Observation(success=True, metadata=None))
+
+        decision = await membrane.inspect_outbound(
+            counter_intent(price=2000.0), negotiation_context()
+        )
+
+        assert decision.outcome == DecisionOutcome.DECISION_OUTCOME_EMIT
+        assert decision.derivation.derivation_hash == ""
+
+    @pytest.mark.asyncio
+    async def test_a_null_valued_record_is_not_attached_as_the_word_none(self) -> None:
+        """
+        `str(None)` is "None", which is truthy — so the naive read would attach a
+        DecisionDerivation whose sequence is the literal text None and whose
+        hash claims a derivation that never ran.
+        """
+        membrane = self.membrane_reporting(
+            Observation(
+                success=True,
+                metadata=make_struct({"gate_sequence": None, "derivation_hash": None}),
+            )
+        )
+
+        decision = await membrane.inspect_outbound(
+            counter_intent(price=2000.0), negotiation_context()
+        )
+
+        assert decision.derivation.gate_sequence == ""
+        assert decision.derivation.derivation_hash == ""
 
 
 class TestNoDeclaredGateRan:
