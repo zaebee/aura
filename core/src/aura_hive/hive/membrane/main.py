@@ -1,4 +1,4 @@
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from typing import Any, cast
 
@@ -108,18 +108,60 @@ class _Verdict:
     offers, read back which invariants answered, and the shape of the hidden
     floor falls out. This constrains only what is recorded; every gate still
     executes.
+
+    `override_scope` rides the same first-wins call as `gate` rather than
+    being a field a call site sets on its own. Two bugs followed from letting
+    it be independent: a later, unrelated `record()` call (e.g. the
+    post-condition failing after DLP already fired) left a stale scope
+    describing a gate that no longer explains the final outcome, and a second
+    OVERRIDE-outcome call downstream of the first could overwrite the scope
+    for a gate it did not win against — `gate` staying DLP_BLOCK while
+    `override_scope` said "value" because the *safe-offer* site, not the DLP
+    site, wrote last. Pairing the write with the same guard that already
+    decides which gate is reported closes both: whatever `_gate_scope` holds
+    was written in the same call that produced `gate`, so it can never
+    describe a different intervention. `override_scope` is exposed as a
+    property recomputed from `self.outcome` on every read rather than a
+    cached value some call site is trusted to clear, so a decision that moves
+    past OVERRIDE (the post-condition rejecting the DLP-sanitised offer, for
+    instance) can never leave the property non-empty — there is no field left
+    to forget to reset.
     """
 
     outcome: DecisionOutcome = _EMIT
     gate: str = ""
     ruleset_version: str = ""
     derivation: DecisionDerivation | None = None
-    override_scope: str = ""
+    _gate_scope: str = field(default="", repr=False)
 
-    def record(self, outcome: DecisionOutcome, gate: str) -> None:
+    def record(self, outcome: DecisionOutcome, gate: str, scope: str = "") -> None:
         self.outcome = outcome
         if not self.gate:
             self.gate = gate
+            self._gate_scope = scope
+            if outcome == _OVERRIDE and not scope:
+                # A call site that reports OVERRIDE must say whether the
+                # substitution touched prose or value — `override_scope`
+                # trusts this rather than re-deriving it, and a call site that
+                # forgets should fail loudly in its own tests rather than
+                # ship a receipt that claims OVERRIDE with nothing to say
+                # about it.
+                raise ValueError(
+                    f"gate {gate!r} recorded outcome OVERRIDE with no scope; "
+                    "every OVERRIDE call site must pass 'prose' or 'value'"
+                )
+
+    @property
+    def override_scope(self) -> str:
+        """
+        The scope of the intervention `gate` names, or "" when the final
+        outcome is not OVERRIDE.
+
+        Derived from `self.outcome` on every read instead of stored plainly,
+        so it cannot outlive the OVERRIDE outcome that justified it — see the
+        class docstring for the failure this closes.
+        """
+        return self._gate_scope if self.outcome == _OVERRIDE else ""
 
     def read_guard_report(self, obs_meta: dict[str, Any]) -> None:
         """
@@ -641,14 +683,13 @@ class HiveMembrane(Membrane[Any, Intent, Context]):
         message = neg_intent.message if neg_intent else ""
         if "floor_price" in message.lower():
             _record_intervention("outbound", "DLP_BLOCK")
-            verdict.record(_OVERRIDE, "DLP_BLOCK")
             # The substitution here touches only the message — the sanitised
             # negotiation keeps the same price and item — so claim and emission
-            # hash alike. `override_scope` says why: a reader who sees the two
-            # hashes agree under an OVERRIDE outcome can tell "prose changed,
-            # value did not" from "this receipt claims a substitution that left
-            # no trace" without knowing which gate names are prose-only.
-            verdict.override_scope = "prose"
+            # hash alike. "prose" says why: a reader who sees the two hashes
+            # agree under an OVERRIDE outcome can tell "prose changed, value
+            # did not" from "this receipt claims a substitution that left no
+            # trace" without knowing which gate names are prose-only.
+            verdict.record(_OVERRIDE, "DLP_BLOCK", "prose")
             # Sanitised into a replacement rather than written back over the
             # caller's Intent. The receipt reports what the Membrane did by
             # comparing a digest of the proposal against a digest of what was
@@ -799,13 +840,16 @@ class HiveMembrane(Membrane[Any, Intent, Context]):
                 message=f"My counter-offer for this item is ${rounded_price:.2f}.",
             ),
         )
-        verdict.record(_OVERRIDE, reason)
         # The substitute price is decidable content, not prose: claim and
-        # emission differ here, but the field is set uniformly with the DLP
+        # emission differ here, but the scope is set uniformly with the DLP
         # site rather than left to be inferred from "the hashes happened to
         # differ" — a verifier checking the pairing reads this instead of a
-        # hardcoded list of which gates are prose-only.
-        verdict.override_scope = "value"
+        # hardcoded list of which gates are prose-only. First-gate-wins still
+        # applies: this write only sticks when nothing recorded a gate
+        # earlier in the same decision (e.g. a DLP block ahead of this one),
+        # in which case `gate` and `override_scope` both stay the earlier
+        # call's.
+        verdict.record(_OVERRIDE, reason, "value")
         return await self._finish(
             original, _replacing(original, replacement), verdict, request_id
         )

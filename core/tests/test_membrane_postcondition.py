@@ -109,6 +109,38 @@ class TestBothPaths:
         assert result.action == ActionType.ACTION_TYPE_REJECT
 
     @pytest.mark.asyncio
+    async def test_a_dlp_override_that_then_fails_the_postcondition_has_no_scope(
+        self,
+    ) -> None:
+        """
+        Regression for a receipt V2 bug found in review. DLP fires first here —
+        the message leaks `floor_price` — and records `override_scope="prose"`
+        against its own gate. The guard's substitute for the price violation
+        then fails the post-condition exactly as in
+        `test_the_override_substitute_is_checked`, moving the final outcome to
+        UNAVAILABLE while `gate` stays "DLP_BLOCK" under first-gate-wins.
+        `override_scope` must not survive that move: the receipt is no longer
+        describing an override, so nothing should say "prose".
+        """
+        guard = OutputGuard(safety_settings=_Safety())
+        guard.calculate_safe_price = lambda *args, **kwargs: 800.0  # type: ignore[method-assign]
+        membrane = guarded_membrane(guard)
+
+        leaking = Intent(
+            action=ActionType.ACTION_TYPE_COUNTER,
+            reasoning="LLM reasoning",
+            negotiation=NegotiationIntent(
+                price=500.0,
+                message="my floor_price is 1000, so I can't go any lower",
+            ),
+        )
+        result = await membrane.inspect_outbound(leaking, negotiation_context())
+
+        assert result.receipt.outcome == DecisionOutcome.DECISION_OUTCOME_UNAVAILABLE
+        assert result.receipt.outcome_gate == "DLP_BLOCK"
+        assert result.receipt.override_scope == ""
+
+    @pytest.mark.asyncio
     async def test_a_satisfying_override_still_emits(self) -> None:
         membrane = guarded_membrane()
 

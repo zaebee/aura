@@ -6,6 +6,7 @@ from aura_core_gen.aura.core.v1 import (
     AgentIdentity,
     Context,
     ContextType,
+    DecisionOutcome,
     HiveContextData,
     Intent,
     NegotiationIntent,
@@ -153,6 +154,16 @@ async def test_membrane_combined_violations():
     assert "floor_price" not in safe_decision.negotiation.message.lower()
     assert "FLOOR_PRICE_VIOLATION" in safe_decision.reasoning
     assert "DLP block" in safe_decision.reasoning
+
+    # DLP fires first here and records "DLP_BLOCK" as the gate — first-gate-
+    # wins keeps it that way even though the price override records its own
+    # OVERRIDE outcome afterward. `override_scope` has to agree with which
+    # gate is actually reported: it must read "prose" (what DLP touched), not
+    # "value" (what the later price override touched), or the receipt would
+    # describe an intervention that is not the one `outcome_gate` names.
+    assert safe_decision.receipt.outcome == DecisionOutcome.DECISION_OUTCOME_OVERRIDE
+    assert safe_decision.receipt.outcome_gate == "DLP_BLOCK"
+    assert safe_decision.receipt.override_scope == "prose"
 
 
 @pytest.mark.asyncio
