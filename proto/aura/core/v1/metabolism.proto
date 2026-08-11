@@ -442,6 +442,12 @@ message NegotiationObservation {
     OfferCountered countered = 6;
     OfferRejected rejected = 7;
   }
+
+  // Carried through from the Intent the Connector acted on, so it survives to
+  // the client. Every message in this chain is re-assembled field by field
+  // rather than passed along, so the receipt has to be copied deliberately at
+  // each hop or it is silently dropped — which is where it used to die.
+  DecisionReceipt receipt = 8;
 }
 
 message OfferAccepted {

@@ -3,7 +3,12 @@ from typing import Any, cast
 
 import betterproto
 import structlog
-from aura_core import Membrane, SkillRegistry, make_struct
+from aura_core import (
+    Membrane,
+    SkillRegistry,
+    decision_outcome_name,
+    make_struct,
+)
 from aura_core_gen.aura.core.v1 import (
     ActionType,
     Context,
@@ -197,15 +202,6 @@ def _context_number(ctx_meta: dict[str, Any], key: str, default: float) -> float
         return default
 
 
-def _outcome_label(outcome: Any) -> str:
-    """`override`, not `2` — the log line is read by people."""
-    try:
-        name = DecisionOutcome(int(outcome)).name or ""
-    except (ValueError, TypeError, AttributeError):
-        return f"outcome_{outcome}"
-    return name.removeprefix("DECISION_OUTCOME_").lower()
-
-
 def _action_label(action: Any) -> str:
     """Safely convert ActionType or raw int to a lowercase name string."""
     try:
@@ -242,7 +238,7 @@ class HiveMembrane(Membrane[Any, Intent, Context]):
             logger.info(
                 "membrane_receipt",
                 prefix=emission.receipt.canonical_prefix,
-                outcome=_outcome_label(emission.receipt.outcome),
+                outcome=decision_outcome_name(emission.receipt.outcome),
                 gate=emission.receipt.outcome_gate or None,
                 ruleset=emission.receipt.ruleset_version or None,
                 attested=bool(emission.receipt.signature),

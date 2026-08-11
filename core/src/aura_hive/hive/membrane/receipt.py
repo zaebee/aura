@@ -26,6 +26,7 @@ from dataclasses import dataclass, replace
 from typing import Any
 
 import betterproto
+from aura_core import decision_outcome_name
 from aura_core_gen.aura.core.v1 import (
     ActionType,
     AssetIntent,
@@ -202,7 +203,7 @@ def _content_fields(receipt: DecisionReceipt) -> str:
             receipt.ruleset_version,
             derivation.derivation_hash,
             receipt.emission_hash,
-            str(int(receipt.outcome)),
+            decision_outcome_name(receipt.outcome),
             receipt.outcome_gate,
         ]
     )
