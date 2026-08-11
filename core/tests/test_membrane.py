@@ -99,7 +99,14 @@ async def test_membrane_rule2_data_leak_prevention():
     safe_decision = await membrane.inspect_outbound(decision, context)
 
     assert "floor_price" not in safe_decision.negotiation.message.lower()
-    assert "cannot disclose internal pricing" in safe_decision.negotiation.message
+    # Neutral phrasing, not "I cannot disclose internal pricing details." —
+    # that line announced a DLP rule had fired. See
+    # core/tests/test_membrane_override_message.py for the message-shape
+    # regression tests.
+    assert (
+        "My counter-offer for this item is $120.00."
+        == safe_decision.negotiation.message
+    )
     assert "DLP block" in safe_decision.reasoning
 
 

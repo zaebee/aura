@@ -128,9 +128,17 @@ class GuardSkill(
                 # skill entirely — which is exactly why calculate_safe_price's
                 # own GuardUnavailable is caught right here instead.
                 try:
+                    violation_context = params.get("context") or {}
+                    # `request_id` rides in `context` here rather than arriving
+                    # as its own param: this call is reached from inside the
+                    # generic `validate_decision` failure handling, which has
+                    # no dedicated request_id field of its own to forward —
+                    # only the context dict the Membrane already built it into.
                     report["safe_price"] = str(
                         self.provider.calculate_safe_price(
-                            params.get("context") or {}, e.code
+                            violation_context,
+                            e.code,
+                            str(violation_context.get("request_id", "")),
                         )
                     )
                 except GuardUnavailable as unavailable:
@@ -179,7 +187,9 @@ class GuardSkill(
     async def _get_safe_price(self, params: dict[str, Any]) -> Observation:
         assert self.provider is not None
         p_safe = SafePriceParams(**params)
-        price = self.provider.calculate_safe_price(p_safe.context, p_safe.reason)
+        price = self.provider.calculate_safe_price(
+            p_safe.context, p_safe.reason, p_safe.request_id
+        )
         return Observation(
             success=True,
             metadata=make_struct({"safe_price": str(price)}),

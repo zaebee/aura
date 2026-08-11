@@ -505,6 +505,14 @@ class HiveMembrane(Membrane[Any, Intent, Context]):
         ctx_meta = context.metadata.to_dict()
         floor_price = _context_number(ctx_meta, "floor_price", 0.0)
 
+        # The session id the substitute price's jitter is keyed on. Read via
+        # `which_one_of` rather than `context.hive` — `Context.data` is a
+        # oneof, and a message field is never `None` on betterproto, so an
+        # identity check on the field would always be true and this would
+        # read a default-constructed HiveContextData instead of "absent".
+        hive = betterproto.which_one_of(context, "data")[1]
+        request_id = getattr(hive, "request_id", "") if hive else ""
+
         # Accumulated as the path proceeds and minted once, at whichever return
         # is taken.
         verdict = _Verdict()
@@ -578,7 +586,11 @@ class HiveMembrane(Membrane[Any, Intent, Context]):
             # as the floor rather than as free, so a context that never
             # supplied one does not vacuously satisfy the margin clause.
             internal_cost = _context_number(ctx_meta, "internal_cost", floor_price)
-            guard_context = {"floor_price": floor_price, "internal_cost": internal_cost}
+            guard_context = {
+                "floor_price": floor_price,
+                "internal_cost": internal_cost,
+                "request_id": request_id,
+            }
 
             safe_price = floor_price * 1.05
             if self.registry:
@@ -588,6 +600,7 @@ class HiveMembrane(Membrane[Any, Intent, Context]):
                     {
                         "context": {"floor_price": floor_price},
                         "reason": "FAILURE_RECOVERY",
+                        "request_id": request_id,
                     },
                 )
                 if obs_safe.success:
@@ -618,7 +631,13 @@ class HiveMembrane(Membrane[Any, Intent, Context]):
                         item_identifier=neg_intent.item_identifier,
                         item_domain=neg_intent.item_domain,
                         price=neg_intent.price,
-                        message="I cannot disclose internal pricing details.",
+                        # Neutral rather than "I cannot disclose internal
+                        # pricing details.": that line told the counterparty
+                        # a DLP rule had fired, which is exactly the kind of
+                        # tell this exists to remove. See the override
+                        # message below for the fuller rationale — the two
+                        # are the same fix applied at two emission points.
+                        message=f"My counter-offer for this item is ${neg_intent.price:.2f}.",
                         thought=neg_intent.thought,
                     ),
                 )
@@ -646,7 +665,11 @@ class HiveMembrane(Membrane[Any, Intent, Context]):
             return await self._finish(claim, decision, verdict)
 
         internal_cost = _context_number(ctx_meta, "internal_cost", floor_price)
-        guard_context = {"floor_price": floor_price, "internal_cost": internal_cost}
+        guard_context = {
+            "floor_price": floor_price,
+            "internal_cost": internal_cost,
+            "request_id": request_id,
+        }
 
         price = neg_intent.price if neg_intent else 0.0
         # Map ActionType to strings expected by OutputGuard
@@ -729,8 +752,15 @@ class HiveMembrane(Membrane[Any, Intent, Context]):
                 }
             ),
             negotiation=NegotiationIntent(
+                # Deliberately indistinguishable from an ordinary counter. The
+                # old text announced "I've reached my final limit", which told
+                # the counterparty a guard had fired — and since the substitute
+                # is a function of the hidden floor, that is most of the way to
+                # inverting it. This reduces distinguishability rather than
+                # removing it: a template still reads differently from the
+                # model's own prose.
                 price=rounded_price,
-                message=f"I've reached my final limit for this item. My best offer is ${rounded_price:.2f}.",
+                message=f"My counter-offer for this item is ${rounded_price:.2f}.",
             ),
         )
         verdict.record(_OVERRIDE, reason)
