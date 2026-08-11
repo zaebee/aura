@@ -6,6 +6,7 @@ from aura_core import Membrane, SkillRegistry, make_struct
 from aura_core_gen.aura.core.v1 import (
     ActionType,
     Context,
+    DecisionOutcome,
     Intent,
     NegotiationIntent,
     RWAVaultIntent,
@@ -70,6 +71,70 @@ def _record_intervention(direction: str, reason: str, **fields: Any) -> None:
         logger.error(
             "membrane_metric_failed", direction=direction, reason=reason, error=str(e)
         )
+
+
+# betterproto enums subclass int, so mypy reads a bare member access as `int`
+# (the same reason ActionType is cast at every use below). Casting once here
+# beats repeating it at each call site.
+_EMIT = cast(DecisionOutcome, DecisionOutcome.DECISION_OUTCOME_EMIT)
+_OVERRIDE = cast(DecisionOutcome, DecisionOutcome.DECISION_OUTCOME_OVERRIDE)
+_REFUSE = cast(DecisionOutcome, DecisionOutcome.DECISION_OUTCOME_REFUSE)
+
+
+def _stamp(decision: Intent, outcome: DecisionOutcome, gate: str) -> Intent:
+    """
+    Record what the Membrane did, on the Intent that will actually be sent.
+
+    First gate wins. A decision that trips DLP and then the floor check records
+    DLP_BLOCK, the earlier one: reporting every gate that fired would hand an
+    adversary an oracle over the policy configuration — probe with crafted
+    offers, read back which invariants answered, and the shape of the hidden
+    floor falls out.
+
+    This constrains only what is *recorded*. Every gate still executes;
+    short-circuiting the floor check to keep the label tidy would trade a
+    guarantee for a string.
+    """
+    decision.outcome = outcome
+    if not decision.outcome_gate:
+        decision.outcome_gate = gate
+    return decision
+
+
+def _replacing(original: Intent, replacement: Intent) -> Intent:
+    """
+    Carry forward the fields that name the decision point rather than the decision.
+
+    Three outbound paths return a different Intent instead of editing the one
+    they were given — the two refusals and the safe-offer override — and a fresh
+    Intent starts blank. It still stands for the same point in the metabolic
+    cycle, so identity and trace belong to it as much as to what it replaced.
+
+    `outcome_gate` travels for a sharper reason: without it a decision that
+    tripped DLP and was then overridden by the floor check would report the
+    floor as the first gate, losing the earlier one.
+
+    Nothing reads `Intent.trace` today — the trace that reaches the Observation
+    comes from `Context.trace` by way of the Connector. Carrying it is cheap and
+    keeps the replacement honest before some later consumer trusts the field.
+    """
+    replacement.identifier = original.identifier
+    replacement.trace = original.trace
+    replacement.outcome_gate = original.outcome_gate
+    return replacement
+
+
+def _settle(decision: Intent) -> Intent:
+    """
+    Nothing further fired, so the Membrane emitted what it was given.
+
+    EMIT is claimed only when no earlier gate has already stamped this Intent —
+    a message sanitised by DLP is still an override even though the price that
+    follows it passes the guard untouched.
+    """
+    if not decision.outcome_gate:
+        decision.outcome = _EMIT
+    return decision
 
 
 def _action_label(action: Any) -> str:
@@ -192,13 +257,20 @@ class HiveMembrane(Membrane[Any, Intent, Context]):
                     violation_code=rwa_intent.compliance.violation_code,
                     wallet_address=rwa_intent.wallet_address,
                 )
-                return Intent(
-                    action=cast(ActionType, ActionType.ACTION_TYPE_REJECT),
-                    reasoning=decision.reasoning
-                    + " [MEMBRANE: KYC compliance failure]",
-                    rwa_vault=rwa_intent,
+                return _stamp(
+                    _replacing(
+                        decision,
+                        Intent(
+                            action=cast(ActionType, ActionType.ACTION_TYPE_REJECT),
+                            reasoning=decision.reasoning
+                            + " [MEMBRANE: KYC compliance failure]",
+                            rwa_vault=rwa_intent,
+                        ),
+                    ),
+                    _REFUSE,
+                    "KYC_FAILURE",
                 )
-            return decision
+            return _settle(decision)
 
         # Trade intent guard: backstop for high-risk trades that slipped through
         if params_name == "trade" and params_value is not None:
@@ -212,13 +284,20 @@ class HiveMembrane(Membrane[Any, Intent, Context]):
                     risk_score=risk_score,
                     risk_category=trade_intent.validation_score.risk_category,
                 )
-                return Intent(
-                    action=cast(ActionType, ActionType.ACTION_TYPE_REJECT),
-                    reasoning=decision.reasoning
-                    + " [MEMBRANE: high-risk trade blocked]",
-                    trade=trade_intent,
+                return _stamp(
+                    _replacing(
+                        decision,
+                        Intent(
+                            action=cast(ActionType, ActionType.ACTION_TYPE_REJECT),
+                            reasoning=decision.reasoning
+                            + " [MEMBRANE: high-risk trade blocked]",
+                            trade=trade_intent,
+                        ),
+                    ),
+                    _REFUSE,
+                    "HIGH_RISK_TRADE",
                 )
-            return decision
+            return _settle(decision)
 
         neg_intent = params_value if params_name == "negotiation" else None
 
@@ -250,16 +329,17 @@ class HiveMembrane(Membrane[Any, Intent, Context]):
                 neg_intent.message = "I cannot disclose internal pricing details."
             decision.reasoning += " [MEMBRANE: DLP block]"
             _record_intervention("outbound", "DLP_BLOCK")
+            _stamp(decision, _OVERRIDE, "DLP_BLOCK")
 
         if decision.action not in [
             ActionType.ACTION_TYPE_ACCEPT,
             ActionType.ACTION_TYPE_COUNTER,
         ]:
-            return decision
+            return _settle(decision)
 
         # 3. Call Guard Protein for validation
         if not self.registry:
-            return decision
+            return _settle(decision)
 
         internal_cost = float(str(ctx_meta.get("internal_cost", floor_price)))
         guard_context = {"floor_price": floor_price, "internal_cost": internal_cost}
@@ -291,7 +371,7 @@ class HiveMembrane(Membrane[Any, Intent, Context]):
 
             return self._override_with_safe_offer(decision, safe_price, reason)
 
-        return decision
+        return _settle(decision)
 
     def _override_with_safe_offer(
         self, original: Intent, safe_price: float, reason: str
@@ -305,7 +385,7 @@ class HiveMembrane(Membrane[Any, Intent, Context]):
         if original.reasoning:
             new_thought = f"{original.reasoning} | {new_thought}"
 
-        return Intent(
+        replacement = Intent(
             action=cast(ActionType, ActionType.ACTION_TYPE_COUNTER),
             reasoning=new_thought,
             metadata=make_struct(
@@ -320,3 +400,4 @@ class HiveMembrane(Membrane[Any, Intent, Context]):
                 message=f"I've reached my final limit for this item. My best offer is ${rounded_price:.2f}.",
             ),
         )
+        return _stamp(_replacing(original, replacement), _OVERRIDE, reason)
