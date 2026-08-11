@@ -1,6 +1,6 @@
-import logging
 from typing import Any
 
+import structlog
 from aura_core import SkillProtocol, SkillRegistry, make_struct
 from aura_core_gen.aura.core.v1 import Observation
 
@@ -9,7 +9,7 @@ from aura_hive.config.policy import SafetySettings
 from .engine import Derivation, OutputGuard, SafetyViolation
 from .schema import SafePriceParams, ValidationParams, VisionValidationParams
 
-logger = logging.getLogger(__name__)
+logger = structlog.get_logger(__name__)
 
 
 def _derivation_fields(
@@ -126,7 +126,7 @@ class GuardSkill(
                 success=False, error=str(e), metadata=make_struct(report)
             )
         except Exception as e:
-            logger.error(f"Guard skill error: {e}")
+            logger.error("guard_skill_error", intent=intent, error=str(e))
             return Observation(success=False, error=str(e))
 
     async def _validate_decision(self, params: dict[str, Any]) -> Observation:
@@ -185,9 +185,9 @@ class GuardSkill(
 
         if not observation.success:
             logger.error(
-                "sanctification_lookup_failed wallet=%s error=%s",
-                wallet_address,
-                observation.error,
+                "sanctification_lookup_failed",
+                wallet=wallet_address,
+                error=observation.error,
             )
             raise SafetyViolation(
                 f"Could not establish whether wallet {wallet_address!r} is "
