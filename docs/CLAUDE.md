@@ -161,8 +161,13 @@ single-purpose, use biological names) rather than reinforcing the drift.
 Generated messages (`aura_core_gen`) use betterproto, whose treatment of unset
 fields catches everyone — one real bug and four false alarms in a single
 afternoon of reviews. **Three kinds of field behave three different ways, and
-the two obvious tests for absence disagree with each other.** Verified against
-the version in this workspace; re-check before trusting it after an upgrade.
+the two obvious tests for absence disagree with each other.**
+
+Verified against this workspace **with `aura_core` imported**, which matters:
+`aura_core.struct_utils` patches `Message.__getattribute__` at import time, so
+one of the behaviours below is ours rather than the library's (see the oneof
+rule). A probe whose imports do not match the code it stands in for will report
+something the application does not do. Re-check after a betterproto upgrade.
 
 ```python
 Observation().metadata is None    # False — default-constructed on ACCESS
@@ -178,21 +183,36 @@ Observation(metadata=None).metadata is None   # True — explicit None really is
 
 **Rules of thumb:**
 
-- **Test absence by value, never by identity.** `if not receipt.version`, not
-  `if receipt is None`. An identity check on a message field never fires, and
-  the failure is silent — in #265 every receipt-less response rendered a JSON
-  object full of empty strings because `if receipt is None` was dead code.
-- **Oneof members behave differently again — they raise.** Reading one that is
-  not the member currently set is an `AttributeError`, not `None`:
+- **Test absence by value, never by identity.** An identity check on a message
+  field never fires, and the failure is silent — in #265 every receipt-less
+  response rendered a JSON object full of empty strings because
+  `if receipt is None` was dead code.
+
+  `if not receipt:` is the concise safe form: falsy for a default-constructed
+  message *and* for an explicit `None`. Use `if not receipt.version:` when the
+  question is "is this well-formed" rather than "is there anything here" — but
+  note it raises on an explicit `None`, so the belt-and-braces version is
+  `if receipt is None or not receipt.version:`.
+- **Oneof members are `None` when inactive — but only because we patch them.**
+  Stock betterproto raises `AttributeError` naming the member that *is* set.
+  `aura_core.struct_utils` replaces `Message.__getattribute__` at import time so
+  inactive members return `None` instead, because betterproto's own `dump()`
+  compares nested messages with `==`, and the dataclass `__eq__` touches every
+  field — including inactive oneof members — which made serialisation raise.
 
   ```python
-  Intent().negotiation            # AttributeError: 'params' is set to None, not 'negotiation'
-  intent_with_negotiation.audit   # AttributeError: 'params' is set to 'negotiation', not 'audit'
-  betterproto.which_one_of(Intent(), "params")   # ('', None) — the safe read
+  # with aura_core imported, i.e. every real code path
+  Intent().negotiation          # None
+  # without it — a bare script, an isolated test
+  Intent().negotiation          # AttributeError: 'params' is set to None, not 'negotiation'
   ```
 
-  So `which_one_of()` is mandatory rather than idiomatic. Reading a member
-  directly is fine only where you have already established it is the one set.
+  So `if intent.negotiation:` works in the application and may not in a probe
+  you write to check something. **`betterproto.which_one_of()` is unaffected by
+  the patch and is the read that behaves the same either way** — prefer it, and
+  be suspicious of any experiment whose imports do not match the code it is
+  standing in for.
+
 - **A truthiness check is not a value check.** `bool(receipt.signature)` is
   `False` for an unset signature but `True` for one carrying a scheme and no
   signature. If the field has a load-bearing member, check that member.
