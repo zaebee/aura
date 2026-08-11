@@ -156,6 +156,11 @@ def _mint_for(claim: Intent, emission: Intent, verdict: _Verdict) -> DecisionRec
     )
 
 
+def _as_dict(struct: Any) -> dict[str, Any]:
+    """A protobuf Struct as a plain dict, tolerating one that is not there."""
+    return struct.to_dict() if struct is not None else {}
+
+
 def _replacing(original: Intent, replacement: Intent) -> Intent:
     """
     Carry forward the fields that name the decision point rather than the decision.
@@ -182,7 +187,13 @@ def _replacing(original: Intent, replacement: Intent) -> Intent:
     # original's metadata must not bury that. Keys the replacement did not set
     # survive, which is the whole point — a hand-written replacement drops them
     # silently, since the constructor is happy to default them and nothing warns.
-    merged = {**original.metadata.to_dict(), **replacement.metadata.to_dict()}
+    # Read defensively. The paths that build replacements omit metadata rather
+    # than passing None, and betterproto default-constructs the field on access,
+    # so neither read can raise today. But this helper is the one place four
+    # paths funnel through, and it exists precisely because hand-built
+    # replacements lose what nobody remembered — it should not be the thing that
+    # raises on a caller who built one badly.
+    merged = {**_as_dict(original.metadata), **_as_dict(replacement.metadata)}
     if merged:
         replacement.metadata = make_struct(merged)
 

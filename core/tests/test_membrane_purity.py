@@ -174,3 +174,38 @@ class TestTheInterventionStaysVisible:
         assert sent.receipt.outcome_gate == "DLP_BLOCK"
         assert sent.receipt.claim_hash == sent.receipt.emission_hash
         assert sent.negotiation.message != "our floor_price is 1000"
+
+
+class TestReplacingSurvivesAMalformedOriginal:
+    """
+    `_replacing` is the one place four paths funnel through, and it exists
+    because hand-built replacements drop what nobody remembered. A helper whose
+    job is defensive completeness should not itself assume its inputs are
+    well-formed.
+
+    Not reachable today: the paths that build replacements omit metadata rather
+    than passing None, and betterproto default-constructs the field on access.
+    But `metadata=None` is a legal construction, and this helper is the last
+    thing that should raise.
+    """
+
+    def test_an_original_with_null_metadata_does_not_take_it_down(self) -> None:
+        from aura_hive.hive.membrane.main import _replacing
+
+        original = Intent(action=ActionType.ACTION_TYPE_COUNTER, metadata=None)
+        replacement = Intent(action=ActionType.ACTION_TYPE_REJECT)
+
+        assert _replacing(original, replacement) is replacement
+
+    def test_a_replacement_with_null_metadata_still_inherits(self) -> None:
+        from aura_hive.hive.membrane.main import _replacing
+
+        original = Intent(
+            action=ActionType.ACTION_TYPE_COUNTER,
+            metadata=make_struct({"trace_note": "keep me"}),
+        )
+        replacement = Intent(action=ActionType.ACTION_TYPE_REJECT, metadata=None)
+
+        assert _replacing(original, replacement).metadata.to_dict() == {
+            "trace_note": "keep me"
+        }
