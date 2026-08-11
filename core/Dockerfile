@@ -68,13 +68,7 @@ RUN python -c "import grpc_health.v1.health_pb2"
 # The guard's rules are a data file beside its code, not Python, so nothing in
 # the build would otherwise notice it missing — and the failure would surface
 # at runtime as a guard that refuses every decision. Load it here instead.
-#
-# Loaded by path rather than as aura_hive.hive.proteins.guard.ruleset: importing
-# through the package pulls aura_hive.config, which builds Settings() at import
-# time and demands a database URL no build stage has. ruleset.py has no local
-# imports, so it loads standalone — if that ever stops being true, this check
-# fails loudly rather than silently passing.
-RUN python -c "import sys; sys.path.insert(0, '/app/core/src/aura_hive/hive/proteins/guard'); import ruleset; print(ruleset.load_ruleset().version_string)"
+RUN python -c "from aura_hive.hive.proteins.guard.ruleset import load_ruleset; print(load_ruleset().version_string)"
 
 EXPOSE 50051
 EXPOSE 9091
