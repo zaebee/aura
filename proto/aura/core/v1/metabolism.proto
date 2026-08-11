@@ -183,6 +183,20 @@ message TelegramContextData {
 // INTENT - Decision made by the Transformer (T output)
 // =============================================================================
 
+// What the Membrane did to the Transformer's proposal on the way out.
+//
+// The distinction that matters is OVERRIDE vs REFUSE: the Membrane does not
+// only reject, it also substitutes deterministic safe values and lets the
+// exchange continue. Both were previously indistinguishable from an untouched
+// decision once the Intent left the process, since the only trace was an
+// aggregate counter and a sentence appended to free-text `reasoning`.
+enum DecisionOutcome {
+  DECISION_OUTCOME_UNSPECIFIED = 0;
+  DECISION_OUTCOME_EMIT = 1;       // passed every gate unaltered
+  DECISION_OUTCOME_OVERRIDE = 2;   // a gate fired; a safe value was substituted
+  DECISION_OUTCOME_REFUSE = 3;     // a gate fired; the action was rejected
+}
+
 message Intent {
   string identifier = 1;  // Schema.org compliant
   ActionType action = 2;
@@ -190,6 +204,19 @@ message Intent {
   repeated IntentStep steps = 4;
   google.protobuf.Struct metadata = 5;
   TraceContext trace = 6;
+
+  // Membrane verdict. Set at the outbound boundary, never by the Transformer.
+  DecisionOutcome outcome = 7;
+
+  // The invariant that fired, as the guard's own error code
+  // (FLOOR_PRICE_VIOLATION, DLP_BLOCK, KYC_FAILURE, ...). Empty when the
+  // outcome is EMIT.
+  //
+  // Records the FIRST gate that fired, not every gate that would have. A full
+  // set is an oracle over the policy configuration: probe with crafted offers,
+  // read back which invariants answered, and the shape of the hidden floor
+  // falls out. This constrains only what is recorded — every gate still runs.
+  string outcome_gate = 8;
 
   // Strictly typed action params
   oneof params {
