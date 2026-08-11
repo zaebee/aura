@@ -1,6 +1,9 @@
 import hashlib
+import hmac
+import secrets
 from collections.abc import Callable
 from dataclasses import dataclass
+from decimal import ROUND_CEILING, Decimal
 from typing import Any
 
 import structlog
@@ -11,15 +14,35 @@ from .ruleset import Ruleset, load_ruleset
 
 logger = structlog.get_logger(__name__)
 
-# Markup applied to the floor when a gate asks for the `floor_markup` strategy.
-# Not operator-tunable: unlike min_profit_margin this is the shape of the
-# fallback rather than a policy dial, so it belongs with the rules.
-_FLOOR_MARKUP = 1.05
+# Markup floor for the substitute. Not operator-tunable: unlike
+# min_profit_margin this is the shape of the fallback rather than a policy dial.
+_FLOOR_MARKUP = Decimal("1.05")
 
-# Used when the configured margin cannot be read or is out of range. Matches
-# the default on SafetySettings, so a deployment that loses its setting behaves
-# like one that never overrode it.
-_DEFAULT_MARGIN = 0.1
+# Used when the configured margin cannot be read or is out of range. Matches the
+# default on SafetySettings, so a deployment that loses its setting behaves like
+# one that never overrode it.
+_DEFAULT_MARGIN = Decimal("0.1")
+
+# Cent, as the quantum every emitted price is rounded to.
+_CENT = Decimal("0.01")
+
+# Upper bound on the multiplicative noise applied to a substitute price.
+#
+# Without it the substitute is a deterministic function of the hidden floor, and
+# a counterparty who receives one inverts it exactly. This bounds the disclosure
+# rather than closing it: the constant is public, so they still learn the floor
+# to within 3%. Closing the channel outright means refusing instead of
+# countering, which is a product decision taken the other way.
+_SAFE_OFFER_JITTER = Decimal("0.03")
+
+# Keyed on request_id so the noise is constant within a negotiation — redrawn
+# per decision, a counterparty averages it away over rounds.
+#
+# Process-lifetime random rather than configured, because nothing needs to
+# reproduce the price: the post-condition checks the value. So there is no
+# setting to add, no fail-closed branch for a missing secret, and nothing to
+# rotate. A restart mid-session reshuffles it, which only adds noise.
+_JITTER_SECRET = secrets.token_bytes(32)
 
 
 def _numeric(mapping: dict, key: str, default: float = 0.0) -> float:
@@ -45,6 +68,38 @@ def _numeric(mapping: dict, key: str, default: float = 0.0) -> float:
     except (TypeError, ValueError):
         logger.warning("guard_unusable_numeric_input", key=key, value=repr(value))
         return default
+
+
+def _decimal(mapping: dict, key: str, default: Decimal = Decimal(0)) -> Decimal:
+    """
+    Read a money value as Decimal, tolerating a caller who did not send one.
+
+    Via `str` rather than the float directly: Decimal(0.1) is
+    0.1000000000000000055511151231257827, and money arithmetic that starts there
+    ends somewhere a cent away.
+    """
+    value = mapping.get(key, None)
+    if value is None:
+        return default
+    try:
+        return Decimal(str(value))
+    except (TypeError, ValueError, ArithmeticError):
+        logger.warning("guard_unusable_numeric_input", key=key, value=repr(value))
+        return default
+
+
+def _jitter(request_id: str) -> Decimal:
+    """
+    Multiplicative noise in [0, _SAFE_OFFER_JITTER), stable for one request_id.
+
+    An empty request_id yields zero rather than a random draw: a caller with no
+    session to key on gets the deterministic price, and the absence is visible
+    in the number rather than hidden behind noise nobody can reproduce.
+    """
+    if not request_id:
+        return Decimal(0)
+    digest = hmac.new(_JITTER_SECRET, request_id.encode("utf-8"), "sha256").digest()
+    return _SAFE_OFFER_JITTER * Decimal(int.from_bytes(digest, "big")) / Decimal(2**256)
 
 
 # Separates records in the canonical sequence. ASCII unit separator: it cannot
@@ -277,55 +332,60 @@ class OutputGuard:
 
         return True
 
-    def _configured_margin(self) -> float:
+    def _configured_margin(self) -> Decimal:
         """
-        The configured minimum margin, clamped to a range that keeps
-        floor/(1-m) at or above the floor.
+        The configured minimum margin as Decimal, clamped to a range that keeps
+        the substitute at or above the floor.
 
         A margin at or above 1.0 makes the formula undefined or negative. A
-        margin below 0.0 is worse and was not caught before: floor/(1-(-0.5))
-        is floor/1.5, so a floor of 1000 came back as a "safe" price of 666.67.
-        `min_profit_margin` is env-configurable with no lower bound declared, so
-        that is one operator typo away, and the substitute price exists
+        margin below 0.0 is worse: floor/(1-(-0.5)) is floor/1.5, so a floor of
+        1000 came back as a "safe" price of 666.67, and the substitute exists
         precisely to be the thing that cannot undercut the floor.
-
-        This is also reached without any gate having run — the Membrane calls
-        `calculate_safe_price` directly on FAILURE_RECOVERY — so a bad setting
-        cannot be assumed to have been caught upstream.
         """
-        if self.settings is None:
-            return _DEFAULT_MARGIN
-
-        raw = getattr(self.settings, "min_profit_margin", None)
+        raw = (
+            getattr(self.settings, "min_profit_margin", None) if self.settings else None
+        )
         if raw is None:
             return _DEFAULT_MARGIN
 
         try:
-            margin = float(raw)
-        except (TypeError, ValueError):
+            margin = Decimal(str(raw))
+        except (TypeError, ValueError, ArithmeticError):
             logger.error("guard_margin_setting_unreadable_using_default", raw=raw)
             return _DEFAULT_MARGIN
 
-        if not 0.0 <= margin < 1.0:
-            logger.error("guard_margin_setting_out_of_range", margin=margin)
+        if not Decimal(0) <= margin < Decimal(1):
+            logger.error("guard_margin_setting_out_of_range", margin=str(margin))
             return _DEFAULT_MARGIN
 
         return margin
 
-    def calculate_safe_price(self, context: dict, reason: str) -> float:
+    def calculate_safe_price(
+        self, context: dict, reason: str = "", request_id: str = ""
+    ) -> float:
         """
-        Deterministic substitute price for the one strategy the rule set declares.
+        The deterministic substitute, by the one strategy the rule set declares.
 
-        `reason` is a gate code where one fired, but not always: the Membrane
-        passes FAILURE_RECOVERY when the Transformer itself blew up, and no gate
-        was involved. It is unused here — transitionally: this restores the old
-        margin-only formula so the module keeps compiling after the strategy
-        collapse. Task 3 replaces this body with the real `safe_offer`
-        computation (Decimal, ceiling, cost floor, jitter).
+        Rounds UP. `round()` goes to the nearest cent, which for a margin
+        substitute is toward breaching it half the time — at floor=100 and m=0.1
+        it produced 111.11 for a required 111.1111..., and a lower price is a
+        lower margin. A value that exists to be safe rounds toward the guarantee.
+
+        Reads `internal_cost`, not just the floor: the margin rule is stated
+        against cost, and where cost exceeds floor no price derived from the
+        floor alone can satisfy it.
+
+        `reason` is unused since the strategies collapsed. It stays in the
+        signature because two call sites pass it positionally, and removing it
+        is churn in a change that is already touching the arithmetic.
         """
-        floor = _numeric(context, "floor_price")
-        min_m = self._configured_margin()
-        return float(round(floor / (1 - min_m), 2))
+        floor = _decimal(context, "floor_price")
+        cost = _decimal(context, "internal_cost")
+        margin = self._configured_margin()
+
+        base = max(_FLOOR_MARKUP * floor, max(floor, cost) / (1 - margin))
+        jittered = base * (1 + _jitter(request_id))
+        return float(jittered.quantize(_CENT, rounding=ROUND_CEILING))
 
     def validate_transaction(
         self,

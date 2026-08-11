@@ -22,9 +22,9 @@ async def test_membrane_rule1_floor_price_override():
     """
     Rule 1: If price < floor_price, override to a guard-computed counter-offer.
 
-    The substitute price is currently floor / (1 - min_profit_margin) — the
-    single, transitional formula every gate shares since the strategy
-    collapse (Task 3 replaces this with the real `safe_offer` computation).
+    The substitute price is the `safe_offer` strategy every gate shares since
+    the strategy collapse: max(1.05*floor, max(floor, cost)/(1-margin)),
+    rounded up to the cent, with no request_id so no jitter is applied here.
     """
     from aura_hive.config.policy import SafetySettings
     from aura_hive.hive.proteins.guard.engine import OutputGuard
@@ -55,7 +55,9 @@ async def test_membrane_rule1_floor_price_override():
     safe_decision = await membrane.inspect_outbound(decision, context)
 
     assert safe_decision.action == ActionType.ACTION_TYPE_COUNTER
-    assert safe_decision.negotiation.price == pytest.approx(111.11)  # 100 / (1 - 0.1)
+    assert safe_decision.negotiation.price == pytest.approx(
+        111.12
+    )  # ceil(100 / (1 - 0.1), cent)
     assert "FLOOR_PRICE_VIOLATION" in safe_decision.reasoning
     assert safe_decision.metadata.to_dict()["original_price"] == "95.0"
 
@@ -138,7 +140,9 @@ async def test_membrane_combined_violations():
     safe_decision = await membrane.inspect_outbound(decision, context)
 
     assert safe_decision.action == ActionType.ACTION_TYPE_COUNTER
-    assert safe_decision.negotiation.price == pytest.approx(111.11)  # 100 / (1 - 0.1)
+    assert safe_decision.negotiation.price == pytest.approx(
+        111.12
+    )  # ceil(100 / (1 - 0.1), cent)
     assert "floor_price" not in safe_decision.negotiation.message.lower()
     assert "FLOOR_PRICE_VIOLATION" in safe_decision.reasoning
     assert "DLP block" in safe_decision.reasoning

@@ -159,7 +159,7 @@ class TestSafePriceStrategy:
         """
         assert guard(_Safety()).calculate_safe_price(
             context(), "FAILURE_RECOVERY"
-        ) == pytest.approx(1111.11)
+        ) == pytest.approx(1111.12)
 
 
 class TestSafePriceNeverUndercutsTheFloor:
