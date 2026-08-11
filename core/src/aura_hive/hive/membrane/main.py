@@ -201,7 +201,7 @@ def _outcome_label(outcome: Any) -> str:
     """`override`, not `2` — the log line is read by people."""
     try:
         name = DecisionOutcome(int(outcome)).name or ""
-    except (ValueError, TypeError):
+    except (ValueError, TypeError, AttributeError):
         return f"outcome_{outcome}"
     return name.removeprefix("DECISION_OUTCOME_").lower()
 
@@ -211,8 +211,8 @@ def _action_label(action: Any) -> str:
     try:
         name = ActionType(int(action)).name
         return name.lower() if name else f"action_{int(action)}"
-    except (ValueError, AttributeError):
-        return f"action_{int(action)}"
+    except (ValueError, TypeError, AttributeError):
+        return f"action_{action}"
 
 
 class HiveMembrane(Membrane[Any, Intent, Context]):
@@ -237,14 +237,23 @@ class HiveMembrane(Membrane[Any, Intent, Context]):
         """
         receipt = _mint_for(claim, emission, verdict)
         emission.receipt = await self._attest(receipt)
-        logger.info(
-            "membrane_receipt",
-            prefix=emission.receipt.canonical_prefix,
-            outcome=_outcome_label(emission.receipt.outcome),
-            gate=emission.receipt.outcome_gate or None,
-            ruleset=emission.receipt.ruleset_version or None,
-            attested=bool(emission.receipt.signature),
-        )
+
+        try:
+            logger.info(
+                "membrane_receipt",
+                prefix=emission.receipt.canonical_prefix,
+                outcome=_outcome_label(emission.receipt.outcome),
+                gate=emission.receipt.outcome_gate or None,
+                ruleset=emission.receipt.ruleset_version or None,
+                attested=bool(emission.receipt.signature),
+            )
+        except Exception as e:  # nosec B110
+            # The same rule `_record_intervention` follows, and for the same
+            # reason: reporting on a decision must never take that decision
+            # down. Losing a negotiation over a sentence nobody was going to
+            # read at the time is the worst trade in the file.
+            logger.error("membrane_receipt_log_failed", error=str(e))
+
         return emission
 
     async def _attest(self, receipt: DecisionReceipt) -> DecisionReceipt:
@@ -253,12 +262,14 @@ class HiveMembrane(Membrane[Any, Intent, Context]):
             return receipt
 
         try:
-            # Reading the chain id sits inside the try with everything else.
-            # It cannot raise today — `Settings.crypto` is a pydantic field with
-            # a default factory, so it is never absent — but a promise that
-            # nothing here costs the decision should hold because of where the
-            # code sits, not because someone checked each line and found it safe.
-            chain_id = int(getattr(self.settings.crypto, "evm_chain_id", 0) or 0)
+            # Looked up rather than accessed: settings with no crypto section
+            # is a configuration a deployment may legitimately have, and an
+            # expected absence should not be discovered by throwing. The try
+            # still wraps it, because the promise that nothing here costs the
+            # decision should hold from where the code sits rather than from
+            # someone having checked each line.
+            crypto = getattr(self.settings, "crypto", None)
+            chain_id = int(getattr(crypto, "evm_chain_id", 0) or 0)
             obs = await self.registry.execute(
                 "transaction",
                 "sign_receipt",

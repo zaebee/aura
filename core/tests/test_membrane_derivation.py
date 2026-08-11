@@ -12,6 +12,8 @@ Nothing here is worth having if the record leaks a number, so that is asserted
 against the Intent itself rather than only against the engine that built it.
 """
 
+from unittest.mock import patch
+
 import pytest
 from aura_core import SkillRegistry
 from aura_core.struct_utils import make_struct
@@ -631,3 +633,25 @@ class TestNothingInAttestationCanCostTheDecision:
 
         assert decision.receipt.outcome == DecisionOutcome.DECISION_OUTCOME_OVERRIDE
         assert decision.negotiation.price != 500.0
+
+    @pytest.mark.asyncio
+    async def test_a_broken_logger_does_not_cost_the_decision(self) -> None:
+        """
+        The same rule `_record_intervention` already follows, applied to the
+        receipt log line: reporting on a decision must never take that decision
+        down. A log call that raises would lose the negotiation for a sentence
+        nobody was going to read at the time.
+        """
+        membrane = guarded_membrane()
+
+        with patch(
+            "aura_hive.hive.membrane.main.logger.info",
+            side_effect=RuntimeError("log sink is gone"),
+        ):
+            decision = await membrane.inspect_outbound(
+                counter_intent(price=500.0), negotiation_context()
+            )
+
+        assert decision.receipt.outcome == DecisionOutcome.DECISION_OUTCOME_OVERRIDE
+        assert decision.negotiation.price != 500.0
+        assert decision.receipt.canonical_prefix != ""
