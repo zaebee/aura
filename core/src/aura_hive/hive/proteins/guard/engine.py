@@ -3,7 +3,7 @@ import hmac
 import secrets
 from collections.abc import Callable
 from dataclasses import dataclass
-from decimal import ROUND_CEILING, Decimal
+from decimal import ROUND_CEILING, Decimal, localcontext
 from typing import Any
 
 import structlog
@@ -25,6 +25,17 @@ _DEFAULT_MARGIN = Decimal("0.1")
 
 # Cent, as the quantum every emitted price is rounded to.
 _CENT = Decimal("0.01")
+
+# Precision for the arithmetic in calculate_safe_price, widened from the
+# default 28-digit context.
+#
+# A `floor_price` arrives over a protobuf `double`, whose magnitude can reach
+# ~1.8e308. Quantizing a value that large to the cent needs a digit for every
+# place from there down to the hundredths — over 300 of them — and the
+# default context's quantize raises decimal.InvalidOperation rather than
+# rounding when the result does not fit in its precision. 400 digits covers
+# a double's full range with room to spare for the 1.05x markup.
+_QUANTIZE_PRECISION = 400
 
 # Upper bound on the multiplicative noise applied to a substitute price.
 #
@@ -77,15 +88,27 @@ def _decimal(mapping: dict, key: str, default: Decimal = Decimal(0)) -> Decimal:
     Via `str` rather than the float directly: Decimal(0.1) is
     0.1000000000000000055511151231257827, and money arithmetic that starts there
     ends somewhere a cent away.
+
+    NaN and +/-Infinity are legal `double` wire values but are not usable
+    money — they cannot be ordered or quantized, and `Decimal(str(value))`
+    parses them without error, so nothing upstream of this catches them.
+    Treated the same as a missing value: the input carried no trustworthy
+    number either way, so this returns `default` rather than propagating a
+    value that would raise the first time calculate_safe_price compares or
+    quantizes it.
     """
     value = mapping.get(key, None)
     if value is None:
         return default
     try:
-        return Decimal(str(value))
+        parsed = Decimal(str(value))
     except (TypeError, ValueError, ArithmeticError):
         logger.warning("guard_unusable_numeric_input", key=key, value=repr(value))
         return default
+    if not parsed.is_finite():
+        logger.warning("guard_unusable_numeric_input", key=key, value=repr(value))
+        return default
+    return parsed
 
 
 def _jitter(request_id: str) -> Decimal:
@@ -354,6 +377,18 @@ class OutputGuard:
             logger.error("guard_margin_setting_unreadable_using_default", raw=raw)
             return _DEFAULT_MARGIN
 
+        # NaN and +/-Infinity parse above without error — `min_profit_margin`
+        # is env-configurable and `float("nan")` parses clean — but the old
+        # float comparison `0.0 <= nan < 1.0` degraded to False and fell
+        # through below; decimal.Decimal's comparison raises InvalidOperation
+        # on NaN instead of returning False, so the range check below never
+        # gets a chance to reject it. Checked explicitly, ahead of the range
+        # check, so a non-finite margin degrades exactly like an
+        # out-of-range one rather than raising.
+        if not margin.is_finite():
+            logger.error("guard_margin_setting_out_of_range", margin=str(margin))
+            return _DEFAULT_MARGIN
+
         if not Decimal(0) <= margin < Decimal(1):
             logger.error("guard_margin_setting_out_of_range", margin=str(margin))
             return _DEFAULT_MARGIN
@@ -378,14 +413,32 @@ class OutputGuard:
         `reason` is unused since the strategies collapsed. It stays in the
         signature because two call sites pass it positionally, and removing it
         is churn in a change that is already touching the arithmetic.
+
+        NaN and +/-Infinity in `floor_price` or `internal_cost` are read as
+        `Decimal(0)` by `_decimal` — treated the same as a value that was
+        never sent, which is the same fallback `test_a_null_floor_still_...`
+        already exercises for a missing floor. Neither ever appears in this
+        formula except inside `max(...)`, so a value of 0 can only ever be
+        outweighed by a real, finite floor or cost — it never pulls the
+        result down below what the other, trustworthy input alone would
+        require. That is the entire justification: this does not "know" what
+        a corrupted floor should have been, but it is guaranteed not to
+        undercut the finite input it does have, and it never raises.
         """
         floor = _decimal(context, "floor_price")
         cost = _decimal(context, "internal_cost")
         margin = self._configured_margin()
 
-        base = max(_FLOOR_MARKUP * floor, max(floor, cost) / (1 - margin))
-        jittered = base * (1 + _jitter(request_id))
-        return float(jittered.quantize(_CENT, rounding=ROUND_CEILING))
+        # Widened precision: see _QUANTIZE_PRECISION. floor/cost/margin are
+        # already guaranteed finite by this point, so nothing here raises
+        # InvalidOperation for want of range — only for want of digits, which
+        # this closes.
+        with localcontext() as ctx:
+            ctx.prec = _QUANTIZE_PRECISION
+            base = max(_FLOOR_MARKUP * floor, max(floor, cost) / (1 - margin))
+            jittered = base * (1 + _jitter(request_id))
+            quantized = jittered.quantize(_CENT, rounding=ROUND_CEILING)
+        return float(quantized)
 
     def validate_transaction(
         self,

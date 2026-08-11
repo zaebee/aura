@@ -64,6 +64,75 @@ class TestCostAboveFloor:
         assert price >= 120.0
 
 
+class TestNonFinite:
+    """
+    NaN and +/-Infinity are legal `double` wire values — floor_price and
+    internal_cost arrive over protobuf, and min_profit_margin is
+    env-configurable, where `float("nan")` parses without error. The old
+    float-comparison code degraded a non-finite margin to _DEFAULT_MARGIN for
+    free (`0.0 <= nan < 1.0` is False); `decimal.Decimal`'s comparison raises
+    InvalidOperation on NaN instead, so the rewrite needs its own explicit
+    handling for all three inputs, and must never raise.
+
+    A non-finite margin falls back to _DEFAULT_MARGIN (0.1), matching the
+    settings-missing path. A non-finite floor_price or internal_cost is read
+    as 0 — the same fallback already used for a value that was never sent
+    (see TestCostAboveFloor and the null-floor case in
+    test_guard_gates.py) — since it appears only inside `max(...)`, a 0 can
+    only be outweighed by the other, trustworthy input, never pull the price
+    below what that input alone requires.
+    """
+
+    @pytest.mark.parametrize("margin", [float("nan"), float("inf"), float("-inf")])
+    def test_a_non_finite_margin_falls_back_to_the_default(self, margin: float) -> None:
+        guard = OutputGuard(safety_settings=Settings(margin))
+        price = guard.calculate_safe_price(
+            {"floor_price": 100.0, "internal_cost": 100.0}
+        )
+        assert price == 111.12
+        assert holds(price, 100.0, 100.0, 0.1)
+
+    @pytest.mark.parametrize("floor", [float("nan"), float("inf")])
+    def test_a_non_finite_floor_does_not_raise_and_still_satisfies_the_rule(
+        self, floor: float
+    ) -> None:
+        guard = OutputGuard(safety_settings=Settings(0.1))
+        price = guard.calculate_safe_price(
+            {"floor_price": floor, "internal_cost": 100.0}
+        )
+        # floor_price is read as 0 (see class docstring), so the margin term
+        # on internal_cost is what the price is checked against.
+        assert holds(price, 0.0, 100.0, 0.1)
+
+    @pytest.mark.parametrize("cost", [float("nan"), float("inf")])
+    def test_a_non_finite_cost_does_not_raise_and_still_satisfies_the_rule(
+        self, cost: float
+    ) -> None:
+        guard = OutputGuard(safety_settings=Settings(0.1))
+        price = guard.calculate_safe_price(
+            {"floor_price": 100.0, "internal_cost": cost}
+        )
+        # internal_cost is read as 0 (see class docstring), so the price is
+        # checked against the floor alone.
+        assert holds(price, 100.0, 0.0, 0.1)
+
+    def test_a_floor_price_at_the_default_context_overflow_does_not_raise(
+        self,
+    ) -> None:
+        """
+        The default 28-digit Decimal context raises InvalidOperation when
+        quantize is asked to round a value that needs more digits than that
+        to represent at the cent — which a floor_price of 1e28 does. Widened
+        locally in calculate_safe_price; this is that widening's regression
+        test.
+        """
+        guard = OutputGuard(safety_settings=Settings(0.1))
+        price = guard.calculate_safe_price({"floor_price": 1e28, "internal_cost": 0.0})
+        assert price > 0
+        assert price >= 1e28
+        assert holds(price, 1e28, 0.0, 0.1)
+
+
 class TestJitter:
     def test_the_price_is_stable_within_one_session(self) -> None:
         """
