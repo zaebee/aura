@@ -156,6 +156,11 @@ def _mint_for(claim: Intent, emission: Intent, verdict: _Verdict) -> DecisionRec
     )
 
 
+def _as_dict(struct: Any) -> dict[str, Any]:
+    """A protobuf Struct as a plain dict, tolerating one that is not there."""
+    return struct.to_dict() if struct is not None else {}
+
+
 def _replacing(original: Intent, replacement: Intent) -> Intent:
     """
     Carry forward the fields that name the decision point rather than the decision.
@@ -175,6 +180,23 @@ def _replacing(original: Intent, replacement: Intent) -> Intent:
     """
     replacement.identifier = original.identifier
     replacement.trace = original.trace
+    replacement.steps = original.steps
+
+    # Merged rather than copied, and the replacement wins on a conflict:
+    # `_override_with_safe_offer` records what it replaced, and carrying the
+    # original's metadata must not bury that. Keys the replacement did not set
+    # survive, which is the whole point — a hand-written replacement drops them
+    # silently, since the constructor is happy to default them and nothing warns.
+    # Read defensively. The paths that build replacements omit metadata rather
+    # than passing None, and betterproto default-constructs the field on access,
+    # so neither read can raise today. But this helper is the one place four
+    # paths funnel through, and it exists precisely because hand-built
+    # replacements lose what nobody remembered — it should not be the thing that
+    # raises on a caller who built one badly.
+    merged = {**_as_dict(original.metadata), **_as_dict(replacement.metadata)}
+    if merged:
+        replacement.metadata = make_struct(merged)
+
     return replacement
 
 
@@ -399,13 +421,37 @@ class HiveMembrane(Membrane[Any, Intent, Context]):
         return signal
 
     async def inspect_outbound(self, decision: Intent, context: Context) -> Intent:
+        """
+        Judge the Transformer's decision and return the one to send.
+
+        **The Intent passed in is never modified.** Every path that changes
+        anything — the two refusals, the safe-offer override, the DLP
+        sanitisation — builds a replacement and leaves the caller's object
+        alone.
+
+        That is not tidiness. The receipt reports what the Membrane did by
+        comparing a digest of what was proposed against a digest of what is
+        going out, and one object cannot produce two: editing the proposal into
+        the emission leaves both hashes taken after the change, and a receipt
+        that reports no intervention. The evidence lives in the difference
+        between two objects, so there have to be two.
+
+        `inspect_inbound` deliberately does the opposite and redacts the Signal
+        in place. Nothing attests to an inbound signal, so there is no earlier
+        state anything needs to compare against; the asymmetry follows from what
+        each boundary is for rather than from inconsistency.
+        """
         ctx_meta = context.metadata.to_dict()
         floor_price = _context_number(ctx_meta, "floor_price", 0.0)
 
         # Accumulated as the path proceeds and minted once, at whichever return
-        # is taken. `decision` is the claim throughout: the only edit before the
-        # receipt is built is DLP rewriting prose, which the claim excludes.
+        # is taken.
         verdict = _Verdict()
+
+        # What the Transformer proposed, kept intact for the receipt. Rebound
+        # only if a later step needs to work on a replacement; `decision` is
+        # then the thing being sent and this is the thing that was asked for.
+        claim = decision
 
         params_name, params_value = betterproto.which_one_of(decision, "params")
 
@@ -421,7 +467,7 @@ class HiveMembrane(Membrane[Any, Intent, Context]):
                 )
                 verdict.record(_REFUSE, "KYC_FAILURE")
                 return await self._finish(
-                    decision,
+                    claim,
                     _replacing(
                         decision,
                         Intent(
@@ -433,7 +479,7 @@ class HiveMembrane(Membrane[Any, Intent, Context]):
                     ),
                     verdict,
                 )
-            return await self._finish(decision, decision, verdict)
+            return await self._finish(claim, decision, verdict)
 
         # Trade intent guard: backstop for high-risk trades that slipped through
         if params_name == "trade" and params_value is not None:
@@ -449,7 +495,7 @@ class HiveMembrane(Membrane[Any, Intent, Context]):
                 )
                 verdict.record(_REFUSE, "HIGH_RISK_TRADE")
                 return await self._finish(
-                    decision,
+                    claim,
                     _replacing(
                         decision,
                         Intent(
@@ -461,7 +507,7 @@ class HiveMembrane(Membrane[Any, Intent, Context]):
                     ),
                     verdict,
                 )
-            return await self._finish(decision, decision, verdict)
+            return await self._finish(claim, decision, verdict)
 
         neg_intent = params_value if params_name == "negotiation" else None
 
@@ -483,27 +529,54 @@ class HiveMembrane(Membrane[Any, Intent, Context]):
                     )
 
             return await self._override_with_safe_offer(
-                decision, safe_price, "FAILURE_RECOVERY", verdict
+                decision, safe_price, "FAILURE_RECOVERY", verdict, claim
             )
 
         # 2. DLP Check
         message = neg_intent.message if neg_intent else ""
         if "floor_price" in message.lower():
-            if neg_intent:
-                neg_intent.message = "I cannot disclose internal pricing details."
-            decision.reasoning += " [MEMBRANE: DLP block]"
             _record_intervention("outbound", "DLP_BLOCK")
             verdict.record(_OVERRIDE, "DLP_BLOCK")
+            # Sanitised into a replacement rather than written back over the
+            # caller's Intent. The receipt reports what the Membrane did by
+            # comparing a digest of the proposal against a digest of what was
+            # sent, and one object cannot produce two — editing in place would
+            # leave nothing to compare against further down this path.
+            sanitised = _replacing(
+                decision,
+                Intent(
+                    action=decision.action,
+                    reasoning=decision.reasoning + " [MEMBRANE: DLP block]",
+                    negotiation=NegotiationIntent(
+                        item_identifier=neg_intent.item_identifier,
+                        item_domain=neg_intent.item_domain,
+                        price=neg_intent.price,
+                        message="I cannot disclose internal pricing details.",
+                        thought=neg_intent.thought,
+                    ),
+                )
+                if neg_intent
+                else Intent(
+                    action=decision.action,
+                    reasoning=decision.reasoning + " [MEMBRANE: DLP block]",
+                ),
+            )
+            # `claim` stays the Intent the Transformer produced; everything
+            # downstream now works on the sanitised copy.
+            claim, decision = decision, sanitised
+            neg_intent = (
+                betterproto.which_one_of(decision, "params")[1] if neg_intent else None
+            )
 
         if decision.action not in [
             ActionType.ACTION_TYPE_ACCEPT,
             ActionType.ACTION_TYPE_COUNTER,
         ]:
-            return await self._finish(decision, decision, verdict)
+            return await self._finish(claim, decision, verdict)
 
         # 3. Call Guard Protein for validation
         if not self.registry:
-            return await self._finish(decision, decision, verdict)
+            return await self._finish(claim, decision, verdict)
 
         internal_cost = _context_number(ctx_meta, "internal_cost", floor_price)
         guard_context = {"floor_price": floor_price, "internal_cost": internal_cost}
@@ -545,13 +618,18 @@ class HiveMembrane(Membrane[Any, Intent, Context]):
             safe_price = float(str(obs_meta.get("safe_price", safe_price)))
 
             return await self._override_with_safe_offer(
-                decision, safe_price, reason, verdict
+                decision, safe_price, reason, verdict, claim
             )
 
-        return await self._finish(decision, decision, verdict)
+        return await self._finish(claim, decision, verdict)
 
     async def _override_with_safe_offer(
-        self, original: Intent, safe_price: float, reason: str, verdict: _Verdict
+        self,
+        original: Intent,
+        safe_price: float,
+        reason: str,
+        verdict: _Verdict,
+        claim: Intent | None = None,
     ) -> Intent:
         _record_intervention("outbound", reason, safe_price=round(safe_price, 2))
         rounded_price = round(safe_price, 2)
