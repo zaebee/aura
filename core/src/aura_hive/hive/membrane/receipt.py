@@ -27,6 +27,8 @@ from aura_core_gen.aura.core.v1 import (
     DecisionReceipt,
     Intent,
     NegotiationIntent,
+    RWAVaultIntent,
+    TradeIntent,
 )
 
 # The signed format will take its own name rather than flipping a flag on this
@@ -98,9 +100,45 @@ def canonical_claim(intent: Intent) -> str:
             f"price={negotiation.price:.2f}"
         )
 
-    # Trade and vault decisions have no price to canonicalise here. The shape
-    # still has to be recorded, or two unrelated decisions would hash alike.
-    return f"action={action};params={params_name or 'none'}"
+    shape = f"action={action};params={params_name or 'none'}"
+
+    # Recording only the shape was the first cut and the wrong half of the job.
+    # `action=approve;params=trade` is the same string for every trade there has
+    # ever been, so a ten-dollar trade and a nine-million-dollar one produced
+    # one digest — a "digest of the decision the Transformer proposed" that does
+    # not identify a decision.
+    #
+    # Harmless while nothing signs a receipt: anyone able to move one onto
+    # another Intent can equally mint a fresh one, since `mint` holds no secret.
+    # It stops being harmless the moment a signature makes a receipt worth
+    # lifting, which is why the collision goes now rather than being inherited
+    # by the format that will have something to protect.
+    if params_name == "trade" and params_value is not None:
+        trade: TradeIntent = params_value
+        return (
+            f"{shape};"
+            f"trade={trade.trade_id};"
+            f"asset={trade.asset_identifier};"
+            f"price={trade.proposed_price:.2f};"
+            f"currency={trade.currency_code}"
+        )
+
+    if params_name == "rwa_vault" and params_value is not None:
+        vault: RWAVaultIntent = params_value
+        # The wallet is part of the claim: same collateral against a different
+        # beneficiary is a different decision, not a restatement of one.
+        return (
+            f"{shape};"
+            f"vault={vault.vault_id};"
+            f"asset={vault.asset_identifier};"
+            f"appraised={vault.appraised_value_usd:.2f};"
+            f"ltv={vault.ltv_ratio:.4f};"
+            f"wallet={vault.wallet_address}"
+        )
+
+    # Anything else — including the bare ERROR Intent the FAILURE_RECOVERY path
+    # arrives with — has no decidable content beyond its shape.
+    return shape
 
 
 def claim_digest(intent: Intent) -> str:
@@ -194,6 +232,12 @@ def verify(receipt: DecisionReceipt) -> VerificationResult:
         expected = hashlib.sha256(derivation.gate_sequence.encode("utf-8")).hexdigest()
         if derivation.derivation_hash != expected:
             failures.append("derivation hash does not match the recorded gate sequence")
+
+    if receipt.outcome == DecisionOutcome.DECISION_OUTCOME_UNSPECIFIED:
+        # Zero is protobuf's default, so an outcome nobody set is
+        # indistinguishable from a field never written. A receipt whose central
+        # claim is absent must not pass for one that merely had nothing go wrong.
+        failures.append("receipt outcome is unspecified")
 
     changed = receipt.claim_hash != receipt.emission_hash
 

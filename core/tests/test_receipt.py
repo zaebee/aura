@@ -24,10 +24,12 @@ from aura_core_gen.aura.core.v1 import (
     DecisionOutcome,
     Intent,
     NegotiationIntent,
+    RWAVaultIntent,
     TradeIntent,
 )
 from aura_hive.hive.membrane.receipt import (
     RECEIPT_VERSION,
+    _prefix,
     canonical_claim,
     claim_digest,
     mint,
@@ -78,17 +80,112 @@ class TestTheCanonicalClaim:
             counter(price=106.0)
         )
 
-    def test_a_non_negotiation_intent_records_its_shape(self) -> None:
+    def test_a_trade_names_the_trade_it_decided(self) -> None:
         """
-        Trade and vault decisions have no price field to canonicalise here. The
-        claim still has to distinguish them from a negotiation, or two unrelated
-        decisions would hash alike.
+        The first cut recorded only the shape — `action=approve;params=trade` for
+        every trade there has ever been. That distinguished a trade from a
+        negotiation and stopped there, which is the wrong half of the job: a
+        digest of "the decision the Transformer proposed" that is identical for a
+        ten-dollar trade and a nine-million-dollar one does not identify a
+        decision at all.
         """
         trade = Intent(
-            action=ActionType.ACTION_TYPE_APPROVE, trade=TradeIntent(trade_id="t-1")
+            action=ActionType.ACTION_TYPE_APPROVE,
+            trade=TradeIntent(
+                trade_id="t-1",
+                asset_identifier="AURA",
+                proposed_price=10.0,
+                currency_code="USD",
+            ),
         )
 
-        assert canonical_claim(trade) == "action=approve;params=trade"
+        assert canonical_claim(trade) == (
+            "action=approve;params=trade;trade=t-1;asset=AURA;price=10.00;currency=USD"
+        )
+
+    def test_two_different_trades_do_not_hash_alike(self) -> None:
+        """
+        Harmless while nothing signs a receipt — anyone who can swap one onto
+        another Intent can equally mint a fresh one, since `mint` holds no
+        secret. It stops being harmless the moment a signature makes a receipt
+        worth lifting, so the collision goes now rather than being inherited by
+        the format that has something to protect.
+        """
+        cheap = Intent(
+            action=ActionType.ACTION_TYPE_APPROVE,
+            trade=TradeIntent(
+                trade_id="t-1", asset_identifier="A", proposed_price=10.0
+            ),
+        )
+        dear = Intent(
+            action=ActionType.ACTION_TYPE_APPROVE,
+            trade=TradeIntent(
+                trade_id="t-999", asset_identifier="B", proposed_price=9_000_000.0
+            ),
+        )
+
+        assert claim_digest(cheap) != claim_digest(dear)
+
+    def test_a_vault_names_the_vault_it_decided(self) -> None:
+        vault = Intent(
+            action=ActionType.ACTION_TYPE_APPROVE,
+            rwa_vault=RWAVaultIntent(
+                vault_id="v-1",
+                asset_identifier="DEED-7",
+                appraised_value_usd=250_000.0,
+                ltv_ratio=0.6,
+                wallet_address="0xabc",
+            ),
+        )
+
+        assert canonical_claim(vault) == (
+            "action=approve;params=rwa_vault;vault=v-1;asset=DEED-7;"
+            "appraised=250000.00;ltv=0.6000;wallet=0xabc"
+        )
+
+    def test_two_vaults_against_different_wallets_do_not_hash_alike(self) -> None:
+        """Same collateral, different beneficiary, is a different decision."""
+        mine = Intent(
+            action=ActionType.ACTION_TYPE_APPROVE,
+            rwa_vault=RWAVaultIntent(vault_id="v-1", wallet_address="0xaaa"),
+        )
+        theirs = Intent(
+            action=ActionType.ACTION_TYPE_APPROVE,
+            rwa_vault=RWAVaultIntent(vault_id="v-1", wallet_address="0xbbb"),
+        )
+
+        assert claim_digest(mine) != claim_digest(theirs)
+
+    def test_a_trade_and_a_vault_still_do_not_hash_alike(self) -> None:
+        """The original property, kept: the shape is still part of the claim."""
+        trade = Intent(
+            action=ActionType.ACTION_TYPE_APPROVE, trade=TradeIntent(trade_id="x")
+        )
+        vault = Intent(
+            action=ActionType.ACTION_TYPE_APPROVE,
+            rwa_vault=RWAVaultIntent(vault_id="x"),
+        )
+
+        assert claim_digest(trade) != claim_digest(vault)
+
+    def test_an_intent_with_no_params_records_that(self) -> None:
+        """The FAILURE_RECOVERY path reaches here with a bare ERROR Intent."""
+        assert (
+            canonical_claim(Intent(action=ActionType.ACTION_TYPE_ERROR))
+            == "action=error;params=none"
+        )
+
+    def test_trade_prose_is_excluded_like_any_other(self) -> None:
+        terse = Intent(
+            action=ActionType.ACTION_TYPE_APPROVE,
+            trade=TradeIntent(trade_id="t-1", reasoning="short"),
+        )
+        florid = Intent(
+            action=ActionType.ACTION_TYPE_APPROVE,
+            trade=TradeIntent(trade_id="t-1", reasoning="a much longer explanation"),
+        )
+
+        assert canonical_claim(terse) == canonical_claim(florid)
 
     def test_the_digest_is_a_full_sha256_of_the_canonical_claim(self) -> None:
         intent = counter(price=105.0)
@@ -308,6 +405,21 @@ class TestVerifyIsHonestAboutWhatItCannotCheck:
 
         assert not result.ok
         assert any("emit" in failure for failure in result.failures)
+
+    def test_an_unspecified_outcome_is_caught(self) -> None:
+        """
+        Zero is protobuf's default, so an outcome nobody set is indistinguishable
+        from a field that was never written. A receipt whose central claim is
+        absent should not pass for one that merely had nothing go wrong.
+        """
+        receipt = self.base_receipt()
+        receipt.outcome = DecisionOutcome.DECISION_OUTCOME_UNSPECIFIED
+        receipt.canonical_prefix = _prefix(receipt)
+
+        result = verify(receipt)
+
+        assert not result.ok
+        assert any("unspecified" in failure for failure in result.failures)
 
     def test_an_unknown_format_version_is_refused_outright(self) -> None:
         """
