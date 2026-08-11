@@ -252,16 +252,21 @@ class HiveMembrane(Membrane[Any, Intent, Context]):
         if not self.registry:
             return receipt
 
-        chain_id = int(getattr(self.settings.crypto, "evm_chain_id", 0) or 0)
         try:
+            # Reading the chain id sits inside the try with everything else.
+            # It cannot raise today — `Settings.crypto` is a pydantic field with
+            # a default factory, so it is never absent — but a promise that
+            # nothing here costs the decision should hold because of where the
+            # code sits, not because someone checked each line and found it safe.
+            chain_id = int(getattr(self.settings.crypto, "evm_chain_id", 0) or 0)
             obs = await self.registry.execute(
                 "transaction",
                 "sign_receipt",
                 {"payload": signing_payload(receipt, chain_id=chain_id)},
             )
         except Exception as e:
-            # Inside the try for the same reason the metric counter is: an
-            # attestation failure must not take down the decision it describes.
+            # Caught for the same reason the metric counter is: an attestation
+            # failure must not take down the decision it describes.
             logger.warning("membrane_receipt_unsigned", error=str(e))
             return receipt
 

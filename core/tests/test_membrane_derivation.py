@@ -600,3 +600,34 @@ class TestSigningTheReceipt:
 
         assert verify(decision.receipt).attested
         assert decision.receipt.claim_hash != decision.receipt.emission_hash
+
+
+class TestNothingInAttestationCanCostTheDecision:
+    """
+    `_attest` promises that a decision survives any failure to sign it. That
+    promise should hold structurally, not because someone audited each line.
+
+    The chain id was read outside the try block. It could not actually raise —
+    `Settings.crypto` is a pydantic field with a default factory, so it is never
+    absent, and `getattr(None, ..., 0)` returns the default rather than raising.
+    But a property that holds only under analysis stops holding the moment
+    someone edits the line, and there is nothing to catch that.
+    """
+
+    @pytest.mark.asyncio
+    async def test_settings_without_crypto_still_emit_the_decision(self) -> None:
+        membrane = guarded_membrane()
+
+        class _NoCrypto:
+            """Settings as a stub might supply them: no crypto section at all."""
+
+            safety = _Safety()
+
+        membrane.settings = _NoCrypto()
+
+        decision = await membrane.inspect_outbound(
+            counter_intent(price=500.0), negotiation_context()
+        )
+
+        assert decision.receipt.outcome == DecisionOutcome.DECISION_OUTCOME_OVERRIDE
+        assert decision.negotiation.price != 500.0
