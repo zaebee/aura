@@ -24,9 +24,7 @@ def _read_record(path):
 
 
 def _read_records(path):
-    return [
-        json.loads(x) for x in open(path, encoding="utf-8").read().splitlines()
-    ]
+    return [json.loads(x) for x in open(path, encoding="utf-8").read().splitlines()]
 
 
 async def test_transformer_failure_still_writes_a_record(tmp_path, monkeypatch):

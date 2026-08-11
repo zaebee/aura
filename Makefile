@@ -23,6 +23,10 @@ lint: $(PROTO_SENTINEL)
 	cd proto && buf lint
 	# Python Lint (Ruff)
 	PYTHONPATH=$(DNA_PATH):$(CORE_PATH):$(GATEWAY_PATH):$(TG_PATH):$(MCP_PATH):$(KEEPER_PATH) uv run ruff check .
+	# Formatting is checked, not merely applied by whoever ran `make format` last.
+	# Without this the repo does not verify the format it claims to enforce, and
+	# a file's formatting is whatever tool touched it most recently.
+	uv run ruff format --check .
 	# Python Type Check (Mypy)
 	# We use --explicit-package-bases to avoid double discovery when multiple paths overlap
 	MYPYPATH=$(CORE_PATH) uv run mypy --explicit-package-bases core/src
