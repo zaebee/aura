@@ -101,6 +101,29 @@ def _stamp(decision: Intent, outcome: DecisionOutcome, gate: str) -> Intent:
     return decision
 
 
+def _replacing(original: Intent, replacement: Intent) -> Intent:
+    """
+    Carry forward the fields that name the decision point rather than the decision.
+
+    Three outbound paths return a different Intent instead of editing the one
+    they were given — the two refusals and the safe-offer override — and a fresh
+    Intent starts blank. It still stands for the same point in the metabolic
+    cycle, so identity and trace belong to it as much as to what it replaced.
+
+    `outcome_gate` travels for a sharper reason: without it a decision that
+    tripped DLP and was then overridden by the floor check would report the
+    floor as the first gate, losing the earlier one.
+
+    Nothing reads `Intent.trace` today — the trace that reaches the Observation
+    comes from `Context.trace` by way of the Connector. Carrying it is cheap and
+    keeps the replacement honest before some later consumer trusts the field.
+    """
+    replacement.identifier = original.identifier
+    replacement.trace = original.trace
+    replacement.outcome_gate = original.outcome_gate
+    return replacement
+
+
 def _settle(decision: Intent) -> Intent:
     """
     Nothing further fired, so the Membrane emitted what it was given.
@@ -235,11 +258,14 @@ class HiveMembrane(Membrane[Any, Intent, Context]):
                     wallet_address=rwa_intent.wallet_address,
                 )
                 return _stamp(
-                    Intent(
-                        action=cast(ActionType, ActionType.ACTION_TYPE_REJECT),
-                        reasoning=decision.reasoning
-                        + " [MEMBRANE: KYC compliance failure]",
-                        rwa_vault=rwa_intent,
+                    _replacing(
+                        decision,
+                        Intent(
+                            action=cast(ActionType, ActionType.ACTION_TYPE_REJECT),
+                            reasoning=decision.reasoning
+                            + " [MEMBRANE: KYC compliance failure]",
+                            rwa_vault=rwa_intent,
+                        ),
                     ),
                     _REFUSE,
                     "KYC_FAILURE",
@@ -259,11 +285,14 @@ class HiveMembrane(Membrane[Any, Intent, Context]):
                     risk_category=trade_intent.validation_score.risk_category,
                 )
                 return _stamp(
-                    Intent(
-                        action=cast(ActionType, ActionType.ACTION_TYPE_REJECT),
-                        reasoning=decision.reasoning
-                        + " [MEMBRANE: high-risk trade blocked]",
-                        trade=trade_intent,
+                    _replacing(
+                        decision,
+                        Intent(
+                            action=cast(ActionType, ActionType.ACTION_TYPE_REJECT),
+                            reasoning=decision.reasoning
+                            + " [MEMBRANE: high-risk trade blocked]",
+                            trade=trade_intent,
+                        ),
                     ),
                     _REFUSE,
                     "HIGH_RISK_TRADE",
@@ -371,8 +400,4 @@ class HiveMembrane(Membrane[Any, Intent, Context]):
                 message=f"I've reached my final limit for this item. My best offer is ${rounded_price:.2f}.",
             ),
         )
-        # This is a fresh Intent, so an earlier gate's mark does not come along
-        # with it. Carry it forward before stamping, or a decision that tripped
-        # DLP and then the floor check would report the floor as the first gate.
-        replacement.outcome_gate = original.outcome_gate
-        return _stamp(replacement, _OVERRIDE, str(reason))
+        return _stamp(_replacing(original, replacement), _OVERRIDE, reason)

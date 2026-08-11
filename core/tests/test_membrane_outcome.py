@@ -23,6 +23,7 @@ from aura_core_gen.aura.core.v1 import (
     NegotiationIntent,
     RWAComplianceScore,
     RWAVaultIntent,
+    TraceContext,
     TradeIntent,
     ValidationScore,
 )
@@ -230,6 +231,79 @@ class TestFailureRecovery:
 
         assert decision.outcome == DecisionOutcome.DECISION_OUTCOME_OVERRIDE
         assert decision.outcome_gate == "FAILURE_RECOVERY"
+
+
+class TestReplacementPreservesIdentity:
+    """
+    Three outbound paths do not edit the Intent they were given, they return a
+    different one: the two refusals and the safe-offer override. A replacement
+    describes the same decision point as the Intent it stands in for, so the
+    fields that name that point have to survive the swap.
+
+    Nothing reads `Intent.trace` today — the trace that reaches the Observation
+    comes from `Context.trace` by way of the Connector, and the Transformer
+    never populates the Intent's copy. So this is not repairing a broken trace;
+    it is keeping a replacement honest about which decision it replaced, before
+    some later consumer starts believing the field.
+    """
+
+    TRACE = TraceContext(trace_id="0af7651916cd43dd", span_id="b7ad6b7169203331")
+
+    @pytest.mark.asyncio
+    async def test_an_override_keeps_the_original_trace_and_identifier(self) -> None:
+        membrane = guarded_membrane()
+        original = counter_intent(price=500.0)
+        original.identifier = "decision-42"
+        original.trace = self.TRACE
+
+        decision = await membrane.inspect_outbound(
+            original, negotiation_context(floor_price=1000.0)
+        )
+
+        assert decision.outcome == DecisionOutcome.DECISION_OUTCOME_OVERRIDE
+        assert decision.identifier == "decision-42"
+        assert decision.trace.trace_id == "0af7651916cd43dd"
+
+    @pytest.mark.asyncio
+    async def test_a_kyc_refusal_keeps_the_original_trace_and_identifier(self) -> None:
+        membrane = guarded_membrane()
+        original = Intent(
+            identifier="decision-43",
+            action=ActionType.ACTION_TYPE_APPROVE,
+            trace=self.TRACE,
+            rwa_vault=RWAVaultIntent(
+                wallet_address="0xdead",
+                compliance=RWAComplianceScore(kyc_passed=False),
+            ),
+        )
+
+        decision = await membrane.inspect_outbound(original, negotiation_context())
+
+        assert decision.outcome == DecisionOutcome.DECISION_OUTCOME_REFUSE
+        assert decision.identifier == "decision-43"
+        assert decision.trace.trace_id == "0af7651916cd43dd"
+
+    @pytest.mark.asyncio
+    async def test_a_trade_refusal_keeps_the_original_trace_and_identifier(
+        self,
+    ) -> None:
+        membrane = guarded_membrane()
+        original = Intent(
+            identifier="decision-44",
+            action=ActionType.ACTION_TYPE_APPROVE,
+            trace=self.TRACE,
+            trade=TradeIntent(
+                validation_score=ValidationScore(
+                    risk_score=0.9, risk_category="EXTREME"
+                )
+            ),
+        )
+
+        decision = await membrane.inspect_outbound(original, negotiation_context())
+
+        assert decision.outcome == DecisionOutcome.DECISION_OUTCOME_REFUSE
+        assert decision.identifier == "decision-44"
+        assert decision.trace.trace_id == "0af7651916cd43dd"
 
 
 class TestPassThrough:
