@@ -6,6 +6,7 @@ from aura_core import Membrane, SkillRegistry, make_struct
 from aura_core_gen.aura.core.v1 import (
     ActionType,
     Context,
+    DecisionDerivation,
     DecisionOutcome,
     Intent,
     NegotiationIntent,
@@ -101,6 +102,28 @@ def _stamp(decision: Intent, outcome: DecisionOutcome, gate: str) -> Intent:
     return decision
 
 
+def _attach_derivation(decision: Intent, obs_meta: dict[str, Any]) -> Intent:
+    """
+    Record how the guard reached its verdict, from what the guard reported.
+
+    Left unset when no declared gate ran — a decision outside the guard's scope,
+    an unwired Membrane, or one of the Membrane's own checks, none of which are
+    declared in a rule set yet. Attaching an empty digest there would assert a
+    derivation that never happened, which is worse than saying nothing.
+    """
+    # `or ""` rather than a default, because `str(None)` is "None" — truthy, and
+    # it would attach a record whose sequence is that literal text and whose
+    # hash claims a derivation that never ran. A Struct round-trips a null value
+    # back as None, so a key being present is not the same as it carrying one.
+    sequence = str(obs_meta.get("gate_sequence") or "")
+    digest = str(obs_meta.get("derivation_hash") or "")
+    if sequence or digest:
+        decision.derivation = DecisionDerivation(
+            gate_sequence=sequence, derivation_hash=digest
+        )
+    return decision
+
+
 def _replacing(original: Intent, replacement: Intent) -> Intent:
     """
     Carry forward the fields that name the decision point rather than the decision.
@@ -121,6 +144,7 @@ def _replacing(original: Intent, replacement: Intent) -> Intent:
     replacement.identifier = original.identifier
     replacement.trace = original.trace
     replacement.outcome_gate = original.outcome_gate
+    replacement.derivation = original.derivation
     return replacement
 
 
@@ -361,11 +385,22 @@ class HiveMembrane(Membrane[Any, Intent, Context]):
             },
         )
 
+        # A default-constructed Observation always has an empty Struct here, so
+        # this is not the usual betterproto caution — but `metadata=None` is a
+        # legal way to build one, and this read moved onto the passing path in
+        # the same change that added the derivation. It had only ever run on the
+        # failing path before. A crash here would lose the negotiation inside
+        # the one component whose job is to never let a bad decision out.
+        obs_meta = obs.metadata.to_dict() if obs.metadata is not None else {}
+
+        # Attached to the Intent the guard judged, before any replacement is
+        # built, so `_replacing` carries it across the swap like the rest of the
+        # fields that describe this decision point.
+        _attach_derivation(decision, obs_meta)
+
         if not obs.success:
             # Determine reason for logging/override using structured error code
-            reason = "SAFETY_VIOLATION"
             safe_price = floor_price * 1.05
-            obs_meta = obs.metadata.to_dict()
             reason = str(obs_meta.get("error_code", "SAFETY_VIOLATION"))
             safe_price = float(str(obs_meta.get("safe_price", safe_price)))
 

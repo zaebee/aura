@@ -1,4 +1,6 @@
+import hashlib
 from collections.abc import Callable
+from dataclasses import dataclass
 from typing import Any
 
 import structlog
@@ -45,6 +47,60 @@ def _numeric(mapping: dict, key: str, default: float = 0.0) -> float:
         return default
 
 
+# Separates records in the canonical sequence. ASCII unit separator: it cannot
+# occur in a gate id or a premise key, so no escaping rule is needed and the
+# canonical form has one fewer thing to get wrong.
+_RECORD_SEPARATOR = "\x1f"
+
+
+@dataclass(frozen=True)
+class GateRecord:
+    """One gate, as it was evaluated."""
+
+    gate_id: str
+    passed: bool
+    consumes: tuple[str, ...]
+
+    @property
+    def canonical(self) -> str:
+        """`G2_FLOOR_VIOLATION:fail:price,floor_price` — keys, never values."""
+        verdict = "pass" if self.passed else "fail"
+        return f"{self.gate_id}:{verdict}:{','.join(self.consumes)}"
+
+
+@dataclass(frozen=True)
+class Derivation:
+    """
+    The ordered record of how the guard reached its verdict.
+
+    Publishable by construction: it names which premises each gate consulted,
+    never what they were. Recording a value here would give away the floor in a
+    field designed to be handed to the counterparty, undoing the invariant the
+    Membrane spends its whole outbound path enforcing.
+    """
+
+    records: tuple[GateRecord, ...]
+    failed_gate: str | None
+
+    @property
+    def canonical(self) -> str:
+        return _RECORD_SEPARATOR.join(record.canonical for record in self.records)
+
+    @property
+    def digest(self) -> str:
+        """
+        SHA-256 over the canonical sequence, or empty when no gate ran.
+
+        An empty sequence gets an empty digest rather than the hash of the empty
+        string. Hashing nothing would assert a derivation that never happened —
+        a verifier could reproduce the value and learn from it that some gates
+        ran, which is false.
+        """
+        if not self.records:
+            return ""
+        return hashlib.sha256(self.canonical.encode("utf-8")).hexdigest()
+
+
 class SafetyViolation(Exception):
     """
     Raised when a negotiation decision violates safety guardrails.
@@ -56,9 +112,18 @@ class SafetyViolation(Exception):
     branch ("Cannot validate margin: ...") as a margin violation.
     """
 
-    def __init__(self, message: str, code: str = "SAFETY_VIOLATION") -> None:
+    def __init__(
+        self,
+        message: str,
+        code: str = "SAFETY_VIOLATION",
+        derivation: "Derivation | None" = None,
+    ) -> None:
         super().__init__(message)
         self.code = code
+        # The failure path is the raising path, so the record travels on the
+        # exception. Recomputing it in the handler would mean evaluating the
+        # gates twice and hoping both runs agreed.
+        self.derivation = derivation
 
 
 class OutputGuard:
@@ -162,21 +227,52 @@ class OutputGuard:
             "G4_MARGIN_VIOLATION": self._gate_margin_violation,
         }[gate_id]
 
-    def validate_decision(self, decision: dict, context: dict) -> bool:
+    def evaluate(self, decision: dict, context: dict) -> Derivation:
         """
-        Walk the declared gates in order and raise on the first that fails.
+        Walk the declared gates in order, recording each, and stop at the first
+        that fails.
 
         Only accept and counter are judged: those are the actions that put a
         price on the wire. A reject carrying a nonsense price is not a safety
         failure, and refusing it would turn the guard into a validator of
-        decisions nobody acts on.
+        decisions nobody acts on. Such a decision derives nothing, and says so
+        with an empty record rather than a record of gates that did not run.
         """
         if decision.get("action") not in ["accept", "counter"]:
-            return True
+            return Derivation(records=(), failed_gate=None)
 
+        records: list[GateRecord] = []
         for gate in self.ruleset.gates:
-            if not self._predicate(gate.id)(decision, context):
-                raise SafetyViolation(self._MESSAGES[gate.id], code=gate.code)
+            passed = self._predicate(gate.id)(decision, context)
+            records.append(
+                GateRecord(gate_id=gate.id, passed=passed, consumes=gate.consumes)
+            )
+            if not passed:
+                return Derivation(records=tuple(records), failed_gate=gate.id)
+
+        return Derivation(records=tuple(records), failed_gate=None)
+
+    def violation_for(self, derivation: Derivation) -> SafetyViolation:
+        """
+        Build the exception a closed-on-failure derivation implies.
+
+        Separate from `evaluate` so a caller that needs the record on both the
+        passing and failing paths can walk the gates once and decide afterwards.
+        Evaluating twice would be wasteful and, worse, would rest on the two
+        runs agreeing.
+        """
+        assert derivation.failed_gate is not None, "derivation did not fail"
+        gate = {g.id: g for g in self.ruleset.gates}[derivation.failed_gate]
+        return SafetyViolation(
+            self._MESSAGES[gate.id], code=gate.code, derivation=derivation
+        )
+
+    def validate_decision(self, decision: dict, context: dict) -> bool:
+        """Raise on the first gate that fails. `evaluate` does the walking."""
+        derivation = self.evaluate(decision, context)
+
+        if derivation.failed_gate is not None:
+            raise self.violation_for(derivation)
 
         return True
 
