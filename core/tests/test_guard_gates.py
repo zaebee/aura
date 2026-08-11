@@ -13,7 +13,11 @@ order rather than a hand-written if-chain.
 """
 
 import pytest
-from aura_hive.hive.proteins.guard.engine import OutputGuard, SafetyViolation
+from aura_hive.hive.proteins.guard.engine import (
+    GuardUnavailable,
+    OutputGuard,
+    SafetyViolation,
+)
 from aura_hive.hive.proteins.guard.ruleset import RulesetError, load_ruleset
 
 
@@ -258,15 +262,26 @@ class TestUnusableInputsStillNameAGate:
             {"floor_price": 1000.0, "internal_cost": "unknown"},
         )
 
-    def test_a_null_floor_still_yields_a_safe_price(self) -> None:
+    def test_a_null_floor_and_absent_cost_refuses_rather_than_pricing_at_zero(
+        self,
+    ) -> None:
         """
-        Reached from inside `skill.py`'s SafetyViolation handler, which is a
-        sibling of its generic `except Exception` rather than nested inside it.
-        A raise here escapes the skill entirely.
+        A null floor and no internal_cost at all used to both default to
+        Decimal(0), producing a "safe price" of 0.0 — a value that fails the
+        guard's own G1_PRICE_POSITIVE gate and psi's `price > 0`, and unlike
+        an exception, one a caller could forward as a real counter-offer
+        without ever learning it was never priced. There is no trustworthy
+        premise left when neither input is usable, so this now refuses.
+
+        Reached from inside `skill.py`'s SafetyViolation handler, which
+        catches this specific exception rather than letting it escape the
+        skill (see test_guard_safe_offer.py's TestGuardUnavailable for the
+        engine-level cases, and test_guard_unavailable.py for that handling).
         """
-        assert guard(_Safety()).calculate_safe_price(
-            {"floor_price": None}, "FLOOR_PRICE_VIOLATION"
-        ) == pytest.approx(0.0)
+        with pytest.raises(GuardUnavailable):
+            guard(_Safety()).calculate_safe_price(
+                {"floor_price": None}, "FLOOR_PRICE_VIOLATION"
+            )
 
 
 class TestFailClosedOnIncompleteSettings:

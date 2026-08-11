@@ -6,7 +6,7 @@ from aura_core_gen.aura.core.v1 import Observation
 
 from aura_hive.config.policy import SafetySettings
 
-from .engine import Derivation, OutputGuard, SafetyViolation
+from .engine import Derivation, GuardUnavailable, OutputGuard, SafetyViolation
 from .schema import SafePriceParams, ValidationParams, VisionValidationParams
 
 logger = structlog.get_logger(__name__)
@@ -86,6 +86,19 @@ class GuardSkill(
 
         try:
             return await handler(params)
+        except GuardUnavailable as e:
+            # A sibling of SafetyViolation, not a subclass: no gate ran to a
+            # verdict here, so there is no derivation and no gate code to
+            # report — only that the guard itself could not answer. Reported
+            # as a failure with its own code rather than folded into the
+            # generic `except Exception` below, so a caller can still tell
+            # "the guard refused" apart from "the guard could not run".
+            logger.error("guard_unavailable", intent=intent, code=e.code, error=str(e))
+            return Observation(
+                success=False,
+                error=str(e),
+                metadata=make_struct({"error_code": e.code}),
+            )
         except SafetyViolation as e:
             # The gate's own code, carried on the exception. This used to be
             # recovered by searching the message for "margin" or "floor", which
@@ -110,12 +123,28 @@ class GuardSkill(
                 # explicit None gets the same treatment as one that passed
                 # nothing. This runs inside the SafetyViolation handler, a
                 # sibling of the generic `except Exception` below rather than
-                # nested in it, so a raise here escapes the skill entirely.
-                report["safe_price"] = str(
-                    self.provider.calculate_safe_price(
-                        params.get("context") or {}, e.code
+                # nested in it, so an unhandled raise here would escape the
+                # skill entirely — which is exactly why calculate_safe_price's
+                # own GuardUnavailable is caught right here instead.
+                try:
+                    report["safe_price"] = str(
+                        self.provider.calculate_safe_price(
+                            params.get("context") or {}, e.code
+                        )
                     )
-                )
+                except GuardUnavailable as unavailable:
+                    # The gate already ruled the decision unsafe; that verdict
+                    # stands regardless. What could not be produced is a
+                    # substitute price to offer instead of it — reported
+                    # alongside the original violation rather than raising
+                    # past it and losing the gate sequence this branch exists
+                    # to report.
+                    logger.warning(
+                        "guard_safe_price_unavailable",
+                        reason=e.code,
+                        error=str(unavailable),
+                    )
+                    report["safe_price_error"] = unavailable.code
                 report.update(
                     _derivation_fields(
                         e.derivation, self.provider.ruleset.version_string

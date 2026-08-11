@@ -204,6 +204,21 @@ class SafetyViolation(Exception):
         self.derivation = derivation
 
 
+class GuardUnavailable(Exception):
+    """
+    Raised when the guard could not establish a verdict at all.
+
+    A sibling of SafetyViolation rather than a subclass. A rule judging against
+    a decision and a judgment that never happened send an operator to different
+    places — one to the offer, one to the dependency that is down — and a caller
+    that catches one must not silently catch the other.
+    """
+
+    def __init__(self, message: str, code: str = "GUARD_UNAVAILABLE") -> None:
+        super().__init__(message)
+        self.code = code
+
+
 class OutputGuard:
     """
     Deterministic safety layer for Aura Core.
@@ -416,17 +431,33 @@ class OutputGuard:
 
         NaN and +/-Infinity in `floor_price` or `internal_cost` are read as
         `Decimal(0)` by `_decimal` — treated the same as a value that was
-        never sent, which is the same fallback `test_a_null_floor_still_...`
-        already exercises for a missing floor. Neither ever appears in this
-        formula except inside `max(...)`, so a value of 0 can only ever be
-        outweighed by a real, finite floor or cost — it never pulls the
-        result down below what the other, trustworthy input alone would
-        require. That is the entire justification: this does not "know" what
-        a corrupted floor should have been, but it is guaranteed not to
-        undercut the finite input it does have, and it never raises.
+        never sent. Where the other of the two is a real, finite, positive
+        number, that 0 can only ever be outweighed inside `max(...)`, so it
+        never pulls the result below what the trustworthy input alone would
+        require.
+
+        Where BOTH land on a non-positive value this way — absent, unparseable,
+        non-finite, or genuinely zero or negative, in any combination — there
+        is no trustworthy premise left, and this raises `GuardUnavailable`
+        instead of returning a price nothing in the inputs justifies. A prior
+        version returned `0.0` here: a value that fails the guard's own
+        G1_PRICE_POSITIVE gate and psi's `price > 0`, and unlike an exception,
+        one a caller could forward as a real counter-offer without ever
+        learning it was never priced.
+
+        Raises:
+            GuardUnavailable: neither `floor_price` nor `internal_cost` yields
+                a usable positive value to price a substitute from.
         """
         floor = _decimal(context, "floor_price")
         cost = _decimal(context, "internal_cost")
+
+        if floor <= 0 and cost <= 0:
+            raise GuardUnavailable(
+                "cannot compute a safe price: neither floor_price nor "
+                "internal_cost is a usable positive value"
+            )
+
         margin = self._configured_margin()
 
         # Widened precision: see _QUANTIZE_PRECISION. floor/cost/margin are

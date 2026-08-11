@@ -11,7 +11,11 @@ satisfy it at all. Both produced prices the guard's own post-condition rejects.
 from decimal import Decimal
 
 import pytest
-from aura_hive.hive.proteins.guard.engine import OutputGuard
+from aura_hive.hive.proteins.guard.engine import (
+    GuardUnavailable,
+    OutputGuard,
+    SafetyViolation,
+)
 
 
 class Settings:
@@ -131,6 +135,80 @@ class TestNonFinite:
         assert price > 0
         assert price >= 1e28
         assert holds(price, 1e28, 0.0, 0.1)
+
+
+class TestGuardUnavailable:
+    """
+    A non-finite or absent `floor_price` and `internal_cost` degrade to
+    Decimal(0) individually (see TestNonFinite), and a 0 that stands beside a
+    real, positive counterpart can only ever be outweighed inside `max(...)`.
+
+    That argument needs a trustworthy counterpart to lean on. When BOTH
+    degrade the same way — nan/nan, inf/inf, nan/inf, -inf/-inf, or neither
+    key sent at all — there is no positive input left anywhere in the
+    formula, and the old code returned `0.0`: a price that fails the guard's
+    own G1_PRICE_POSITIVE gate and psi's `price > 0`, silently. This class
+    is the fix: refuse instead of inventing a number nothing justifies.
+    """
+
+    @pytest.mark.parametrize(
+        "context",
+        [
+            pytest.param(
+                {"floor_price": float("nan"), "internal_cost": float("nan")},
+                id="nan/nan",
+            ),
+            pytest.param(
+                {"floor_price": float("inf"), "internal_cost": float("inf")},
+                id="inf/inf",
+            ),
+            pytest.param(
+                {"floor_price": float("nan"), "internal_cost": float("inf")},
+                id="nan/inf",
+            ),
+            pytest.param(
+                {"floor_price": float("-inf"), "internal_cost": float("-inf")},
+                id="-inf/-inf",
+            ),
+            pytest.param({}, id="absent/absent"),
+        ],
+    )
+    def test_neither_input_usable_refuses(self, context: dict) -> None:
+        guard = OutputGuard(safety_settings=Settings(0.1))
+        with pytest.raises(GuardUnavailable):
+            guard.calculate_safe_price(context)
+
+    def test_it_is_not_a_safety_violation(self) -> None:
+        """
+        A judgment that never happened is not a rule judging against a
+        decision. A caller that means to catch one must not accidentally
+        catch the other by inheritance.
+        """
+        assert not issubclass(GuardUnavailable, SafetyViolation)
+        assert not issubclass(SafetyViolation, GuardUnavailable)
+
+    def test_one_usable_input_still_prices_as_before(self) -> None:
+        """
+        The property this class must not break: a lone trustworthy floor or
+        cost is still enough to price a substitute, unchanged from
+        TestCostAboveFloor and TestNonFinite.
+        """
+        guard = OutputGuard(safety_settings=Settings(0.1))
+
+        assert (
+            guard.calculate_safe_price({"floor_price": 100.0, "internal_cost": 100.0})
+            == 111.12
+        )
+        # floor unusable, cost=100.0 usable: floor reads as 0, so the price
+        # is set entirely by the margin term on cost — same 111.12 as above.
+        assert guard.calculate_safe_price(
+            {"floor_price": float("nan"), "internal_cost": 100.0}
+        ) == pytest.approx(111.12)
+        # cost unusable, floor=100.0 usable: cost reads as 0, so the margin
+        # term (100/0.9) still exceeds the 1.05x markup term — same 111.12.
+        assert guard.calculate_safe_price(
+            {"floor_price": 100.0, "internal_cost": float("nan")}
+        ) == pytest.approx(111.12)
 
 
 class TestJitter:
