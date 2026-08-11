@@ -48,6 +48,7 @@ class TransactionSkill(
             "get_network_name": self._get_network_name,
             "transfer": self._transfer,
             "sign_trade_intent": self._sign_trade_intent,
+            "sign_receipt": self._sign_receipt,
             "submit_to_router": self._submit_to_router,
             "execute_rwa_collateral": self._execute_rwa_collateral,
             "mint_rwa_vault": self._mint_rwa_vault,
@@ -212,6 +213,29 @@ class TransactionSkill(
             )
         except Exception as e:
             logger.error(f"EIP-712 signing failed: {e}")
+            return Observation(success=False, error=str(e))
+
+    async def _sign_receipt(self, params: dict[str, Any]) -> Observation:
+        """
+        Attest a decision receipt the Membrane built.
+
+        Failure is reported rather than raised. The decision this receipt
+        describes has already been made and is already safe; the Membrane keeps
+        the unsigned receipt and emits anyway, because losing a negotiation
+        because a key was unreachable trades the guarantee for the attestation.
+        """
+        payload = params.get("payload")
+        if not payload:
+            return Observation(success=False, error="payload_missing")
+
+        if not self.evm_provider:
+            return Observation(success=False, error="evm_provider_not_configured")
+
+        try:
+            result = await self.evm_provider.sign_receipt(payload)
+            return Observation(success=True, metadata=make_struct(result))
+        except Exception as e:
+            logger.error(f"Receipt signing failed: {e}")
             return Observation(success=False, error=str(e))
 
     async def _submit_to_router(self, params: dict[str, Any]) -> Observation:

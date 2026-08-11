@@ -1,8 +1,9 @@
 # Decision Receipt (AURA-RECEIPT-V1) — design sketch
 
-Status: **draft / not implemented**. Adapted from VISION whitepaper v1.7.0 (Durov, 2026-05-05),
-chapters 4–6. This document records where we follow that spec, and — more importantly — the three
-places where our domain forces us to diverge from it.
+Status: **steps 1, 2, 3, 5 and 6 built; step 4 deferred.** Adapted from VISION whitepaper v1.7.0
+(Durov, 2026-05-05), chapters 4–6. This document records where we follow that spec and — more
+importantly — the five places where our domain forces us to diverge from it. Sections marked
+*Implemented* describe code; the rest is still design.
 
 ## 1. What the receipt is for
 
@@ -29,9 +30,10 @@ verification boundary: it is the last deterministic checkpoint before `Connector
 signal → M(in) → A(perceive) → T(think) → M(out) ⇐ RECEIPT MINTED HERE → C(act) → G(pulse)
 ```
 
-The receipt attaches to `Intent.metadata` under key `receipt` (text form) so it survives the
-existing proto plumbing without a schema change on day one. A typed `DecisionReceipt` message in
-`aura/core/v1/metabolism.proto` is the follow-up once the format stabilises.
+The receipt is `Intent.receipt`, a typed `DecisionReceipt` in
+`aura/core/v1/metabolism.proto`. It is minted after the verdict is settled and signed by the
+transaction protein, which owns the key; a receipt that cannot be signed is emitted unsigned rather
+than costing the decision.
 
 ## 3. Wire format
 
@@ -65,16 +67,29 @@ canonical-prefix: <hex16>
 | `item` | `HiveContextData.item_identifier` | public |
 | `health` | `Context.system_health` | public |
 
-**The salt is mandatory, not optional.** VISION §8.7.1 treats salting as a per-domain option, but
-our premise set is low-entropy: `floor_price` is a two-decimal number over a bounded range, so an
-unsalted `premise-hash` is brute-forceable in ~10⁶ hashes. A deployment-scoped salt (rotated per
-epoch, its *commitment* published in the policy stamp) is required for the hidden-knowledge
-invariant to survive contact with the receipt. Without it, publishing receipts would defeat the DLP
-guard we already run in `inspect_outbound`.
+**Deferred — and the analysis changed what it would have to be.** The premise set is low-entropy:
+`floor_price` is a two-decimal number over a bounded range, ~10⁷ candidates on its own, ~10¹⁴ with
+`internal_cost` — hours on one GPU, and far less once you bound the range from the offers you have
+already seen.
 
-Consequence, accepted: receipts become verifiable only by parties holding the salt (us, an auditor
-under NDA, bee-keeper). The counterparty verifies everything *except* premise re-derivation. That is
-still strictly more than they can check today.
+So **anyone holding the salt can recover the premises by enumeration**. The salt is exactly as
+secret as `floor_price` itself, which means the premise hash can *never* be a counterparty-verifiable
+field: verification and secrecy are mutually exclusive here. It can only be a commitment we open to a
+party already trusted with the floor.
+
+That is a different threat from VISION's. §8.7.1 salts against **linkage** — "an adversary who
+observes a sequence of receipts may infer that two receipts consume the same premise set" — on
+premises assumed high-entropy, and records the salt *in the policy stamp*, where it is public. For
+our threat, inversion, their design accomplishes nothing.
+
+If built, the right primitive is a **per-receipt random nonce stored alongside the receipt**, not a
+configured salt: no long-lived secret to rotate, nothing whose leak retroactively exposes the whole
+history, and opening is selective — reveal `(nonce, premises)` for the one deal under dispute. Use
+HMAC rather than `SHA256(salt ‖ data)`; there is no reason to hand-roll a keyed digest.
+
+The prerequisite is not cryptographic: a commitment you cannot open is a random number, so this needs
+receipts persisted where an auditor can read them. **The question to answer before writing any of it
+is who opens it and when.** Without a concrete dispute or audit flow, this is ceremony.
 
 ### 3.2 `claim-hash`
 
@@ -261,15 +276,47 @@ Two limits worth stating rather than discovering later:
   trade risk) that no rule set declares, so there are no gate ids to record (§3.3). They carry an
   `outcome_gate` and an empty derivation, which is honest but is a gap against the spec.
 
-### 3.7 `verifier` and `canonical-prefix`
+### 3.7 `signature` and `canonical-prefix`
 
-Ed25519 over `canon(lines 2–9)`, signed with the agent's existing identity key — the same key
-already used for wallet sanctification, which binds receipts to our ERC-8004 identity work. The
-`verifier` value is `<agent-id>@<key-fingerprint-hex16>` followed by the 128-hex signature.
+**Implemented.** EIP-712 over the receipt's content fields, signed with the agent's existing
+**EVM key** — not the Ed25519 scheme this document first sketched.
 
-`canonical-prefix` is the first 8 bytes of `SHA256(canon(content fields))`, rendered as 16 lowercase
-hex. It is the human-legible handle for logs, Telegram, and the frontend — **not** the binding
-commitment. The signature is.
+The reason is key distribution, not convenience. **A signature under a key nobody can attribute is
+decoration.** Signing is the easy half; giving a counterparty a way to learn that the key is ours is
+the hard one, and the EVM identity already has an answer — the recovered address resolves against
+the ERC-8004 identity registry. A fresh Ed25519 key would have had no such story, and inventing one
+is a larger piece of work than all of step 5.
+
+**The cost, stated plainly: the EVM key is a spending key.** The same `EVMProvider` that signs
+receipts also does `transfer_usdc`. The mitigation that matters is domain separation, which is
+exactly what EIP-712 domains are for:
+
+```python
+domain = {"name": "AuraDecisionReceipt", "version": "1", "chainId": <id>}
+#         ^ not "HackathonRiskRouter", and no verifyingContract
+```
+
+Different domain separator means a receipt signature is **not** a valid `TradeIntent` authorisation
+and a trade authorisation is not a valid receipt. `verifyingContract` is absent rather than zeroed —
+a receipt has no contract — which makes the domain structurally different, not merely renamed.
+
+The `ReceiptSignature` message is self-describing: scheme, domain, domain version, chain id, signer,
+signature. A verifier rebuilds the domain from the receipt alone and needs no out-of-band
+configuration, which is what VISION §5.2.2 means by a receipt being self-contained for replay.
+
+**Two formats, not one format with a flag.** `AURA-RECEIPT-V1` is signed; `AURA-RECEIPT-V0-UNSIGNED`
+is what a deployment with no key configured honestly produces. Separate names so a consumer written
+against the signed format cannot be satisfied by a downgrade, and `verify` refuses a version it does
+not recognise rather than best-effort checking it. `VerificationResult.attested` is true only when a
+signature was present *and* recovered to the signer the receipt claims.
+
+**Signing never costs a decision.** The decision is already made and already safe by the time the
+Membrane asks for an attestation; if the key is unreachable the receipt is emitted unsigned. Trading
+the guarantee for the attestation would be the wrong way round.
+
+`canonical-prefix` is the first 8 bytes of `SHA256(content fields)`, 16 lowercase hex, and now
+appears on every `membrane_receipt` log line alongside the outcome, gate and rule set. It is the
+human-legible handle — **not** the binding commitment. The signature is.
 
 ## 4. Worked example
 
@@ -326,12 +373,29 @@ committed beforehand. What they do not learn: the floor, the margin, the cost.
    and returns the record, which travels on `SafetyViolation` for the failing path. Replay tests
    build a fresh Membrane, registry and guard per run, since anything surviving between them is
    state a verifier does not have. Covered by `core/tests/test_{guard,membrane}_derivation.py`.
-4. Add `premise-hash` + salt, and split the policy stamp. **Blocked on a decision, not on code**:
-   who holds the salt and how it rotates. Without that the premise hash is either brute-forceable
-   (§3.1) or unverifiable by anyone but us.
-5. Sign with the identity key; wire `canonical-prefix` into logs and frontend. **Blocked on a
-   decision**: which key signs. The wallet-sanctification key is the obvious candidate, since it
-   would bind receipts to the ERC-8004 identity work.
+4. Add `premise-hash` + salt, and split the policy stamp. **Deferred, and the reason changed.**
+   Not merely "who holds the salt": our premises are low-entropy enough (a two-decimal floor over a
+   bounded range — ~10⁷ candidates for the floor alone) that **anyone holding the salt can recover
+   them by enumeration**. So the salt is exactly as secret as `floor_price`, and a premise hash can
+   never be a counterparty-verifiable field — only a commitment we open to a party already trusted
+   with the floor.
+
+   That is a different threat from VISION's. §8.7.1 salts against *linkage* between receipts, on
+   premises assumed high-entropy (a diagnosis, a customer identity), and records the salt in the
+   policy stamp — which for us would accomplish nothing. Fifth divergence.
+
+   If built, the right primitive is a **per-receipt random nonce stored with the receipt**, not a
+   configured salt: no long-lived secret to rotate or leak in bulk, and opening is selective. That
+   needs receipts persisted somewhere an auditor can read — the same gap that made the bee-keeper
+   half of step 6 unbuildable. Worth answering first: **who opens it, and when?** Absent a concrete
+   dispute or audit flow, this builds a ceremony nobody performs.
+5. ~~Sign with the identity key; wire `canonical-prefix` into logs and frontend.~~ **DONE for the
+   backend.** EIP-712 with the existing EVM key under a domain of its own (§3.7); signing lives in
+   the transaction protein, which owns the key, and verification in `membrane/receipt.py`, which
+   needs none. `canonical_prefix` is on every `membrane_receipt` log line.
+
+   **The frontend half is not done.** It needs the receipt on the wire past the gateway and a place
+   in the UI to show it, which is its own piece of work rather than a line of this one.
 6. ~~Typed `DecisionReceipt` proto message; bee-keeper verifies receipts in CI audit.~~
    **PARTLY DONE.** `DecisionReceipt` exists and `Intent.receipt` replaces the three fields that
    accumulated on `Intent` (7, 8 and 9 are reserved). It adds `claim_hash` / `emission_hash`, so an
