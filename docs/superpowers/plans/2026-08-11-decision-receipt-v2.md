@@ -17,6 +17,8 @@
 - Core tests run as: `PYTHONPATH=core/src:core/gen-proto:packages/aura-core/src:packages/aura-core/gen-proto uv run pytest core/tests/ -v`. This plan writes that prefix as `$CORE` — expand it every time.
 - Gateway tests run as: `PYTHONPATH=api-gateway/src:api-gateway/gen-proto:packages/aura-core/src:packages/aura-core/gen-proto uv run pytest api-gateway/tests/ -v`. Written below as `$GW`.
 - **Never hand-edit generated protobuf code** (`*/gen-proto/`, `aura_core_gen`). Edit `proto/aura/**` and run `make generate`.
+- **Generated code is gitignored.** `core/gen-proto` and `packages/aura-core/gen-proto` are not tracked, so a `git add` naming them fails with "paths are ignored". Stage `proto/`, hand-written sources and tests only.
+- **A new `DecisionOutcome` value needs a name in `packages/aura-core/src/aura_core/wire_names.py`.** That mapping is signed content — an unnamed outcome signs as `outcome_4`, and the name is the whole reason the integer is not what gets signed. `test_every_declared_outcome_has_a_name` catches the drift.
 - **betterproto: absence is not `None`.** `msg.field is None` is always false for a message field and is dead code. Test absence by value: `if not receipt:`. For oneofs use `betterproto.which_one_of()`. See `docs/CLAUDE.md` § "betterproto".
 - All money arithmetic inside the guard is `decimal.Decimal`. Never `float`, never `round()`. Prices cross the protobuf boundary as `double`, so convert at the edge with `Decimal(str(value))` and return `float(result)`.
 - Every task ends green: `make lint` and the relevant test suite pass before the commit.
@@ -156,13 +158,10 @@ Expected: PASS, 2 tests.
 Run: `$CORE uv run pytest core/tests/ -q`
 Expected: PASS. Adding an enum value and four optional string fields is backward compatible; if anything fails here, the failure is real and must be fixed before committing.
 
-- [ ] **Step 8: Commit**
+- [x] **Step 8: Commit** — done, `df0db4b`. Generated code is gitignored, so the staged set is:
 
 ```bash
-git add proto/aura/core/v1/metabolism.proto core/gen-proto packages/aura-core/gen-proto core/tests/test_receipt_v2_proto.py
-git commit -m "feat(proto): add the unavailable outcome and the receipt's binding fields
-
-Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>"
+git add proto/aura/core/v1/metabolism.proto packages/aura-core/src/aura_core/wire_names.py core/tests/test_receipt_v2_proto.py
 ```
 
 ---
