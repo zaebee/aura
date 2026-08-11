@@ -17,7 +17,7 @@ from aura_core_gen.aura.core.v1 import (
 )
 
 SIGNED = DecisionReceipt(
-    version="AURA-RECEIPT-V1",
+    version="AURA-RECEIPT-V2",
     claim_hash="a" * 64,
     ruleset_version="guard/negotiation@1.0.0+46cc0e38ca4f895c",
     derivation=DecisionDerivation(
@@ -67,12 +67,12 @@ class TestTheSignatureIsSelfDescribing:
 class TestAnUnsignedReceiptCannotPassForASignedOne:
     def test_the_version_says_so(self) -> None:
         unsigned = DecisionReceipt(
-            version="AURA-RECEIPT-V0-UNSIGNED",
+            version="AURA-RECEIPT-V2-UNSIGNED",
             outcome=DecisionOutcome.DECISION_OUTCOME_EMIT,
             canonical_prefix="0123456789abcdef",
         )
 
-        assert receipt_to_json(unsigned)["version"] == "AURA-RECEIPT-V0-UNSIGNED"
+        assert receipt_to_json(unsigned)["version"] == "AURA-RECEIPT-V2-UNSIGNED"
 
     def test_the_signature_is_null_rather_than_an_empty_shape(self) -> None:
         """
@@ -81,7 +81,7 @@ class TestAnUnsignedReceiptCannotPassForASignedOne:
         have no content.
         """
         unsigned = DecisionReceipt(
-            version="AURA-RECEIPT-V0-UNSIGNED",
+            version="AURA-RECEIPT-V2-UNSIGNED",
             outcome=DecisionOutcome.DECISION_OUTCOME_EMIT,
         )
 
@@ -118,7 +118,7 @@ class TestNothingHiddenNothingInvented:
         An empty object would assert one that never ran.
         """
         bare = DecisionReceipt(
-            version="AURA-RECEIPT-V0-UNSIGNED",
+            version="AURA-RECEIPT-V2-UNSIGNED",
             outcome=DecisionOutcome.DECISION_OUTCOME_REFUSE,
             outcome_gate="KYC_FAILURE",
         )
@@ -161,11 +161,11 @@ class TestAnUnsetReceiptIsAbsence:
     def test_a_receipt_with_a_version_is_still_rendered(self) -> None:
         """The check must not swallow a real receipt that happens to be sparse."""
         sparse = DecisionReceipt(
-            version="AURA-RECEIPT-V0-UNSIGNED",
+            version="AURA-RECEIPT-V2-UNSIGNED",
             outcome=DecisionOutcome.DECISION_OUTCOME_EMIT,
         )
 
         rendered = receipt_to_json(sparse)
 
         assert rendered is not None
-        assert rendered["version"] == "AURA-RECEIPT-V0-UNSIGNED"
+        assert rendered["version"] == "AURA-RECEIPT-V2-UNSIGNED"

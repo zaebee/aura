@@ -1,11 +1,20 @@
 """
 Mints and checks what the Membrane can attest about a decision.
 
-Two formats, and the difference is the point. `AURA-RECEIPT-V1` carries an
+Two formats, and the difference is the point. `AURA-RECEIPT-V2` carries an
 EIP-712 signature over its content fields and can be attributed to the agent
-that produced it. `AURA-RECEIPT-V0-UNSIGNED` carries everything else and says in
+that produced it. `AURA-RECEIPT-V2-UNSIGNED` carries everything else and says in
 its own name that it carries no attestation, which is what a deployment with no
 key configured honestly produces.
+
+The number is the format generation; the suffix is attestation. V0 and V1 read
+as though they were successive formats, but they were one format signed and
+unsigned — the generation never actually changed between them. V2 is the first
+real generation bump: `issued_at`, `decision_id` and `request_id` enter the
+signed content, binding a receipt to the one decision it describes instead of
+to an equivalence class of decisions that happen to share a claim and an
+emission. V0 and V1 are deleted rather than deprecated — no persisted receipt
+exists anywhere to read back in the old shape.
 
 They are separate names rather than one name and a flag, so a consumer written
 against the signed format cannot be satisfied by a downgrade, and `verify`
@@ -46,8 +55,8 @@ from eth_account.messages import encode_typed_data
 # unsigned one, so a consumer written against it cannot be satisfied by a
 # downgrade. A deployment with no key configured produces the unsigned format
 # and says so — that is the honest report, not an error.
-RECEIPT_VERSION = "AURA-RECEIPT-V0-UNSIGNED"
-SIGNED_VERSION = "AURA-RECEIPT-V1"
+RECEIPT_VERSION = "AURA-RECEIPT-V2-UNSIGNED"
+SIGNED_VERSION = "AURA-RECEIPT-V2"
 
 # Kept DISTINCT from the domain TradeIntent signs under (`HackathonRiskRouter`).
 #
@@ -189,22 +198,28 @@ def claim_digest(intent: Intent) -> str:
 
 def _content_fields(receipt: DecisionReceipt) -> str:
     """
-    The fields the prefix commits to, concatenated in fixed order.
+    The fields the prefix and the signature commit to, in fixed order.
 
-    Order is part of the canonical form: reordering would produce a different
-    prefix and fail verification, which is the intended behaviour rather than an
-    inconvenience.
+    Order is part of the canonical form: reordering produces a different prefix
+    and fails verification, which is intended rather than inconvenient.
+
+    `issued_at`, `decision_id` and `request_id` are here rather than alongside
+    because binding that is not signed is decorative — anyone can rewrite it.
     """
     derivation = receipt.derivation or DecisionDerivation()
     return "\n".join(
         [
             receipt.version,
+            receipt.issued_at,
+            receipt.decision_id,
+            receipt.request_id,
             receipt.claim_hash,
             receipt.ruleset_version,
             derivation.derivation_hash,
             receipt.emission_hash,
             decision_outcome_name(receipt.outcome),
             receipt.outcome_gate,
+            receipt.override_scope,
         ]
     )
 
@@ -221,14 +236,17 @@ def mint(
     outcome_gate: str = "",
     ruleset_version: str = "",
     derivation: DecisionDerivation | None = None,
+    issued_at: str = "",
+    decision_id: str = "",
+    request_id: str = "",
+    override_scope: str = "",
 ) -> DecisionReceipt:
     """
     Build the receipt for one decision.
 
-    `claim` is what the Transformer proposed; `emission` is what is actually
-    being sent. Passing the same Intent for both is correct when the Membrane
-    changed nothing — the two hashes agreeing is then a fact a reader can check,
-    not an assumption.
+    `claim` is what the Transformer proposed; `emission` is what is being sent.
+    Passing the same Intent for both is correct when the Membrane changed
+    nothing — the two hashes agreeing is then a fact a reader can check.
     """
     receipt = DecisionReceipt(
         version=RECEIPT_VERSION,
@@ -237,6 +255,10 @@ def mint(
         emission_hash=claim_digest(emission),
         outcome=outcome,
         outcome_gate=outcome_gate,
+        issued_at=issued_at,
+        decision_id=decision_id,
+        request_id=request_id,
+        override_scope=override_scope,
     )
     if derivation is not None:
         receipt.derivation = derivation

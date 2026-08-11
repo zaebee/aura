@@ -28,7 +28,7 @@ def counter_intent_with_receipt() -> Intent:
         action=ActionType.ACTION_TYPE_COUNTER,
         negotiation=NegotiationIntent(price=105.0, message="my best offer"),
         receipt=DecisionReceipt(
-            version="AURA-RECEIPT-V1",
+            version="AURA-RECEIPT-V2",
             claim_hash="a" * 64,
             emission_hash="b" * 64,
             ruleset_version="guard/negotiation@1.0.0+46cc0e38ca4f895c",

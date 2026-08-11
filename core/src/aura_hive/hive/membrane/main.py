@@ -1,4 +1,5 @@
 from dataclasses import dataclass
+from datetime import UTC, datetime
 from typing import Any, cast
 
 import betterproto
@@ -113,6 +114,7 @@ class _Verdict:
     gate: str = ""
     ruleset_version: str = ""
     derivation: DecisionDerivation | None = None
+    override_scope: str = ""
 
     def record(self, outcome: DecisionOutcome, gate: str) -> None:
         self.outcome = outcome
@@ -141,11 +143,20 @@ class _Verdict:
             )
 
 
-def _mint_for(claim: Intent, emission: Intent, verdict: _Verdict) -> DecisionReceipt:
+def _mint_for(
+    claim: Intent, emission: Intent, verdict: _Verdict, request_id: str
+) -> DecisionReceipt:
     """
     `claim` is what the Transformer proposed and `emission` is what is going
     out; they are the same object when the Membrane changed nothing, and the two
     hashes agreeing is then a fact a reader can check rather than an assumption.
+
+    `decision_id` is the emission's identifier rather than the claim's: on the
+    override path the emission is a replacement Intent, and `_replacing` carries
+    the identifier across from the original, so this still names the one
+    decision the receipt describes. `request_id` names the negotiation session
+    it belongs to, and comes from the Context the outbound path was given —
+    nothing on the Intent carries it.
     """
     return mint(
         claim=claim,
@@ -154,6 +165,12 @@ def _mint_for(claim: Intent, emission: Intent, verdict: _Verdict) -> DecisionRec
         outcome_gate=verdict.gate,
         ruleset_version=verdict.ruleset_version,
         derivation=verdict.derivation,
+        issued_at=datetime.now(UTC)
+        .isoformat(timespec="seconds")
+        .replace("+00:00", "Z"),
+        decision_id=emission.identifier,
+        request_id=request_id,
+        override_scope=verdict.override_scope,
     )
 
 
@@ -277,7 +294,7 @@ class HiveMembrane(Membrane[Any, Intent, Context]):
         self.registry = registry
 
     async def _finish(
-        self, claim: Intent, emission: Intent, verdict: _Verdict
+        self, claim: Intent, emission: Intent, verdict: _Verdict, request_id: str
     ) -> Intent:
         """
         Attach the receipt to the Intent that will actually be sent, asking
@@ -289,7 +306,7 @@ class HiveMembrane(Membrane[Any, Intent, Context]):
         the attestation — the wrong way round. The version name carries that
         distinction rather than leaving a reader to infer it.
         """
-        receipt = _mint_for(claim, emission, verdict)
+        receipt = _mint_for(claim, emission, verdict, request_id)
         emission.receipt = await self._attest(receipt)
 
         try:
@@ -547,8 +564,9 @@ class HiveMembrane(Membrane[Any, Intent, Context]):
                         ),
                     ),
                     verdict,
+                    request_id,
                 )
-            return await self._finish(claim, decision, verdict)
+            return await self._finish(claim, decision, verdict, request_id)
 
         # Trade intent guard: backstop for high-risk trades that slipped through
         if params_name == "trade" and params_value is not None:
@@ -575,8 +593,9 @@ class HiveMembrane(Membrane[Any, Intent, Context]):
                         ),
                     ),
                     verdict,
+                    request_id,
                 )
-            return await self._finish(claim, decision, verdict)
+            return await self._finish(claim, decision, verdict, request_id)
 
         neg_intent = params_value if params_name == "negotiation" else None
 
@@ -609,7 +628,13 @@ class HiveMembrane(Membrane[Any, Intent, Context]):
                     )
 
             return await self._override_with_safe_offer(
-                decision, safe_price, "FAILURE_RECOVERY", verdict, guard_context, claim
+                decision,
+                safe_price,
+                "FAILURE_RECOVERY",
+                verdict,
+                guard_context,
+                request_id,
+                claim,
             )
 
         # 2. DLP Check
@@ -617,6 +642,13 @@ class HiveMembrane(Membrane[Any, Intent, Context]):
         if "floor_price" in message.lower():
             _record_intervention("outbound", "DLP_BLOCK")
             verdict.record(_OVERRIDE, "DLP_BLOCK")
+            # The substitution here touches only the message — the sanitised
+            # negotiation keeps the same price and item — so claim and emission
+            # hash alike. `override_scope` says why: a reader who sees the two
+            # hashes agree under an OVERRIDE outcome can tell "prose changed,
+            # value did not" from "this receipt claims a substitution that left
+            # no trace" without knowing which gate names are prose-only.
+            verdict.override_scope = "prose"
             # Sanitised into a replacement rather than written back over the
             # caller's Intent. The receipt reports what the Membrane did by
             # comparing a digest of the proposal against a digest of what was
@@ -658,11 +690,11 @@ class HiveMembrane(Membrane[Any, Intent, Context]):
             ActionType.ACTION_TYPE_ACCEPT,
             ActionType.ACTION_TYPE_COUNTER,
         ]:
-            return await self._finish(claim, decision, verdict)
+            return await self._finish(claim, decision, verdict, request_id)
 
         # 3. Call Guard Protein for validation
         if not self.registry:
-            return await self._finish(claim, decision, verdict)
+            return await self._finish(claim, decision, verdict, request_id)
 
         internal_cost = _context_number(ctx_meta, "internal_cost", floor_price)
         guard_context = {
@@ -708,15 +740,15 @@ class HiveMembrane(Membrane[Any, Intent, Context]):
             safe_price = float(str(obs_meta.get("safe_price", safe_price)))
 
             return await self._override_with_safe_offer(
-                decision, safe_price, reason, verdict, guard_context, claim
+                decision, safe_price, reason, verdict, guard_context, request_id, claim
             )
 
         if not await self._postcondition_holds(price, guard_context, verdict):
             return await self._finish(
-                claim, _replacing(decision, _rejection()), verdict
+                claim, _replacing(decision, _rejection()), verdict, request_id
             )
 
-        return await self._finish(claim, decision, verdict)
+        return await self._finish(claim, decision, verdict, request_id)
 
     async def _override_with_safe_offer(
         self,
@@ -725,6 +757,7 @@ class HiveMembrane(Membrane[Any, Intent, Context]):
         reason: str,
         verdict: _Verdict,
         guard_context: dict[str, Any],
+        request_id: str,
         claim: Intent | None = None,
     ) -> Intent:
         _record_intervention("outbound", reason, safe_price=round(safe_price, 2))
@@ -732,7 +765,10 @@ class HiveMembrane(Membrane[Any, Intent, Context]):
 
         if not await self._postcondition_holds(rounded_price, guard_context, verdict):
             return await self._finish(
-                claim or original, _replacing(original, _rejection()), verdict
+                claim or original,
+                _replacing(original, _rejection()),
+                verdict,
+                request_id,
             )
         params_name, params_value = betterproto.which_one_of(original, "params")
         neg_intent = params_value if params_name == "negotiation" else None
@@ -764,4 +800,12 @@ class HiveMembrane(Membrane[Any, Intent, Context]):
             ),
         )
         verdict.record(_OVERRIDE, reason)
-        return await self._finish(original, _replacing(original, replacement), verdict)
+        # The substitute price is decidable content, not prose: claim and
+        # emission differ here, but the field is set uniformly with the DLP
+        # site rather than left to be inferred from "the hashes happened to
+        # differ" — a verifier checking the pairing reads this instead of a
+        # hardcoded list of which gates are prose-only.
+        verdict.override_scope = "value"
+        return await self._finish(
+            original, _replacing(original, replacement), verdict, request_id
+        )

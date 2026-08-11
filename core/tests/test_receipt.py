@@ -8,8 +8,8 @@ model proposed and a digest of what was actually sent. Those two differing IS
 the override, stated as a fact a reader can verify rather than a claim they must
 take on trust.
 
-There are two formats. `AURA-RECEIPT-V1` carries an EIP-712 signature and can be
-attributed to the agent that produced it; `AURA-RECEIPT-V0-UNSIGNED` carries
+There are two formats. `AURA-RECEIPT-V2` carries an EIP-712 signature and can be
+attributed to the agent that produced it; `AURA-RECEIPT-V2-UNSIGNED` carries
 everything else and says in its own name that it carries no attestation. Separate
 names rather than one name and a flag, so a consumer written against the signed
 format cannot be satisfied by a downgrade.
@@ -20,6 +20,7 @@ everything a reader might want.
 """
 
 import hashlib
+from dataclasses import replace
 
 import pytest
 from aura_core import decision_outcome_name
@@ -28,6 +29,7 @@ from aura_core_gen.aura.core.v1 import (
     AssetIntent,
     DecisionDerivation,
     DecisionOutcome,
+    DecisionReceipt,
     Intent,
     NegotiationIntent,
     RWAVaultIntent,
@@ -696,3 +698,72 @@ class TestTheOutcomeNamesMatchTheEnum:
     def test_an_unknown_number_renders_distinctly(self) -> None:
         """It must not be mistakable for a known outcome."""
         assert decision_outcome_name(99) == "outcome_99"
+
+
+class TestVersionNames:
+    def test_the_number_is_the_generation_and_the_suffix_is_attestation(self) -> None:
+        """
+        V0-UNSIGNED and V1 encoded attestation in the generation number, so the
+        two looked like successive formats when they were one format signed and
+        unsigned.
+        """
+        assert RECEIPT_VERSION == "AURA-RECEIPT-V2-UNSIGNED"
+        assert SIGNED_VERSION == "AURA-RECEIPT-V2"
+
+    def test_the_old_formats_are_refused_not_read(self) -> None:
+        """
+        No persisted receipts exist, so V0/V1 are deleted rather than supported.
+        A verifier that best-effort reads a format it does not know is the
+        downgrade the version string exists to prevent.
+        """
+        for old in ("AURA-RECEIPT-V0-UNSIGNED", "AURA-RECEIPT-V1"):
+            result = verify(DecisionReceipt(version=old))
+            assert not result.ok
+            assert any("unknown receipt version" in f for f in result.failures)
+
+
+class TestBinding:
+    def test_the_binding_fields_are_signed(self) -> None:
+        """
+        Binding that is not in the content fields is decorative: anyone can
+        rewrite it and the signature still verifies.
+        """
+        base = mint(
+            counter(100.0),
+            counter(100.0),
+            DecisionOutcome.DECISION_OUTCOME_EMIT,
+            issued_at="2026-08-11T10:00:00Z",
+            decision_id="d-1",
+            request_id="r-1",
+        )
+        for field, value in (
+            ("issued_at", "2026-08-11T11:00:00Z"),
+            ("decision_id", "d-2"),
+            ("request_id", "r-2"),
+        ):
+            altered = replace(base, **{field: value})
+            assert _prefix(altered) != _prefix(base), field
+
+    def test_two_sessions_do_not_share_a_receipt(self) -> None:
+        """
+        Same item, same price, different deals produced a byte-identical
+        receipt, signature included — a receipt about an equivalence class of
+        decisions rather than one decision.
+        """
+        one = mint(
+            counter(100.0),
+            counter(100.0),
+            DecisionOutcome.DECISION_OUTCOME_EMIT,
+            issued_at="2026-08-11T10:00:00Z",
+            decision_id="d-1",
+            request_id="r-1",
+        )
+        two = mint(
+            counter(100.0),
+            counter(100.0),
+            DecisionOutcome.DECISION_OUTCOME_EMIT,
+            issued_at="2026-08-11T10:00:00Z",
+            decision_id="d-2",
+            request_id="r-2",
+        )
+        assert one.canonical_prefix != two.canonical_prefix
