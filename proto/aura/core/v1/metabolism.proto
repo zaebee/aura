@@ -226,6 +226,58 @@ message DecisionDerivation {
   string derivation_hash = 2;
 }
 
+// What the Membrane can attest about one decision, in one place.
+//
+// NOT YET A RECEIPT IN THE SENSE THE SPEC MEANS. VISION §5.1.7 is explicit that
+// a receipt without a valid verifier signature is not a receipt regardless of
+// any other field, and the signature (§3.7) and premise hash (§3.1) are not
+// built. `version` says UNSIGNED for exactly that reason: a consumer must not be
+// able to mistake this for the attested article, and a later signed format must
+// not be satisfiable by downgrading to this one.
+//
+// What it does carry is everything checkable without a key: which rules judged
+// the decision, how they were applied, what the model proposed, and what was
+// actually sent. See docs/DECISION_RECEIPT.md §3.
+message DecisionReceipt {
+  // Format identifier. `AURA-RECEIPT-V0-UNSIGNED` today. The signed format gets
+  // its own name rather than a flag on this one.
+  string version = 1;
+
+  // Canonical digest of the decision the Transformer proposed, before the
+  // Membrane inspected it. Prose (`reasoning`, `message`, `thought`) is excluded
+  // — it is not decidable content, and hashing a model's free text would make
+  // the digest irreproducible.
+  string claim_hash = 2;
+
+  // The rule set that judged it: `guard/negotiation@1.0.0+<hex16>`. Empty when
+  // no rule set was consulted.
+  string ruleset_version = 3;
+
+  // How the verdict was reached. Absent when no declared gate ran.
+  DecisionDerivation derivation = 4;
+
+  // Canonical digest of what was actually emitted, over the same fields as
+  // claim_hash. The two differing IS the Membrane's intervention, stated as a
+  // fact a reader can check rather than a claim they must trust.
+  string emission_hash = 5;
+
+  // The Membrane's verdict, and the first gate that produced it.
+  DecisionOutcome outcome = 6;
+  string outcome_gate = 7;
+
+  // First eight bytes of SHA-256 over the content fields, as 16 lowercase hex.
+  // A human-legible handle for logs and UI — NOT a binding commitment. Nothing
+  // is bound until something signs it.
+  string canonical_prefix = 8;
+
+  // Reserved for the fields that need keys or a salt, so nothing reuses these
+  // numbers meanwhile. premise_hash (§3.1) needs the salt decision;
+  // policy_stamp (§3.5) needs the public/committed split; verifier (§3.7) needs
+  // a signing identity.
+  reserved 9, 10, 11;
+  reserved "premise_hash", "policy_stamp", "verifier";
+}
+
 message Intent {
   string identifier = 1;  // Schema.org compliant
   ActionType action = 2;
@@ -234,21 +286,15 @@ message Intent {
   google.protobuf.Struct metadata = 5;
   TraceContext trace = 6;
 
-  // Membrane verdict. Set at the outbound boundary, never by the Transformer.
-  DecisionOutcome outcome = 7;
+  // Folded into `receipt` below: outcome (7), outcome_gate (8) and
+  // derivation (9) lived here first and moved once there was a message to hold
+  // them together. Reserved so the numbers cannot be reused for anything else.
+  reserved 7, 8, 9;
+  reserved "outcome", "outcome_gate", "derivation";
 
-  // The invariant that fired, as the guard's own error code
-  // (FLOOR_PRICE_VIOLATION, DLP_BLOCK, KYC_FAILURE, ...). Empty when the
-  // outcome is EMIT.
-  //
-  // Records the FIRST gate that fired, not every gate that would have. A full
-  // set is an oracle over the policy configuration: probe with crafted offers,
-  // read back which invariants answered, and the shape of the hidden floor
-  // falls out. This constrains only what is recorded — every gate still runs.
-  string outcome_gate = 8;
-
-  // How the Membrane reached that verdict. Absent when no declared gate ran.
-  DecisionDerivation derivation = 9;
+  // What the Membrane attests about this decision. Set at the outbound
+  // boundary, never by the Transformer.
+  DecisionReceipt receipt = 16;
 
   // Strictly typed action params
   oneof params {

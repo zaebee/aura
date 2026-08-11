@@ -1,3 +1,4 @@
+from dataclasses import dataclass
 from typing import Any, cast
 
 import betterproto
@@ -16,6 +17,8 @@ from aura_core_gen.aura.core.v1 import (
 from prometheus_client import REGISTRY, Counter
 
 from aura_hive.config import get_settings
+
+from .receipt import mint
 
 logger = structlog.get_logger(__name__)
 
@@ -82,46 +85,72 @@ _OVERRIDE = cast(DecisionOutcome, DecisionOutcome.DECISION_OUTCOME_OVERRIDE)
 _REFUSE = cast(DecisionOutcome, DecisionOutcome.DECISION_OUTCOME_REFUSE)
 
 
-def _stamp(decision: Intent, outcome: DecisionOutcome, gate: str) -> Intent:
+@dataclass
+class _Verdict:
     """
-    Record what the Membrane did, on the Intent that will actually be sent.
+    The Membrane's finding, accumulated as the outbound path proceeds.
+
+    Kept here rather than written onto the Intent as it goes, because the Intent
+    on the override path is replaced part-way and a verdict half-written onto a
+    discarded object is how `outcome_gate` nearly lost its first gate.
 
     First gate wins. A decision that trips DLP and then the floor check records
     DLP_BLOCK, the earlier one: reporting every gate that fired would hand an
     adversary an oracle over the policy configuration — probe with crafted
     offers, read back which invariants answered, and the shape of the hidden
-    floor falls out.
-
-    This constrains only what is *recorded*. Every gate still executes;
-    short-circuiting the floor check to keep the label tidy would trade a
-    guarantee for a string.
+    floor falls out. This constrains only what is recorded; every gate still
+    executes.
     """
-    decision.outcome = outcome
-    if not decision.outcome_gate:
-        decision.outcome_gate = gate
-    return decision
+
+    outcome: DecisionOutcome = _EMIT
+    gate: str = ""
+    ruleset_version: str = ""
+    derivation: DecisionDerivation | None = None
+
+    def record(self, outcome: DecisionOutcome, gate: str) -> None:
+        self.outcome = outcome
+        if not self.gate:
+            self.gate = gate
+
+    def read_guard_report(self, obs_meta: dict[str, Any]) -> None:
+        """
+        Take the rule set and the derivation from what the guard reported.
+
+        `or ""` rather than a default, because `str(None)` is "None" — truthy,
+        and it would record a sequence of that literal text and a hash claiming
+        a derivation that never ran. A Struct round-trips a null value back as
+        None, so a key being present is not the same as it carrying one.
+        """
+        self.ruleset_version = str(obs_meta.get("ruleset_version") or "")
+        sequence = str(obs_meta.get("gate_sequence") or "")
+        digest = str(obs_meta.get("derivation_hash") or "")
+        # Left unset when no declared gate ran — a decision outside the guard's
+        # scope, an unwired Membrane, or one of the Membrane's own checks, none
+        # of which are declared in a rule set. Recording an empty digest there
+        # would assert a derivation that never happened.
+        if sequence or digest:
+            self.derivation = DecisionDerivation(
+                gate_sequence=sequence, derivation_hash=digest
+            )
 
 
-def _attach_derivation(decision: Intent, obs_meta: dict[str, Any]) -> Intent:
+def _finish(claim: Intent, emission: Intent, verdict: _Verdict) -> Intent:
     """
-    Record how the guard reached its verdict, from what the guard reported.
+    Attach the receipt and hand back the Intent that will actually be sent.
 
-    Left unset when no declared gate ran — a decision outside the guard's scope,
-    an unwired Membrane, or one of the Membrane's own checks, none of which are
-    declared in a rule set yet. Attaching an empty digest there would assert a
-    derivation that never happened, which is worse than saying nothing.
+    `claim` is what the Transformer proposed and `emission` is what is going
+    out; they are the same object when the Membrane changed nothing, and the two
+    hashes agreeing is then a fact a reader can check rather than an assumption.
     """
-    # `or ""` rather than a default, because `str(None)` is "None" — truthy, and
-    # it would attach a record whose sequence is that literal text and whose
-    # hash claims a derivation that never ran. A Struct round-trips a null value
-    # back as None, so a key being present is not the same as it carrying one.
-    sequence = str(obs_meta.get("gate_sequence") or "")
-    digest = str(obs_meta.get("derivation_hash") or "")
-    if sequence or digest:
-        decision.derivation = DecisionDerivation(
-            gate_sequence=sequence, derivation_hash=digest
-        )
-    return decision
+    emission.receipt = mint(
+        claim=claim,
+        emission=emission,
+        outcome=verdict.outcome,
+        outcome_gate=verdict.gate,
+        ruleset_version=verdict.ruleset_version,
+        derivation=verdict.derivation,
+    )
+    return emission
 
 
 def _replacing(original: Intent, replacement: Intent) -> Intent:
@@ -143,22 +172,7 @@ def _replacing(original: Intent, replacement: Intent) -> Intent:
     """
     replacement.identifier = original.identifier
     replacement.trace = original.trace
-    replacement.outcome_gate = original.outcome_gate
-    replacement.derivation = original.derivation
     return replacement
-
-
-def _settle(decision: Intent) -> Intent:
-    """
-    Nothing further fired, so the Membrane emitted what it was given.
-
-    EMIT is claimed only when no earlier gate has already stamped this Intent —
-    a message sanitised by DLP is still an override even though the price that
-    follows it passes the guard untouched.
-    """
-    if not decision.outcome_gate:
-        decision.outcome = _EMIT
-    return decision
 
 
 def _action_label(action: Any) -> str:
@@ -269,6 +283,11 @@ class HiveMembrane(Membrane[Any, Intent, Context]):
         ctx_meta = context.metadata.to_dict()
         floor_price = float(str(ctx_meta.get("floor_price", 0.0)))
 
+        # Accumulated as the path proceeds and minted once, at whichever return
+        # is taken. `decision` is the claim throughout: the only edit before the
+        # receipt is built is DLP rewriting prose, which the claim excludes.
+        verdict = _Verdict()
+
         params_name, params_value = betterproto.which_one_of(decision, "params")
 
         # RWA vault guard: backstop for KYC failures that slipped through
@@ -281,7 +300,9 @@ class HiveMembrane(Membrane[Any, Intent, Context]):
                     violation_code=rwa_intent.compliance.violation_code,
                     wallet_address=rwa_intent.wallet_address,
                 )
-                return _stamp(
+                verdict.record(_REFUSE, "KYC_FAILURE")
+                return _finish(
+                    decision,
                     _replacing(
                         decision,
                         Intent(
@@ -291,10 +312,9 @@ class HiveMembrane(Membrane[Any, Intent, Context]):
                             rwa_vault=rwa_intent,
                         ),
                     ),
-                    _REFUSE,
-                    "KYC_FAILURE",
+                    verdict,
                 )
-            return _settle(decision)
+            return _finish(decision, decision, verdict)
 
         # Trade intent guard: backstop for high-risk trades that slipped through
         if params_name == "trade" and params_value is not None:
@@ -308,7 +328,9 @@ class HiveMembrane(Membrane[Any, Intent, Context]):
                     risk_score=risk_score,
                     risk_category=trade_intent.validation_score.risk_category,
                 )
-                return _stamp(
+                verdict.record(_REFUSE, "HIGH_RISK_TRADE")
+                return _finish(
+                    decision,
                     _replacing(
                         decision,
                         Intent(
@@ -318,10 +340,9 @@ class HiveMembrane(Membrane[Any, Intent, Context]):
                             trade=trade_intent,
                         ),
                     ),
-                    _REFUSE,
-                    "HIGH_RISK_TRADE",
+                    verdict,
                 )
-            return _settle(decision)
+            return _finish(decision, decision, verdict)
 
         neg_intent = params_value if params_name == "negotiation" else None
 
@@ -343,7 +364,7 @@ class HiveMembrane(Membrane[Any, Intent, Context]):
                     )
 
             return self._override_with_safe_offer(
-                decision, safe_price, "FAILURE_RECOVERY"
+                decision, safe_price, "FAILURE_RECOVERY", verdict
             )
 
         # 2. DLP Check
@@ -353,17 +374,17 @@ class HiveMembrane(Membrane[Any, Intent, Context]):
                 neg_intent.message = "I cannot disclose internal pricing details."
             decision.reasoning += " [MEMBRANE: DLP block]"
             _record_intervention("outbound", "DLP_BLOCK")
-            _stamp(decision, _OVERRIDE, "DLP_BLOCK")
+            verdict.record(_OVERRIDE, "DLP_BLOCK")
 
         if decision.action not in [
             ActionType.ACTION_TYPE_ACCEPT,
             ActionType.ACTION_TYPE_COUNTER,
         ]:
-            return _settle(decision)
+            return _finish(decision, decision, verdict)
 
         # 3. Call Guard Protein for validation
         if not self.registry:
-            return _settle(decision)
+            return _finish(decision, decision, verdict)
 
         internal_cost = float(str(ctx_meta.get("internal_cost", floor_price)))
         guard_context = {"floor_price": floor_price, "internal_cost": internal_cost}
@@ -396,7 +417,7 @@ class HiveMembrane(Membrane[Any, Intent, Context]):
         # Attached to the Intent the guard judged, before any replacement is
         # built, so `_replacing` carries it across the swap like the rest of the
         # fields that describe this decision point.
-        _attach_derivation(decision, obs_meta)
+        verdict.read_guard_report(obs_meta)
 
         if not obs.success:
             # Determine reason for logging/override using structured error code
@@ -404,12 +425,12 @@ class HiveMembrane(Membrane[Any, Intent, Context]):
             reason = str(obs_meta.get("error_code", "SAFETY_VIOLATION"))
             safe_price = float(str(obs_meta.get("safe_price", safe_price)))
 
-            return self._override_with_safe_offer(decision, safe_price, reason)
+            return self._override_with_safe_offer(decision, safe_price, reason, verdict)
 
-        return _settle(decision)
+        return _finish(decision, decision, verdict)
 
     def _override_with_safe_offer(
-        self, original: Intent, safe_price: float, reason: str
+        self, original: Intent, safe_price: float, reason: str, verdict: _Verdict
     ) -> Intent:
         _record_intervention("outbound", reason, safe_price=round(safe_price, 2))
         rounded_price = round(safe_price, 2)
@@ -435,4 +456,5 @@ class HiveMembrane(Membrane[Any, Intent, Context]):
                 message=f"I've reached my final limit for this item. My best offer is ${rounded_price:.2f}.",
             ),
         )
-        return _stamp(_replacing(original, replacement), _OVERRIDE, reason)
+        verdict.record(_OVERRIDE, reason)
+        return _finish(original, _replacing(original, replacement), verdict)
