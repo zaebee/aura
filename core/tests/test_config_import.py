@@ -19,12 +19,13 @@ developer's own file. The first version of this test passed for that reason
 while proving nothing — a build stage has neither.
 """
 
+import os
 import subprocess
 import sys
 from pathlib import Path
 
 _REPO = Path(__file__).resolve().parents[2]
-CORE_PATHS = ":".join(
+CORE_PATHS = os.pathsep.join(
     str(_REPO / p)
     for p in (
         "core/src",
@@ -40,11 +41,21 @@ def import_without_config(statement: str, cwd: Path) -> subprocess.CompletedProc
     Run one import in a fresh interpreter with no AURA_ variables, from a
     directory carrying no `.env` — the conditions a Docker build stage has.
     """
+    # Filtered rather than replaced. A hand-built environment strips whatever
+    # the interpreter needs to start on someone else's machine, and this test
+    # would then fail for a reason that has nothing to do with what it asserts —
+    # which is the failure it exists to catch, so it should not commit it.
+    #
+    # The two conditions that matter are here: no AURA_ variables, and a cwd
+    # with no `.env` for `SettingsConfigDict(env_file=".env")` to find.
+    env = {k: v for k, v in os.environ.items() if not k.startswith("AURA_")}
+    env["PYTHONPATH"] = CORE_PATHS
+
     return subprocess.run(
         [sys.executable, "-c", statement],
         capture_output=True,
         text=True,
-        env={"PYTHONPATH": CORE_PATHS, "PATH": "/usr/bin:/bin"},
+        env=env,
         cwd=cwd,
         timeout=120,
     )
@@ -100,3 +111,18 @@ class TestTheHiveImportsWithoutRuntimeConfiguration:
 
         assert result.returncode != 0
         assert "url" in result.stderr.lower()
+
+    def test_the_entrypoint_module_imports_without_a_database(
+        self, tmp_path: Path
+    ) -> None:
+        """
+        `NegotiationService` lives in `main.py`, so an import-time settings read
+        there makes the service class untestable without a deployment behind it.
+
+        The entrypoint still needs configuration to *run* — `serve()` reads
+        settings first thing. Needing it to be *imported* is the part that
+        buys nothing.
+        """
+        result = import_without_config("import aura_hive.main", cwd=tmp_path)
+
+        assert result.returncode == 0, result.stderr

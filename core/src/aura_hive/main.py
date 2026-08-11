@@ -32,13 +32,13 @@ from aura_hive.nats_gateway import NatsSignalGateway
 
 tracer = trace.get_tracer(__name__)
 
-# 1. Configure structured logging
+# Logging is configured in `serve()`, not here.
 #
-# Reading settings at module scope is right *here* and nowhere else: this is the
-# entrypoint, so importing it reasonably requires the deployment to be
-# configured. `aura_hive.config` no longer does the same on everyone's behalf.
-settings = get_settings()
-configure_logging(log_level=settings.server.log_level)
+# `NegotiationService` lives in this module, so reading settings at import time
+# would make the service class untestable without a deployment behind it. The
+# entrypoint still needs configuration to *run* — `serve()` reads it first
+# thing — but needing it to be *imported* buys nothing. `get_settings()` is
+# memoised, so calling it where it is used costs a dict lookup.
 logger = get_logger("core")
 
 # Metadata key for request_id
@@ -237,7 +237,7 @@ class NegotiationService:
     async def check_deal_status(self, deal_id: str = "") -> CheckDealStatusResponse:
         """Check crypto payment status."""
         try:
-            if not settings.crypto.enabled or not self.market_service:
+            if not get_settings().crypto.enabled or not self.market_service:
                 return CheckDealStatusResponse(status="NOT_FOUND")
 
             # Betterproto expects the response from the service
@@ -309,8 +309,9 @@ class NegotiationService:
 
 
 async def serve() -> None:
+    configure_logging(log_level=get_settings().server.log_level)
     # 1. Initialize the "Cell" (The HiveCell)
-    cell = HiveCell(settings)
+    cell = HiveCell(get_settings())
 
     # 2. Initialize Negotiation Service (metabolism set later)
     negotiation_service = NegotiationService(
@@ -339,23 +340,23 @@ async def serve() -> None:
                             mock_signal = NegotiateRequest(
                                 item_id=item["id"],
                                 bid_amount=item["base_price"]
-                                * settings.heartbeat.bid_multiplier,
+                                * get_settings().heartbeat.bid_multiplier,
                                 currency_code="USD",
                                 agent=NegotiationAgentIdentity(
-                                    did=settings.heartbeat.agent_did,
-                                    reputation_score=settings.heartbeat.agent_reputation,
+                                    did=get_settings().heartbeat.agent_did,
+                                    reputation_score=get_settings().heartbeat.agent_reputation,
                                 ),
                                 request_id=f"heartbeat-{uuid.uuid4()}",
                             )
                             await metabolism.execute(mock_signal)
             except Exception as e:
                 logger.error("heartbeat_deal_error", error=str(e))
-            await asyncio.sleep(settings.heartbeat.interval_seconds)
+            await asyncio.sleep(get_settings().heartbeat.interval_seconds)
 
     with tracer.start_as_current_span("core_server_start"):
         # Start server first so liveness probes pass during metabolism initialization
-        await server.start(host="0.0.0.0", port=settings.server.port)  # nosec
-        logger.info("server_started", port=settings.server.port)
+        await server.start(host="0.0.0.0", port=get_settings().server.port)  # nosec
+        logger.info("server_started", port=get_settings().server.port)
 
         # 4. Complex protein initialization (The organism builds itself)
         metabolism = await cell.build_organism()
@@ -363,7 +364,7 @@ async def serve() -> None:
 
         # 5. Start NATS Signal Gateway
         gateway = NatsSignalGateway(
-            nats_url=settings.server.nats_url,
+            nats_url=get_settings().server.nats_url,
             metabolism=metabolism,
         )
         await gateway.start()
