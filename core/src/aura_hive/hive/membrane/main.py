@@ -641,6 +641,14 @@ class HiveMembrane(Membrane[Any, Intent, Context]):
 
         neg_intent = params_value if params_name == "negotiation" else None
 
+        # From context, not from the model. Stamped as soon as neg_intent is
+        # resolved and before `claim` and `decision` can diverge — the DLP
+        # block below is the only place that happens in this path, and it
+        # copies `currency_code` forward from this same object — so both the
+        # claim and the emission carry it and the two digests stay comparable.
+        if neg_intent is not None and hive is not None:
+            neg_intent.currency_code = hive.offer.currency_code
+
         # 1. Handle explicit failures
         if decision.action == ActionType.ACTION_TYPE_ERROR:
             # Same default as the guard block below: an unspecified cost reads
@@ -712,6 +720,13 @@ class HiveMembrane(Membrane[Any, Intent, Context]):
                         # are the same fix applied at two emission points.
                         message=f"My counter-offer for this item is ${neg_intent.price:.2f}.",
                         thought=neg_intent.thought,
+                        # Carried forward like the other decidable fields. Left
+                        # out, the sanitised copy would default to an empty
+                        # currency while `claim` (the object stamped above)
+                        # keeps the real one — a currency-only mismatch that
+                        # would make a prose-only DLP block look like a value
+                        # override under `verify`.
+                        currency_code=neg_intent.currency_code,
                     ),
                 )
                 if neg_intent

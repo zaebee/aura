@@ -65,7 +65,7 @@ def counter(price: float, item: str = "htl-9931", message: str = "an offer") -> 
 class TestTheCanonicalClaim:
     def test_it_names_the_decidable_content(self) -> None:
         assert canonical_claim(counter(price=105.0)) == (
-            "action=counter;item=htl-9931;price=105.00"
+            "action=counter;item=htl-9931;price=105.00;currency="
         )
 
     def test_prose_is_excluded(self) -> None:
@@ -208,6 +208,26 @@ class TestTheCanonicalClaim:
         assert (
             claim_digest(intent)
             == hashlib.sha256(canonical_claim(intent).encode("utf-8")).hexdigest()
+        )
+
+
+class TestCurrencyIsPartOfTheClaim:
+    def test_two_currencies_are_two_claims(self) -> None:
+        """
+        The same number in two denominations is not the same decision, and the
+        doc has promised this field since §3.2 while the code omitted it.
+        """
+        eur = counter(100.0)
+        eur.negotiation.currency_code = "EUR"
+        usd = counter(100.0)
+        usd.negotiation.currency_code = "USD"
+        assert claim_digest(eur) != claim_digest(usd)
+
+    def test_the_canonical_form_matches_the_documented_one(self) -> None:
+        intent = counter(100.0, item="htl-9931")
+        intent.negotiation.currency_code = "EUR"
+        assert canonical_claim(intent) == (
+            "action=counter;item=htl-9931;price=100.00;currency=EUR"
         )
 
 

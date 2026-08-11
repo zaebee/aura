@@ -122,10 +122,14 @@ def canonical_claim(intent: Intent) -> str:
 
     if params_name == "negotiation" and params_value is not None:
         negotiation: NegotiationIntent = params_value
+        # An unset currency renders empty rather than defaulting to one. A
+        # denomination nobody stated is not USD; inventing one would make two
+        # different decisions share a digest.
         return (
             f"action={action};"
             f"item={negotiation.item_identifier};"
-            f"price={negotiation.price:.2f}"
+            f"price={negotiation.price:.2f};"
+            f"currency={negotiation.currency_code}"
         )
 
     shape = f"action={action};params={params_name or 'none'}"

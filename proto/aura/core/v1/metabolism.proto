@@ -161,6 +161,7 @@ message NegotiationOffer {
   double bid_amount = 1;
   float reputation = 2;
   string agent_did = 3;
+  string currency_code = 4;  // ISO 4217, as it arrived on the request
 }
 
 message BeeContextData {
@@ -390,6 +391,10 @@ message NegotiationIntent {
   double price = 3;
   string message = 4;
   string thought = 5;
+
+  // Stamped by the Membrane from context, never by the Transformer: the
+  // denomination is a property of the request, not something the model decides.
+  string currency_code = 6;
 }
 
 message AuditIntent {
