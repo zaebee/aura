@@ -219,6 +219,14 @@ class GuardUnavailable(Exception):
         self.code = code
 
 
+@dataclass(frozen=True)
+class PostconditionResult:
+    """Whether the emitted value satisfies psi, and which clause stopped it."""
+
+    holds: bool
+    failed_clause: str | None
+
+
 class OutputGuard:
     """
     Deterministic safety layer for Aura Core.
@@ -320,6 +328,59 @@ class OutputGuard:
             "G3_SETTINGS_PRESENT": self._gate_settings_present,
             "G4_MARGIN_VIOLATION": self._gate_margin_violation,
         }[gate_id]
+
+    # Clause id -> the predicate that decides it. The ids are the contract with
+    # ruleset.yaml exactly as the gate ids are: `validate_against` refuses to
+    # construct if the two drift in either direction.
+    #
+    # Every one of these reads the EMITTED value. That is the whole distinction
+    # from the gates, which read what the model proposed.
+    def _clause_price_positive(self, emission: dict, context: dict) -> bool:
+        return _decimal(emission, "price") > 0
+
+    def _clause_above_floor(self, emission: dict, context: dict) -> bool:
+        return _decimal(emission, "price") >= _decimal(context, "floor_price")
+
+    def _clause_min_margin(self, emission: dict, context: dict) -> bool:
+        # Multiplicative, not (price - cost)/price >= m. The ratio form is not
+        # decidable in binary floats on money: where the price is exactly right,
+        # it evaluates to 0.09999999999999995 against 0.1. psi is fail-closed,
+        # so that artefact would cost a live negotiation.
+        price = _decimal(emission, "price")
+        cost = _decimal(context, "internal_cost")
+        return price * (1 - self._configured_margin()) >= cost
+
+    def _clause_predicate(self, clause_id: str) -> Callable[[dict, dict], bool]:
+        return {
+            "PSI_PRICE_POSITIVE": self._clause_price_positive,
+            "PSI_ABOVE_FLOOR": self._clause_above_floor,
+            "PSI_MIN_MARGIN": self._clause_min_margin,
+        }[clause_id]
+
+    def check_postcondition(self, emission: dict, context: dict) -> PostconditionResult:
+        """
+        Whether what is about to be sent satisfies what the rule set guarantees.
+
+        Walked in declared order and stopped at the first failure, so the reason
+        a decision was held back does not depend on evaluation accidents.
+
+        A raising predicate is a failure, not an exception to propagate: a
+        post-condition that could not be evaluated has not been established, and
+        the emission must not proceed on the strength of a crash.
+        """
+        for clause in self.ruleset.postcondition.clauses:
+            try:
+                held = self._clause_predicate(clause.id)(emission, context)
+            except Exception as exc:
+                logger.error(
+                    "guard_postcondition_unevaluable", clause=clause.id, error=str(exc)
+                )
+                return PostconditionResult(holds=False, failed_clause=clause.id)
+            if not held:
+                logger.warning("guard_postcondition_failed", clause=clause.id)
+                return PostconditionResult(holds=False, failed_clause=clause.id)
+
+        return PostconditionResult(holds=True, failed_clause=None)
 
     def evaluate(self, decision: dict, context: dict) -> Derivation:
         """

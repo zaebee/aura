@@ -58,6 +58,7 @@ class GuardSkill(
             "validate_vision": self._validate_vision,
             "validate_transaction": self._validate_transaction,
             "validate_x402_payment": self._validate_x402_payment,
+            "check_postcondition": self._check_postcondition,
         }
 
     def get_name(self) -> str:
@@ -184,6 +185,18 @@ class GuardSkill(
             metadata=make_struct({"safe_price": str(price)}),
         )
 
+    async def _check_postcondition(self, params: dict[str, Any]) -> Observation:
+        assert self.provider is not None
+        result = self.provider.check_postcondition(
+            params.get("emission", {}), params.get("context", {})
+        )
+        return Observation(
+            success=True,
+            metadata=make_struct(
+                {"holds": result.holds, "failed_clause": result.failed_clause or ""}
+            ),
+        )
+
     async def _validate_vision(self, params: dict[str, Any]) -> Observation:
         assert self.provider is not None
         p = VisionValidationParams(**params)
@@ -218,7 +231,7 @@ class GuardSkill(
                 wallet=wallet_address,
                 error=observation.error,
             )
-            raise SafetyViolation(
+            raise GuardUnavailable(
                 f"Could not establish whether wallet {wallet_address!r} is "
                 f"sanctified: {observation.error}",
                 code="SANCTIFICATION_UNAVAILABLE",
