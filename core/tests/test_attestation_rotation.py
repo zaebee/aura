@@ -74,8 +74,20 @@ async def mint(account: Any, chain_id: int) -> DecisionReceipt:
 
 
 def verifies(receipt: DecisionReceipt) -> bool:
-    """Recovery only — no private key is involved, which is the whole point."""
-    payload = signing_payload(receipt, chain_id=receipt.signature.chain_id)
+    """
+    Recovery only — no private key is involved, which is the whole point.
+
+    Every domain field comes from the receipt, matching what `_check_signature`
+    does. Passing only `chain_id` and letting name and version fall back to the
+    module constants is the exact pattern this branch removed from production,
+    and a helper is what the next reader copies.
+    """
+    payload = signing_payload(
+        receipt,
+        chain_id=receipt.signature.chain_id,
+        domain=receipt.signature.domain,
+        domain_version=receipt.signature.domain_version,
+    )
     raw = bytes.fromhex(receipt.signature.signature.removeprefix("0x"))
     recovered = Account.recover_message(
         encode_typed_data(full_message=payload), signature=raw
@@ -122,6 +134,13 @@ async def test_editing_the_recorded_domain_does_not_forge_a_receipt() -> None:
     tell it which document to reconstruct: editing them changes the message
     recovered, so the recovered address stops matching the `signer` the receipt
     still claims, and the existing signer check refuses it.
+
+    The boundary of what this proves, so nobody cites it for more: an attacker
+    who edits the domain **and** rewrites `signer` to whatever the edited
+    payload now recovers to passes `verify()`. That was equally true before
+    this change — `verify()` checks that a signature is the claimed signer's,
+    never that the claimed signer is ours. Attribution is the signers file, and
+    `verify()` is not tamper-evidence for the document as a whole.
     """
     receipt = await mint(Account.create(), chain_id=84532)
     assert verify(receipt).ok

@@ -79,6 +79,25 @@ class TestTheEngine:
 
         assert first["signature"] != second["signature"]
 
+    def test_a_key_that_signs_unrecoverably_is_refused_at_construction(self) -> None:
+        """
+        The all-zero key is accepted by `Account.from_key`, yields an address,
+        and signs 65 bytes that no recovery accepts. It is also the canonical
+        placeholder a secret template or a CI variable gets seeded with.
+
+        Without this check such a deployment reports `attestation_signer_ready`,
+        stamps receipts `AURA-RECEIPT-V2`, and every one of them fails
+        `verify()` — the deployment believes it attests while the corpus is
+        worthless. That is strictly worse than the unsigned state this protein
+        exists to replace, because the unsigned one is honest.
+
+        Checked by signing and recovering rather than by range-checking the
+        scalar, so any degenerate key the library mishandles is caught, not
+        just this one.
+        """
+        with pytest.raises(ValueError, match="cannot produce a recoverable"):
+            AttestationEngine("0x" + "00" * 32)
+
     def test_the_address_is_readable_without_signing_anything(self) -> None:
         """The Cortex logs it at startup, before any decision exists."""
         account = Account.create()

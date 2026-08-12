@@ -473,7 +473,13 @@ class HiveMembrane(Membrane[Any, Intent, Context]):
         # life, and `to_dict()` on a message this method does not construct is
         # exactly where the next surprise would arrive.
         try:
-            meta = obs.metadata.to_dict() if obs.metadata is not None else {}
+            # Truthiness, not identity: falsy for a default-constructed Struct
+            # and for an explicit `metadata=None` alike. The identity form was
+            # not dead here — `Observation(metadata=None)` really is `None`, so
+            # it did fire — but `docs/CLAUDE.md` names this the safe form
+            # precisely so a reader never has to work out which of the three
+            # betterproto absence behaviours applies at a given line.
+            meta = obs.metadata.to_dict() if obs.metadata else {}
             signer = str(meta.get("signer") or "")
             signature = str(meta.get("signature") or "")
             if not signer or not signature:

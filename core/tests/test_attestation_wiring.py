@@ -80,6 +80,20 @@ class TestTheProteinIsRegisteredOnlyWithAKey:
         assert "AURA_ATTESTATION__PRIVATE_KEY" in message
         assert "not-a-key-at-all" not in message
 
+    def test_a_placeholder_key_refuses_to_boot_rather_than_pretend(self) -> None:
+        """
+        `0x000…0` is what a secret template or an unset CI variable seeds. It
+        is accepted by `Account.from_key` and signs unrecoverably, so without a
+        check the cell boots announcing a signer and then mints signed-format
+        receipts that its own verifier rejects — every single one.
+        """
+        import pytest
+
+        with pytest.raises(ValueError) as caught:
+            build_attestation("0x" + "00" * 32)
+
+        assert "AURA_ATTESTATION__PRIVATE_KEY" in str(caught.value)
+
     def test_the_startup_line_carries_the_address_not_the_key(self) -> None:
         """
         The address is the durable fact — it is what a signature recovers to,

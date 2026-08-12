@@ -96,7 +96,13 @@ class TestTheMembraneAttests:
         assert receipt.version == "AURA-RECEIPT-V2"
         assert receipt.signature.signer == account.address
 
-        payload = signing_payload(receipt, chain_id=receipt.signature.chain_id)
+        # Every domain field from the receipt, as `_check_signature` does.
+        payload = signing_payload(
+            receipt,
+            chain_id=receipt.signature.chain_id,
+            domain=receipt.signature.domain,
+            domain_version=receipt.signature.domain_version,
+        )
         raw = bytes.fromhex(receipt.signature.signature.removeprefix("0x"))
         recovered = Account.recover_message(
             encode_typed_data(full_message=payload), signature=raw

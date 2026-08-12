@@ -74,7 +74,7 @@ signal → M(in) → A(perceive) → T(think) → M(out) ⇐ RECEIPT MINTED HERE
 
 The receipt is `Intent.receipt`, a typed `DecisionReceipt` in
 `aura/core/v1/metabolism.proto`. It is minted after the verdict is settled and signed by the
-transaction protein, which owns the key; a receipt that cannot be signed is emitted unsigned rather
+attestation protein, which owns the key; a receipt that cannot be signed is emitted unsigned rather
 than costing the decision.
 
 One step now sits between the verdict and the mint:
@@ -1169,9 +1169,10 @@ format above is the contract, and a consumer reimplementing it owes us nothing.
    dispute, against whom. Until that has an answer this stays deferred, and the reasoning above is
    the reasoning — not the absence of a place to put bytes.
 5. ~~Sign with the identity key; wire `canonical-prefix` into logs and frontend.~~ **DONE for the
-   backend.** EIP-712 with the existing EVM key under a domain of its own (§3.7); signing lives in
-   the transaction protein, which owns the key, and verification in `membrane/receipt.py`, which
-   needs none. `canonical_prefix` is on every `membrane_receipt` log line, beside the full receipt.
+   backend.** EIP-712 under a domain of its own (§3.7); signing lives in the attestation protein,
+   which owns the key, and verification in `membrane/receipt.py`, which needs none. It was the
+   agent's existing EVM key until attestation moved to a dedicated one — see §3.7 for why that
+   trade was made and what it cost. `canonical_prefix` is on every `membrane_receipt` log line, beside the full receipt.
 
    **The frontend half is not done, and the audience decision changed what it would be.** The
    gateway puts no part of the receipt on the wire at all (§1.1, §3.4, §7), so a UI built for the
