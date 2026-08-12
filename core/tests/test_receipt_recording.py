@@ -6,8 +6,9 @@ Membrane, so a refusal reaches the Connector like anything else — and "you
 refused me" is the likeliest dispute a counterparty brings.
 """
 
+import asyncio
 from typing import Any
-from unittest.mock import AsyncMock, MagicMock
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 from aura_core_gen.aura.core.v1 import (
@@ -104,6 +105,35 @@ class TestTheArchiveNeverCostsTheDecision:
         observation = await connector_with(registry).act(
             a_decision(ActionType.ACTION_TYPE_COUNTER), a_context()
         )
+
+        assert observation is not None
+
+    @pytest.mark.asyncio
+    async def test_a_hanging_write_is_abandoned_rather_than_waited_on(self) -> None:
+        """
+        The failure mode a refused connection does not cover.
+
+        A refused connect raises in milliseconds. A blackholed one does not
+        raise at all — psycopg2 sits in the kernel's TCP retry for minutes,
+        serially, ahead of the decision, on every call including the refusals
+        that did no database work before this change. Fail-open against
+        exceptions is only half the promise.
+        """
+        import aura_hive.hive.connector.main as connector_main
+
+        async def never_returns(*args: Any, **kwargs: Any) -> Any:
+            await asyncio.sleep(60)
+
+        registry = MagicMock()
+        registry.execute = never_returns
+
+        with patch.object(connector_main, "_ARCHIVE_TIMEOUT_SECONDS", 0.05):
+            observation = await asyncio.wait_for(
+                connector_with(registry).act(
+                    a_decision(ActionType.ACTION_TYPE_COUNTER), a_context()
+                ),
+                timeout=5,
+            )
 
         assert observation is not None
 

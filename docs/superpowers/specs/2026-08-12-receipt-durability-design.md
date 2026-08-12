@@ -135,15 +135,26 @@ answering.
 
 ## Testing
 
-- **A recorded receipt is found by its token**, driven through the protein against a real session,
-  as the existing repository tests do.
+**All of these run against `MagicMock` sessions, in the style of the existing repository tests
+(`test_persistence_wallet.py`). SQLAlchemy itself never executes.** That is worth stating plainly
+rather than implying otherwise: no test here could catch a JSONB type error, a broken column default,
+or an index that fails to create. The live path was verified by hand against a Postgres 16 container
+during review — table creation reached through `cortex.py` → `post_initialize` → `create_all`, a real
+minted receipt round-tripping byte-identical including the `\x1f` separators in `gateSequence`, and
+`verify()` returning ok and attested on what came back — but verified by hand is not verified by the
+suite. A Postgres-marked integration test is the honest follow-up.
+
+- **A recorded receipt is found by its token**, driven through the protein.
 - **A refused decision is recorded too.** This is the case the Connector-writes decision was checked
   against; a dispute about a refusal is the likeliest dispute there is.
 - **A database failure does not cost the decision:** the observation still returns, and
   `receipt_record_failed` is logged.
-- **A receipt still verifies after the round trip through Postgres.** The single most important test
-  here: JSON serialisation must not disturb a signed document. If this fails the archive is
-  decorative.
+- **A receipt survives JSON and still parses.** The property the archive rests on — serialisation
+  must not disturb a signed document. Note what this test is and is not: it runs `json.dumps` /
+  `json.loads` over the stored dict, which is the risk that lives in the code under test. It does
+  **not** go through Postgres, and a hand-built dict cannot exercise `verify()` at all, because
+  `canonical_prefix` is a digest of the content fields and an invented one fails for reasons
+  unrelated to storage. The end-to-end version of this claim was established by hand, above.
 - **An unknown token reports not-found and exits 0.**
 - **Two decisions in one session** both resolve, and share a `request_id` — the field exists for
   reassembly and nothing else asserts it.

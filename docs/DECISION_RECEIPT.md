@@ -984,9 +984,12 @@ anywhere. The log line makes the log *a* store, and the tool makes it read.
 
 **The log is not the durable store, and treating it as one was the gap.** It goes to a Loki outside
 this repository whose retention is measured in days to weeks, so a dispute arriving a month after the
-decision found nothing — the receipt had expired, signature and all. Every decision is now also
-written to `decision_receipts` by the Connector on the C step, keyed by `dispute_token`, and
-`make resolve-dispute TOKEN=…` turns a counterparty's citation into the receipt plus its verdict.
+decision found nothing — the receipt had expired, signature and all. Every decision the Membrane
+minted a receipt for is now also written to `decision_receipts` by the Connector on the C step, keyed
+by `dispute_token`, and `make resolve-dispute TOKEN=…` turns a counterparty's citation into the
+receipt plus its verdict. Refusals included — every refusal path returns through `_finish`, which
+mints and stamps the token unconditionally. A Membrane that was never wired mints nothing, and there
+is correspondingly nothing to archive.
 
 The write is fail-open, like the log line and for the same reason: reporting on a decision must never
 take that decision down. The cost is that archive holes are possible and silent, so a failure emits

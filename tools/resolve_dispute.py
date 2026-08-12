@@ -20,8 +20,10 @@ from typing import Any
 
 from aura_core_gen.aura.core.v1 import DecisionReceipt
 from aura_hive.config import get_settings
-from aura_hive.hive.cortex import HiveCell
 from aura_hive.hive.membrane.receipt import verify
+from aura_hive.hive.proteins.persistence.skill import PersistenceSkill
+from sqlalchemy import create_engine
+from sqlalchemy.orm import sessionmaker
 
 
 def render(receipt: dict[str, Any] | None) -> tuple[str, int]:
@@ -62,10 +64,30 @@ def render(receipt: dict[str, Any] | None) -> tuple[str, int]:
 
 
 async def _lookup(token: str) -> dict[str, Any] | None:
-    cell = HiveCell(get_settings())
-    await cell._init_proteins()
-    observation = await cell.registry.execute(
-        "persistence", "find_receipt_by_dispute_token", {"dispute_token": token}
+    """
+    One protein, one connection, no cell.
+
+    Booting a `HiveCell` was the short way to reach the persistence protein and
+    it was wrong in a way that matters for an audit tool: `_init_proteins` runs
+    `post_initialize`, which runs `Base.metadata.create_all`. So the first run
+    of this command against a deployment whose archive had never worked would
+    have silently created the empty table and then reported "not found" — and
+    "the token was never issued" and "the archive was never running" are
+    exactly the two answers an auditor must be able to tell apart. The second
+    is the finding.
+
+    Binding without `initialize()` is deliberate and sufficient: `execute`
+    checks only that a provider is bound, so the lookup needs neither the Redis
+    ping nor NATS nor an embedding model — none of which a SELECT has any
+    business requiring.
+    """
+    settings = get_settings()
+    engine = create_engine(str(settings.database.url))
+    protein = PersistenceSkill()
+    protein.bind(settings.database, (sessionmaker(bind=engine), engine, None))
+
+    observation = await protein.execute(
+        "find_receipt_by_dispute_token", {"dispute_token": token}
     )
     if not observation.success:
         if observation.error == "not_found":

@@ -1,3 +1,4 @@
+import asyncio
 import time
 import uuid
 from typing import Any, cast
@@ -21,6 +22,11 @@ from aura_core_gen.aura.core.v1 import (
 )
 
 logger = structlog.get_logger(__name__)
+
+# How long the archive write may hold up a decision before it is abandoned.
+# Generous for a single indexed insert and short enough that a hung database
+# costs a negotiation latency rather than a negotiation.
+_ARCHIVE_TIMEOUT_SECONDS = 2.0
 
 
 def _get_hive(context: Context) -> Any:
@@ -73,6 +79,14 @@ class HiveConnector(BaseConnector):
         possible and silent, which is why the failure is its own event — an
         archive that sometimes never arrives is worse than one that expires,
         because nothing announces it.
+
+        Bounded, because "fail-open" against exceptions is only half of it. A
+        refused connection raises and lands here in milliseconds; a blackholed
+        one does not raise at all, and psycopg2 would sit in the kernel's TCP
+        retry for minutes — serially, ahead of the decision, on every call
+        including the refusals, which did no database work before this. The
+        timeout is what makes the promise above true for the failure mode that
+        is likelier in production than the one it was written against.
         """
         if not action.receipt or not action.dispute_token:
             return
@@ -83,16 +97,21 @@ class HiveConnector(BaseConnector):
         # adds a field to one of them.
         error: str | None = None
         try:
-            observation = await self.registry.execute(
-                "persistence",
-                "record_receipt",
-                {
-                    "receipt": action.receipt.to_dict(),
-                    "dispute_token": action.dispute_token,
-                },
+            observation = await asyncio.wait_for(
+                self.registry.execute(
+                    "persistence",
+                    "record_receipt",
+                    {
+                        "receipt": action.receipt.to_dict(),
+                        "dispute_token": action.dispute_token,
+                    },
+                ),
+                timeout=_ARCHIVE_TIMEOUT_SECONDS,
             )
             if not observation.success:
                 error = observation.error
+        except TimeoutError:
+            error = f"archive write exceeded {_ARCHIVE_TIMEOUT_SECONDS}s"
         except Exception as e:
             error = str(e)
 
