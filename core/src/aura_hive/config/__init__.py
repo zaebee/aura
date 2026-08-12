@@ -3,6 +3,7 @@ from functools import lru_cache
 from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
+from .attestation import AttestationSettings
 from .blockchain_data import BlockchainDataSettings
 from .crypto import CryptoSettings
 from .database import DatabaseSettings
@@ -38,6 +39,9 @@ class Settings(BaseSettings):
     blockchain_data: BlockchainDataSettings = Field(
         default_factory=lambda: BlockchainDataSettings()
     )  # type: ignore
+    attestation: AttestationSettings = Field(
+        default_factory=lambda: AttestationSettings()
+    )
 
 
 @lru_cache

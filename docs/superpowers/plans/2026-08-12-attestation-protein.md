@@ -672,6 +672,7 @@ from eth_account import Account
 from eth_account.messages import encode_typed_data
 
 from aura_hive.config.attestation import AttestationSettings
+from aura_hive.config.policy import SafetySettings
 from aura_hive.hive.membrane.main import HiveMembrane
 from aura_hive.hive.membrane.receipt import signing_payload
 from aura_hive.hive.proteins.attestation import AttestationEngine, AttestationSkill
@@ -686,10 +687,17 @@ class _Safety:
 
 
 class _Settings:
-    """Only what `_attest` reads."""
+    """
+    What the Membrane reads off `self.settings`.
+
+    `safety` is carried even though these tests never reach it: `inspect_outbound`
+    reads `self.settings.safety.trade_risk_threshold` on the trade path, and a
+    stub missing it fails only for whoever adds the first trade test here.
+    """
 
     def __init__(self, chain_id: int = 84532) -> None:
         self.attestation = AttestationSettings(chain_id=chain_id)
+        self.safety = SafetySettings()
 
 
 def membrane_with(attestation: Any | None) -> HiveMembrane:
@@ -869,6 +877,7 @@ from eth_account import Account
 from eth_account.messages import encode_typed_data
 
 from aura_hive.config.attestation import AttestationSettings
+from aura_hive.config.policy import SafetySettings
 from aura_hive.hive.membrane.main import HiveMembrane
 from aura_hive.hive.membrane.receipt import signing_payload
 from aura_hive.hive.proteins.attestation import AttestationEngine, AttestationSkill
