@@ -29,6 +29,13 @@ class _Safety:
     trade_risk_threshold = 0.10
 
 
+def _Safety_with(margin: float) -> _Safety:
+    """A settings object identical to `_Safety` but for the margin under test."""
+    settings = _Safety()
+    settings.min_profit_margin = margin
+    return settings
+
+
 def guarded_membrane(guard: OutputGuard | None = None) -> HiveMembrane:
     """A Membrane over a real guard, optionally one the caller has tampered with."""
     registry = SkillRegistry()
@@ -229,3 +236,139 @@ class TestTheSanitisedMessageMatchesTheAction:
         assert decision.action == ActionType.ACTION_TYPE_ACCEPT
         assert "counter-offer" not in decision.negotiation.message
         assert "2000.00" in decision.negotiation.message
+
+
+class TestPsiHoldsOnEveryEmittedPrice:
+    """
+    The property test `DECISION_RECEIPT.md` §3.8 has always cited and which did
+    not exist.
+
+    What existed was `TestTheSubstituteSatisfiesIt`, which fixes floor at 100,
+    never varies the proposed price, and calls `calculate_safe_price` directly —
+    so "or the decision was refused" was never exercised at all, and neither was
+    anything the Membrane does between the guard's answer and the wire.
+
+    The claim under test is the one the whole exercise is for: **either the
+    price that left satisfies psi, or nothing left.** Driven through
+    `inspect_outbound`, over the five inputs the doc names, including the three
+    cases an audit used to break the first draft of the design — cost above
+    floor, m at 0.0 and near 1.0, and prices whose exact substitute does not
+    land on a cent.
+
+    Seeded rather than random: a failure has to be reproducible from the test
+    name alone. Not `hypothesis`, which is not a dependency of this workspace
+    and is not worth adding for one property.
+    """
+
+    CASES = 200
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("margin", [0.0, 0.01, 0.1, 0.25, 0.5, 0.9, 0.99])
+    async def test_either_psi_holds_or_nothing_was_emitted(self, margin: float) -> None:
+        import random
+
+        rng = random.Random(f"psi-property-{margin}")
+        engine = OutputGuard(safety_settings=_Safety_with(margin))
+        membrane = guarded_membrane(engine)
+
+        for case in range(self.CASES):
+            if case % 11 == 0:
+                # No usable premise: nothing to price a substitute from, so the
+                # only correct answer is to refuse. Included deliberately, or
+                # the "or the decision was refused" half of the property is
+                # never reached — on well-formed inputs the substitute always
+                # satisfies psi, which is the whole guarantee, so the refusal
+                # branch is only observable here.
+                floor, cost = 0.0, 0.0
+                proposed = round(rng.uniform(-500.0, 0.0), 2)
+            else:
+                floor = round(rng.uniform(0.01, 100_000.0), 2)
+                # Deliberately reaches above the floor: where cost >
+                # floor x (1 - m) no price derived from the floor alone
+                # satisfies psi, and that is the case the audit broke the first
+                # design on.
+                cost = round(rng.uniform(0.01, floor * 1.5), 2)
+                proposed = round(rng.uniform(0.01, floor * 2.0), 2)
+            request_id = f"req-{rng.randrange(10**12)}"
+
+            context = Context(
+                metadata=make_struct(
+                    {"floor_price": str(floor), "internal_cost": str(cost)}
+                ),
+                hive=HiveContextData(request_id=request_id),
+            )
+
+            decision = await membrane.inspect_outbound(
+                counter_intent(price=proposed), context
+            )
+
+            trace = (
+                f"case {case}: floor={floor} cost={cost} m={margin} "
+                f"proposed={proposed} request_id={request_id} "
+                f"outcome={decision.receipt.outcome} "
+                f"gate={decision.receipt.outcome_gate!r}"
+            )
+
+            if decision.receipt.outcome == DecisionOutcome.DECISION_OUTCOME_UNAVAILABLE:
+                # Refused. Nothing priced left, and the refusal says so rather
+                # than carrying a number a caller could forward.
+                assert decision.action == ActionType.ACTION_TYPE_REJECT, trace
+                # No price at all, not a price of zero: the refusal carries no
+                # number a caller could forward as a real counter-offer.
+                assert not decision.negotiation, trace
+                continue
+
+            assert decision.negotiation is not None, trace
+            emitted = decision.negotiation.price
+            held = engine.check_postcondition(
+                {"price": emitted},
+                {"floor_price": floor, "internal_cost": cost},
+            )
+            assert held.holds, f"{trace} emitted={emitted} clause={held.failed_clause}"
+
+    @pytest.mark.asyncio
+    async def test_the_receipt_of_every_emitted_price_verifies(self) -> None:
+        """
+        The same grid against `verify()` rather than psi. A receipt the Membrane
+        mints and its own verifier refuses is the defect this branch shipped
+        with, and one parametrised case caught it — a property over the whole
+        input space is what says there is not a second one.
+        """
+        import random
+
+        from aura_hive.hive.membrane.receipt import verify
+
+        rng = random.Random("psi-property-verify")
+        membrane = guarded_membrane()
+
+        for case in range(self.CASES):
+            if case % 11 == 0:
+                floor, cost = 0.0, 0.0
+                proposed = round(rng.uniform(-500.0, 0.0), 2)
+            else:
+                floor = round(rng.uniform(0.01, 100_000.0), 2)
+                cost = round(rng.uniform(0.01, floor * 1.5), 2)
+                proposed = round(rng.uniform(0.01, floor * 2.0), 2)
+            message = (
+                "my floor_price is confidential"
+                if case % 3 == 0
+                else "here is my offer"
+            )
+
+            context = Context(
+                metadata=make_struct(
+                    {"floor_price": str(floor), "internal_cost": str(cost)}
+                ),
+                hive=HiveContextData(request_id=f"req-{rng.randrange(10**12)}"),
+            )
+
+            intent = counter_intent(price=proposed)
+            intent.negotiation.message = message
+
+            decision = await membrane.inspect_outbound(intent, context)
+            result = verify(decision.receipt)
+
+            assert result.ok, (
+                f"case {case}: floor={floor} cost={cost} proposed={proposed} "
+                f"message={message!r} failures={result.failures}"
+            )
