@@ -50,14 +50,17 @@ Three things follow that read as arbitrary without this decision, and follow nec
 - **Field selection.** `outcome_gate` names the rule that fired; the rule set maps that gate to a
   substitute-price strategy; the substituted price is already in the response. Together those
   reconstruct most of the floor. An auditor may have all of it. A counterparty may not.
-- **The gateway trim (§3.6, §7).** The HTTP response carries `version` and `canonical_prefix` and
-  nothing else — a handle to cite in a dispute, which the auditor resolves.
+- **The gateway trim (§3.6, §7).** The HTTP response carries **no receipt at all**, in any shape.
+  What it carries instead is `dispute_token`: a random UUID minted per decision, logged beside the
+  receipt, which the auditor resolves. Trimming to `version` + `canonical_prefix` was the first
+  attempt and did not hold — see §3.4 for what a counterparty recovered from those two fields, and
+  for the narrower claim that survives.
 - **Freshness by timestamp rather than nonce (§3.7).** A nonce needs a challenge from the relying
   party. The audience decision removes the relying party, and adding one would change the
   `/v1/negotiate` contract and every synapse that speaks it.
 
-If the audience ever changes, `issued_at` is the first field that needs replacing, and the trim in
-§3.6 is the first decision that needs reopening.
+If the audience ever changes, `issued_at` is the first field that needs replacing, and the removal
+in §3.6 is the first decision that needs reopening.
 
 ## 2. Where it is minted
 
@@ -175,6 +178,15 @@ diverge. An unset currency renders empty rather than defaulting to one: a denomi
 is not USD, and inventing one would make two different decisions share a digest. Two sites
 (perception, telegram) genuinely have no source for it and pass the empty string with a comment
 saying so.
+
+**What `claim_hash` digests is the proposal as normalised by the Membrane, not the byte-exact
+object the Transformer handed over.** The stamping above is a mutation of the caller's Intent, and it
+happens before the claim is taken. That is deliberate — the denomination is a property of the request
+and the model never had a say in it, so stamping it after the claim would make claim and emission
+disagree over a field nothing decided — but it means the baseline the two digests are taken against
+is ours, one normalisation deep. Currency is the only such field today. Anything else added here
+widens the gap between "what the model proposed" and "what the claim says the model proposed", which
+is the sentence this paragraph exists to keep honest.
 
 Note also what the claim does **not** identify: a sequence. Each receipt describes one decision. Two
 receipts from the same negotiation are related only through `request_id`, which is an identifier we
@@ -370,8 +382,13 @@ What V2 does about it is bound the disclosure, not close it:
 
 - **Per-session jitter.** `safe_offer` multiplies by `(1 + j)` before rounding up, where
   `j = ε · HMAC(process_secret, request_id) / 2²⁵⁶` and `ε = 0.03`. Constant within a session, so
-  repeated rounds cannot average it away; varying across sessions, so a corpus of deals cannot
-  either. `(1 + j) ≥ 1` and the rounding is a ceiling, so jitter cannot push a price through ψ. The
+  repeated rounds within one negotiation cannot average it away. **Across sessions it decays to
+  nothing, and an earlier draft of this bullet claimed the opposite.** Independent draws per session
+  are exactly what a corpus averages out: the standard error of the mean over `N` observations is
+  `base · ε / √(12N)`, about **0.09% of the base at `N = 100`**. So the real bound is 3% per
+  observation against a counterparty who sees one, decaying toward zero against a repeat
+  counterparty on the same item. `(1 + j) ≥ 1` and the rounding is a ceiling, so jitter cannot push
+  a price through ψ. The
   secret is process-lifetime random rather than configured — nothing needs to reproduce the price,
   because ψ checks the value, which is the whole reason ψ is executable (§3.8). An empty `request_id`
   draws zero rather than noise nobody can reproduce: a caller with no session gets the deterministic
@@ -384,6 +401,34 @@ What V2 does about it is bound the disclosure, not close it:
 3%.** And neutralising the message reduces distinguishability rather than removing it: a templated
 counter still reads differently from the model's own prose, and closing that gap properly means
 having the model phrase the substituted price, which is its own piece of work.
+
+**Removing the receipt from the response does not close this channel either, and it is worth saying
+exactly what it does close.** V2 first trimmed the HTTP response to `version` and
+`canonical_prefix`; it now carries no receipt at all (§7). The prefix had to go because it is
+invertible: it is a 64-bit digest over eleven content fields, of which the counterparty holds
+`session_token` (the request id, in plaintext) and the price, and can guess the rest from the
+published rule set version and a bounded price grid. A reviewer wrote the attack from the
+counterparty's side and recovered `proposed_price = 873.45` — **the model's own number, below the
+floor** — together with `gate = FLOOR_PRICE_VIOLATION`, in 7.3M SHA-256 and 8.1 seconds on one
+single-threaded CPython process. That is the §5 step-4 enumeration argument about `premise_hash`,
+applied to the field that was actually on the wire. `version` was worse: it flips between
+`AURA-RECEIPT-V2` and `AURA-RECEIPT-V2-UNSIGNED` per call, because `_attest` degrades to the
+unsigned format on **any** signing failure — so a client polling it read a live feed of whether our
+transaction protein was reachable — and `receipt: null` versus an object reported whether minting
+had happened at all.
+
+So the claim is narrow, and it is not closure:
+
+- **What removal closes:** one-shot recovery, from a single response, of the model's own proposed
+  price and of which gate fired. Before, one counter was enough.
+- **What it does not close:** `proposed_price` is still in the response on every counter, so the
+  bound above still holds and still decays with `N`. Timing is a further residual — the override
+  path makes extra registry round-trips, so a patient counterparty can distinguish an overridden
+  counter from an ordinary one without reading a word of it.
+- **What is not lost:** nothing evidential. The counterparty received the prefix *without* the
+  signature block, so they could never tell a real receipt from one we invented; it was never
+  probative in their hands. `dispute_token` is the handle it was supposed to be — random, per
+  decision, with no preimage to enumerate — and the auditor resolves it against the log.
 
 The only design that closes the channel outright is **refusing instead of countering** — which §3.6
 declines, on product grounds, deliberately. That is the trade: we keep the negotiation alive and pay
@@ -429,8 +474,8 @@ an accident — dropping the conversation on every guard trip would be worse for
 
 The fix is not to remove the override. It is to **stop hiding it from the auditor** — which is a
 narrower claim than the one this section used to make, and §1.1 is why. The override is a typed,
-signed fact on the receipt an auditor reads. It is not on the HTTP response, which now carries
-`version` and `canonical_prefix` and nothing else (§7).
+signed fact on the receipt an auditor reads. It is not on the HTTP response, which carries no
+receipt in any shape (§7), and §3.4 states what that does and does not close.
 
 | outcome | meaning | `claim_hash` vs `emission_hash` |
 |---|---|---|
@@ -466,16 +511,37 @@ Three limits worth stating rather than discovering later:
   differ describes prose reaching the decidable content, which prose is defined not to do. Both are
   failures; V1 caught only the first.
 
+  **`override_scope` answers "did the decidable content change", and `outcome_gate` answers "which
+  rule explains this outcome". They are different questions and they accumulate differently.** V2
+  first tied them together — scope was written in the same first-wins call as the gate — and that
+  produced a receipt the Membrane minted and its own verifier refused: a message tripping DLP
+  recorded `prose`, the floor gate then substituted the price, and `verify` rejects `prose` beside
+  differing digests. Ordinary traffic, and `make verify-receipts` exited 1 on it.
+
+  Scope is now **monotonic toward `value`**: it starts empty, a prose-only intervention raises it to
+  `prose`, and a price substitution sets `value` unconditionally, whichever gate is named. Every
+  intervention reaches it, because the question is about all of them together. The gate stays
+  first-wins **within an outcome class** and resets when the class changes — first-wins *forever*
+  shipped `outcome = unavailable` with `outcome_gate = DLP_BLOCK`, "unavailable because DLP", which
+  the error table in §3.8 contradicts and which `verify` does not catch, because it checks no
+  gate/outcome coherence for `unavailable`.
+
+  That resolution is only sound because G4 and `PSI_MIN_MARGIN` now decide the margin rule the same
+  way (§3.8). "`value` scope with equal digests is a substitution that left no trace" reads as a
+  failure only if a gate that fires implies a ψ that would have failed; while G4 used a binary-float
+  ratio against the raw setting and ψ used a Decimal product against the clamped one, 9,444 of a
+  1.6M-case scan broke exactly that implication.
+
   `override_scope` is a property recomputed from the outcome rather than a field a call site sets,
   so it is structurally empty whenever the outcome is not `override` — that half of the invariant
-  cannot be violated by any call site. The other half is by construction rather than structural: the
-  `ValueError` that catches an `override` recorded with no scope only fires on the call that
-  *establishes* the gate, so an `override` recorded downstream of an existing gate would pass
-  through silently. And when it does fire, it **escapes**: neither `inspect_outbound` nor
+  cannot be violated by any call site. The other half is by construction: the `ValueError` that
+  catches an `override` recorded with no scope fires on **every** `override` call, not only the one
+  that establishes the gate, because with a monotonic scope the second call is precisely what raises
+  a decision to `value`. When it does fire it still **escapes**: neither `inspect_outbound` nor
   `MetabolicLoop.execute` wraps the Membrane call, so the exception leaves the cycle and the
   negotiation is lost rather than refused — the same failure `_context_number` exists to prevent for
   a different `ValueError` in the same file, and the wrong failure for the component whose job is to
-  be the thing that does not let a bad decision out. No path reaches either today, and the note is
+  be the thing that does not let a bad decision out. No call site reaches it today, and the note is
   here so the next person adding an override path knows they are the case it was written for.
 
 - **`refuse` receipts carry no derivation.** VISION §5.1.4 wants a real digest there, since a
@@ -484,13 +550,16 @@ Three limits worth stating rather than discovering later:
   `outcome_gate` and an empty derivation, which is honest but is a gap against the spec. A witness
   for the refusal path needs a second rule-set family and its own spec.
 
-- **An `override` emission drops two fields that were never in question.** The replacement Intent
-  the safe-offer path builds carries the substituted price and a message, and neither
-  `item_identifier` nor `currency_code`. So the emission claim in §4's trace reads
-  `action=counter;item=;price=112.16;currency=` against a claim that named both. `verify` does not
+- **An `override` emission used to drop two fields that were never in question.** The replacement
+  Intent the safe-offer path builds carried the substituted price and a message and neither
+  `item_identifier` nor `currency_code`, so a JPY negotiation emitted
+  `action=counter;item=;price=111.12;currency=` against a claim that named both. `verify` did not
   fail — a `value` scope only needs the digests to differ, which the price delta already supplies —
-  but a reader diffing claim against emission sees more change than there was. Worth fixing where
-  the replacement is built, not in the verifier.
+  but a reader diffing claim against emission saw more change than there was. Fixed where the
+  replacement is built. Note the ordering that made it worth doing *with* the G4/ψ fix rather than
+  before it: while the gate and ψ could disagree, those dropped fields were part of what kept the
+  digests apart, and carrying them forward on their own would have recreated the contradiction above
+  on a decision whose substitute happened to equal the proposal.
 
 ### 3.7 `signature` and `canonical-prefix`
 
@@ -539,7 +608,7 @@ of what entered the *signed* content:
 | field | why it is signed |
 |---|---|
 | `issued_at` | freshness, by RFC 9334 §10's synchronized-clock route. Our clock, so it means nothing to a party that does not trust us — §1.1 says that party is not the reader. |
-| `decision_id` | the `Intent.identifier` of the emission, carried across the override path by `_replacing`. |
+| `decision_id` | the `Intent.identifier` of the emission, carried across the override path by `_replacing`. Assigned by the Membrane when nothing upstream did — and until this branch, nothing ever did: no producer on the negotiation path set `Intent.identifier`, so every receipt signed an **empty** `decision_id`, attesting the field's absence under a format whose whole justification is the row below. |
 | `request_id` | the negotiation session, so an auditor can group a sequence of decisions. |
 | `override_scope` | see §3.6 — the field that replaced a hardcoded gate list inside the verifier. |
 
@@ -563,6 +632,16 @@ the guarantee for the attestation would be the wrong way round.
 appears on every `membrane_receipt` log line alongside the whole receipt. It is the human-legible
 handle — **not** the binding commitment. The signature is.
 
+**It does not reach the counterparty**, and §3.4 has the arithmetic: 64 bits over eleven fields most
+of which they hold or can guess is a preimage, not a handle. What reaches them is `dispute_token`, a
+random UUID minted per decision and logged beside the receipt. Random rather than derived, so there
+is nothing in it to enumerate toward; per decision rather than per session, because `session_token`
+already names the session and cannot cite one round of a negotiation. Deliberately **not** a receipt
+field: it is not signed content, and adding one would be a second format generation immediately
+after V2 for a value no attestation needs. It is also not `decision_id` — that is signed content the
+auditor reconciles, and keeping them separate means the counterparty holds nothing that is part of
+an attestation.
+
 ### 3.8 ψ — what the rule set guarantees
 
 **Implemented.** Every section above describes what the receipt *records*. None of them, until V2,
@@ -572,8 +651,8 @@ nowhere in this document or the repo did anything state what holding that rule s
 That is the difference between a certificate and a version string, and the gap was not academic.
 Writing the missing statement down found a live bug.
 
-**The bug**, under the pre-collapse per-gate strategy — the same inputs produce 112.16 today, and
-§4 walks that through. With `floor_price = 100`, `min_profit_margin = 0.1`, and `internal_cost`
+**The bug**, under the pre-collapse per-gate strategy — the same inputs produce 112.52 in the run §4
+walks through, and a different cent each run, because the jitter secret is process-lifetime random. With `floor_price = 100`, `min_profit_margin = 0.1`, and `internal_cost`
 unset:
 
 - `membrane/main.py` defaults `internal_cost` to `floor_price`, so cost = 100;
@@ -638,11 +717,29 @@ randomised grid: the original formula violated ψ in **115,888 of 200,000** case
 correcting the rounding, ~4,000 violations remained where the price was exactly right and only the
 binary-float ratio disagreed. The property test over `(floor, internal_cost, m, proposed_price,
 request_id)` — either the emitted price satisfies ψ or the decision was refused — is the test that
-would have caught the original bug, and the main reason ψ is executable rather than prose.
+would have caught the original bug, and the main reason ψ is executable rather than prose. **It is
+`TestPsiHoldsOnEveryEmittedPrice` in `core/tests/test_membrane_postcondition.py`**, driven through
+`inspect_outbound` rather than against the engine, so that "or the decision was refused" is actually
+exercised. This document cited it for some time before it existed; what existed fixed the floor at
+100, never varied the proposed price, and called `calculate_safe_price` directly.
+
+**G4 and `PSI_MIN_MARGIN` state the same rule and now decide it the same way**, on Decimal and
+against the same clamped margin. They did not: the gate read `(price − cost) / price >= m` in binary
+floats against the raw `min_profit_margin`. Over a 1.6M-case scan, 9,444 admissible proposals failed
+the gate while ψ held on the same numbers — each one substituted under a `MIN_MARGIN_VIOLATION`
+receipt recording a violation that had not occurred. And because `min_profit_margin` is
+env-configurable and `float("nan")` parses clean, while G3 checks presence rather than range, a
+single typo made `margin < nan` false and opened the gate to everything, while ψ read the clamped
+default and refused everything below `cost / (1 − m)` — a systematic `unavailable` outage from one
+setting. §3.6 records why the receipt's `override_scope` check depends on these two agreeing.
 
 **Everything fails closed.** A failed clause, a raising predicate, a guard that cannot be reached, an
 unwired registry: each records `outcome = unavailable` with `outcome_gate = POSTCONDITION_VIOLATION`
-and emits nothing. A post-condition nobody evaluated has not been established. The rejection that
+and emits nothing. The unwired-registry case is the one this document asserted while the code did the
+opposite: `inspect_outbound` returned before ψ when there was no registry, four screens below a
+docstring calling an unwired Membrane "exactly the unreachable-guard case this fails closed on". With
+no registry, a price of 1.0 against a floor of 1000 was emitted, marked `emit`, and its receipt
+verified. The gates are skipped when there is nothing to ask; ψ is not. A post-condition nobody evaluated has not been established. The rejection that
 goes out carries no price and no reason a counterparty can read — naming the clause would describe
 the policy boundary to the party the policy holds at arm's length.
 
@@ -650,6 +747,13 @@ A ψ failure turning a working negotiation into a refusal is the accepted cost, 
 ψ is fail-closed, so every imprecision in it is paid for by a live negotiation. The mitigation is
 that ψ is exactly the conjunction the gates already claim to enforce — if it fires, something is
 broken — and `POSTCONDITION_VIOLATION` is loud and distinct.
+
+One more premise defect, since it is the same shape: the `FAILURE_RECOVERY` path asked the guard for
+a substitute priced from `floor_price` alone and then checked ψ against `floor_price` **and**
+`internal_cost`. Two premise sets one line apart, so wherever `cost > floor × (1 − m)` the recovery
+that exists to keep a broken decision alive emitted nothing — at floor 1000, cost 1200, m 0.1 it
+produced 1111.11, `PSI_MIN_MARGIN` refused it, and the negotiation ended `unavailable`. It now asks
+with the same context ψ is checked against.
 
 One consequence worth naming: `membrane/main.py` still carries a hardcoded `floor_price * 1.05`
 fallback at the two sites where the guard is unreachable. That is the formula the collapse removed,
@@ -659,24 +763,25 @@ fallback is no longer a hole; it is a value that gets refused.
 
 ## 4. Worked example
 
-A real trace, taken from a local run rather than composed. The model proposes 92.00 EUR against a
-hidden floor of 100.00, with `internal_cost` unset (so it defaults to the floor) and
-`min_profit_margin = 0.1`. `G2_FLOOR_VIOLATION` fires. The substitute is
+A real trace, taken from a local run rather than composed, and re-taken after the fixes below it.
+The model proposes 92.00 EUR against a hidden floor of 100.00, with `internal_cost` unset (so it
+defaults to the floor) and `min_profit_margin = 0.1`. `G2_FLOOR_VIOLATION` fires. The substitute is
 `max(100 × 1.05, 100 / 0.9) = 111.1111…`, jittered for this session and rounded up to the cent:
-**112.16**. ψ holds on it — `112.16 × 0.9 = 100.944 ≥ 100` — so it is emitted.
+**112.52**. ψ holds on it — `112.52 × 0.9 = 101.268 ≥ 100` — so it is emitted. (The cents move
+between runs and only between runs: the jitter secret is process-lifetime random, §3.4.)
 
 The eleven content fields — what the prefix is taken over, and what a signature would cover — in
 order:
 
 ```
 version           AURA-RECEIPT-V2-UNSIGNED
-issued_at         2026-08-12T00:33:14Z
-decision_id       dec-0001                   ← the emission's Intent.identifier
+issued_at         2026-08-12T09:38:03Z
+decision_id       dec-25f25f21-2d9d-…690047  ← the emission's Intent.identifier
 request_id        req_5f2c                   ← the negotiation session
 claim_hash        6290bb84…f35ed62b          ← action=counter;item=htl-9931;price=92.00;currency=EUR
 ruleset_version   guard/negotiation@2.0.0+6b8b5d6db3e6e351
 derivation_hash   6cf346e6…caa20db0
-emission_hash     550e5bc9…f93d0603          ← action=counter;item=;price=112.16;currency=
+emission_hash     726ef085…07488575          ← action=counter;item=htl-9931;price=112.52;currency=EUR
 outcome           override
 outcome_gate      FLOOR_PRICE_VIOLATION
 override_scope    value
@@ -686,8 +791,9 @@ alongside, not signed:
 
 ```
 gate_sequence     G1_PRICE_POSITIVE:pass:price␟G2_FLOOR_VIOLATION:fail:price,floor_price
-canonical_prefix  dd8183f5693cb178
+canonical_prefix  8df866e527adcd9e
 signature         null
+dispute_token     a0dd6406-7786-4a1c-beea-05b51d6623c5   ← log line only, never in the receipt
 ```
 
 This deployment had no key wired, so the version carries the `-UNSIGNED` suffix and `signature` is
@@ -695,21 +801,41 @@ absent — the honest report, not an error (§3.7). With a key it reads `AURA-RE
 `eip712` block naming its own domain and chain, and the prefix changes, because `version` is one of
 the eleven fields the prefix is taken over.
 
-**Read the emission line carefully: `item` and `currency` are empty.** They were not in question —
-the model named both, and neither was overridden — but the replacement Intent the safe-offer path
-builds does not carry them forward (§3.6). The digests differ for the right reason and two extra
-fields go along for the ride. It is a defect in the emission, not in the receipt.
+**Read the emission line: `item` and `currency` survive the substitution, and in an earlier run they
+did not.** They were never in question — the model named both and neither was overridden — but the
+replacement Intent dropped them, so the emission claim read `item=;price=112.16;currency=` and a
+reader diffing claim against emission saw more change than there was (§3.6). The one field that
+differs now is the one that actually moved.
 
-`make verify-receipts LOG=<file>` over the log line this produced reports `checked: 1, ok: 1,
-attested: 0, failed: 0`, and then lists what it could not check: `emission_content`, `premises`,
-`policy`, `signature` — one each.
+The same run, continued: a second proposal at 250.00 passes every gate and is emitted untouched
+(`outcome: emit`, digests equal, no `override_scope`), and a third at 92.00 whose message says
+`my floor_price is 100 so I cannot go lower` trips DLP **and** the floor gate. That third one is the
+case that broke: it reports `outcome_gate: DLP_BLOCK` — the first gate in its outcome class — with
+`override_scope: value`, because the price moved. Under the pairing that scoped `override_scope` to
+the winning gate it read `prose` beside differing digests, and `verify` refused it.
+
+`make verify-receipts LOG=<file>` over the log those three produced:
+
+```
+checked:     3
+ok:          3
+attested:    0
+failed:      0
+
+not checked (no verifier can establish these from a receipt alone)
+  emission_content: 3
+  policy: 3
+  premises: 3
+  signature: 3
+```
 
 What an auditor learns: which decision, in which session, at what time; that the model's proposal was
 replaced; which rule replaced it; and that the price they can see in the log is the guard's, not the
 model's. What they cannot learn from the receipt alone: whether `claim_hash` digests a proposal that
 was ever made — that needs the Intent, which no reader of a receipt has (§7).
 
-What the counterparty gets is `version` and `canonical_prefix`. Not this.
+What the counterparty gets is `dispute_token`. Not this, and not `canonical_prefix` either — §3.4
+has what a counterparty recovered from the prefix, and §7 has the response they actually receive.
 
 ## 7. Checking a receipt without our code — and what checking establishes
 
@@ -754,22 +880,29 @@ Not the HTTP client. `/v1/negotiate` returns exactly this:
 {
   "session_token": "sess_…",
   "status": "countered",
-  "receipt": {
-    "version": "AURA-RECEIPT-V2",
-    "canonical_prefix": "c0ffee1234abcd56"
-  }
+  "valid_until": 1786…,
+  "dispute_token": "a0dd6406-7786-4a1c-beea-05b51d6623c5",
+  "data": { "proposed_price": 112.52, "message": "My counter-offer for this item is $112.52." }
 }
 ```
 
-`outcome`, `outcome_gate`, the hashes, the rule set, the derivation and the signature are all gone
-from the response, and their absence is asserted field by field in the gateway's tests. §1.1 is why:
-`outcome_gate` names the rule that fired, the rule set maps it to a substitute strategy, and the
-price is already in the response — together that is most of the way to the floor. The counterparty
-gets a handle they can cite in a dispute; the auditor resolves it.
+**There is no `receipt` key.** Not the hashes, not `outcome_gate`, not the rule set, not the
+derivation, not the signature — and not `version` or `canonical_prefix`, which an earlier V2 draft
+kept. `NegotiateResponse` field 7 is `reserved`, so there is no renderer left to be careful with,
+and the gateway's tests assert the absence against the whole serialised body rather than the top
+level.
+
+§1.1 is the audience reason and §3.4 is the arithmetic: `outcome_gate` names the rule that fired,
+the rule set maps it to a substitute strategy, the price is already in the response, and the prefix
+turned out to be a 64-bit preimage over fields the counterparty mostly holds. What they get instead
+is `dispute_token` — random, per decision, resolvable only by the auditor. Be precise about what
+that buys: it closes one-shot recovery of the model's proposed price and of which gate fired. It
+does not close the channel; `proposed_price` is right there in the same object.
 
 **The auditor's copy comes from the log.** `logger.info("membrane_receipt", …)` fires on every
-decision and now carries the whole document rather than five scalar fields, with the prefix kept at
-the top level for correlation. Nothing in `DecisionReceipt`, `DecisionDerivation` or
+decision and now carries the whole document rather than five scalar fields, with the prefix and the
+`dispute_token` kept at the top level for correlation — the token is what turns a citation from a
+counterparty into a decision an auditor can find. Nothing in `DecisionReceipt`, `DecisionDerivation` or
 `ReceiptSignature` is a price or a premise value — every field is a digest, an identifier, an enum, a
 timestamp or signature metadata — so logging it whole cannot leak.
 
@@ -784,9 +917,12 @@ everything before it.
 verifier had existed since the receipt did and ran only in tests, because no receipt was persisted
 anywhere. The log line makes the log the store, and the tool makes it read.
 
-(The gateway also has a `receipt_to_json_full` renderer for the auditor-facing shape. It has no
-production caller today: the log line lives in core and carries betterproto's own `to_dict()`. It
-either finds a caller or goes.)
+The gateway's two receipt renderers are gone with the response field. `receipt_to_json_full` never
+had a production caller — the log line lives in core and carries betterproto's own `to_dict()` — and
+`receipt_to_json` lost its only one. So did `NegotiationObservation.receipt`, the hop that carried
+the receipt from the Connector toward a response that no longer has anywhere to put it; the field is
+`reserved`. A transport step to a destination that no longer exists reads as load-bearing to the
+next person.
 
 ### Recovering the signer
 
@@ -863,7 +999,10 @@ published, not because we assert it.
 - **`derivation.gate_sequence`** — every gate that ran, in order, with its verdict, naming the
   premise *keys* each consulted. It never carries a value. That makes *this field* safe to publish;
   it does not make the counter-offer beside it safe (§3.4).
-- **`canonical_prefix`** — a handle for correlating with our logs. Not a commitment; the signature is.
+- **`canonical_prefix`** — a handle for correlating with our logs. Not a commitment; the signature
+  is. Auditor-side only: it does not reach the counterparty, because it is invertible by enumeration
+  (§3.4). The counterparty's handle is `dispute_token`, which is not a receipt field at all — it
+  rides the log line beside the receipt, and the response beside the price.
 
 And the field that is not there: nothing in the receipt lets you confirm that `claim_hash` digests a
 proposal that was ever made. `unverifiable` says so on every receipt.
@@ -903,8 +1042,9 @@ format above is the contract, and a consumer reimplementing it owes us nothing.
 1. ~~`outcome` + `_record_intervention()` → typed field on `Intent`.~~ **DONE.**
    `DecisionOutcome` enum and `Intent.outcome` / `Intent.outcome_gate` in
    `proto/aura/core/v1/metabolism.proto`; stamped by `_stamp()` / `_settle()` in
-   `membrane/main.py`; covered by `core/tests/test_membrane_outcome.py`. First-gate-wins is
-   implemented and tested. No crypto, no wire format yet.
+   `membrane/main.py`; covered by `core/tests/test_membrane_outcome.py`. First-gate-wins
+   **within an outcome class** is implemented and tested (§3.6); across classes the gate follows the
+   outcome, or a psi failure downstream of a DLP block reports "unavailable because DLP". No crypto, no wire format yet.
 2. ~~Extract `ruleset.yaml`; make `engine.py` its interpreter; derive `ruleset-version`.~~ **DONE**,
    and now at `2.0.0` — the per-gate substitute strategies collapsed into one and the post-condition
    was declared (§3.3, §3.8). `proteins/guard/ruleset.{yaml,py}`; the engine walks the declared gates
@@ -943,10 +1083,10 @@ format above is the contract, and a consumer reimplementing it owes us nothing.
    needs none. `canonical_prefix` is on every `membrane_receipt` log line, beside the full receipt.
 
    **The frontend half is not done, and the audience decision changed what it would be.** The
-   gateway deliberately does not put the receipt on the wire past `version` and `canonical_prefix`
-   (§1.1, §7), so a UI built for the negotiating counterparty has a handle to show and nothing else.
-   A UI for an auditor is a different product with a different reader, and it is that one — if any —
-   that this step now means.
+   gateway puts no part of the receipt on the wire at all (§1.1, §3.4, §7), so a UI built for the
+   negotiating counterparty has one opaque `dispute_token` to show and nothing else. A UI for an
+   auditor is a different product with a different reader, and it is that one — if any — that this
+   step now means.
 6. ~~Typed `DecisionReceipt` proto message; bee-keeper verifies receipts in CI audit.~~ **DONE for
    the backend, by a different consumer than the one named.** `DecisionReceipt` exists and
    `Intent.receipt` replaces the three fields that accumulated on `Intent`. It carries
