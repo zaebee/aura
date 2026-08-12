@@ -297,6 +297,7 @@ dependencies = [
     { name = "pygithub" },
     { name = "pynacl" },
     { name = "python-dotenv" },
+    { name = "python-multipart" },
     { name = "redis" },
     { name = "requests" },
     { name = "solana" },
@@ -362,6 +363,7 @@ requires-dist = [
     { name = "pygithub", specifier = ">=2.8.1" },
     { name = "pynacl", specifier = ">=1.5.0" },
     { name = "python-dotenv", specifier = ">=1.2.1" },
+    { name = "python-multipart", specifier = ">=0.0.12" },
     { name = "redis", specifier = ">=5.0.0" },
     { name = "requests", specifier = ">=2.32.5" },
     { name = "solana", specifier = ">=0.34.0" },
@@ -540,14 +542,18 @@ source = { editable = "packages/aura-worker" }
 dependencies = [
     { name = "aiofiles" },
     { name = "aura-core" },
-    { name = "gradio" },
     { name = "httpx" },
     { name = "nats-py" },
-    { name = "nest-asyncio" },
-    { name = "python-dotenv" },
     { name = "requests" },
     { name = "toml" },
     { name = "types-aiofiles" },
+]
+
+[package.optional-dependencies]
+ui = [
+    { name = "gradio" },
+    { name = "nest-asyncio" },
+    { name = "python-dotenv" },
 ]
 
 [package.dev-dependencies]
@@ -561,15 +567,16 @@ ml = [
 requires-dist = [
     { name = "aiofiles", specifier = ">=24.0.0" },
     { name = "aura-core", editable = "packages/aura-core" },
-    { name = "gradio", specifier = ">=4.0.0" },
+    { name = "gradio", marker = "extra == 'ui'", specifier = ">=4.0.0" },
     { name = "httpx", specifier = ">=0.27.0" },
     { name = "nats-py", specifier = ">=2.7.0" },
-    { name = "nest-asyncio", specifier = ">=1.6.0" },
-    { name = "python-dotenv", specifier = ">=1.0.0" },
+    { name = "nest-asyncio", marker = "extra == 'ui'", specifier = ">=1.6.0" },
+    { name = "python-dotenv", marker = "extra == 'ui'", specifier = ">=1.0.0" },
     { name = "requests", specifier = ">=2.31.0" },
     { name = "toml", specifier = ">=0.10.2" },
     { name = "types-aiofiles", specifier = ">=25.1.0.20251011" },
 ]
+provides-extras = ["ui"]
 
 [package.metadata.requires-dev]
 ml = [

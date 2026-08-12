@@ -1,17 +1,36 @@
+from __future__ import annotations
+
 import asyncio
 import logging
 import secrets
-from typing import Any
+from collections.abc import Callable
+from typing import TYPE_CHECKING, Any
 
-import gradio as gr
 import structlog
 
 from .metabolism import HiveLogHandler, MetabolicLoop
 from .node import AuraNode
 from .tunnel import Umbilical
 
+if TYPE_CHECKING:
+    import gradio as gr
+
 logger = structlog.get_logger(__name__)
 ollama_logger = structlog.get_logger("ollama")
+
+
+def _ui_progress() -> Callable[..., Any]:
+    """A Gradio progress bar when the UI extra is installed, else a no-op.
+
+    Progress is a phenotype. A headless node — MLS mode, the test suite — has no
+    panel to draw on, and must not have to carry the whole Gradio stack just to
+    report into the void.
+    """
+    try:
+        import gradio  # noqa: PLC0415
+    except ImportError:
+        return lambda *args, **kwargs: None
+    return gradio.Progress()
 
 
 class WorkerController:
@@ -59,8 +78,7 @@ class WorkerController:
         frp_port: float | int,
         progress: gr.Progress | None = None,
     ) -> str:
-        if progress is None:
-            progress = gr.Progress()
+        report: Callable[..., Any] = _ui_progress() if progress is None else progress
 
         async with self.node.lock:
             if self.node.is_running:
@@ -74,13 +92,13 @@ class WorkerController:
                 else False
             )
 
-            progress(0, desc="Starting Ollama...")
+            report(0, desc="Starting Ollama...")
             await self.node.start_ollama(log_callback=self.log)
 
-            progress(0.3, desc=f"Pulling model {model}...")
+            report(0.3, desc=f"Pulling model {model}...")
             await self.node.pull_model(model, log_callback=self.log)
 
-            progress(0.7, desc="Establishing Umbilical...")
+            report(0.7, desc="Establishing Umbilical...")
             self.umbilical = Umbilical(
                 hive_host=hive_host,
                 frp_token=frp_token,
@@ -93,7 +111,7 @@ class WorkerController:
 
             if self.nats_enabled:
                 # Initialize Log Protein and Metabolic Loop
-                progress(0.8, desc="Synchronizing with Hive Bloodstream...")
+                report(0.8, desc="Synchronizing with Hive Bloodstream...")
                 self.log_handler = HiveLogHandler(
                     worker_name=self.worker_id,
                     nats_url=nats_url,

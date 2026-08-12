@@ -7,6 +7,10 @@ requires-python = ">=3.12,<3.13"
 dependencies = [
     "alembic>=1.18.1",
     "fastapi>=0.128.0",
+    # api-gateway's File()/Form() endpoints need it, and its tests run in this
+    # env — the gateway is not a workspace dependency of the root, so its own
+    # declaration is never synced. Until now gradio supplied it by accident.
+    "python-multipart>=0.0.12",
     "structlog>=25.0.0",
     "grpcio>=1.76.0",
     "grpcio-tools>=1.76.0",
