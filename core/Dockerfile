@@ -5,13 +5,17 @@ WORKDIR /app
 # Install system dependencies for health probe and health checks
 RUN apt-get update && \
     apt-get install -y --no-install-recommends curl ca-certificates && \
-    curl -fsSL -o /bin/grpc_health_probe https://github.com/grpc-ecosystem/grpc-health-probe/releases/download/v0.4.44/grpc_health_probe-linux-amd64 && \
+    curl -fsSL --retry 3 --retry-delay 2 \
+        -o /bin/grpc_health_probe \
+        https://github.com/grpc-ecosystem/grpc-health-probe/releases/download/v0.4.44/grpc_health_probe-linux-amd64 && \
     chmod +x /bin/grpc_health_probe && \
     rm -rf /var/lib/apt/lists/*
 
 # Install buf
 RUN BUF_VERSION="1.47.2" && \
-    curl -sSL "https://github.com/bufbuild/buf/releases/download/v${BUF_VERSION}/buf-Linux-x86_64" -o "/usr/local/bin/buf" && \
+    curl -fsSL --retry 3 --retry-delay 2 \
+        "https://github.com/bufbuild/buf/releases/download/v${BUF_VERSION}/buf-Linux-x86_64" \
+        -o "/usr/local/bin/buf" && \
     chmod +x "/usr/local/bin/buf"
 
 ENV UV_COMPILE_BYTECODE=1
