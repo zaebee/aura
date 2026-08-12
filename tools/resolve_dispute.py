@@ -72,7 +72,12 @@ async def _lookup(token: str) -> dict[str, Any] | None:
             return None
         raise RuntimeError(observation.error)
     meta = observation.metadata.to_dict() if observation.metadata else {}
-    return dict(meta.get("receipt") or {})
+    receipt = meta.get("receipt")
+    # An empty payload reads as "not found" rather than as a receipt.
+    # Returning `{}` here would hand `render` an empty document, which then
+    # reports a verification failure — telling an auditor the record is broken
+    # when what actually happened is that nothing came back.
+    return dict(receipt) if receipt else None
 
 
 def main() -> int:

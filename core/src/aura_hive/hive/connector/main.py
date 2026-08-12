@@ -77,6 +77,11 @@ class HiveConnector(BaseConnector):
         if not action.receipt or not action.dispute_token:
             return
 
+        # One log site, two ways to get there. A reported failure and a raised
+        # one are the same event to whoever is watching for archive holes, and
+        # two `logger.warning` calls of the same shape drift the moment someone
+        # adds a field to one of them.
+        error: str | None = None
         try:
             observation = await self.registry.execute(
                 "persistence",
@@ -87,16 +92,15 @@ class HiveConnector(BaseConnector):
                 },
             )
             if not observation.success:
-                logger.warning(
-                    "receipt_record_failed",
-                    dispute_token=action.dispute_token,
-                    error=observation.error,
-                )
+                error = observation.error
         except Exception as e:
+            error = str(e)
+
+        if error:
             logger.warning(
                 "receipt_record_failed",
                 dispute_token=action.dispute_token,
-                error=str(e),
+                error=error,
             )
 
     async def _handle_legacy(self, action: Intent, context: Context) -> Observation:
