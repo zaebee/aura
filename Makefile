@@ -62,8 +62,14 @@ keeper-audit: $(PROTO_SENTINEL)
 test: $(PROTO_SENTINEL)
 	# Run core tests
 	PYTHONPATH=$(CORE_PATH) uv run pytest core/tests/ -v
-	# Run api-gateway tests (env is provided by api-gateway/tests/conftest.py)
-	PYTHONPATH=$(GATEWAY_PATH) uv run pytest api-gateway/tests/ -v
+	# Run api-gateway tests (env is provided by api-gateway/tests/conftest.py).
+	# Sync the gateway's own declared deps rather than trusting the root env to
+	# happen to carry them: it is a workspace member, not a root dependency, so
+	# `uv sync --group dev` never reaches its declarations, and until something
+	# else stopped pulling python-multipart in nobody could tell. --inexact adds
+	# them to what is already synced; --no-sync stops `uv run` reverting that.
+	uv sync --package api-gateway --inexact
+	PYTHONPATH=$(GATEWAY_PATH) uv run --no-sync pytest api-gateway/tests/ -v
 	# Run telegram-bot tests with isolated path to avoid 'src' collision
 	PYTHONPATH=$(TG_PATH) uv run pytest synapses/telegram-bot/tests/ -v
 	# Run bee.Keeper tests from the root env: its transformer imports dspy, which
