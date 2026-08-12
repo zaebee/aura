@@ -203,3 +203,7 @@ tools-buyer:
 verify-receipts:
 	# Check the receipts a running Hive left in its log (LOG=path, or stdin when unset)
 	PYTHONPATH=$(TOOL_PATH):. uv run python tools/verify_receipts.py $(LOG)
+
+resolve-dispute:
+	# Resolve a dispute token into the receipt it names (TOKEN=<uuid>)
+	PYTHONPATH=$(TOOL_PATH):$(CORE_PATH) uv run python tools/resolve_dispute.py $(TOKEN)
