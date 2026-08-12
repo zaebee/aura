@@ -437,16 +437,21 @@ class HiveMembrane(Membrane[Any, Intent, Context]):
             return receipt
 
         try:
-            # Looked up rather than accessed: settings with no crypto section
-            # is a configuration a deployment may legitimately have, and an
-            # expected absence should not be discovered by throwing. The try
-            # still wraps it, because the promise that nothing here costs the
-            # decision should hold from where the code sits rather than from
-            # someone having checked each line.
-            crypto = getattr(self.settings, "crypto", None)
-            chain_id = int(getattr(crypto, "evm_chain_id", 0) or 0)
+            # Looked up rather than accessed: settings with no attestation
+            # section is a configuration a deployment may legitimately have,
+            # and an expected absence should not be discovered by throwing. The
+            # try still wraps it, because the promise that nothing here costs
+            # the decision should hold from where the code sits rather than
+            # from someone having checked each line.
+            #
+            # `attestation` rather than `transaction`: the key that vouches for
+            # an audit record has nothing to do with the one that moves money,
+            # and asking the payments protein meant a deployment had to enable
+            # payment locks before a single receipt could be signed.
+            attestation = getattr(self.settings, "attestation", None)
+            chain_id = int(getattr(attestation, "chain_id", 0) or 0)
             obs = await self.registry.execute(
-                "transaction",
+                "attestation",
                 "sign_receipt",
                 {"payload": signing_payload(receipt, chain_id=chain_id)},
             )
