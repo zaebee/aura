@@ -4,6 +4,7 @@ Subprocess, HTTP and the real filesystem are avoided via tmp paths + mocks.
 
 from unittest.mock import AsyncMock, MagicMock, patch
 
+import httpx
 import pytest
 import toml
 from aura_worker.tunnel import Umbilical
@@ -122,6 +123,114 @@ async def test_ensure_frpc_rejects_bad_checksum(tmp_path):
 
     tar_path = u.bin_dir / f"frp_{u.FRPC_VERSION}_linux_amd64.tar.gz"
     assert not tar_path.exists()  # partial download cleaned up
+
+
+def _scripted_client(*outcomes):
+    """An httpx.AsyncClient stand-in playing one outcome per stream() call.
+
+    An outcome is either an exception — raised on entering the stream, which is
+    where both a dropped connection and a raise_for_status land as far as the
+    caller is concerned — or the bytes the response body should yield.
+
+    Returns the client context manager and the list that records each attempt.
+    """
+    attempts: list[str] = []
+
+    def _stream(method, url, **kwargs):
+        attempts.append(url)
+        outcome = outcomes[len(attempts) - 1]
+        cm = MagicMock()
+        cm.__aexit__ = AsyncMock(return_value=False)
+        if isinstance(outcome, Exception):
+            cm.__aenter__ = AsyncMock(side_effect=outcome)
+            return cm
+
+        response = MagicMock()
+        response.raise_for_status = MagicMock()
+
+        async def _aiter_bytes(chunk_size=8192, _body=outcome):
+            yield _body
+
+        response.aiter_bytes = _aiter_bytes
+        cm.__aenter__ = AsyncMock(return_value=response)
+        return cm
+
+    client = MagicMock()
+    client.stream = MagicMock(side_effect=_stream)
+    client_cm = MagicMock()
+    client_cm.__aenter__ = AsyncMock(return_value=client)
+    client_cm.__aexit__ = AsyncMock(return_value=False)
+    return client_cm, attempts
+
+
+def _dropped_connection():
+    return httpx.RemoteProtocolError("Server disconnected without sending a response.")
+
+
+def _missing_release():
+    request = httpx.Request("GET", "https://github.com/fatedier/frp")
+    return httpx.HTTPStatusError(
+        "404", request=request, response=httpx.Response(404, request=request)
+    )
+
+
+@pytest.mark.asyncio
+async def test_ensure_frpc_retries_a_dropped_connection(tmp_path):
+    """One blip must not end the download — this is what killed a Colab run."""
+    u = _umbilical(tmp_path)
+    client_cm, attempts = _scripted_client(_dropped_connection(), b"second-attempt")
+
+    with patch("aura_worker.tunnel.httpx.AsyncClient", return_value=client_cm):
+        with patch("aura_worker.tunnel.asyncio.sleep", AsyncMock()):
+            # The retry succeeds at the network layer; the body is not the real
+            # archive, so it stops at the checksum — past the point that failed.
+            with pytest.raises(RuntimeError, match="Checksum verification failed"):
+                await u.ensure_frpc()
+
+    assert len(attempts) == 2
+
+
+@pytest.mark.asyncio
+async def test_ensure_frpc_reports_the_url_when_every_attempt_drops(tmp_path):
+    u = _umbilical(tmp_path)
+    client_cm, attempts = _scripted_client(
+        _dropped_connection(), _dropped_connection(), _dropped_connection()
+    )
+
+    with patch("aura_worker.tunnel.httpx.AsyncClient", return_value=client_cm):
+        with patch("aura_worker.tunnel.asyncio.sleep", AsyncMock()):
+            with pytest.raises(RuntimeError, match="frp_0.61.0_linux_amd64.tar.gz"):
+                await u.ensure_frpc()
+
+    assert len(attempts) == u.FRPC_DOWNLOAD_ATTEMPTS == 3
+
+
+@pytest.mark.asyncio
+async def test_ensure_frpc_does_not_retry_a_missing_release(tmp_path):
+    """A 404 will not heal on its own; retrying it only delays the truth."""
+    u = _umbilical(tmp_path)
+    client_cm, attempts = _scripted_client(_missing_release(), b"never-reached")
+
+    with patch("aura_worker.tunnel.httpx.AsyncClient", return_value=client_cm):
+        with patch("aura_worker.tunnel.asyncio.sleep", AsyncMock()):
+            with pytest.raises(httpx.HTTPStatusError):
+                await u.ensure_frpc()
+
+    assert len(attempts) == 1
+
+
+@pytest.mark.asyncio
+async def test_ensure_frpc_does_not_retry_a_bad_checksum(tmp_path):
+    """The integrity check is a verdict, not a transient error."""
+    u = _umbilical(tmp_path)
+    client_cm, attempts = _scripted_client(b"corrupted", b"corrupted")
+
+    with patch("aura_worker.tunnel.httpx.AsyncClient", return_value=client_cm):
+        with patch("aura_worker.tunnel.asyncio.sleep", AsyncMock()):
+            with pytest.raises(RuntimeError, match="Checksum verification failed"):
+                await u.ensure_frpc()
+
+    assert len(attempts) == 1
 
 
 # --- stop -------------------------------------------------------------------
