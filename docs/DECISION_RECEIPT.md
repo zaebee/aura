@@ -391,22 +391,27 @@ that no rule set declares, so they cannot be recorded as gates without inventing
 
 #### The leak this field closes, and the one it does not
 
-**"You cannot probe it for the floor" holds for this field and not for the channel, and an earlier
-draft of this document ran the two together.** The derivation is clean. The counter-offer beside it
-is not: when a gate fires, the Membrane substitutes `safe_offer(context)`, and that price is a
-function of the hidden floor. It reaches the counterparty as `proposed_price` on every counter,
-whatever a receipt does or does not say. No amount of trimming the receipt touches it.
+**"You cannot probe it for the floor" holds for this field and not for the response around it, and
+an earlier draft of this document ran the two together.** The derivation is clean. Two channels
+beside it are not, and they are bounded very differently: the **counter-offer**, which is jittered,
+and the **accept/reject decision**, which is not and cannot be. The first is treated below; the
+second gets its own subsection because it is exact, and because measuring the first and reporting
+the answer as the system's bound is the mistake this section previously made.
 
-What V2 does about it is bound the disclosure, not close it:
+The counter-offer channel first. When a gate fires, the Membrane substitutes `safe_offer(context)`,
+and that price is a function of the hidden floor. It reaches the counterparty as `proposed_price` on
+every counter, whatever a receipt does or does not say. No amount of trimming the receipt touches
+it. What V2 does about it is bound the disclosure, not close it:
 
 - **Per-session jitter.** `safe_offer` multiplies by `(1 + j)` before rounding up, where
   `j = ε · HMAC(process_secret, request_id) / 2²⁵⁶` and `ε = 0.03`. Constant within a session, so
   repeated rounds within one negotiation cannot average it away. **Across sessions it decays to
   nothing, and an earlier draft of this bullet claimed the opposite.** Independent draws per session
   are exactly what a corpus averages out: the standard error of the mean over `N` observations is
-  `base · ε / √(12N)`, about **0.09% of the base at `N = 100`**. So the real bound is 3% per
-  observation against a counterparty who sees one, decaying toward zero against a repeat
-  counterparty on the same item. `(1 + j) ≥ 1` and the rounding is a ceiling, so jitter cannot push
+  `base · ε / √(12N)`, about **0.09% of the base at `N = 100`**. So this channel bounds disclosure at
+  3% per observation against a counterparty who sees one, decaying toward zero against a repeat
+  counterparty on the same item — and the accept/reject channel below bounds nothing at all, which
+  is why neither figure is the bound on the floor. `(1 + j) ≥ 1` and the rounding is a ceiling, so jitter cannot push
   a price through ψ. The
   secret is process-lifetime random rather than configured — nothing needs to reproduce the price,
   because ψ checks the value, which is the whole reason ψ is executable (§3.8). An empty `request_id`
@@ -416,9 +421,10 @@ What V2 does about it is bound the disclosure, not close it:
   limit for this item. My best offer is $X."` and the DLP block `"I cannot disclose internal pricing
   details."` — each of which announced that a guard had fired. Both now read as an ordinary counter.
 
-**`ε` is a source constant and therefore public, so the counterparty still learns the floor to within
-3%.** That bound holds only because every floor-derived price is born in the guard, which applies the
-markup and the jitter. The rules-based strategy used to break it: with `llm.model == "rule"` a
+**`ε` is a source constant and therefore public, so a counterparty reading counter-offers learns the
+floor to within 3% per observation.** That is a bound on *this channel*, not on the floor — the
+accept/reject channel below is exact, and dominates it. It holds only because every floor-derived
+price is born in the guard, which applies the markup and the jitter. The rules-based strategy used to break it: with `llm.model == "rule"` a
 below-floor bid was countered at `floor_price` exactly, and the message said the number out loud —
 a 0% bound on a path the DLP check could not see, because it scans for the literal token
 `floor_price` rather than for its value. That strategy no longer prices at all; it proposes the bid
@@ -442,14 +448,59 @@ unsigned format on **any** signing failure — so a client polling it read a liv
 transaction protein was reachable — and `receipt: null` versus an object reported whether minting
 had happened at all.
 
+#### The channel none of this bounds
+
+**An acceptance proves the bid was at or above the floor.** `PSI_ABOVE_FLOOR` is
+`emitted_price >= floor_price` (`guard/engine.py`), and ψ runs on every ACCEPT and COUNTER
+(`membrane/main.py`), so a decision to accept at price P cannot leave unless P ≥ floor. On every
+path, by construction.
+
+That makes acceptance an oracle, and it carries no jitter — nor could it, since noise on the
+decision to accept means refusing sales above the floor. A counterparty who can bid and watch for
+acceptance binary-searches:
+
+| item base price | cent-precision values | probes |
+|---|---|---|
+| 100 | 10,000 | 14 |
+| 1,000 | 100,000 | 17 |
+| 10,000 | 1,000,000 | 20 |
+
+`log₂(range ÷ precision)`, and the logarithm is the point: **widening the price range is not a
+defence.** Doubling it costs the adversary one probe.
+
+The oracle is one-sided, which changes what is learned rather than whether. Acceptance implies
+`bid ≥ floor` always. Non-acceptance implies nothing definite on the LLM path — the model may
+counter a bid above the floor for its own reasons — and is exact on the rules path, where
+`bid < floor_price` counters and anything else accepts. So what a counterparty converges on is the
+**infimum of accepted bids**: exactly the floor on the rules path, the floor or higher on the LLM
+path. Either way it is the number they act on.
+
+**This is not a defect and not fixable by trimming the response.** A threshold that decides
+accept/reject is discoverable by probing the threshold — a property of having a reservation price,
+not of this implementation. Note where it comes from: the safety guarantee is what creates the
+proof. "Never emit below the floor" is precisely what makes an acceptance informative.
+
+Three mitigations were considered and none is built. **Rate limiting per (counterparty, item)** is
+the only one that changes anything: it closes nothing — nothing does — but stretches seventeen
+probes over longer than a price stays current. **Stochastic refusal near the floor** would break the
+proof by making acceptance non-deterministic, and is rejected: it costs revenue on honest bids and
+destroys predictability for the buyers the system exists to serve, in order to slow an adversary who
+can simply probe again. And **keying the jitter deterministically** — `HMAC(secret, item ‖
+counterparty)` rather than on `request_id` — would close the averaging attack described above, since
+a constant offset cannot be averaged away; it is recorded here because it is the obvious fix and it
+addresses the channel that is not the problem. Against a repeat counterparty on one item it buys
+almost nothing: there is no reason to average a hundred observations down to 0.09% when seventeen
+probes give the cent.
+
 So the claim is narrow, and it is not closure:
 
 - **What removal closes:** one-shot recovery, from a single response, of the model's own proposed
   price and of which gate fired. Before, one counter was enough.
-- **What it does not close:** `proposed_price` is still in the response on every counter, so the
-  bound above still holds and still decays with `N`. Timing is a further residual — the override
-  path makes extra registry round-trips, so a patient counterparty can distinguish an overridden
-  counter from an ordinary one without reading a word of it.
+- **What it does not close:** the floor. `proposed_price` is still in the response on every counter,
+  so the 3% bound above still holds and still decays with `N` — and the accept/reject oracle is
+  exact regardless, which is the bound that matters. Timing is a further residual: the override path
+  makes extra registry round-trips, so a patient counterparty can distinguish an overridden counter
+  from an ordinary one without reading a word of it.
 - **What is not lost:** nothing evidential. The counterparty received the prefix *without* the
   signature block, so they could never tell a real receipt from one we invented; it was never
   probative in their hands. `dispute_token` is the handle it was supposed to be — random, per
