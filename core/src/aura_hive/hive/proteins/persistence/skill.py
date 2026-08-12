@@ -20,6 +20,7 @@ from .engine import (
     RedisCache,
 )
 from .items import ItemRepository
+from .receipts import ReceiptRepository
 from .wallet import WalletRepository
 
 logger = structlog.get_logger(__name__)
@@ -62,6 +63,8 @@ class PersistenceSkill(
             "sanctify_wallet": self._sanctify_wallet,
             "is_wallet_sanctified": self._is_wallet_sanctified,
             "log_metabolic_cost": self._log_metabolic_cost,
+            "record_receipt": self._record_receipt,
+            "find_receipt_by_dispute_token": self._find_receipt_by_dispute_token,
         }
 
         # Entity SQL lives in dedicated repositories; the _get_session reference
@@ -69,6 +72,7 @@ class PersistenceSkill(
         self._deals = DealRepository(self._get_session)
         self._items = ItemRepository(self._get_session)
         self._wallets = WalletRepository(self._get_session)
+        self._receipts = ReceiptRepository(self._get_session)
 
     def get_name(self) -> str:
         return "persistence"
@@ -276,6 +280,44 @@ class PersistenceSkill(
         if result:
             return Observation(success=True, metadata=make_struct(result))
         return Observation(success=False, error="deal_not_found")
+
+    async def _record_receipt(self, params: dict[str, Any]) -> Observation:
+        """
+        Store the auditor's copy. Failure is reported, never raised: the
+        Connector treats this as fail-open, because reporting on a decision
+        must not take that decision down.
+        """
+        receipt = params.get("receipt")
+        if not receipt:
+            return Observation(success=False, error="receipt_required")
+        dispute_token = params.get("dispute_token")
+        if not dispute_token:
+            return Observation(success=False, error="dispute_token_required")
+
+        try:
+            await asyncio.to_thread(self._receipts.record, receipt, dispute_token)
+            return Observation(success=True)
+        except Exception as e:
+            return Observation(success=False, error=str(e))
+
+    async def _find_receipt_by_dispute_token(
+        self, params: dict[str, Any]
+    ) -> Observation:
+        """
+        The query lives here rather than in the tool that calls it, so a
+        future internal endpoint is a second thin caller rather than a second
+        implementation.
+        """
+        token = params.get("dispute_token")
+        if not token:
+            return Observation(success=False, error="dispute_token_required")
+
+        result = await asyncio.to_thread(self._receipts.find_by_dispute_token, token)
+        if result is None:
+            # Not an error. A token that was never issued is a legitimate
+            # answer to give an auditor — someone may have invented it.
+            return Observation(success=False, error="not_found")
+        return Observation(success=True, metadata=make_struct({"receipt": result}))
 
     async def _update_deal_status(self, params: dict[str, Any]) -> Observation:
         deal_id = params.get("deal_id")
