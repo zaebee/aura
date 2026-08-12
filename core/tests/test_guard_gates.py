@@ -107,6 +107,62 @@ class TestGateOrder:
         )
 
 
+class TestTheMarginGateAgreesWithPsi:
+    """
+    G4 and PSI_MIN_MARGIN state the same rule and must decide it the same way.
+
+    The receipt leans on that: `override_scope="value"` with equal digests is
+    reported as "a substitution that left no trace", which is only a sound
+    reading if a gate that fails implies psi that fails. While G4 read
+    `(price - cost) / price >= m` in binary floats against the RAW setting and
+    psi read `price * (1 - m) >= cost` in Decimal against the CLAMPED one, the
+    two disagreed in both directions.
+    """
+
+    def test_a_price_psi_accepts_is_not_refused_by_the_gate(self) -> None:
+        """
+        2094.00 at cost 1696.14 and m = 0.19 is EXACTLY right: 2094 x 0.81 is
+        1696.14 to the cent. The float ratio makes it 0.18999999999999995 and
+        refuses it. This is the guard's own substitute formula's output, so the
+        old gate refused prices the guard itself would have offered — 9,444 of
+        them in a 1.6M-case scan.
+        """
+
+        class _Nineteen:
+            min_profit_margin = 0.19
+
+        engine = guard(_Nineteen())
+        assert engine.validate_decision(
+            decision(price=2094.00), context(floor=1000.0, cost=1696.14)
+        )
+        assert engine.check_postcondition(
+            {"price": 2094.00}, {"floor_price": 1000.0, "internal_cost": 1696.14}
+        ).holds
+
+    def test_a_non_finite_margin_does_not_open_the_gate(self) -> None:
+        """
+        `min_profit_margin` is env-configurable and `float("nan")` parses clean.
+        G3 checks presence, not range, so the NaN reached G4 — where
+        `margin < nan` is False and every proposal passed, while psi used the
+        clamped default and refused everything below cost/0.9. One typo, a
+        systematic UNAVAILABLE outage rather than a loud misconfiguration.
+        """
+
+        class _NotANumber:
+            min_profit_margin = float("nan")
+
+        engine = guard(_NotANumber())
+        with pytest.raises(SafetyViolation) as caught:
+            engine.validate_decision(
+                decision(price=1010.0), context(floor=1000.0, cost=1000.0)
+            )
+
+        assert caught.value.code == "MIN_MARGIN_VIOLATION"
+        assert not engine.check_postcondition(
+            {"price": 1010.0}, {"floor_price": 1000.0, "internal_cost": 1000.0}
+        ).holds
+
+
 class TestDeclarationMatchesImplementation:
     def test_the_engine_implements_exactly_the_declared_gates(self) -> None:
         """

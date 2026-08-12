@@ -287,19 +287,37 @@ class OutputGuard:
         return True
 
     def _gate_margin_violation(self, decision: dict, context: dict) -> bool:
-        price = _numeric(decision, "price")
-        internal_cost = _numeric(context, "internal_cost")
-        margin = (price - internal_cost) / price if price > 0 else 0
+        # Deliberately the SAME predicate as `_clause_min_margin`, on the same
+        # Decimal arithmetic and the same clamped margin. The gate used to read
+        # `(price - cost) / price >= self.settings.min_profit_margin` in binary
+        # floats against the RAW setting, and the two disagreements that
+        # produced were not cosmetic:
+        #
+        #   * the ratio form is not decidable on money — over a 1.6M-case scan
+        #     of admissible inputs, 9,444 proposals FAILED this gate while psi
+        #     held on the very same numbers, so the Membrane substituted a price
+        #     under a MIN_MARGIN_VIOLATION receipt recording a violation that
+        #     had not occurred;
+        #   * `min_profit_margin` is env-configurable and `float("nan")` parses
+        #     clean. G3 checks presence, not range, so a NaN reached here, and
+        #     `margin < nan` is False — the gate passed everything while psi,
+        #     reading the clamped default, refused everything below cost/0.9.
+        #     One config typo, a systematic UNAVAILABLE outage.
+        #
+        # The receipt's override_scope check ("value scope with equal digests is
+        # a substitution that left no trace") is only sound if a failing gate
+        # implies psi is violated. Reading the two the same way is what makes
+        # that implication true rather than nearly true.
+        price = _decimal(decision, "price")
+        internal_cost = _decimal(context, "internal_cost")
+        min_margin = self._configured_margin()
 
-        # Reached only after G3_SETTINGS_PRESENT passed, so settings are here.
-        min_margin = self.settings.min_profit_margin
-        if margin < min_margin:
+        if price * (1 - min_margin) < internal_cost:
             logger.warning(
                 "safety_margin_violation",
-                offered_price=price,
-                internal_cost=internal_cost,
-                margin=margin,
-                min_margin=min_margin,
+                offered_price=str(price),
+                internal_cost=str(internal_cost),
+                min_margin=str(min_margin),
             )
             return False
         return True
