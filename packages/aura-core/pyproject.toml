@@ -17,7 +17,11 @@ dependencies = [
 ]
 
 [tool.hatch.build.targets.wheel]
-packages = ["src/aura_core", "gen-proto/aura_core_gen"]
+# gen-proto/aura_core_gen is deliberately absent: gen_hooks.py force_includes it.
+# Listing it here too would work in a checkout (where .gitignore suppresses this
+# selection) and break in a Docker context (where nothing is ignored, both
+# mechanisms fire, and hatchling aborts on the duplicate path).
+packages = ["src/aura_core"]
 
 [tool.hatch.build.targets.sdist]
 include = [
