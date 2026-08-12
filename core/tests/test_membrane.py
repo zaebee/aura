@@ -104,9 +104,10 @@ async def test_membrane_rule2_data_leak_prevention():
     # that line announced a DLP rule had fired. See
     # core/tests/test_membrane_override_message.py for the message-shape
     # regression tests.
+    # Bare number, because this Context states no currency. The `$` this
+    # asserted was hardcoded, so a JPY negotiation was quoted in dollars.
     assert (
-        "My counter-offer for this item is $120.00."
-        == safe_decision.negotiation.message
+        "My counter-offer for this item is 120.00." == safe_decision.negotiation.message
     )
     assert "DLP block" in safe_decision.reasoning
 

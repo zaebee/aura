@@ -951,3 +951,54 @@ class TestTheDisputeToken:
         second = await membrane.inspect_outbound(counter_intent(price=2000.0), context)
 
         assert first.dispute_token != second.dispute_token
+
+
+class TestThePriceIsQuotedInTheCurrencyItIsIn:
+    """
+    Both counterparty-facing messages hardcoded a `$`.
+
+    The branch carries `currency_code` into the claim precisely because the
+    denomination is a property of the request that nothing decided — and then
+    told the counterparty a JPY deal was `$111.12`. The structured field said
+    one thing and the prose beside it said another, on the one path where the
+    Membrane, not the model, is writing the words.
+
+    The message is not part of the canonical claim, so nothing here moves a
+    digest.
+    """
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize(
+        ("price", "message"),
+        [
+            (500.0, "Here is my offer"),  # substituted: the override's message
+            (2000.0, LEAKING_MESSAGE),  # sanitised: the DLP block's message
+            (500.0, LEAKING_MESSAGE),  # both
+        ],
+    )
+    async def test_no_path_quotes_a_dollar_sign_for_a_yen_deal(
+        self, price: float, message: str
+    ) -> None:
+        decision = await guarded_membrane().inspect_outbound(
+            counter_intent(price=price, message=message),
+            negotiation_context(currency_code="JPY"),
+        )
+
+        emitted = decision.negotiation.message
+        assert "$" not in emitted, emitted
+        assert "JPY" in emitted, emitted
+
+    @pytest.mark.asyncio
+    async def test_an_unstated_denomination_quotes_a_bare_number(self) -> None:
+        """
+        Two call sites legitimately have no source for a currency and pass the
+        empty string (§3.2). A bare number is the honest rendering; the naive
+        f-string leaves a trailing space before the full stop.
+        """
+        decision = await guarded_membrane().inspect_outbound(
+            counter_intent(price=500.0), negotiation_context(currency_code="")
+        )
+
+        emitted = decision.negotiation.message
+        assert " ." not in emitted, emitted
+        assert "$" not in emitted, emitted

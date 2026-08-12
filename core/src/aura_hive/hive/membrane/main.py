@@ -324,7 +324,26 @@ def _context_number(ctx_meta: dict[str, Any], key: str, default: float) -> float
         return default
 
 
-def _neutral_price_message(action: Any, price: float) -> str:
+def _quoted_price(price: float, currency_code: str) -> str:
+    """
+    A price in the denomination it is actually in.
+
+    Both messages the Membrane writes used to hardcode `$`, so a JPY
+    negotiation was told `$111.12` — the structured `currency_code` saying one
+    thing and the prose beside it another, on the one path where the Membrane
+    rather than the model is choosing the words.
+
+    No symbol table: mapping codes to glyphs is a localisation problem this
+    module has no business holding an opinion about, and getting it wrong is
+    the failure being fixed. The code itself is unambiguous in every currency.
+    An unstated denomination renders as a bare number — two call sites
+    legitimately have no source for one (§3.2) and the naive f-string would
+    leave a space before the full stop.
+    """
+    return f"{price:.2f} {currency_code}".rstrip()
+
+
+def _neutral_price_message(action: Any, price: float, currency_code: str) -> str:
     """
     State the price without stating that a guard produced it.
 
@@ -334,9 +353,10 @@ def _neutral_price_message(action: Any, price: float) -> str:
     receives alongside it. A message that disagrees with the decision beside it
     is its own tell.
     """
+    quoted = _quoted_price(price, currency_code)
     if action == ActionType.ACTION_TYPE_ACCEPT:
-        return f"I accept your offer at ${price:.2f}."
-    return f"My counter-offer for this item is ${price:.2f}."
+        return f"I accept your offer at {quoted}."
+    return f"My counter-offer for this item is {quoted}."
 
 
 def _action_label(action: Any) -> str:
@@ -838,7 +858,9 @@ class HiveMembrane(Membrane[Any, Intent, Context]):
                         # model's: an ACCEPT sanitised into a "counter-offer"
                         # contradicts the result sent beside it.
                         message=_neutral_price_message(
-                            decision.action, neg_intent.price
+                            decision.action,
+                            neg_intent.price,
+                            neg_intent.currency_code,
                         ),
                         thought=neg_intent.thought,
                         # Carried forward like the other decidable fields. Left
@@ -1018,7 +1040,15 @@ class HiveMembrane(Membrane[Any, Intent, Context]):
                 # removing it: a template still reads differently from the
                 # model's own prose.
                 price=rounded_price,
-                message=f"My counter-offer for this item is ${rounded_price:.2f}.",
+                # The same helper the DLP path uses. Two sites were formatting
+                # the same sentence independently, which is how one of them
+                # came to hardcode a currency the other had already been taught
+                # to read from the decision.
+                message=_neutral_price_message(
+                    ActionType.ACTION_TYPE_COUNTER,
+                    rounded_price,
+                    neg_intent.currency_code if neg_intent else "",
+                ),
             ),
         )
         # The substitute price is decidable content, not prose. This write is
