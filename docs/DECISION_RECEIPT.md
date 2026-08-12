@@ -980,7 +980,19 @@ everything before it.
 
 **This is the consumer that was missing when step 6 was written off as unbuildable** (§6). The
 verifier had existed since the receipt did and ran only in tests, because no receipt was persisted
-anywhere. The log line makes the log the store, and the tool makes it read.
+anywhere. The log line makes the log *a* store, and the tool makes it read.
+
+**The log is not the durable store, and treating it as one was the gap.** It goes to a Loki outside
+this repository whose retention is measured in days to weeks, so a dispute arriving a month after the
+decision found nothing — the receipt had expired, signature and all. Every decision is now also
+written to `decision_receipts` by the Connector on the C step, keyed by `dispute_token`, and
+`make resolve-dispute TOKEN=…` turns a counterparty's citation into the receipt plus its verdict.
+
+The write is fail-open, like the log line and for the same reason: reporting on a decision must never
+take that decision down. The cost is that archive holes are possible and silent, so a failure emits
+`receipt_record_failed` as its own event — an archive that sometimes never arrives is worse than one
+that expires, because nothing announces it. The log line stays as an independent second path, and
+survives Postgres being unreachable.
 
 The gateway's two receipt renderers are gone with the response field. `receipt_to_json_full` never
 had a production caller — the log line lives in core and carries betterproto's own `to_dict()` — and
@@ -1192,11 +1204,16 @@ format above is the contract, and a consumer reimplementing it owes us nothing.
    nothing to run against on both counts.
 
    **What was actually missing was a consumer, and it now exists.** The `membrane_receipt` log line
-   carries the whole document, which makes the log the store; `tools/verify_receipts.py` and
-   `make verify-receipts` run `verify()` over that stream and report totals, failures and the
-   `unverifiable` tally, exiting non-zero when anything failed. No schema, no migration, no new
-   responsibility on `PersistenceSkill`. Storing receipts properly is still open — see step 4 — but
-   the receipt is no longer a document nobody reads.
+   carries the whole document; `tools/verify_receipts.py` and `make verify-receipts` run `verify()`
+   over that stream and report totals, failures and the `unverifiable` tally, exiting non-zero when
+   anything failed.
+
+   That first pass claimed the log line "makes the log the store", and added that storing receipts
+   properly was still open. Both were written in the same breath and the first quietly undid the
+   second: a store with a retention of days is a buffer. Receipts are now written to
+   `decision_receipts` by the Connector, resolvable by `dispute_token` through
+   `make resolve-dispute` (§7), and the log line remains as an independent second path rather than
+   as the archive.
 7. ~~Declare ψ and check it on the emitted value.~~ **DONE**, and not in the original plan — it was
    added because writing down what the rule set guarantees found the bug in §3.8. `postcondition` in
    `ruleset.yaml` at `2.0.0`, clause predicates in `engine.py` cross-checked against the declaration
