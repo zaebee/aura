@@ -17,7 +17,15 @@ from eth_account.messages import encode_typed_data
 
 
 def a_payload(chain_id: int = 84532) -> dict[str, Any]:
-    """The EIP-712 shape `signing_payload()` produces, built by hand here."""
+    """
+    The EIP-712 shape `signing_payload()` produces, built by hand here.
+
+    The domain version is `RECEIPT_EIP712_VERSION`, which is "1" and tracks the
+    EIP-712 domain rather than the receipt format — this fixture said "2" and
+    taught the opposite. The engine signs whatever it is handed, so the drift
+    was harmless to the assertions and precisely the kind the module docstring
+    warns about: one side building a document the other signs blind.
+    """
     return {
         "types": {
             "EIP712Domain": [
@@ -29,7 +37,7 @@ def a_payload(chain_id: int = 84532) -> dict[str, Any]:
         },
         "domain": {
             "name": "AuraDecisionReceipt",
-            "version": "2",
+            "version": "1",
             "chainId": chain_id,
         },
         "primaryType": "DecisionReceipt",

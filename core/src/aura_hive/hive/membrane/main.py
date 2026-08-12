@@ -465,14 +465,29 @@ class HiveMembrane(Membrane[Any, Intent, Context]):
             logger.warning("membrane_receipt_unsigned", error=obs.error)
             return receipt
 
-        meta = obs.metadata.to_dict() if obs.metadata is not None else {}
-        signer = str(meta.get("signer") or "")
-        signature = str(meta.get("signature") or "")
-        if not signer or not signature:
-            logger.warning("membrane_receipt_unsigned", error="signer reported neither")
-            return receipt
+        # Inside the try for the same reason the call is. Reading the reply and
+        # stamping it onto the receipt used to sit outside it, which meant the
+        # promise above — that nothing here costs the decision — held only
+        # because someone had checked each of these lines and found nothing
+        # that raises. That is not a guarantee, it is an audit with a shelf
+        # life, and `to_dict()` on a message this method does not construct is
+        # exactly where the next surprise would arrive.
+        try:
+            meta = obs.metadata.to_dict() if obs.metadata is not None else {}
+            signer = str(meta.get("signer") or "")
+            signature = str(meta.get("signature") or "")
+            if not signer or not signature:
+                logger.warning(
+                    "membrane_receipt_unsigned", error="signer reported neither"
+                )
+                return receipt
 
-        return signed(receipt, signer=signer, signature=signature, chain_id=chain_id)
+            return signed(
+                receipt, signer=signer, signature=signature, chain_id=chain_id
+            )
+        except Exception as e:
+            logger.warning("membrane_receipt_unsigned", error=str(e))
+            return receipt
 
     async def _postcondition_holds(
         self, price: float, guard_context: dict[str, Any], verdict: _Verdict

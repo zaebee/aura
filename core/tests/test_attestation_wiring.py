@@ -51,6 +51,35 @@ class TestTheProteinIsRegisteredOnlyWithAKey:
         assert skill is None
         assert "attestation_disabled_no_key" in events
 
+    def test_a_key_with_surrounding_whitespace_still_works(self) -> None:
+        """
+        `printf` versus `echo` into a secret is the difference, and a trailing
+        newline is the most common way a real key arrives malformed. Without a
+        strip it is indistinguishable from a corrupt key: the cell refuses to
+        boot over an invisible character.
+        """
+        account = Account.create()
+
+        skill, events = build_attestation(f"  {account.key.hex()}\n")
+
+        assert skill is not None
+        assert "attestation_signer_ready" in events
+
+    def test_a_corrupt_key_names_the_setting_and_not_the_key(self) -> None:
+        """
+        Refusing to boot is right — the alternative is a deployment that
+        believes it attests. But the operator has to be told which setting is
+        wrong, and must not be told what the value was.
+        """
+        import pytest
+
+        with pytest.raises(ValueError) as caught:
+            build_attestation("not-a-key-at-all")
+
+        message = str(caught.value)
+        assert "AURA_ATTESTATION__PRIVATE_KEY" in message
+        assert "not-a-key-at-all" not in message
+
     def test_the_startup_line_carries_the_address_not_the_key(self) -> None:
         """
         The address is the durable fact — it is what a signature recovers to,

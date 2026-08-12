@@ -65,11 +65,32 @@ def build_attestation(
     A module-level function rather than a method, so the decision can be tested
     without booting a cell.
     """
+    # Stripped before anything looks at it. A secret written with `echo` rather
+    # than `printf` carries a trailing newline, which is the most common way a
+    # real key arrives malformed — and without this it is indistinguishable
+    # from a corrupt one, so the cell refuses to boot over an invisible
+    # character.
+    private_key_hex = private_key_hex.strip()
+
     if not private_key_hex:
         logger.info("attestation_disabled_no_key")
         return None
 
-    engine = AttestationEngine(private_key_hex)
+    try:
+        engine = AttestationEngine(private_key_hex)
+    except Exception as exc:
+        # Deliberately fatal. The alternatives are booting while believing we
+        # attest, or failing per-decision — and a deployment that cannot read
+        # its own signing key is the "enabled but not working" state this
+        # protein exists to make unrepresentable.
+        #
+        # The setting is named because the operator has to know which one is
+        # wrong; the value never is, and the underlying libraries do not echo
+        # it either ("Non-hexadecimal digit found", "must be exactly 32 bytes").
+        raise ValueError(
+            f"AURA_ATTESTATION__PRIVATE_KEY is set but unusable: {exc}"
+        ) from exc
+
     skill = AttestationSkill()
     skill.bind(settings, engine)
     # The address, never the key. This is the only place a deployment states
