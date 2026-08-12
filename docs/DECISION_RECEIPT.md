@@ -564,6 +564,16 @@ Three limits worth stating rather than discovering later:
   unevaluable, which `ruleset.yaml` says must not happen. Since the substitute is a fixed cent within
   a session, a model echoing the Membrane's own last counter — ordinary convergence — proposed
   exactly it and minted `value` scope with equal digests, deterministically. G3 now refuses outright.
+
+  Read that as a claim about the gate, not about the deployment. Gates stop at the first failure, so
+  G3 is only *reached* when G1 and G2 pass: a below-floor or non-positive proposal on a misconfigured
+  deployment is still answered, priced by the default-margin formula, and `ruleset.yaml`'s "must not
+  answer at all" is honoured only for proposals that clear the price gates. That cannot reopen the
+  collision — a proposal strictly under the floor cannot share a cent with a substitute ceilinged
+  at-or-above it — so what remains is the narrower point that a deployment which cannot read its own
+  margin still trades on those paths. Closing it means ordering G3 ahead of the price gates, which
+  changes the rule set's digest and therefore `ruleset_version` on every receipt: a versioned change
+  of its own, deliberately not folded in here.
   Independently of that, an override whose emitted cent equals the proposed one is not recorded as an
   override: a substitution that moves nothing is not a substitution, and the invariant holds when a
   fifth gate is added rather than relying on the next author to rederive why it held.

@@ -285,18 +285,23 @@ def _replacing(original: Intent, replacement: Intent) -> Intent:
     return replacement
 
 
-def _rejection() -> Intent:
+def _rejection(reasoning: str = "Membrane: post-condition not established") -> Intent:
     """
-    What leaves when the post-condition did not hold.
+    What leaves when the Membrane cannot stand behind a decision.
 
     Deliberately carries no price and no reason the counterparty can read: the
     decision was stopped because we could not establish our own guarantee, and
     saying which clause failed would describe the policy boundary to the party
     the policy exists to hold at arm's length.
+
+    The default names the ψ failure, which is the common case. G3 passes its
+    own: refusing because the rule set cannot be evaluated is a different fact
+    from refusing because it was evaluated and failed, and the internal
+    `reasoning` is where an operator reads which one happened.
     """
     return Intent(
         action=cast(ActionType, ActionType.ACTION_TYPE_REJECT),
-        reasoning="Membrane: post-condition not established",
+        reasoning=reasoning,
     )
 
 
@@ -607,8 +612,9 @@ class HiveMembrane(Membrane[Any, Intent, Context]):
         alone.
 
         The exceptions are three normalisations, all written below before
-        `claim` and the emission can diverge, and all of them properties of the
-        request rather than decisions the model made:
+        `claim` and the emission can diverge. The first two are properties of
+        the request that nothing decided; the third is not, and says why it is
+        normalised anyway:
 
         - `identifier`, named here when nothing upstream named it, so the
           receipt binds to one decision. Outside the canonical claim, so it
@@ -971,11 +977,24 @@ class HiveMembrane(Membrane[Any, Intent, Context]):
                 # on the next round, minting `override_scope="value"` with equal
                 # digests: a claimed substitution with no trace, which `verify()`
                 # refuses.
+                #
+                # The literal is the gate's `code` in `ruleset.yaml`. Nothing
+                # cross-checks it the way `validate_against` cross-checks gate
+                # ids, so a rename there silently returns this branch to
+                # substituting — flagged in the ledger rather than solved here,
+                # because the fix is a shared constant the rule set and the
+                # Membrane both read, which is its own change.
                 if reason == "SETTINGS_MISSING":
                     _record_intervention("outbound", reason)
                     verdict.record(_UNAVAILABLE, reason)
                     return await self._finish(
-                        claim, _replacing(decision, _rejection()), verdict, request_id
+                        claim,
+                        _replacing(
+                            decision,
+                            _rejection("Membrane: rule set could not be evaluated"),
+                        ),
+                        verdict,
+                        request_id,
                     )
 
                 return await self._override_with_safe_offer(
@@ -1049,7 +1068,21 @@ class HiveMembrane(Membrane[Any, Intent, Context]):
         # `original` is returned untouched rather than replaced, so a DLP block
         # that already sanitised the prose keeps its emission and its "prose"
         # record — the reason for not simply dropping to EMIT here.
-        if rounded_price == orig_price:
+        #
+        # Restricted to the two actions that carry a price the counterparty can
+        # act on. FAILURE_RECOVERY reaches here with the model's ERROR intent as
+        # `original`, and "emit it unchanged" is the one answer that path must
+        # never give: it exists to replace a broken decision, so forwarding the
+        # broken decision under an EMIT receipt would report the opposite of
+        # what happened. Unreachable today — every ERROR producer builds a
+        # payload with no price, so `orig_price` is 0.0 and cannot equal a
+        # ψ-positive substitute — but this guard justifies itself by the gates
+        # that do not exist yet, and a future ERROR carrying a price is the
+        # same kind of future.
+        if rounded_price == orig_price and original.action in (
+            ActionType.ACTION_TYPE_ACCEPT,
+            ActionType.ACTION_TYPE_COUNTER,
+        ):
             logger.info(
                 "membrane_override_without_effect",
                 reason=reason,

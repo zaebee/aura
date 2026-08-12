@@ -42,3 +42,10 @@ docs/knowledge/*.json
 
 # Makefile proto generation sentinel
 .gen-proto.stamp
+
+# The kinetic protein's Remotion/React scaffold. Untracked deliberately: it has
+# been swept onto a receipt branch twice by a broad `git add`, and it belongs on
+# its own branch with a review that is about it.
+core/src/hive/proteins/kinetic/bun.lock
+core/src/hive/proteins/kinetic/package.json
+core/src/hive/proteins/kinetic/src/
