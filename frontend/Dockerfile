@@ -10,7 +10,9 @@ WORKDIR /app
 # Install buf
 RUN apk add --no-cache curl && \
     BUF_VERSION="1.47.2" && \
-    curl -sSL "https://github.com/bufbuild/buf/releases/download/v${BUF_VERSION}/buf-Linux-x86_64" -o "/usr/local/bin/buf" && \
+    curl -fsSL --retry 3 --retry-delay 2 \
+        "https://github.com/bufbuild/buf/releases/download/v${BUF_VERSION}/buf-Linux-x86_64" \
+        -o "/usr/local/bin/buf" && \
     chmod +x "/usr/local/bin/buf"
 
 # Copy workspace files for buf
