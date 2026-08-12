@@ -101,66 +101,91 @@ class _Verdict:
     on the override path is replaced part-way and a verdict half-written onto a
     discarded object is how `outcome_gate` nearly lost its first gate.
 
-    First gate wins. A decision that trips DLP and then the floor check records
-    DLP_BLOCK, the earlier one: reporting every gate that fired would hand an
-    adversary an oracle over the policy configuration — probe with crafted
-    offers, read back which invariants answered, and the shape of the hidden
-    floor falls out. This constrains only what is recorded; every gate still
-    executes.
+    **`gate` and `override_scope` answer different questions, so they
+    accumulate by different rules.**
 
-    `override_scope` rides the same first-wins call as `gate` rather than
-    being a field a call site sets on its own. Two bugs followed from letting
-    it be independent: a later, unrelated `record()` call (e.g. the
-    post-condition failing after DLP already fired) left a stale scope
-    describing a gate that no longer explains the final outcome, and a second
-    OVERRIDE-outcome call downstream of the first could overwrite the scope
-    for a gate it did not win against — `gate` staying DLP_BLOCK while
-    `override_scope` said "value" because the *safe-offer* site, not the DLP
-    site, wrote last. Pairing the write with the same guard that already
-    decides which gate is reported closes both: whatever `_gate_scope` holds
-    was written in the same call that produced `gate`, so it can never
-    describe a different intervention. `override_scope` is exposed as a
-    property recomputed from `self.outcome` on every read rather than a
-    cached value some call site is trusted to clear, so a decision that moves
-    past OVERRIDE (the post-condition rejecting the DLP-sanitised offer, for
-    instance) can never leave the property non-empty — there is no field left
-    to forget to reset.
+    `gate` answers "which rule explains this outcome". First gate wins *within
+    an outcome class*, and resets when the class changes. Within a class the
+    earlier gate is the one that explains the finding — a decision that trips
+    DLP and then the floor check is reported as DLP_BLOCK — and holding to the
+    first also keeps the schema stable and leaves the full detail to
+    `gate_sequence`, which the auditor has. But first-wins *forever* was a bug:
+    DLP → substitution → post-condition failure shipped
+    `outcome=UNAVAILABLE, outcome_gate=DLP_BLOCK`, a receipt saying "unavailable
+    because DLP" to the one party this document is written for, and one the
+    error table contradicts (a psi failure is POSTCONDITION_VIOLATION) while
+    `verify()` checks no gate/outcome coherence for UNAVAILABLE and so ships it
+    silently. The gate that explained the previous class cannot explain the new
+    one, so it is discarded with it.
+
+    An earlier version of this docstring justified first-wins as denying an
+    adversary an oracle over the policy configuration. That reasoning is a
+    fossil: since the gateway trim the counterparty never sees `outcome_gate`
+    at all. Schema stability and `gate_sequence` are the reasons that survive.
+
+    `override_scope` answers "did the decidable content change", so it is
+    **monotonic toward "value"** and does not ride `gate` at all. It starts
+    empty, a prose-only intervention raises it to "prose", and a price
+    substitution sets "value" unconditionally. Pairing it with the winning gate
+    was the previous fix and it produced the branch's central contradiction: a
+    DLP block followed by a price substitution reported `scope="prose"` while
+    the digests differed, and `verify()` — which checks scope against the
+    emission delta — failed a receipt the Membrane had just minted. Every
+    intervention has to reach this field, because the question it answers is
+    about all of them together, not about whichever one is named.
+
+    It stays a property recomputed from `self.outcome` rather than a stored
+    value some call site is trusted to clear, so a decision that moves past
+    OVERRIDE can never leave a scope behind — there is no field to forget.
     """
 
     outcome: DecisionOutcome = _EMIT
     gate: str = ""
     ruleset_version: str = ""
     derivation: DecisionDerivation | None = None
-    _gate_scope: str = field(default="", repr=False)
+    _scope: str = field(default="", repr=False)
 
     def record(self, outcome: DecisionOutcome, gate: str, scope: str = "") -> None:
-        self.outcome = outcome
-        if not self.gate:
+        # Checked on EVERY OVERRIDE call, not only the one that establishes the
+        # gate. Now that scope is monotonic, the second OVERRIDE record is
+        # load-bearing on its own: it is what raises a DLP-then-substitution
+        # decision from "prose" to "value". A call site that forgot its scope
+        # there used to slip through this guard entirely and ship the receipt
+        # `verify()` rejects.
+        if outcome == _OVERRIDE and not scope:
+            raise ValueError(
+                f"gate {gate!r} recorded outcome OVERRIDE with no scope; "
+                "every OVERRIDE call site must pass 'prose' or 'value'"
+            )
+
+        if outcome != self.outcome:
+            # The class changed, so the gate that explained the old outcome is
+            # not an explanation of this one. Replace it rather than keep it.
             self.gate = gate
-            self._gate_scope = scope
-            if outcome == _OVERRIDE and not scope:
-                # A call site that reports OVERRIDE must say whether the
-                # substitution touched prose or value — `override_scope`
-                # trusts this rather than re-deriving it, and a call site that
-                # forgets should fail loudly in its own tests rather than
-                # ship a receipt that claims OVERRIDE with nothing to say
-                # about it.
-                raise ValueError(
-                    f"gate {gate!r} recorded outcome OVERRIDE with no scope; "
-                    "every OVERRIDE call site must pass 'prose' or 'value'"
-                )
+        elif not self.gate:
+            self.gate = gate
+
+        self.outcome = outcome
+
+        # Monotonic: value is absorbing, prose only fills an empty scope. Order
+        # of interventions must not change the answer to "did the decidable
+        # content change".
+        if scope == "value":
+            self._scope = "value"
+        elif scope == "prose" and self._scope != "value":
+            self._scope = "prose"
 
     @property
     def override_scope(self) -> str:
         """
-        The scope of the intervention `gate` names, or "" when the final
-        outcome is not OVERRIDE.
+        Whether this decision's interventions reached the decidable content,
+        or "" when the final outcome is not OVERRIDE.
 
         Derived from `self.outcome` on every read instead of stored plainly,
         so it cannot outlive the OVERRIDE outcome that justified it — see the
         class docstring for the failure this closes.
         """
-        return self._gate_scope if self.outcome == _OVERRIDE else ""
+        return self._scope if self.outcome == _OVERRIDE else ""
 
     def read_guard_report(self, obs_meta: dict[str, Any]) -> None:
         """
@@ -296,6 +321,21 @@ def _context_number(ctx_meta: dict[str, Any], key: str, default: float) -> float
     except (TypeError, ValueError):
         logger.warning("membrane_unusable_context_number", key=key, value=repr(value))
         return default
+
+
+def _neutral_price_message(action: Any, price: float) -> str:
+    """
+    State the price without stating that a guard produced it.
+
+    Phrased from the action rather than fixed, because the DLP block keeps the
+    model's action: sanitising an ACCEPT used to emit "My counter-offer for this
+    item is $X", which contradicts the `accepted` result the counterparty
+    receives alongside it. A message that disagrees with the decision beside it
+    is its own tell.
+    """
+    if action == ActionType.ACTION_TYPE_ACCEPT:
+        return f"I accept your offer at ${price:.2f}."
+    return f"My counter-offer for this item is ${price:.2f}."
 
 
 def _action_label(action: Any) -> str:
@@ -520,10 +560,20 @@ class HiveMembrane(Membrane[Any, Intent, Context]):
         """
         Judge the Transformer's decision and return the one to send.
 
-        **The Intent passed in is never modified.** Every path that changes
-        anything — the two refusals, the safe-offer override, the DLP
+        **No decision the Intent carries is modified in place.** Every path that
+        changes one — the two refusals, the safe-offer override, the DLP
         sanitisation — builds a replacement and leaves the caller's object
         alone.
+
+        The one exception is `currency_code`, stamped onto the caller's
+        `NegotiationIntent` from the Context below. That is normalisation, not a
+        decision: the denomination is a property of the request and the model
+        never had a say in it. It is written before `claim` and the emission can
+        diverge, deliberately, so both digests cover the same denomination
+        rather than differing over a field nothing decided. The consequence is
+        worth stating plainly and `DECISION_RECEIPT.md` §3.2 now does: what
+        `claim_hash` digests is the proposal **as normalised by the Membrane**,
+        not the byte-exact object the Transformer handed over.
 
         That is not tidiness. The receipt reports what the Membrane did by
         comparing a digest of what was proposed against a digest of what is
@@ -643,7 +693,17 @@ class HiveMembrane(Membrane[Any, Intent, Context]):
                     "guard",
                     "get_safe_price",
                     {
-                        "context": {"floor_price": floor_price},
+                        # The SAME context psi is checked against, floor and
+                        # cost together. Asking for a substitute priced from
+                        # the floor alone and then judging it against the cost
+                        # starves this path wherever cost > floor x (1 - m):
+                        # floor 1000, cost 1200, m 0.1 yielded 1111.11,
+                        # PSI_MIN_MARGIN refused it, and the recovery that
+                        # exists to keep a broken decision alive emitted
+                        # nothing. Pre-branch it emitted an unsafe price
+                        # instead; neither is the substitute the guard can
+                        # actually compute from these premises.
+                        "context": guard_context,
                         "reason": "FAILURE_RECOVERY",
                         "request_id": request_id,
                     },
@@ -673,6 +733,10 @@ class HiveMembrane(Membrane[Any, Intent, Context]):
             # agree under an OVERRIDE outcome can tell "prose changed, value
             # did not" from "this receipt claims a substitution that left no
             # trace" without knowing which gate names are prose-only.
+            #
+            # It raises the scope only from empty. If the guard later
+            # substitutes a price on this same decision, that call sets "value"
+            # over it — the digests will differ, and the receipt has to say so.
             verdict.record(_OVERRIDE, "DLP_BLOCK", "prose")
             # Sanitised into a replacement rather than written back over the
             # caller's Intent. The receipt reports what the Membrane did by
@@ -694,7 +758,12 @@ class HiveMembrane(Membrane[Any, Intent, Context]):
                         # tell this exists to remove. See the override
                         # message below for the fuller rationale — the two
                         # are the same fix applied at two emission points.
-                        message=f"My counter-offer for this item is ${neg_intent.price:.2f}.",
+                        # Phrased from the action, because this path keeps the
+                        # model's: an ACCEPT sanitised into a "counter-offer"
+                        # contradicts the result sent beside it.
+                        message=_neutral_price_message(
+                            decision.action, neg_intent.price
+                        ),
                         thought=neg_intent.thought,
                         # Carried forward like the other decidable fields. Left
                         # out, the sanitised copy would default to an empty
@@ -724,10 +793,6 @@ class HiveMembrane(Membrane[Any, Intent, Context]):
         ]:
             return await self._finish(claim, decision, verdict, request_id)
 
-        # 3. Call Guard Protein for validation
-        if not self.registry:
-            return await self._finish(claim, decision, verdict, request_id)
-
         internal_cost = _context_number(ctx_meta, "internal_cost", floor_price)
         guard_context = {
             "floor_price": floor_price,
@@ -736,46 +801,73 @@ class HiveMembrane(Membrane[Any, Intent, Context]):
         }
 
         price = neg_intent.price if neg_intent else 0.0
-        # Map ActionType to strings expected by OutputGuard
-        action_map = {
-            ActionType.ACTION_TYPE_ACCEPT: "accept",
-            ActionType.ACTION_TYPE_COUNTER: "counter",
-        }
-        action_name = action_map.get(decision.action, _action_label(decision.action))
 
-        obs = await self.registry.execute(
-            "guard",
-            "validate_decision",
-            {
-                "decision": {"action": action_name, "price": price},
-                "context": guard_context,
-            },
-        )
-
-        # A default-constructed Observation always has an empty Struct here, so
-        # this is not the usual betterproto caution — but `metadata=None` is a
-        # legal way to build one, and this read moved onto the passing path in
-        # the same change that added the derivation. It had only ever run on the
-        # failing path before. A crash here would lose the negotiation inside
-        # the one component whose job is to never let a bad decision out.
-        obs_meta = obs.metadata.to_dict() if obs.metadata is not None else {}
-
-        # Attached to the Intent the guard judged, before any replacement is
-        # built, so `_replacing` carries it across the swap like the rest of the
-        # fields that describe this decision point.
-        verdict.read_guard_report(obs_meta)
-
-        if not obs.success:
-            # Determine reason for logging/override using structured error code
-            safe_price = floor_price * 1.05
-            reason = str(obs_meta.get("error_code", "SAFETY_VIOLATION"))
-            safe_price = float(str(obs_meta.get("safe_price", safe_price)))
-
-            return await self._override_with_safe_offer(
-                decision, safe_price, reason, verdict, guard_context, request_id, claim
+        # 3. Call Guard Protein for validation
+        #
+        # An unwired registry skips the gates — there is nothing to ask — but
+        # NOT the post-condition. It used to return here, four screens below a
+        # `_postcondition_holds` docstring stating that an unwired Membrane "is
+        # exactly the unreachable-guard case this fails closed on, not an
+        # exemption from it". The early return made that false: with no registry
+        # a price of 1.0 against a floor of 1000 was emitted, EMIT, and the
+        # receipt verified. The one branch the whole method exists to close was
+        # reachable by never wiring the thing that closes it. `_postcondition_
+        # holds` records UNAVAILABLE and refuses on its own, so falling through
+        # to it is all that is needed.
+        if self.registry:
+            # Map ActionType to strings expected by OutputGuard
+            action_map = {
+                ActionType.ACTION_TYPE_ACCEPT: "accept",
+                ActionType.ACTION_TYPE_COUNTER: "counter",
+            }
+            action_name = action_map.get(
+                decision.action, _action_label(decision.action)
             )
 
+            obs = await self.registry.execute(
+                "guard",
+                "validate_decision",
+                {
+                    "decision": {"action": action_name, "price": price},
+                    "context": guard_context,
+                },
+            )
+
+            # A default-constructed Observation always has an empty Struct here,
+            # so this is not the usual betterproto caution — but `metadata=None`
+            # is a legal way to build one, and this read moved onto the passing
+            # path in the same change that added the derivation. It had only ever
+            # run on the failing path before. A crash here would lose the
+            # negotiation inside the one component whose job is to never let a
+            # bad decision out.
+            obs_meta = obs.metadata.to_dict() if obs.metadata is not None else {}
+
+            # Attached to the Intent the guard judged, before any replacement is
+            # built, so `_replacing` carries it across the swap like the rest of
+            # the fields that describe this decision point.
+            verdict.read_guard_report(obs_meta)
+
+            if not obs.success:
+                # Determine reason for logging/override using structured error code
+                safe_price = floor_price * 1.05
+                reason = str(obs_meta.get("error_code", "SAFETY_VIOLATION"))
+                safe_price = float(str(obs_meta.get("safe_price", safe_price)))
+
+                return await self._override_with_safe_offer(
+                    decision,
+                    safe_price,
+                    reason,
+                    verdict,
+                    guard_context,
+                    request_id,
+                    claim,
+                )
+
         if not await self._postcondition_holds(price, guard_context, verdict):
+            # Counted like every other refusal. A psi failure on this path is
+            # the Membrane rejecting the model's own price, and it used to be
+            # the one intervention that left no trace in the counter.
+            _record_intervention("outbound", "POSTCONDITION_VIOLATION", price=price)
             return await self._finish(
                 claim, _replacing(decision, _rejection()), verdict, request_id
             )
@@ -792,16 +884,26 @@ class HiveMembrane(Membrane[Any, Intent, Context]):
         request_id: str,
         claim: Intent | None = None,
     ) -> Intent:
-        _record_intervention("outbound", reason, safe_price=round(safe_price, 2))
         rounded_price = round(safe_price, 2)
 
+        # Counted AFTER the post-condition, and under the reason that actually
+        # describes the outcome. Counting `reason` first meant every decision
+        # that went on to fail psi was tallied as a completed substitution under
+        # the gate that proposed it, so the intervention rate — the one number
+        # that says whether the Membrane is earning its place — included
+        # decisions that emitted nothing at all.
         if not await self._postcondition_holds(rounded_price, guard_context, verdict):
+            _record_intervention(
+                "outbound", "POSTCONDITION_VIOLATION", attempted_reason=reason
+            )
             return await self._finish(
                 claim or original,
                 _replacing(original, _rejection()),
                 verdict,
                 request_id,
             )
+
+        _record_intervention("outbound", reason, safe_price=rounded_price)
         params_name, params_value = betterproto.which_one_of(original, "params")
         neg_intent = params_value if params_name == "negotiation" else None
         orig_price = neg_intent.price if neg_intent else 0.0
@@ -820,6 +922,18 @@ class HiveMembrane(Membrane[Any, Intent, Context]):
                 }
             ),
             negotiation=NegotiationIntent(
+                # Carried forward, not dropped. These two were left off the
+                # hand-built replacement, and a JPY negotiation emitted
+                # `action=counter;item=;price=111.12;currency=` — two fields
+                # vanishing from the claim that were never in question, so a
+                # reader diffing claim against emission saw more changed than
+                # did. Dropping them also kept the digests apart by accident on
+                # a decision where the substitute happens to equal the
+                # proposal; the margin gate now agreeing with psi is what makes
+                # the price difference load-bearing instead.
+                item_identifier=neg_intent.item_identifier if neg_intent else "",
+                item_domain=neg_intent.item_domain if neg_intent else "",
+                currency_code=neg_intent.currency_code if neg_intent else "",
                 # Deliberately indistinguishable from an ordinary counter. The
                 # old text announced "I've reached my final limit", which told
                 # the counterparty a guard had fired — and since the substitute
@@ -831,16 +945,12 @@ class HiveMembrane(Membrane[Any, Intent, Context]):
                 message=f"My counter-offer for this item is ${rounded_price:.2f}.",
             ),
         )
-        # The substitute price is decidable content, not prose: claim and
-        # emission differ here, but the scope is set uniformly with the DLP
-        # site rather than left to be inferred from "the hashes happened to
-        # differ" — a verifier checking the pairing reads this instead of a
-        # hardcoded list of which gates are prose-only. First-gate-wins still
-        # applies: this write only sticks when nothing recorded a gate
-        # earlier in the same decision (e.g. a DLP block ahead of this one),
-        # in which case `gate` and `override_scope` both stay the earlier
-        # call's.
+        # The substitute price is decidable content, not prose. This write is
+        # unconditional and absorbing: whatever a DLP block ahead of it already
+        # recorded, the digests now differ, and `override_scope` exists to say
+        # exactly that. `gate` is separate and stays with the first gate in this
+        # outcome class — see `_Verdict` for why the two accumulate differently.
         verdict.record(_OVERRIDE, reason, "value")
         return await self._finish(
-            original, _replacing(original, replacement), verdict, request_id
+            claim or original, _replacing(original, replacement), verdict, request_id
         )

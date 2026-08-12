@@ -27,7 +27,13 @@ from aura_core_gen.aura.core.v1 import (
     TradeIntent,
     ValidationScore,
 )
-from aura_hive.hive.membrane.main import HiveMembrane
+from aura_hive.hive.membrane.main import (
+    _OVERRIDE,
+    _REFUSE,
+    _UNAVAILABLE,
+    HiveMembrane,
+    _Verdict,
+)
 from aura_hive.hive.proteins.guard import GuardSkill
 from aura_hive.hive.proteins.guard.engine import OutputGuard
 
@@ -44,8 +50,9 @@ def guarded_membrane() -> HiveMembrane:
     """
     A Membrane wired the way cortex wires it.
 
-    `inspect_outbound` returns early when `self.registry` is None, so an unwired
-    Membrane passes every price through untouched and would mark it EMIT.
+    Without a registry there is nothing to ask, so the post-condition cannot be
+    established and every price is refused. Tests that want a decision judged
+    rather than refused need this.
     """
     registry = SkillRegistry()
     guard = GuardSkill()
@@ -79,11 +86,17 @@ class TestEmit:
         assert decision.receipt.outcome_gate == ""
 
     @pytest.mark.asyncio
-    async def test_a_decision_the_guard_never_saw_is_still_marked_emit(self) -> None:
+    async def test_a_decision_the_guard_never_saw_is_refused(self) -> None:
         """
-        An unwired Membrane makes no claim about the price, but it must still
-        claim that it did not alter one. UNSPECIFIED would be indistinguishable
-        from a field nobody set.
+        An unwired Membrane cannot establish the post-condition, so it does not
+        emit. This test used to assert EMIT, and the price it used (2000 against
+        a floor of 1000) would have satisfied psi anyway — the receipt said
+        "emit, nothing altered" on the strength of nobody having checked.
+
+        `_postcondition_holds` had already documented an unwired Membrane as
+        "exactly the unreachable-guard case this fails closed on"; the outbound
+        path returned before reaching it. Whichever number happens to be in
+        hand, an unevaluated post-condition is an unestablished one.
         """
         membrane = HiveMembrane(registry=None)
 
@@ -91,7 +104,9 @@ class TestEmit:
             counter_intent(price=2000.0), negotiation_context(floor_price=1000.0)
         )
 
-        assert decision.receipt.outcome == DecisionOutcome.DECISION_OUTCOME_EMIT
+        assert decision.receipt.outcome == DecisionOutcome.DECISION_OUTCOME_UNAVAILABLE
+        assert decision.receipt.outcome_gate == "POSTCONDITION_VIOLATION"
+        assert decision.action == ActionType.ACTION_TYPE_REJECT
 
 
 class TestOverride:
@@ -138,15 +153,17 @@ class TestOverride:
     async def test_the_first_gate_to_fire_is_the_one_recorded(self) -> None:
         """
         A decision that trips DLP and then the floor check records DLP_BLOCK,
-        the earlier gate.
+        the earlier gate — both being OVERRIDE, so the same outcome class.
 
-        Recording every gate that fired would hand an adversary an oracle over
-        the policy configuration: probe with crafted offers, read back the full
-        set, and the shape of the hidden floor falls out. One binding reason.
+        The reason is no longer the oracle argument this docstring used to make:
+        since the gateway trim the counterparty never sees `outcome_gate` at
+        all. What survives is that the schema stays one gate wide and the
+        auditor already has the full set in `gate_sequence`.
 
         Note this constrains only what is *recorded*. Both gates still execute —
         short-circuiting the floor check to save a field would trade a guarantee
-        for a label.
+        for a label — and `override_scope` reports the price move regardless
+        (see test_membrane_derivation.py).
         """
         membrane = guarded_membrane()
 
@@ -328,3 +345,68 @@ class TestPassThrough:
 
         assert decision.receipt.outcome == DecisionOutcome.DECISION_OUTCOME_EMIT
         assert decision.receipt.outcome_gate == ""
+
+
+class TestTheVerdictAccumulator:
+    """
+    `_Verdict` directly, because the two fields it carries accumulate by
+    different rules and the reachable call sites only exercise some of the
+    combinations. Both rules were wrong in ways no end-to-end test could see.
+    """
+
+    def test_the_gate_holds_within_an_outcome_class(self) -> None:
+        verdict = _Verdict()
+        verdict.record(_OVERRIDE, "DLP_BLOCK", "prose")
+        verdict.record(_OVERRIDE, "FLOOR_PRICE_VIOLATION", "value")
+
+        assert verdict.gate == "DLP_BLOCK"
+
+    def test_the_gate_moves_when_the_outcome_class_changes(self) -> None:
+        """
+        The defect first-wins-forever produced: DLP, then a substitution, then a
+        post-condition failure shipped `outcome=UNAVAILABLE` with
+        `outcome_gate="DLP_BLOCK"` — "unavailable because DLP", which the error
+        table contradicts and which `verify()` does not check for UNAVAILABLE,
+        so it shipped silently to the one reader the receipt is written for.
+        """
+        verdict = _Verdict()
+        verdict.record(_OVERRIDE, "DLP_BLOCK", "prose")
+        verdict.record(_UNAVAILABLE, "POSTCONDITION_VIOLATION")
+
+        assert verdict.outcome == _UNAVAILABLE
+        assert verdict.gate == "POSTCONDITION_VIOLATION"
+        assert verdict.override_scope == ""
+
+    def test_the_scope_rises_to_value_and_stays(self) -> None:
+        verdict = _Verdict()
+        verdict.record(_OVERRIDE, "DLP_BLOCK", "prose")
+        verdict.record(_OVERRIDE, "FLOOR_PRICE_VIOLATION", "value")
+
+        assert verdict.override_scope == "value"
+
+    def test_the_scope_does_not_fall_back_to_prose(self) -> None:
+        """
+        Monotonic in one direction only. Order of interventions must not change
+        the answer to "did the decidable content change".
+        """
+        verdict = _Verdict()
+        verdict.record(_OVERRIDE, "FLOOR_PRICE_VIOLATION", "value")
+        verdict.record(_OVERRIDE, "DLP_BLOCK", "prose")
+
+        assert verdict.override_scope == "value"
+
+    def test_a_scopeless_override_is_refused_even_when_it_loses_the_gate(
+        self,
+    ) -> None:
+        """
+        The guard used to fire only on the call that ESTABLISHED the gate, so a
+        second OVERRIDE record could omit its scope and pass. That was harmless
+        while scope rode the winning gate. It is not harmless now: the second
+        call is precisely what raises a DLP-then-substitution decision to
+        "value", and skipping it mints the receipt `verify()` rejects.
+        """
+        verdict = _Verdict()
+        verdict.record(_REFUSE, "EARLY")
+
+        with pytest.raises(ValueError):
+            verdict.record(_OVERRIDE, "LATER")

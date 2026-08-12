@@ -21,8 +21,10 @@ from aura_core_gen.aura.core.v1 import (
     ActionType,
     Context,
     DecisionOutcome,
+    HiveContextData,
     Intent,
     NegotiationIntent,
+    NegotiationOffer,
     Observation,
     RWAComplianceScore,
     RWAVaultIntent,
@@ -30,7 +32,7 @@ from aura_core_gen.aura.core.v1 import (
     ValidationScore,
 )
 from aura_hive.hive.membrane.main import HiveMembrane
-from aura_hive.hive.membrane.receipt import verify
+from aura_hive.hive.membrane.receipt import canonical_claim, verify
 from aura_hive.hive.proteins.guard import GuardSkill
 from aura_hive.hive.proteins.guard.engine import OutputGuard
 from eth_account import Account
@@ -53,19 +55,25 @@ def guarded_membrane() -> HiveMembrane:
     return HiveMembrane(registry=registry)
 
 
-def negotiation_context(floor_price: float = FLOOR) -> Context:
+def negotiation_context(floor_price: float = FLOOR, currency_code: str = "") -> Context:
     return Context(
         metadata=make_struct(
             {"floor_price": str(floor_price), "internal_cost": "777.0"}
-        )
+        ),
+        hive=HiveContextData(offer=NegotiationOffer(currency_code=currency_code)),
     )
 
 
-def counter_intent(price: float) -> Intent:
+# The message that trips the Membrane's DLP check. Ordinary traffic: the model
+# explaining itself with the word it is not allowed to say.
+LEAKING_MESSAGE = "my floor_price is 1000, so I can't go lower"
+
+
+def counter_intent(price: float, message: str = "Here is my offer") -> Intent:
     return Intent(
         action=ActionType.ACTION_TYPE_COUNTER,
         reasoning="LLM reasoning",
-        negotiation=NegotiationIntent(price=price, message="Here is my offer"),
+        negotiation=NegotiationIntent(price=price, message=message),
     )
 
 
@@ -364,6 +372,10 @@ class TestNoDeclaredGateRan:
         No registry means no guard ran. Claiming a derivation here would be the
         worst version of the lie: a receipt asserting gates on a deployment that
         has none wired.
+
+        The outcome is UNAVAILABLE rather than EMIT because the post-condition
+        could not be evaluated either — the same absence, read honestly at both
+        ends. Nothing is emitted, and nothing is claimed about how.
         """
         membrane = HiveMembrane(registry=None)
 
@@ -371,7 +383,7 @@ class TestNoDeclaredGateRan:
             counter_intent(price=2000.0), negotiation_context()
         )
 
-        assert decision.receipt.outcome == DecisionOutcome.DECISION_OUTCOME_EMIT
+        assert decision.receipt.outcome == DecisionOutcome.DECISION_OUTCOME_UNAVAILABLE
         assert decision.receipt.derivation.derivation_hash == ""
 
 
@@ -412,14 +424,108 @@ class TestTheReceiptTheMembraneMints:
 
     @pytest.mark.asyncio
     @pytest.mark.parametrize("price", [500.0, 2000.0])
-    async def test_the_minted_receipt_verifies(self, price: float) -> None:
+    @pytest.mark.parametrize("message", ["Here is my offer", LEAKING_MESSAGE])
+    async def test_the_minted_receipt_verifies(
+        self, price: float, message: str
+    ) -> None:
+        """
+        Parametrised over the MESSAGE as well as the price, and that second
+        parameter is the whole point.
+
+        It was price-only, so no test in the suite ever ran `verify()` over a
+        receipt the Membrane minted for a decision whose message tripped DLP.
+        At (500.0, LEAKING_MESSAGE) the DLP block recorded `scope="prose"` and
+        the floor gate then substituted the price, so the digests differed and
+        the verifier refused a receipt the Membrane had just produced —
+        `make verify-receipts` exited 1 on ordinary traffic. Two tests asserted
+        the opposite halves of that and both passed, because neither of them
+        was this one.
+        """
         decision = await guarded_membrane().inspect_outbound(
-            counter_intent(price=price), negotiation_context()
+            counter_intent(price=price, message=message), negotiation_context()
         )
 
         result = verify(decision.receipt)
 
         assert result.ok, result.failures
+
+    @pytest.mark.asyncio
+    async def test_a_dlp_block_that_also_moves_the_price_is_scoped_to_value(
+        self,
+    ) -> None:
+        """
+        `override_scope` answers "did the decidable content change", not "what
+        did the gate named in `outcome_gate` touch". Both interventions ran
+        here; the price moved; the answer is "value".
+
+        Scoping it to the winning gate instead gave "prose" beside two
+        differing digests — the contradiction above, stated as a field.
+        """
+        decision = await guarded_membrane().inspect_outbound(
+            counter_intent(price=500.0, message=LEAKING_MESSAGE),
+            negotiation_context(),
+        )
+
+        assert decision.receipt.outcome == DecisionOutcome.DECISION_OUTCOME_OVERRIDE
+        assert decision.receipt.outcome_gate == "DLP_BLOCK"
+        assert decision.receipt.override_scope == "value"
+        assert decision.receipt.claim_hash != decision.receipt.emission_hash
+
+
+class TestTheCurrencyReachesTheClaim:
+    """
+    Nothing asserted a currency through the Membrane at all.
+
+    Task 9 stamped `currency_code` from the Context onto the claim, and the bug
+    it found on the way — the DLP block rebuilding a NegotiationIntent from a
+    field list that omitted the currency — was caught by hand-tracing, not by a
+    test. Every `NegotiationOffer` fixture in the suite left `currency_code`
+    unset, so the entire class had zero coverage and a regression would have
+    been invisible on all four outbound shapes.
+    """
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize(
+        ("price", "message"),
+        [
+            (2000.0, "Here is my offer"),  # emitted untouched
+            (500.0, "Here is my offer"),  # price substituted
+            (2000.0, LEAKING_MESSAGE),  # prose sanitised
+            (500.0, LEAKING_MESSAGE),  # both
+        ],
+    )
+    async def test_every_outbound_path_keeps_the_denomination(
+        self, price: float, message: str
+    ) -> None:
+        decision = await guarded_membrane().inspect_outbound(
+            counter_intent(price=price, message=message),
+            negotiation_context(currency_code="JPY"),
+        )
+
+        assert decision.negotiation.currency_code == "JPY"
+        assert "currency=JPY" in canonical_claim(decision)
+        assert verify(decision.receipt).ok
+
+    @pytest.mark.asyncio
+    async def test_the_substitute_keeps_the_item_it_is_substituting_for(
+        self,
+    ) -> None:
+        """
+        The hand-built replacement carried neither the item nor the currency, so
+        a JPY negotiation emitted `action=counter;item=;price=111.12;currency=`
+        — two fields disappearing from a claim that were never in question, and
+        a reader diffing claim against emission seeing more changed than did.
+        """
+        intent = counter_intent(price=500.0)
+        intent.negotiation.item_identifier = "sku-9"
+
+        decision = await guarded_membrane().inspect_outbound(
+            intent, negotiation_context(currency_code="JPY")
+        )
+
+        assert decision.negotiation.item_identifier == "sku-9"
+        assert "item=sku-9" in canonical_claim(decision)
+        assert "currency=JPY" in canonical_claim(decision)
 
     @pytest.mark.asyncio
     async def test_an_override_is_visible_as_two_differing_hashes(self) -> None:

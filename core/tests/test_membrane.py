@@ -155,15 +155,16 @@ async def test_membrane_combined_violations():
     assert "FLOOR_PRICE_VIOLATION" in safe_decision.reasoning
     assert "DLP block" in safe_decision.reasoning
 
-    # DLP fires first here and records "DLP_BLOCK" as the gate — first-gate-
-    # wins keeps it that way even though the price override records its own
-    # OVERRIDE outcome afterward. `override_scope` has to agree with which
-    # gate is actually reported: it must read "prose" (what DLP touched), not
-    # "value" (what the later price override touched), or the receipt would
-    # describe an intervention that is not the one `outcome_gate` names.
+    # DLP fires first and records "DLP_BLOCK" as the gate; the price override
+    # follows in the same outcome class, so first-wins keeps the earlier gate.
+    # `override_scope` answers a different question — did the decidable content
+    # change — and so is monotonic toward "value": the price DID move, the two
+    # digests differ, and a receipt saying "prose" here is the one `verify()`
+    # rejects. It is not required to agree with `outcome_gate`; requiring that
+    # is what produced a receipt the Membrane minted and the verifier refused.
     assert safe_decision.receipt.outcome == DecisionOutcome.DECISION_OUTCOME_OVERRIDE
     assert safe_decision.receipt.outcome_gate == "DLP_BLOCK"
-    assert safe_decision.receipt.override_scope == "prose"
+    assert safe_decision.receipt.override_scope == "value"
 
 
 @pytest.mark.asyncio

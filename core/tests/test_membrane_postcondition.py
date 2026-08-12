@@ -38,7 +38,7 @@ def guarded_membrane(guard: OutputGuard | None = None) -> HiveMembrane:
     return HiveMembrane(registry=registry)
 
 
-def negotiation_context(request_id: str = "") -> Context:
+def negotiation_context(request_id: str = "", cost: float = COST) -> Context:
     """
     Floor and cost live in metadata, as the Membrane reads them.
 
@@ -47,7 +47,7 @@ def negotiation_context(request_id: str = "") -> Context:
     build a metadata-only Context where that field does not exist.
     """
     return Context(
-        metadata=make_struct({"floor_price": str(FLOOR), "internal_cost": str(COST)}),
+        metadata=make_struct({"floor_price": str(FLOOR), "internal_cost": str(cost)}),
         hive=HiveContextData(request_id=request_id),
     )
 
@@ -109,18 +109,24 @@ class TestBothPaths:
         assert result.action == ActionType.ACTION_TYPE_REJECT
 
     @pytest.mark.asyncio
-    async def test_a_dlp_override_that_then_fails_the_postcondition_has_no_scope(
+    async def test_a_dlp_override_that_then_fails_the_postcondition(
         self,
     ) -> None:
         """
-        Regression for a receipt V2 bug found in review. DLP fires first here —
-        the message leaks `floor_price` — and records `override_scope="prose"`
-        against its own gate. The guard's substitute for the price violation
-        then fails the post-condition exactly as in
-        `test_the_override_substitute_is_checked`, moving the final outcome to
-        UNAVAILABLE while `gate` stays "DLP_BLOCK" under first-gate-wins.
-        `override_scope` must not survive that move: the receipt is no longer
-        describing an override, so nothing should say "prose".
+        Two regressions on one sequence. DLP fires first here — the message
+        leaks `floor_price` — and records `override_scope="prose"`. The guard's
+        substitute for the price violation then fails the post-condition
+        exactly as in `test_the_override_substitute_is_checked`.
+
+        `override_scope` must not survive the move to UNAVAILABLE: the receipt
+        no longer describes an override, so nothing should say "prose".
+
+        And `outcome_gate` must move WITH the outcome. It used to stay
+        "DLP_BLOCK" because `record()` was first-wins forever, shipping
+        "unavailable because DLP" — which the error table contradicts (a psi
+        failure is POSTCONDITION_VIOLATION) and which `verify()` does not catch,
+        because it checks no gate/outcome coherence for UNAVAILABLE. First-wins
+        holds within an outcome class and resets when the class changes.
         """
         guard = OutputGuard(safety_settings=_Safety())
         guard.calculate_safe_price = lambda *args, **kwargs: 800.0  # type: ignore[method-assign]
@@ -137,7 +143,7 @@ class TestBothPaths:
         result = await membrane.inspect_outbound(leaking, negotiation_context())
 
         assert result.receipt.outcome == DecisionOutcome.DECISION_OUTCOME_UNAVAILABLE
-        assert result.receipt.outcome_gate == "DLP_BLOCK"
+        assert result.receipt.outcome_gate == "POSTCONDITION_VIOLATION"
         assert result.receipt.override_scope == ""
 
     @pytest.mark.asyncio
@@ -164,3 +170,62 @@ class TestNothingLeaks:
         )
 
         assert "800" not in str(result.to_dict())
+
+
+class TestFailureRecoveryPricesFromTheSamePremises:
+    """
+    The recovery path asked for a substitute priced from `floor_price` alone
+    and then judged it against `internal_cost` — two different sets of
+    premises, one line apart.
+    """
+
+    @pytest.mark.asyncio
+    async def test_a_cost_above_the_floor_still_recovers(self) -> None:
+        """
+        floor 1000, cost 1200, m 0.1. Pricing from the floor alone gives
+        1111.11, PSI_MIN_MARGIN refuses it (1111.11 x 0.9 = 1000.00 < 1200),
+        and the path that exists to keep a broken decision alive emitted
+        nothing at all. Silently unrecoverable wherever cost > floor x (1 - m).
+
+        Pre-branch this same input emitted the 1111.11 unjudged, so the bug is
+        older than the refusal; what the branch changed is which way it fails.
+        """
+        membrane = guarded_membrane()
+
+        decision = await membrane.inspect_outbound(
+            Intent(action=ActionType.ACTION_TYPE_ERROR, reasoning="model failed"),
+            negotiation_context(cost=1200.0),
+        )
+
+        assert decision.receipt.outcome == DecisionOutcome.DECISION_OUTCOME_OVERRIDE
+        assert decision.receipt.outcome_gate == "FAILURE_RECOVERY"
+        assert decision.action == ActionType.ACTION_TYPE_COUNTER
+        # cost / (1 - m) = 1333.33..., rounded up to the cent.
+        assert decision.negotiation.price >= 1333.34
+
+
+class TestTheSanitisedMessageMatchesTheAction:
+    @pytest.mark.asyncio
+    async def test_an_accept_is_not_rephrased_as_a_counter(self) -> None:
+        """
+        The DLP block keeps the model's action but used one fixed sentence, so a
+        sanitised ACCEPT went out saying "My counter-offer for this item is $X"
+        beside an `accepted` result. A message that disagrees with the decision
+        printed next to it is its own tell.
+        """
+        membrane = guarded_membrane()
+
+        decision = await membrane.inspect_outbound(
+            Intent(
+                action=ActionType.ACTION_TYPE_ACCEPT,
+                reasoning="LLM reasoning",
+                negotiation=NegotiationIntent(
+                    price=2000.0, message="my floor_price is 1000"
+                ),
+            ),
+            negotiation_context(),
+        )
+
+        assert decision.action == ActionType.ACTION_TYPE_ACCEPT
+        assert "counter-offer" not in decision.negotiation.message
+        assert "2000.00" in decision.negotiation.message
