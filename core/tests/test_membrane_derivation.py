@@ -12,6 +12,7 @@ Nothing here is worth having if the record leaks a number, so that is asserted
 against the Intent itself rather than only against the engine that built it.
 """
 
+import re
 from unittest.mock import patch
 
 import pytest
@@ -554,6 +555,15 @@ class TestTheCurrencyReachesTheClaim:
         """
         Every field at once, not just the gate sequence: the receipt is the
         artefact meant to leave the building.
+
+        Split by what each field IS. A substring search only means something
+        over a field that could carry a value; over a uniform digest it is a
+        coin flip. `canonical_prefix` is 16 hex characters, so it contains
+        "500" or "777" by chance about **0.7% of the time** — this assertion
+        used to include it and failed at roughly that rate, indistinguishably
+        from a real leak. The digests get a shape check instead, which is the
+        stronger claim anyway: a field that is structurally 64 hex characters
+        cannot carry a price whatever the price is.
         """
         decision = await guarded_membrane().inspect_outbound(
             counter_intent(price=500.0), negotiation_context(floor_price=FLOOR)
@@ -562,18 +572,20 @@ class TestTheCurrencyReachesTheClaim:
         rendered = " ".join(
             [
                 r.version,
-                r.claim_hash,
                 r.ruleset_version,
-                r.emission_hash,
                 r.outcome_gate,
-                r.canonical_prefix,
+                r.override_scope,
                 r.derivation.gate_sequence,
-                r.derivation.derivation_hash,
             ]
         )
 
         for secret in ("1000", "777", "500", "1050"):
             assert secret not in rendered
+
+        assert re.fullmatch(r"[0-9a-f]{64}", r.claim_hash)
+        assert re.fullmatch(r"[0-9a-f]{64}", r.emission_hash)
+        assert re.fullmatch(r"[0-9a-f]{64}", r.derivation.derivation_hash)
+        assert re.fullmatch(r"[0-9a-f]{16}", r.canonical_prefix)
 
 
 class TestAContextWithNullNumbers:

@@ -168,6 +168,17 @@ class TestBothPaths:
 class TestNothingLeaks:
     @pytest.mark.asyncio
     async def test_the_offending_price_never_reaches_the_emission(self) -> None:
+        """
+        The refused substitute must not survive anywhere on the Intent that
+        leaves — not in the price, not in the prose, not in the metadata the
+        override path writes about what it replaced.
+
+        Searched over the emission with its opaque identifiers removed:
+        `decision_id`, `dispute_token` and the digests are uniform, so "800"
+        turns up in one of them about 1.5% of the time. A substring search that
+        fails at that rate cannot tell a leak from a coincidence, and it was
+        failing on the coincidences.
+        """
         guard = OutputGuard(safety_settings=_Safety())
         guard.calculate_safe_price = lambda *args, **kwargs: 800.0  # type: ignore[method-assign]
         membrane = guarded_membrane(guard)
@@ -176,7 +187,17 @@ class TestNothingLeaks:
             counter_intent(price=500.0), negotiation_context()
         )
 
-        assert "800" not in str(result.to_dict())
+        rendered = result.to_dict()
+        rendered.pop("identifier", None)
+        rendered.pop("disputeToken", None)
+        rendered.pop("receipt", None)
+
+        assert "800" not in str(rendered)
+        # The receipt separately, by the fields that could carry a value at all.
+        receipt = result.receipt
+        assert "800" not in receipt.outcome_gate
+        assert "800" not in receipt.override_scope
+        assert "800" not in receipt.derivation.gate_sequence
 
 
 class TestFailureRecoveryPricesFromTheSamePremises:
