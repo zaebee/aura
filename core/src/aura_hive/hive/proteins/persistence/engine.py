@@ -116,6 +116,46 @@ class MetabolicCost(Base):
     )
 
 
+class DecisionReceiptRecord(Base):
+    """
+    The auditor's copy of a decision receipt.
+
+    The log line was the only store, and it lives in a Loki with a short
+    retention — so a dispute arriving a month after the decision found nothing.
+    This table is what makes the corpus outlive the stream; the log line stays
+    as a second, independent path.
+
+    Nothing here is a price or a premise. Every receipt field is a digest, an
+    identifier, an enum, a timestamp or signature metadata, which is why the
+    whole document can be stored without becoming a new place the floor lives.
+    """
+
+    __tablename__ = "decision_receipts"
+
+    id: Mapped[str] = mapped_column(
+        String, primary_key=True, default=lambda: str(uuid.uuid4())
+    )
+    # What the counterparty cites. The lookup key.
+    dispute_token: Mapped[str] = mapped_column(
+        String, nullable=False, unique=True, index=True
+    )
+    # What the signature binds — the auditor's other way in.
+    decision_id: Mapped[str] = mapped_column(String, nullable=False, index=True)
+    # The session, for reassembling a whole negotiation.
+    request_id: Mapped[str] = mapped_column(String, nullable=False, index=True)
+    # The receipt's own timestamp, kept as the string it carries rather than
+    # parsed into a DateTime, so the column holds what was signed instead of a
+    # reconstruction of it.
+    issued_at: Mapped[str] = mapped_column(String, nullable=False)
+    # The whole document, exactly as the log line carries it.
+    receipt: Mapped[dict[str, Any]] = mapped_column(JSONB, nullable=False)
+    # When the row was written — deliberately separate from `issued_at`, so a
+    # divergence between deciding and recording is visible rather than hidden.
+    recorded_at: Mapped[datetime] = mapped_column(
+        DateTime, nullable=False, default=lambda: datetime.now(UTC)
+    )
+
+
 logger = structlog.get_logger(__name__)
 
 

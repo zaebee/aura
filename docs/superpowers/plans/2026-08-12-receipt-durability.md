@@ -672,8 +672,13 @@ Expected: FAIL — no `record_receipt` call is ever made, so `next(...)` raises 
 
 In `core/src/aura_hive/hive/connector/main.py`, add to `HiveConnector` immediately after `__init__`:
 
+Note the parameter types: `BaseConnector.act` is declared `(action: Any, context: Any)`, so the
+override must not narrow them to `Intent`/`Context` — mypy rejects that as a Liskov violation and
+`make lint` will refuse the commit. `_record_receipt` takes the narrow type, since nothing overrides
+it.
+
 ```python
-    async def act(self, action: Intent, context: Context) -> Observation:
+    async def act(self, action: Any, context: Any) -> Observation:
         """
         Archive the receipt, then act.
 
