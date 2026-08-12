@@ -1,3 +1,4 @@
+import uuid
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from typing import Any, cast
@@ -370,10 +371,30 @@ class HiveMembrane(Membrane[Any, Intent, Context]):
         receipt = _mint_for(claim, emission, verdict, request_id)
         emission.receipt = await self._attest(receipt)
 
+        # The counterparty's handle on this decision, and the only thing about
+        # the receipt that reaches them.
+        #
+        # Random, and never derived from receipt content. A handle computed from
+        # the decision would be a preimage the counterparty could enumerate —
+        # which is what the canonical prefix turned out to be: 7.3M SHA-256 in
+        # eight seconds recovered the model's own proposed price and the gate
+        # that fired, from the prefix plus the session token plus the published
+        # rule set version. A UUID has nothing in it to invert.
+        #
+        # Per DECISION rather than per session. `session_token` already reaches
+        # the client and already names the session; it cannot cite the third
+        # round of a negotiation, which is what a dispute is actually about.
+        #
+        # Logged beside the receipt rather than carried inside it. The receipt's
+        # content fields are signed, and adding one would be a second format
+        # bump immediately after V2 for a field no attestation needs.
+        emission.dispute_token = str(uuid.uuid4())
+
         try:
             logger.info(
                 "membrane_receipt",
                 prefix=emission.receipt.canonical_prefix,
+                dispute_token=emission.dispute_token,
                 receipt=emission.receipt.to_dict(),
             )
         except Exception as e:  # nosec B110
@@ -601,6 +622,24 @@ class HiveMembrane(Membrane[Any, Intent, Context]):
         # Accumulated as the path proceeds and minted once, at whichever return
         # is taken.
         verdict = _Verdict()
+
+        # Name the decision, if nothing upstream did.
+        #
+        # Nothing does: no producer on the negotiation path ever assigned
+        # `Intent.identifier`, so every production receipt signed an empty
+        # `decision_id` — attesting the ABSENCE of the field, under a format
+        # whose stated justification is that it binds a receipt to one decision
+        # rather than to an equivalence class of decisions sharing a claim and
+        # an emission. Two deals for the same item at the same price produced
+        # byte-identical receipts, signature included.
+        #
+        # Assigned here rather than in the Transformer because this is the one
+        # funnel every emission passes through: a new decision-producing path
+        # cannot forget. Written before the path branches, so `_replacing`
+        # carries it onto whichever replacement leaves. `identifier` is not part
+        # of the canonical claim, so this does not move a digest.
+        if not decision.identifier:
+            decision.identifier = f"dec-{uuid.uuid4()}"
 
         # What the Transformer proposed, kept intact for the receipt. Rebound
         # only if a later step needs to work on a replacement; `decision` is

@@ -63,8 +63,11 @@ class HiveConnector(BaseConnector):
         # forgets. The chain out to the client re-assembles each message field
         # by field rather than passing it along, and the receipt died here —
         # NegotiationObservation had nowhere to put it.
-        if action.receipt is not None and action.receipt.version:
-            neg_obs.receipt = action.receipt
+        #
+        # It is the dispute token that travels now, not the receipt. The receipt
+        # is addressed to an auditor and stops at the Membrane's structured log;
+        # what the counterparty gets is a handle the auditor resolves.
+        neg_obs.dispute_token = action.dispute_token
 
         action_type = action.action
         event_type = "negotiation_unknown"

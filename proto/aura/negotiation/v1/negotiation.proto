@@ -48,14 +48,26 @@ message NegotiateResponse {
     JitUiRequest ui_required = 6;
   }
 
-  // What the Membrane attests about the decision behind this response: which
-  // rules judged it, how they were applied, whether the price is the model's or
-  // the guard's, and who signed that.
-  //
-  // Present but UNSIGNED when the deployment has no key configured. A consumer
-  // must read `version` rather than assume — treating an unsigned receipt as a
-  // signed one is the downgrade the two version names exist to prevent.
-  aura.core.v1.DecisionReceipt receipt = 7;
+  // Reserved: the receipt used to travel here and be rendered into the HTTP
+  // response. It is addressed to an auditor, not to the party we negotiate
+  // against — `outcome_gate` names the rule that fired, the rule set maps that
+  // gate to a substitute-price strategy, and the price is already in this
+  // response, so together they reconstruct most of the hidden floor. `version`
+  // was worse than the hashes: it degrades to the UNSIGNED name on any signing
+  // failure, so a client watching it read whether our transaction protein was
+  // reachable, and `receipt: null` versus an object said whether minting
+  // happened at all. Nothing evidential is lost — the counterparty received the
+  // canonical prefix without the signature block, so it was never probative in
+  // their hands. The receipt now stops at the structured log.
+  reserved 7;
+  reserved "receipt";
+
+  // The counterparty's handle on this decision: a random UUID minted at
+  // emission, logged beside the receipt so an auditor can resolve a citation.
+  // Per DECISION, not per session — `session_token` above cannot cite the third
+  // round of a negotiation. Carries no preimage: it is not derived from receipt
+  // content and there is nothing in it to invert.
+  string dispute_token = 8;
 }
 
 message OfferAccepted {

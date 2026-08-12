@@ -827,3 +827,115 @@ class TestTheReceiptLogClaimsOnlyWhatItKnows:
             )
 
         assert "signature" in self.logged(calls)["receipt"]
+
+
+class TestTheReceiptNamesTheDecisionItDescribes:
+    """
+    `decision_id` was EMPTY on every production receipt.
+
+    Nothing on the negotiation path ever assigned `Intent.identifier`, so the
+    signature covered an empty string — attesting the field's absence. V2 exists
+    because binding that is not signed is decorative, and the receipt module
+    sells the bump on exactly this field: without it a receipt is about a SHAPE
+    of decision, and two deals for the same item at the same price produced
+    byte-identical receipts, signature included.
+    """
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("price", [500.0, 2000.0])
+    async def test_an_emitted_decision_is_named(self, price: float) -> None:
+        decision = await guarded_membrane().inspect_outbound(
+            counter_intent(price=price), negotiation_context()
+        )
+
+        assert decision.receipt.decision_id
+        assert decision.receipt.decision_id == decision.identifier
+
+    @pytest.mark.asyncio
+    async def test_an_upstream_identifier_is_not_overwritten(self) -> None:
+        """
+        Assigned only when absent. If a producer names its own decision, that
+        name is what an auditor will be reconciling against.
+        """
+        intent = counter_intent(price=2000.0)
+        intent.identifier = "decision-44"
+
+        decision = await guarded_membrane().inspect_outbound(
+            intent, negotiation_context()
+        )
+
+        assert decision.receipt.decision_id == "decision-44"
+
+    @pytest.mark.asyncio
+    async def test_two_identical_decisions_get_different_receipts(self) -> None:
+        """
+        The property the field exists for, stated as a test rather than as a
+        docstring: same item, same price, same everything the model decided.
+        """
+        first = await guarded_membrane().inspect_outbound(
+            counter_intent(price=2000.0), negotiation_context()
+        )
+        second = await guarded_membrane().inspect_outbound(
+            counter_intent(price=2000.0), negotiation_context()
+        )
+
+        assert first.receipt.claim_hash == second.receipt.claim_hash
+        assert first.receipt.canonical_prefix != second.receipt.canonical_prefix
+
+
+class TestTheDisputeToken:
+    @pytest.mark.asyncio
+    async def test_every_emission_carries_one(self) -> None:
+        decision = await guarded_membrane().inspect_outbound(
+            counter_intent(price=500.0), negotiation_context()
+        )
+
+        assert decision.dispute_token
+
+    @pytest.mark.asyncio
+    async def test_a_refusal_carries_one_too(self) -> None:
+        """A rejection is exactly as disputable as a counter."""
+        decision = await guarded_membrane().inspect_outbound(
+            Intent(
+                action=ActionType.ACTION_TYPE_APPROVE,
+                rwa_vault=RWAVaultIntent(
+                    wallet_address="0xdead",
+                    compliance=RWAComplianceScore(kyc_passed=False),
+                ),
+            ),
+            negotiation_context(),
+        )
+
+        assert decision.dispute_token
+
+    @pytest.mark.asyncio
+    async def test_it_is_not_derived_from_the_receipt(self) -> None:
+        """
+        The property that makes it safe to hand over. The canonical prefix was
+        invertible by enumeration — 7.3M SHA-256 recovered the model's proposed
+        price and the gate that fired. A random UUID has no preimage, so there
+        is nothing in it to enumerate toward.
+        """
+        decision = await guarded_membrane().inspect_outbound(
+            counter_intent(price=500.0), negotiation_context()
+        )
+        token = decision.dispute_token
+
+        assert token not in str(decision.receipt.to_dict())
+        assert token != decision.receipt.canonical_prefix
+        assert token != decision.receipt.decision_id
+
+    @pytest.mark.asyncio
+    async def test_two_decisions_in_one_session_get_different_tokens(self) -> None:
+        """
+        Per decision, not per session. `session_token` already names the session
+        and already reaches the client; it cannot cite one round of a
+        negotiation, which is what a dispute is about.
+        """
+        membrane = guarded_membrane()
+        context = negotiation_context()
+
+        first = await membrane.inspect_outbound(counter_intent(price=2000.0), context)
+        second = await membrane.inspect_outbound(counter_intent(price=2000.0), context)
+
+        assert first.dispute_token != second.dispute_token

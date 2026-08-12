@@ -1,11 +1,17 @@
 """
-The receipt survives every hop between the Membrane and the client.
+The dispute token survives every hop between the Membrane and the client.
 
 Each message in that chain is re-assembled field by field rather than passed
-along, so the receipt has to be copied deliberately at each one. It used to die
-at the first — `NegotiationObservation` simply had no field for it — and a
-receipt that stops inside the process is a receipt nobody outside can read,
-which is the only audience it has.
+along, so anything that has to reach the client must be copied deliberately at
+each one. The receipt used to be that thing and used to die at the first hop —
+`NegotiationObservation` simply had no field for it.
+
+The receipt no longer travels here at all. It is addressed to an auditor
+(DECISION_RECEIPT.md §1.1) and reaches them through the Membrane's structured
+log; handing it to the party we negotiate against reconstructs most of the
+hidden floor. What travels is a random per-decision handle they can cite, which
+the auditor resolves — so the copy-at-every-hop hazard is unchanged and these
+tests still guard it.
 """
 
 import pytest
@@ -14,76 +20,70 @@ from aura_core.struct_utils import make_struct
 from aura_core_gen.aura.core.v1 import (
     ActionType,
     Context,
-    DecisionOutcome,
-    DecisionReceipt,
     Intent,
     NegotiationIntent,
-    ReceiptSignature,
+    NegotiationObservation,
 )
 from aura_hive.hive.connector.main import HiveConnector
 
+TOKEN = "7c1b4a2e-0000-4000-8000-abcdefabcdef"
 
-def counter_intent_with_receipt() -> Intent:
+
+def counter_intent_with_token() -> Intent:
     return Intent(
         action=ActionType.ACTION_TYPE_COUNTER,
         negotiation=NegotiationIntent(price=105.0, message="my best offer"),
-        receipt=DecisionReceipt(
-            version="AURA-RECEIPT-V2",
-            claim_hash="a" * 64,
-            emission_hash="b" * 64,
-            ruleset_version="guard/negotiation@1.0.0+46cc0e38ca4f895c",
-            outcome=DecisionOutcome.DECISION_OUTCOME_OVERRIDE,
-            outcome_gate="FLOOR_PRICE_VIOLATION",
-            canonical_prefix="c0ffee1234abcd56",
-            signature=ReceiptSignature(signer="0xabc", signature="0xdef"),
-        ),
+        dispute_token=TOKEN,
     )
 
 
-class TestTheConnectorCarriesItOut:
+def connector() -> HiveConnector:
+    return HiveConnector(SkillRegistry())
+
+
+def context() -> Context:
+    return Context(metadata=make_struct({"floor_price": "100.0"}))
+
+
+class TestTheTokenReachesTheObservation:
     @pytest.mark.asyncio
-    async def test_a_countered_offer_carries_its_receipt(self) -> None:
-        observation = await HiveConnector(SkillRegistry()).act(
-            counter_intent_with_receipt(), Context(metadata=make_struct({}))
-        )
+    async def test_a_countered_offer_carries_its_token(self) -> None:
+        observation = await connector().act(counter_intent_with_token(), context())
 
-        assert observation.negotiation.receipt.canonical_prefix == "c0ffee1234abcd56"
-        assert observation.negotiation.receipt.outcome_gate == "FLOOR_PRICE_VIOLATION"
-
-    @pytest.mark.asyncio
-    async def test_the_signature_survives_the_hop(self) -> None:
-        """
-        A receipt whose signature was dropped en route verifies as unsigned,
-        which is worse than being absent: it looks like a deployment with no key
-        rather than a transport that lost the attestation.
-        """
-        observation = await HiveConnector(SkillRegistry()).act(
-            counter_intent_with_receipt(), Context(metadata=make_struct({}))
-        )
-
-        assert observation.negotiation.receipt.signature.signer == "0xabc"
+        assert observation.negotiation.dispute_token == TOKEN
 
     @pytest.mark.asyncio
     async def test_a_rejected_offer_carries_it_too(self) -> None:
-        """Refusals are the decisions a counterparty most wants to check."""
-        intent = counter_intent_with_receipt()
-        intent.action = ActionType.ACTION_TYPE_REJECT
-
-        observation = await HiveConnector(SkillRegistry()).act(
-            intent, Context(metadata=make_struct({}))
+        """
+        Copied before the result branches, so no branch can be the one that
+        forgets. A rejection is exactly as disputable as a counter.
+        """
+        rejection = Intent(
+            action=ActionType.ACTION_TYPE_REJECT,
+            negotiation=NegotiationIntent(price=0.0),
+            dispute_token=TOKEN,
         )
 
-        assert observation.negotiation.receipt.canonical_prefix == "c0ffee1234abcd56"
+        observation = await connector().act(rejection, context())
+
+        assert observation.negotiation.dispute_token == TOKEN
 
     @pytest.mark.asyncio
-    async def test_an_intent_without_a_receipt_does_not_invent_one(self) -> None:
-        intent = Intent(
+    async def test_an_intent_without_a_token_does_not_invent_one(self) -> None:
+        untouched = Intent(
             action=ActionType.ACTION_TYPE_COUNTER,
             negotiation=NegotiationIntent(price=105.0),
         )
 
-        observation = await HiveConnector(SkillRegistry()).act(
-            intent, Context(metadata=make_struct({}))
-        )
+        observation = await connector().act(untouched, context())
 
-        assert observation.negotiation.receipt.canonical_prefix == ""
+        assert observation.negotiation.dispute_token == ""
+
+
+class TestTheReceiptDoesNotTravelThisWay:
+    def test_the_observation_has_no_receipt_field_left(self) -> None:
+        """
+        Structural rather than a matter of the Connector being careful: field 8
+        is reserved, so there is no hop left to leak through.
+        """
+        assert not hasattr(NegotiationObservation(), "receipt")
