@@ -88,6 +88,31 @@ class TestRecording:
         assert parsed.canonical_prefix == "c" * 16
 
 
+class TestADocumentThatCarriesNulls:
+    def test_a_null_field_stores_an_empty_string_not_the_word_none(self) -> None:
+        """
+        `str(None)` is `"None"`, and an indexed column holding that literal is
+        a row that exists and cannot be found — the worst shape of silent
+        corruption for an archive whose only job is to be searchable.
+
+        betterproto omits empty fields rather than emitting null, so a receipt
+        minted here cannot carry one. A dict reaching this repository from
+        anywhere else — a JSON blob with explicit nulls, a future caller — can.
+        """
+        session = a_session()
+        repo = ReceiptRepository(MagicMock(return_value=session))
+
+        repo.record(
+            a_receipt() | {"decisionId": None, "requestId": None, "issuedAt": None},
+            dispute_token="tok-abc",
+        )
+
+        row = session.add.call_args[0][0]
+        assert row.decision_id == ""
+        assert row.request_id == ""
+        assert row.issued_at == ""
+
+
 class TestFinding:
     def test_a_known_token_returns_the_document(self) -> None:
         session = a_session()

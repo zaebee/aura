@@ -109,6 +109,31 @@ class TestTheArchiveNeverCostsTheDecision:
         assert observation is not None
 
     @pytest.mark.asyncio
+    async def test_the_archive_step_survives_something_that_is_not_an_intent(
+        self,
+    ) -> None:
+        """
+        `act` is declared `(action: Any, ...)`, and the guard used to read
+        `action.receipt` outside the try — so anything that was not an Intent
+        raised an AttributeError straight past every piece of fail-open
+        handling.
+
+        Asserted against `_record_receipt` rather than `act`, and the
+        distinction is the point: the Genome's `act` hands a `None` to
+        `_handle_legacy`, which reads `action.action` and raises. That is
+        pre-existing and not this change's to fix or to claim. What is claimed
+        here is narrower and true — the archive step added by this branch does
+        not turn a malformed action into a lost decision.
+        """
+        registry = a_registry()
+
+        await connector_with(registry)._record_receipt(None)
+
+        assert not any(
+            c[0][1] == "record_receipt" for c in registry.execute.await_args_list
+        )
+
+    @pytest.mark.asyncio
     async def test_a_hanging_write_is_abandoned_rather_than_waited_on(self) -> None:
         """
         The failure mode a refused connection does not cover.

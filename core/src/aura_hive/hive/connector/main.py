@@ -88,7 +88,15 @@ class HiveConnector(BaseConnector):
         timeout is what makes the promise above true for the failure mode that
         is likelier in production than the one it was written against.
         """
-        if not action.receipt or not action.dispute_token:
+        # Read defensively, because this guard sits outside the try below and
+        # `act` is declared `(action: Any, ...)`. Reaching straight for
+        # `action.receipt` meant anything that was not an Intent raised an
+        # AttributeError past every piece of fail-open handling and took the
+        # decision with it. No caller does that today; the promise is that it
+        # would not matter if one did.
+        receipt = getattr(action, "receipt", None)
+        dispute_token = getattr(action, "dispute_token", None)
+        if not receipt or not dispute_token:
             return
 
         # One log site, two ways to get there. A reported failure and a raised
@@ -102,8 +110,8 @@ class HiveConnector(BaseConnector):
                     "persistence",
                     "record_receipt",
                     {
-                        "receipt": action.receipt.to_dict(),
-                        "dispute_token": action.dispute_token,
+                        "receipt": receipt.to_dict(),
+                        "dispute_token": dispute_token,
                     },
                 ),
                 timeout=_ARCHIVE_TIMEOUT_SECONDS,
@@ -118,7 +126,7 @@ class HiveConnector(BaseConnector):
         if error:
             logger.warning(
                 "receipt_record_failed",
-                dispute_token=action.dispute_token,
+                dispute_token=dispute_token,
                 error=error,
             )
 

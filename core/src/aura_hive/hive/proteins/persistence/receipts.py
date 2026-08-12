@@ -31,9 +31,15 @@ class ReceiptRepository:
             session.add(
                 DecisionReceiptRecord(
                     dispute_token=dispute_token,
-                    decision_id=str(receipt.get("decisionId", "")),
-                    request_id=str(receipt.get("requestId", "")),
-                    issued_at=str(receipt.get("issuedAt", "")),
+                    # `or ""` rather than a `get` default: a key present with
+                    # a null value would otherwise store the literal string
+                    # "None", which is a row that exists and cannot be found.
+                    # betterproto omits empty fields rather than emitting null,
+                    # so a minted receipt cannot carry one — but this takes a
+                    # plain dict, and one from anywhere else can.
+                    decision_id=str(receipt.get("decisionId") or ""),
+                    request_id=str(receipt.get("requestId") or ""),
+                    issued_at=str(receipt.get("issuedAt") or ""),
                     receipt=receipt,
                 )
             )
