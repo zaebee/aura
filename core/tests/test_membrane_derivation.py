@@ -21,11 +21,9 @@ from aura_core_gen.aura.core.v1 import (
     ActionType,
     Context,
     DecisionOutcome,
-    DecisionReceipt,
     Intent,
     NegotiationIntent,
     Observation,
-    ReceiptSignature,
     RWAComplianceScore,
     RWAVaultIntent,
     TradeIntent,
@@ -723,17 +721,3 @@ class TestTheReceiptLogClaimsOnlyWhatItKnows:
             )
 
         assert "signature" in self.logged(calls)["receipt"]
-
-    def test_a_signature_block_with_no_signature_is_not_signed(self) -> None:
-        """
-        Narrow, and unreachable through `signed()` which fills every field at
-        once — but the log's notion of signed should not be weaker than
-        `verify`'s, which already checks the value rather than the object.
-        """
-        from aura_hive.hive.membrane.main import _is_signed
-
-        assert not _is_signed(
-            DecisionReceipt(
-                version="AURA-RECEIPT-V1", signature=ReceiptSignature(scheme="eip712")
-            )
-        )

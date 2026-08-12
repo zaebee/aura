@@ -274,26 +274,6 @@ def _rejection() -> Intent:
     )
 
 
-def _is_signed(receipt: DecisionReceipt) -> bool:
-    """
-    Whether an attestation is attached — not whether it is valid.
-
-    Checked by value rather than by object. betterproto messages define their
-    own falsiness, so `bool(receipt.signature)` does discriminate a signed
-    receipt from an unsigned one; but a signature block carrying a scheme and no
-    signature would still read as truthy, and the log's notion of signed should
-    not be weaker than `verify`'s, which already reads the value.
-
-    Deliberately NOT called `attested`. That word belongs to `verify` and means
-    the signature recovered to the signer the receipt claims. This function
-    recovers nothing, and a log claiming attestation nobody performed is the
-    same overstatement `VerificationResult` separates `ok` from `attested` to
-    avoid — in a cheaper place.
-    """
-    signature = receipt.signature
-    return signature is not None and bool(signature.signature)
-
-
 def _context_number(ctx_meta: dict[str, Any], key: str, default: float) -> float:
     """
     Read a number out of Context.metadata that may not be one.
