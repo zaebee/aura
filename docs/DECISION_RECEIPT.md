@@ -186,11 +186,22 @@ and the model never had a say in it, so stamping it after the claim would make c
 disagree over a field nothing decided — but it means the baseline the two digests are taken against
 is ours, one normalisation deep. Three fields are normalised today: `currency_code` (above),
 `identifier` (named when nothing upstream did — outside the canonical claim, so it moves no digest),
-and `price`, **quantised to cents**. The last is not cosmetic: the claim renders `price` at `.2f`,
-so without it the gates decide at a precision finer than the digest can express, and a proposal a
-fraction of a cent below the margin threshold is substituted onto its own cent — claim and emission
-digesting alike while `override_scope` says `value`, which is exactly the combination §3.5 says
-cannot happen. Quantising first makes the gate, ψ, the substitute and both digests read one value.
+and `price`, **quantised to cents**.
+
+The first two are properties of the request that nothing decided. **The price is not** — it is the
+model's own decision, and quantising moves it by up to half a cent. It is normalised anyway, for a
+different reason: the claim renders `price` at `.2f`, so without it the gates decide at a precision
+the digest cannot express, and a proposal a fraction of a cent below the margin threshold is
+substituted onto its own cent — claim and emission digesting alike while `override_scope` says
+`value`, the combination §3.6 and `verify()` refuse. Quantising first makes the gate, ψ, the
+substitute and both digests read one value.
+
+That closes the collision for every gate that refuses a *price*: G1, G2 and G4 each imply the
+proposal sits strictly below a threshold the substitute is ceilinged above, so the two cannot render
+to the same cent. It does not close it for a gate that refuses the *configuration* — G3 fires at any
+price — which is why G3 now refuses outright rather than substituting (§3.6), and why an override
+whose emitted cent equals the proposed one is not recorded as an override at all.
+
 Anything else added here
 widens the gap between "what the model proposed" and "what the claim says the model proposed", which
 is the sentence this paragraph exists to keep honest.
@@ -405,7 +416,13 @@ What V2 does about it is bound the disclosure, not close it:
   details."` — each of which announced that a guard had fired. Both now read as an ordinary counter.
 
 **`ε` is a source constant and therefore public, so the counterparty still learns the floor to within
-3%.** And neutralising the message reduces distinguishability rather than removing it: a templated
+3%.** That bound holds only because every floor-derived price is born in the guard, which applies the
+markup and the jitter. The rules-based strategy used to break it: with `llm.model == "rule"` a
+below-floor bid was countered at `floor_price` exactly, and the message said the number out loud —
+a 0% bound on a path the DLP check could not see, because it scans for the literal token
+`floor_price` rather than for its value. That strategy no longer prices at all; it proposes the bid
+back and lets the floor gate fire, so the substitute comes from the same place as every other one.
+And neutralising the message reduces distinguishability rather than removing it: a templated
 counter still reads differently from the model's own prose, and closing that gap properly means
 having the model phrase the substituted price, which is its own piece of work.
 
@@ -538,6 +555,18 @@ Three limits worth stating rather than discovering later:
   failure only if a gate that fires implies a ψ that would have failed; while G4 used a binary-float
   ratio against the raw setting and ψ used a Decimal product against the clamped one, 9,444 of a
   1.6M-case scan broke exactly that implication.
+
+  It needs one more thing, and the branch shipped without it once. That argument covers gates that
+  refuse a **price** — G1, G2 and G4, each of which implies the proposal is strictly under a
+  threshold the substitute is ceilinged above, so the two cannot render to the same cent. **G3
+  refuses the configuration, not the price**, and fires at any price at all. Substituting on it also
+  meant pricing with the default margin — answering with the very formula the gate had just declared
+  unevaluable, which `ruleset.yaml` says must not happen. Since the substitute is a fixed cent within
+  a session, a model echoing the Membrane's own last counter — ordinary convergence — proposed
+  exactly it and minted `value` scope with equal digests, deterministically. G3 now refuses outright.
+  Independently of that, an override whose emitted cent equals the proposed one is not recorded as an
+  override: a substitution that moves nothing is not a substitution, and the invariant holds when a
+  fifth gate is added rather than relying on the next author to rederive why it held.
 
   `override_scope` is a property recomputed from the outcome rather than a field a call site sets,
   so it is structurally empty whenever the outcome is not `override` — that half of the invariant

@@ -951,6 +951,33 @@ class HiveMembrane(Membrane[Any, Intent, Context]):
                 reason = str(obs_meta.get("error_code", "SAFETY_VIOLATION"))
                 safe_price = float(str(obs_meta.get("safe_price", safe_price)))
 
+                # A gate that fired on the CONFIGURATION cannot be answered
+                # with a price.
+                #
+                # G3 fires when `min_profit_margin` is unreadable. Substituting
+                # then means pricing with the default margin — answering with
+                # the very formula the gate just declared unevaluable, which
+                # `ruleset.yaml` and `_gate_settings_present` both say must not
+                # happen ("must not answer at all rather than answer with a
+                # formula it cannot evaluate"). Only this branch disagreed.
+                #
+                # It also broke the receipt. Every other gate refuses a price
+                # for being wrong, so a failing gate implies the proposal sits
+                # strictly below a threshold the substitute is ceilinged above,
+                # and the two cannot render to the same cent. G3 holds at any
+                # price, so the substitute could land on the proposal's own
+                # cent — and since jitter is fixed within a session, a model
+                # echoing the Membrane's last counter hit that deterministically
+                # on the next round, minting `override_scope="value"` with equal
+                # digests: a claimed substitution with no trace, which `verify()`
+                # refuses.
+                if reason == "SETTINGS_MISSING":
+                    _record_intervention("outbound", reason)
+                    verdict.record(_UNAVAILABLE, reason)
+                    return await self._finish(
+                        claim, _replacing(decision, _rejection()), verdict, request_id
+                    )
+
                 return await self._override_with_safe_offer(
                     decision,
                     safe_price,
@@ -1001,10 +1028,36 @@ class HiveMembrane(Membrane[Any, Intent, Context]):
                 request_id,
             )
 
-        _record_intervention("outbound", reason, safe_price=rounded_price)
         params_name, params_value = betterproto.which_one_of(original, "params")
         neg_intent = params_value if params_name == "negotiation" else None
         orig_price = neg_intent.price if neg_intent else 0.0
+
+        # A substitution that moves nothing is not a substitution.
+        #
+        # The receipt reports an intervention by the difference between two
+        # digests, so recording OVERRIDE/"value" when the emitted cent equals
+        # the proposed one claims a change the evidence cannot show — the one
+        # combination `verify()` refuses. Both prices are already quantised
+        # (the proposal at the top of `inspect_outbound`, the substitute a line
+        # above), so this compares what the digests will actually cover.
+        #
+        # No live gate can reach it now that G3 fails closed: G1, G2 and G4 all
+        # imply the proposal is strictly under a threshold the substitute is
+        # ceilinged above. This keeps that true when the fifth gate is added,
+        # rather than trusting the next author to rediscover why it held.
+        #
+        # `original` is returned untouched rather than replaced, so a DLP block
+        # that already sanitised the prose keeps its emission and its "prose"
+        # record — the reason for not simply dropping to EMIT here.
+        if rounded_price == orig_price:
+            logger.info(
+                "membrane_override_without_effect",
+                reason=reason,
+                price=rounded_price,
+            )
+            return await self._finish(claim or original, original, verdict, request_id)
+
+        _record_intervention("outbound", reason, safe_price=rounded_price)
         new_thought = f"Membrane Override: {reason}. LLM suggested {_action_label(original.action)} at {orig_price}."
         if original.reasoning:
             new_thought = f"{original.reasoning} | {new_thought}"

@@ -84,15 +84,34 @@ class RuleBasedStrategy:
             )
 
         floor_price = float(str(item_data.get("floor_price", 0.0)))
-        # Rule: Bid below floor price - counter with floor price
+        # Rule: bid below the floor — refuse the number, and let the guard
+        # supply the one we would accept.
+        #
+        # This used to counter at `floor_price` exactly, with the message "We
+        # cannot accept less than $1000.0". Both halves handed the counterparty
+        # the floor: the price to the cent, and the prose in words. The
+        # Membrane's DLP scans for the literal token `floor_price`, not for its
+        # value, so nothing downstream noticed — and `DECISION_RECEIPT.md` §3.4
+        # bounds what a counterparty can learn about the floor at 3%, the
+        # markup and per-session jitter the guard applies. This path was a 0%
+        # bound on both.
+        #
+        # The strategy has no pricing model of its own and should not acquire
+        # one — duplicating `safe_offer` here is how the gate and psi came to
+        # disagree in the first place. So it states what it actually decided,
+        # which is that this bid is not acceptable, and proposes the bid back.
+        # G2 then fires on it and the Membrane substitutes the marked-up,
+        # jittered price, which is the only place a floor-derived number is
+        # allowed to be born. The receipt records that truthfully: proposed the
+        # bid, emitted the substitute, gate FLOOR_PRICE_VIOLATION.
         if bid < floor_price:
             return Intent(
                 action=cast(ActionType, ActionType.ACTION_TYPE_COUNTER),
-                reasoning=f"<think>Bid {bid} below floor {floor_price}. Countering.</think>",
+                reasoning=f"<think>Bid {bid} below floor. Countering.</think>",
                 metadata=make_struct({"reason_code": "BELOW_FLOOR"}),
                 negotiation=NegotiationIntent(
-                    price=floor_price,
-                    message=f"We cannot accept less than ${floor_price}.",
+                    price=bid,
+                    message="I cannot accept that offer.",
                 ),
             )
 

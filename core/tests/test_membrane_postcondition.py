@@ -485,3 +485,104 @@ class TestAProposalFinerThanACent:
         assert decision.receipt.claim_hash != decision.receipt.emission_hash or (
             decision.receipt.outcome != DecisionOutcome.DECISION_OUTCOME_OVERRIDE
         )
+
+
+class TestAGateThatCannotJudgeDoesNotSubstitute:
+    """
+    G3 fires on the *configuration*, not on the price.
+
+    Every other gate refuses a price for being wrong, so a failing gate implies
+    the proposal is strictly below a threshold the substitute is ceilinged
+    above, and the two can never render to the same cent. G3 breaks that
+    premise: it fires when `min_profit_margin` is unreadable, at any price at
+    all — and the Membrane then substituted using the *default* margin, i.e.
+    answered with the very formula the gate had just declared unevaluable.
+
+    `ruleset.yaml` states the intent outright — "a deployment that cannot read
+    its own margin setting must not answer at all rather than answer with a
+    formula it cannot evaluate" — as does `_gate_settings_present`'s own
+    comment. Only the Membrane disagreed.
+
+    The receipt consequence is the one this branch exists to prevent: because
+    the substitute is a fixed cent within a session, a model that echoes the
+    Membrane's own last counter — ordinary convergence — proposes exactly it,
+    and claim and emission digest alike under `override_scope="value"`, which
+    `verify()` refuses.
+    """
+
+    class _NoMargin:
+        min_profit_margin = None
+        ui_trigger_price = 100000.0
+        trade_risk_threshold = 0.10
+
+    def _unjudgeable_membrane(self) -> HiveMembrane:
+        registry = SkillRegistry()
+        skill = GuardSkill()
+        settings = self._NoMargin()
+        skill.bind(settings, OutputGuard(safety_settings=settings))
+        registry.register(skill.get_name(), skill)
+        return HiveMembrane(registry=registry)
+
+    @pytest.mark.asyncio
+    async def test_an_unreadable_margin_refuses_instead_of_pricing(self) -> None:
+        # Above the floor, so G1 and G2 both pass and G3 is the gate that
+        # fires. A price below the floor trips G2 first, which is a price gate
+        # and rightly substitutes.
+        decision = await self._unjudgeable_membrane().inspect_outbound(
+            counter_intent(price=1500.0), negotiation_context()
+        )
+
+        assert decision.receipt.outcome == DecisionOutcome.DECISION_OUTCOME_UNAVAILABLE
+        assert decision.action == ActionType.ACTION_TYPE_REJECT
+        assert not decision.negotiation
+
+    @pytest.mark.asyncio
+    async def test_the_echoed_counter_no_longer_mints_a_refused_receipt(self) -> None:
+        """The two-round convergence that reproduced the collision."""
+        from aura_hive.hive.membrane.receipt import verify
+
+        membrane = self._unjudgeable_membrane()
+
+        for price in (500.0, 1111.12):
+            decision = await membrane.inspect_outbound(
+                counter_intent(price=price), negotiation_context()
+            )
+            assert verify(decision.receipt).ok, (
+                f"price={price} scope={decision.receipt.override_scope!r} "
+                f"failures={verify(decision.receipt).failures}"
+            )
+
+
+class TestAnOverrideThatChangesNothingIsNotAnOverride:
+    """
+    The receipt reports an intervention by the difference between two digests,
+    so an OVERRIDE whose digests are identical claims a substitution the
+    evidence cannot show — the exact combination `verify()` refuses.
+
+    With G3 failing closed no live gate can reach this: G1, G2 and G4 all imply
+    the proposal is strictly under a threshold the substitute is ceilinged
+    above. This is the invariant that keeps it that way when the fifth gate is
+    added, and it is asserted through a stubbed substitute rather than a real
+    one because no real one can currently produce it.
+    """
+
+    @pytest.mark.asyncio
+    async def test_a_substitute_equal_to_the_proposal_records_no_override(
+        self,
+    ) -> None:
+        from aura_hive.hive.membrane.receipt import verify
+
+        guard = OutputGuard(safety_settings=_Safety())
+        # A gate refuses the price, and the substitute lands on the very cent
+        # that was proposed.
+        guard._gate_floor_violation = lambda decision, context: False  # type: ignore[method-assign]
+        guard.calculate_safe_price = lambda *args, **kwargs: 1111.12  # type: ignore[method-assign]
+        membrane = guarded_membrane(guard)
+
+        decision = await membrane.inspect_outbound(
+            counter_intent(price=1111.12), negotiation_context()
+        )
+
+        assert decision.receipt.outcome != DecisionOutcome.DECISION_OUTCOME_OVERRIDE
+        assert decision.receipt.override_scope == ""
+        assert verify(decision.receipt).ok, verify(decision.receipt).failures
