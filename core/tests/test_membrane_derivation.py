@@ -12,6 +12,7 @@ Nothing here is worth having if the record leaks a number, so that is asserted
 against the Intent itself rather than only against the engine that built it.
 """
 
+import re
 from unittest.mock import patch
 
 import pytest
@@ -21,18 +22,18 @@ from aura_core_gen.aura.core.v1 import (
     ActionType,
     Context,
     DecisionOutcome,
-    DecisionReceipt,
+    HiveContextData,
     Intent,
     NegotiationIntent,
+    NegotiationOffer,
     Observation,
-    ReceiptSignature,
     RWAComplianceScore,
     RWAVaultIntent,
     TradeIntent,
     ValidationScore,
 )
 from aura_hive.hive.membrane.main import HiveMembrane
-from aura_hive.hive.membrane.receipt import verify
+from aura_hive.hive.membrane.receipt import canonical_claim, verify
 from aura_hive.hive.proteins.guard import GuardSkill
 from aura_hive.hive.proteins.guard.engine import OutputGuard
 from eth_account import Account
@@ -55,19 +56,25 @@ def guarded_membrane() -> HiveMembrane:
     return HiveMembrane(registry=registry)
 
 
-def negotiation_context(floor_price: float = FLOOR) -> Context:
+def negotiation_context(floor_price: float = FLOOR, currency_code: str = "") -> Context:
     return Context(
         metadata=make_struct(
             {"floor_price": str(floor_price), "internal_cost": "777.0"}
-        )
+        ),
+        hive=HiveContextData(offer=NegotiationOffer(currency_code=currency_code)),
     )
 
 
-def counter_intent(price: float) -> Intent:
+# The message that trips the Membrane's DLP check. Ordinary traffic: the model
+# explaining itself with the word it is not allowed to say.
+LEAKING_MESSAGE = "my floor_price is 1000, so I can't go lower"
+
+
+def counter_intent(price: float, message: str = "Here is my offer") -> Intent:
     return Intent(
         action=ActionType.ACTION_TYPE_COUNTER,
         reasoning="LLM reasoning",
-        negotiation=NegotiationIntent(price=price, message="Here is my offer"),
+        negotiation=NegotiationIntent(price=price, message=message),
     )
 
 
@@ -244,6 +251,16 @@ class TestAGuardThatReportsNothingUsable:
             return "guard"
 
         async def execute(self, intent: str, params: dict) -> Observation:
+            # The Membrane also asks this double to check the post-condition on
+            # what it is about to emit. These tests are about validate_decision
+            # reporting metadata the Membrane cannot use, not about psi, so
+            # report a clean hold here rather than have that second question
+            # decide an outcome these tests were not written to describe.
+            if intent == "check_postcondition":
+                return Observation(
+                    success=True,
+                    metadata=make_struct({"holds": True, "failed_clause": ""}),
+                )
             return self._observation
 
     def membrane_reporting(self, observation: Observation) -> HiveMembrane:
@@ -356,6 +373,10 @@ class TestNoDeclaredGateRan:
         No registry means no guard ran. Claiming a derivation here would be the
         worst version of the lie: a receipt asserting gates on a deployment that
         has none wired.
+
+        The outcome is UNAVAILABLE rather than EMIT because the post-condition
+        could not be evaluated either — the same absence, read honestly at both
+        ends. Nothing is emitted, and nothing is claimed about how.
         """
         membrane = HiveMembrane(registry=None)
 
@@ -363,7 +384,7 @@ class TestNoDeclaredGateRan:
             counter_intent(price=2000.0), negotiation_context()
         )
 
-        assert decision.receipt.outcome == DecisionOutcome.DECISION_OUTCOME_EMIT
+        assert decision.receipt.outcome == DecisionOutcome.DECISION_OUTCOME_UNAVAILABLE
         assert decision.receipt.derivation.derivation_hash == ""
 
 
@@ -404,14 +425,108 @@ class TestTheReceiptTheMembraneMints:
 
     @pytest.mark.asyncio
     @pytest.mark.parametrize("price", [500.0, 2000.0])
-    async def test_the_minted_receipt_verifies(self, price: float) -> None:
+    @pytest.mark.parametrize("message", ["Here is my offer", LEAKING_MESSAGE])
+    async def test_the_minted_receipt_verifies(
+        self, price: float, message: str
+    ) -> None:
+        """
+        Parametrised over the MESSAGE as well as the price, and that second
+        parameter is the whole point.
+
+        It was price-only, so no test in the suite ever ran `verify()` over a
+        receipt the Membrane minted for a decision whose message tripped DLP.
+        At (500.0, LEAKING_MESSAGE) the DLP block recorded `scope="prose"` and
+        the floor gate then substituted the price, so the digests differed and
+        the verifier refused a receipt the Membrane had just produced —
+        `make verify-receipts` exited 1 on ordinary traffic. Two tests asserted
+        the opposite halves of that and both passed, because neither of them
+        was this one.
+        """
         decision = await guarded_membrane().inspect_outbound(
-            counter_intent(price=price), negotiation_context()
+            counter_intent(price=price, message=message), negotiation_context()
         )
 
         result = verify(decision.receipt)
 
         assert result.ok, result.failures
+
+    @pytest.mark.asyncio
+    async def test_a_dlp_block_that_also_moves_the_price_is_scoped_to_value(
+        self,
+    ) -> None:
+        """
+        `override_scope` answers "did the decidable content change", not "what
+        did the gate named in `outcome_gate` touch". Both interventions ran
+        here; the price moved; the answer is "value".
+
+        Scoping it to the winning gate instead gave "prose" beside two
+        differing digests — the contradiction above, stated as a field.
+        """
+        decision = await guarded_membrane().inspect_outbound(
+            counter_intent(price=500.0, message=LEAKING_MESSAGE),
+            negotiation_context(),
+        )
+
+        assert decision.receipt.outcome == DecisionOutcome.DECISION_OUTCOME_OVERRIDE
+        assert decision.receipt.outcome_gate == "DLP_BLOCK"
+        assert decision.receipt.override_scope == "value"
+        assert decision.receipt.claim_hash != decision.receipt.emission_hash
+
+
+class TestTheCurrencyReachesTheClaim:
+    """
+    Nothing asserted a currency through the Membrane at all.
+
+    Task 9 stamped `currency_code` from the Context onto the claim, and the bug
+    it found on the way — the DLP block rebuilding a NegotiationIntent from a
+    field list that omitted the currency — was caught by hand-tracing, not by a
+    test. Every `NegotiationOffer` fixture in the suite left `currency_code`
+    unset, so the entire class had zero coverage and a regression would have
+    been invisible on all four outbound shapes.
+    """
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize(
+        ("price", "message"),
+        [
+            (2000.0, "Here is my offer"),  # emitted untouched
+            (500.0, "Here is my offer"),  # price substituted
+            (2000.0, LEAKING_MESSAGE),  # prose sanitised
+            (500.0, LEAKING_MESSAGE),  # both
+        ],
+    )
+    async def test_every_outbound_path_keeps_the_denomination(
+        self, price: float, message: str
+    ) -> None:
+        decision = await guarded_membrane().inspect_outbound(
+            counter_intent(price=price, message=message),
+            negotiation_context(currency_code="JPY"),
+        )
+
+        assert decision.negotiation.currency_code == "JPY"
+        assert "currency=JPY" in canonical_claim(decision)
+        assert verify(decision.receipt).ok
+
+    @pytest.mark.asyncio
+    async def test_the_substitute_keeps_the_item_it_is_substituting_for(
+        self,
+    ) -> None:
+        """
+        The hand-built replacement carried neither the item nor the currency, so
+        a JPY negotiation emitted `action=counter;item=;price=111.12;currency=`
+        — two fields disappearing from a claim that were never in question, and
+        a reader diffing claim against emission seeing more changed than did.
+        """
+        intent = counter_intent(price=500.0)
+        intent.negotiation.item_identifier = "sku-9"
+
+        decision = await guarded_membrane().inspect_outbound(
+            intent, negotiation_context(currency_code="JPY")
+        )
+
+        assert decision.negotiation.item_identifier == "sku-9"
+        assert "item=sku-9" in canonical_claim(decision)
+        assert "currency=JPY" in canonical_claim(decision)
 
     @pytest.mark.asyncio
     async def test_an_override_is_visible_as_two_differing_hashes(self) -> None:
@@ -440,6 +555,15 @@ class TestTheReceiptTheMembraneMints:
         """
         Every field at once, not just the gate sequence: the receipt is the
         artefact meant to leave the building.
+
+        Split by what each field IS. A substring search only means something
+        over a field that could carry a value; over a uniform digest it is a
+        coin flip. `canonical_prefix` is 16 hex characters, so it contains
+        "500" or "777" by chance about **0.7% of the time** — this assertion
+        used to include it and failed at roughly that rate, indistinguishably
+        from a real leak. The digests get a shape check instead, which is the
+        stronger claim anyway: a field that is structurally 64 hex characters
+        cannot carry a price whatever the price is.
         """
         decision = await guarded_membrane().inspect_outbound(
             counter_intent(price=500.0), negotiation_context(floor_price=FLOOR)
@@ -448,18 +572,20 @@ class TestTheReceiptTheMembraneMints:
         rendered = " ".join(
             [
                 r.version,
-                r.claim_hash,
                 r.ruleset_version,
-                r.emission_hash,
                 r.outcome_gate,
-                r.canonical_prefix,
+                r.override_scope,
                 r.derivation.gate_sequence,
-                r.derivation.derivation_hash,
             ]
         )
 
         for secret in ("1000", "777", "500", "1050"):
             assert secret not in rendered
+
+        assert re.fullmatch(r"[0-9a-f]{64}", r.claim_hash)
+        assert re.fullmatch(r"[0-9a-f]{64}", r.emission_hash)
+        assert re.fullmatch(r"[0-9a-f]{64}", r.derivation.derivation_hash)
+        assert re.fullmatch(r"[0-9a-f]{16}", r.canonical_prefix)
 
 
 class TestAContextWithNullNumbers:
@@ -663,12 +789,16 @@ class TestTheReceiptLogClaimsOnlyWhatItKnows:
     """
     `attested` is a word `verify` owns: it means the signature recovered to the
     signer the receipt claims. The log line never recovers anything — it knows
-    only whether a signature is attached — so it says `signed`.
+    only whether a signature is attached.
 
-    Using the stronger word for the weaker fact is the conflation
-    `VerificationResult` separates `ok` from `attested` to avoid, and a log
-    asserting attestation nobody performed is the same overstatement in a
-    cheaper place.
+    The log now carries `receipt.to_dict()` rather than a hand-picked scalar, so
+    that fact is read from the document itself: betterproto omits an empty
+    `signature` field from the dict rather than emitting it null, so an unsigned
+    receipt's logged payload carries no `signature` key at all and a signed
+    one's does. A reader checking presence, not a top-level `signed` flag this
+    module used to compute, cannot claim an attestation nobody performed — the
+    same overstatement `VerificationResult` separates `ok` from `attested` to
+    avoid, in a cheaper place.
     """
 
     def logged(self, calls: list) -> dict:
@@ -687,7 +817,7 @@ class TestTheReceiptLogClaimsOnlyWhatItKnows:
                 counter_intent(price=500.0), negotiation_context()
             )
 
-        assert self.logged(calls)["signed"] is False
+        assert "signature" not in self.logged(calls)["receipt"]
 
     @pytest.mark.asyncio
     async def test_a_signed_decision_is(self) -> None:
@@ -708,18 +838,167 @@ class TestTheReceiptLogClaimsOnlyWhatItKnows:
                 counter_intent(price=500.0), negotiation_context()
             )
 
-        assert self.logged(calls)["signed"] is True
+        assert "signature" in self.logged(calls)["receipt"]
 
-    def test_a_signature_block_with_no_signature_is_not_signed(self) -> None:
-        """
-        Narrow, and unreachable through `signed()` which fills every field at
-        once — but the log's notion of signed should not be weaker than
-        `verify`'s, which already checks the value rather than the object.
-        """
-        from aura_hive.hive.membrane.main import _is_signed
 
-        assert not _is_signed(
-            DecisionReceipt(
-                version="AURA-RECEIPT-V1", signature=ReceiptSignature(scheme="eip712")
-            )
+class TestTheReceiptNamesTheDecisionItDescribes:
+    """
+    `decision_id` was EMPTY on every production receipt.
+
+    Nothing on the negotiation path ever assigned `Intent.identifier`, so the
+    signature covered an empty string — attesting the field's absence. V2 exists
+    because binding that is not signed is decorative, and the receipt module
+    sells the bump on exactly this field: without it a receipt is about a SHAPE
+    of decision, and two deals for the same item at the same price produced
+    byte-identical receipts, signature included.
+    """
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("price", [500.0, 2000.0])
+    async def test_an_emitted_decision_is_named(self, price: float) -> None:
+        decision = await guarded_membrane().inspect_outbound(
+            counter_intent(price=price), negotiation_context()
         )
+
+        assert decision.receipt.decision_id
+        assert decision.receipt.decision_id == decision.identifier
+
+    @pytest.mark.asyncio
+    async def test_an_upstream_identifier_is_not_overwritten(self) -> None:
+        """
+        Assigned only when absent. If a producer names its own decision, that
+        name is what an auditor will be reconciling against.
+        """
+        intent = counter_intent(price=2000.0)
+        intent.identifier = "decision-44"
+
+        decision = await guarded_membrane().inspect_outbound(
+            intent, negotiation_context()
+        )
+
+        assert decision.receipt.decision_id == "decision-44"
+
+    @pytest.mark.asyncio
+    async def test_two_identical_decisions_get_different_receipts(self) -> None:
+        """
+        The property the field exists for, stated as a test rather than as a
+        docstring: same item, same price, same everything the model decided.
+        """
+        first = await guarded_membrane().inspect_outbound(
+            counter_intent(price=2000.0), negotiation_context()
+        )
+        second = await guarded_membrane().inspect_outbound(
+            counter_intent(price=2000.0), negotiation_context()
+        )
+
+        assert first.receipt.claim_hash == second.receipt.claim_hash
+        assert first.receipt.canonical_prefix != second.receipt.canonical_prefix
+
+
+class TestTheDisputeToken:
+    @pytest.mark.asyncio
+    async def test_every_emission_carries_one(self) -> None:
+        decision = await guarded_membrane().inspect_outbound(
+            counter_intent(price=500.0), negotiation_context()
+        )
+
+        assert decision.dispute_token
+
+    @pytest.mark.asyncio
+    async def test_a_refusal_carries_one_too(self) -> None:
+        """A rejection is exactly as disputable as a counter."""
+        decision = await guarded_membrane().inspect_outbound(
+            Intent(
+                action=ActionType.ACTION_TYPE_APPROVE,
+                rwa_vault=RWAVaultIntent(
+                    wallet_address="0xdead",
+                    compliance=RWAComplianceScore(kyc_passed=False),
+                ),
+            ),
+            negotiation_context(),
+        )
+
+        assert decision.dispute_token
+
+    @pytest.mark.asyncio
+    async def test_it_is_not_derived_from_the_receipt(self) -> None:
+        """
+        The property that makes it safe to hand over. The canonical prefix was
+        invertible by enumeration — 7.3M SHA-256 recovered the model's proposed
+        price and the gate that fired. A random UUID has no preimage, so there
+        is nothing in it to enumerate toward.
+        """
+        decision = await guarded_membrane().inspect_outbound(
+            counter_intent(price=500.0), negotiation_context()
+        )
+        token = decision.dispute_token
+
+        assert token not in str(decision.receipt.to_dict())
+        assert token != decision.receipt.canonical_prefix
+        assert token != decision.receipt.decision_id
+
+    @pytest.mark.asyncio
+    async def test_two_decisions_in_one_session_get_different_tokens(self) -> None:
+        """
+        Per decision, not per session. `session_token` already names the session
+        and already reaches the client; it cannot cite one round of a
+        negotiation, which is what a dispute is about.
+        """
+        membrane = guarded_membrane()
+        context = negotiation_context()
+
+        first = await membrane.inspect_outbound(counter_intent(price=2000.0), context)
+        second = await membrane.inspect_outbound(counter_intent(price=2000.0), context)
+
+        assert first.dispute_token != second.dispute_token
+
+
+class TestThePriceIsQuotedInTheCurrencyItIsIn:
+    """
+    Both counterparty-facing messages hardcoded a `$`.
+
+    The branch carries `currency_code` into the claim precisely because the
+    denomination is a property of the request that nothing decided — and then
+    told the counterparty a JPY deal was `$111.12`. The structured field said
+    one thing and the prose beside it said another, on the one path where the
+    Membrane, not the model, is writing the words.
+
+    The message is not part of the canonical claim, so nothing here moves a
+    digest.
+    """
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize(
+        ("price", "message"),
+        [
+            (500.0, "Here is my offer"),  # substituted: the override's message
+            (2000.0, LEAKING_MESSAGE),  # sanitised: the DLP block's message
+            (500.0, LEAKING_MESSAGE),  # both
+        ],
+    )
+    async def test_no_path_quotes_a_dollar_sign_for_a_yen_deal(
+        self, price: float, message: str
+    ) -> None:
+        decision = await guarded_membrane().inspect_outbound(
+            counter_intent(price=price, message=message),
+            negotiation_context(currency_code="JPY"),
+        )
+
+        emitted = decision.negotiation.message
+        assert "$" not in emitted, emitted
+        assert "JPY" in emitted, emitted
+
+    @pytest.mark.asyncio
+    async def test_an_unstated_denomination_quotes_a_bare_number(self) -> None:
+        """
+        Two call sites legitimately have no source for a currency and pass the
+        empty string (§3.2). A bare number is the honest rendering; the naive
+        f-string leaves a trailing space before the full stop.
+        """
+        decision = await guarded_membrane().inspect_outbound(
+            counter_intent(price=500.0), negotiation_context(currency_code="")
+        )
+
+        emitted = decision.negotiation.message
+        assert " ." not in emitted, emitted
+        assert "$" not in emitted, emitted

@@ -8,8 +8,8 @@ model proposed and a digest of what was actually sent. Those two differing IS
 the override, stated as a fact a reader can verify rather than a claim they must
 take on trust.
 
-There are two formats. `AURA-RECEIPT-V1` carries an EIP-712 signature and can be
-attributed to the agent that produced it; `AURA-RECEIPT-V0-UNSIGNED` carries
+There are two formats. `AURA-RECEIPT-V2` carries an EIP-712 signature and can be
+attributed to the agent that produced it; `AURA-RECEIPT-V2-UNSIGNED` carries
 everything else and says in its own name that it carries no attestation. Separate
 names rather than one name and a flag, so a consumer written against the signed
 format cannot be satisfied by a downgrade.
@@ -20,6 +20,7 @@ everything a reader might want.
 """
 
 import hashlib
+from dataclasses import replace
 
 import pytest
 from aura_core import decision_outcome_name
@@ -28,6 +29,7 @@ from aura_core_gen.aura.core.v1 import (
     AssetIntent,
     DecisionDerivation,
     DecisionOutcome,
+    DecisionReceipt,
     Intent,
     NegotiationIntent,
     RWAVaultIntent,
@@ -63,7 +65,7 @@ def counter(price: float, item: str = "htl-9931", message: str = "an offer") -> 
 class TestTheCanonicalClaim:
     def test_it_names_the_decidable_content(self) -> None:
         assert canonical_claim(counter(price=105.0)) == (
-            "action=counter;item=htl-9931;price=105.00"
+            "action=counter;item=htl-9931;price=105.00;currency="
         )
 
     def test_prose_is_excluded(self) -> None:
@@ -206,6 +208,26 @@ class TestTheCanonicalClaim:
         assert (
             claim_digest(intent)
             == hashlib.sha256(canonical_claim(intent).encode("utf-8")).hexdigest()
+        )
+
+
+class TestCurrencyIsPartOfTheClaim:
+    def test_two_currencies_are_two_claims(self) -> None:
+        """
+        The same number in two denominations is not the same decision, and the
+        doc has promised this field since §3.2 while the code omitted it.
+        """
+        eur = counter(100.0)
+        eur.negotiation.currency_code = "EUR"
+        usd = counter(100.0)
+        usd.negotiation.currency_code = "USD"
+        assert claim_digest(eur) != claim_digest(usd)
+
+    def test_the_canonical_form_matches_the_documented_one(self) -> None:
+        intent = counter(100.0, item="htl-9931")
+        intent.negotiation.currency_code = "EUR"
+        assert canonical_claim(intent) == (
+            "action=counter;item=htl-9931;price=100.00;currency=EUR"
         )
 
 
@@ -402,6 +424,7 @@ class TestVerifyIsHonestAboutWhatItCannotCheck:
             emission=counter(price=105.0),
             outcome=DecisionOutcome.DECISION_OUTCOME_OVERRIDE,
             outcome_gate="DLP_BLOCK",
+            override_scope="prose",
         )
 
         assert verify(receipt).ok
@@ -447,6 +470,88 @@ class TestVerifyIsHonestAboutWhatItCannotCheck:
 
         assert not result.ok
         assert any("version" in failure for failure in result.failures)
+
+
+class TestVerifyNamesWhatItCannotCheck:
+    def test_emission_content_is_always_unverifiable(self) -> None:
+        """
+        verify() receives the receipt and never the Intent, so it cannot learn
+        that claim_hash digests anything real. Saying so is the honest report;
+        a verifier answering "ok" while silently skipping teaches its consumer
+        to rely on a guarantee nobody made.
+        """
+        receipt = mint(
+            counter(100.0), counter(100.0), DecisionOutcome.DECISION_OUTCOME_EMIT
+        )
+        result = verify(receipt)
+        assert result.ok
+        assert "emission_content" in result.unverifiable
+
+    def test_signature_is_listed_only_when_absent(self) -> None:
+        unsigned = mint(
+            counter(100.0), counter(100.0), DecisionOutcome.DECISION_OUTCOME_EMIT
+        )
+        assert "signature" in verify(unsigned).unverifiable
+
+
+class TestOverrideScope:
+    def test_a_value_override_with_equal_hashes_fails(self) -> None:
+        receipt = mint(
+            counter(100.0),
+            counter(100.0),
+            DecisionOutcome.DECISION_OUTCOME_OVERRIDE,
+            override_scope="value",
+        )
+        assert not verify(receipt).ok
+
+    def test_a_prose_override_with_equal_hashes_passes(self) -> None:
+        receipt = mint(
+            counter(100.0),
+            counter(100.0),
+            DecisionOutcome.DECISION_OUTCOME_OVERRIDE,
+            override_scope="prose",
+        )
+        assert verify(receipt).ok
+
+    def test_a_prose_override_with_differing_hashes_fails(self) -> None:
+        """
+        Prose is defined not to reach the decidable content, so a prose-scoped
+        override whose digests differ describes something that cannot happen.
+        This direction was never checked.
+        """
+        receipt = mint(
+            counter(100.0),
+            counter(105.0),
+            DecisionOutcome.DECISION_OUTCOME_OVERRIDE,
+            override_scope="prose",
+        )
+        assert not verify(receipt).ok
+
+
+class TestDerivationIsRequired:
+    def test_a_judged_decision_must_carry_its_derivation(self) -> None:
+        """
+        The witness was optional and unenforced: a receipt could claim a rule set
+        judged it and record nothing about how.
+        """
+        receipt = mint(
+            counter(100.0),
+            counter(100.0),
+            DecisionOutcome.DECISION_OUTCOME_EMIT,
+            ruleset_version="guard/negotiation@2.0.0+abcdef0123456789",
+        )
+        result = verify(receipt)
+        assert not result.ok
+        assert any("derivation" in f for f in result.failures)
+
+    def test_an_unavailable_outcome_needs_none(self) -> None:
+        receipt = mint(
+            counter(100.0),
+            counter(100.0),
+            DecisionOutcome.DECISION_OUTCOME_UNAVAILABLE,
+            outcome_gate="POSTCONDITION_VIOLATION",
+        )
+        assert verify(receipt).ok
 
 
 class TestTheAssetClaimAlsoNamesItsDecision:
@@ -514,8 +619,15 @@ class TestSigning:
             claim=counter(price=92.0),
             emission=counter(price=105.0),
             ruleset_version="guard/negotiation@1.0.0+46cc0e38ca4f895c",
+            derivation=DecisionDerivation(
+                gate_sequence="G1_FLOOR_PRICE:fail:price",
+                derivation_hash=hashlib.sha256(
+                    b"G1_FLOOR_PRICE:fail:price"
+                ).hexdigest(),
+            ),
             outcome=DecisionOutcome.DECISION_OUTCOME_OVERRIDE,
             outcome_gate="FLOOR_PRICE_VIOLATION",
+            override_scope="value",
         )
 
     def sign_with(self, receipt: object, account: object) -> object:
@@ -696,3 +808,72 @@ class TestTheOutcomeNamesMatchTheEnum:
     def test_an_unknown_number_renders_distinctly(self) -> None:
         """It must not be mistakable for a known outcome."""
         assert decision_outcome_name(99) == "outcome_99"
+
+
+class TestVersionNames:
+    def test_the_number_is_the_generation_and_the_suffix_is_attestation(self) -> None:
+        """
+        V0-UNSIGNED and V1 encoded attestation in the generation number, so the
+        two looked like successive formats when they were one format signed and
+        unsigned.
+        """
+        assert RECEIPT_VERSION == "AURA-RECEIPT-V2-UNSIGNED"
+        assert SIGNED_VERSION == "AURA-RECEIPT-V2"
+
+    def test_the_old_formats_are_refused_not_read(self) -> None:
+        """
+        No persisted receipts exist, so V0/V1 are deleted rather than supported.
+        A verifier that best-effort reads a format it does not know is the
+        downgrade the version string exists to prevent.
+        """
+        for old in ("AURA-RECEIPT-V0-UNSIGNED", "AURA-RECEIPT-V1"):
+            result = verify(DecisionReceipt(version=old))
+            assert not result.ok
+            assert any("unknown receipt version" in f for f in result.failures)
+
+
+class TestBinding:
+    def test_the_binding_fields_are_signed(self) -> None:
+        """
+        Binding that is not in the content fields is decorative: anyone can
+        rewrite it and the signature still verifies.
+        """
+        base = mint(
+            counter(100.0),
+            counter(100.0),
+            DecisionOutcome.DECISION_OUTCOME_EMIT,
+            issued_at="2026-08-11T10:00:00Z",
+            decision_id="d-1",
+            request_id="r-1",
+        )
+        for field, value in (
+            ("issued_at", "2026-08-11T11:00:00Z"),
+            ("decision_id", "d-2"),
+            ("request_id", "r-2"),
+        ):
+            altered = replace(base, **{field: value})
+            assert _prefix(altered) != _prefix(base), field
+
+    def test_two_sessions_do_not_share_a_receipt(self) -> None:
+        """
+        Same item, same price, different deals produced a byte-identical
+        receipt, signature included — a receipt about an equivalence class of
+        decisions rather than one decision.
+        """
+        one = mint(
+            counter(100.0),
+            counter(100.0),
+            DecisionOutcome.DECISION_OUTCOME_EMIT,
+            issued_at="2026-08-11T10:00:00Z",
+            decision_id="d-1",
+            request_id="r-1",
+        )
+        two = mint(
+            counter(100.0),
+            counter(100.0),
+            DecisionOutcome.DECISION_OUTCOME_EMIT,
+            issued_at="2026-08-11T10:00:00Z",
+            decision_id="d-2",
+            request_id="r-2",
+        )
+        assert one.canonical_prefix != two.canonical_prefix

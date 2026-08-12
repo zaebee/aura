@@ -18,10 +18,10 @@ from typing import Any
 
 import yaml
 
-# How the Membrane prices a substitute offer when a gate fires. Kept closed:
-# an unrecognised strategy is a rule set claiming behaviour the engine has no
-# implementation for, which is the same failure as an undeclared gate.
-SAFE_PRICE_STRATEGIES = frozenset({"margin", "floor_markup"})
+# The only substitute strategy. Kept as a set rather than a bare string so an
+# unrecognised value reads as "a rule set claiming behaviour the engine has no
+# implementation for" — the same failure as an undeclared gate.
+SAFE_PRICE_STRATEGIES = frozenset({"safe_offer"})
 
 _RULESET_PATH = Path(__file__).with_name("ruleset.yaml")
 
@@ -43,44 +43,74 @@ class Gate:
     id: str
     code: str
     consumes: tuple[str, ...]
-    safe_price: str
+
+
+@dataclass(frozen=True)
+class Clause:
+    """One conjunct of the post-condition, in the order it is evaluated."""
+
+    id: str
+    expr: str
+    consumes: tuple[str, ...]
+
+
+@dataclass(frozen=True)
+class Postcondition:
+    """
+    What the rule set guarantees about an emitted decision.
+
+    `expr` is prose for a human reader and for the digest, never evaluated: an
+    expression evaluator in the guard would be a second implementation of the
+    rules, and the point of declaring them once is to not have that.
+    """
+
+    id: str
+    clauses: tuple[Clause, ...]
 
 
 @dataclass(frozen=True)
 class Ruleset:
     family: str
     version: str
+    safe_price: str
+    postcondition: Postcondition
     gates: tuple[Gate, ...]
     digest: str
 
     @property
     def version_string(self) -> str:
-        """`guard/negotiation@1.0.0+9c1de4a70b3f5821` — family, semver, digest."""
+        """`guard/negotiation@2.0.0+9c1de4a70b3f5821` — family, semver, digest."""
         return f"{self.family}@{self.version}+{self.digest}"
 
-    def validate_against(self, implemented: set[str]) -> None:
+    def validate_against(self, gates: set[str], clauses: set[str]) -> None:
         """
         Confirm the declaration and the implementation describe the same rules.
 
-        Both directions are errors. A declared gate with no predicate would
-        never fire while the rule set advertises that it does; an implemented
-        predicate that is not declared is a rule running outside anything a
-        receipt can account for. Either way the version string would be a claim
-        about behaviour that is not the behaviour.
+        Both directions are errors, for gates and for post-condition clauses
+        alike. A declared rule with no predicate would never fire while the rule
+        set advertises that it does; an implemented predicate that is not
+        declared runs outside anything a receipt can account for. Either way the
+        version string would name behaviour that is not the behaviour.
         """
-        declared = {gate.id for gate in self.gates}
+        for kind, declared, implemented in (
+            ("gates", {gate.id for gate in self.gates}, gates),
+            (
+                "postcondition clauses",
+                {c.id for c in self.postcondition.clauses},
+                clauses,
+            ),
+        ):
+            undeclared = sorted(implemented - declared)
+            if undeclared:
+                raise RulesetError(
+                    f"{kind} implemented but not declared in ruleset.yaml: {undeclared}"
+                )
 
-        undeclared = sorted(implemented - declared)
-        if undeclared:
-            raise RulesetError(
-                f"gates implemented but not declared in ruleset.yaml: {undeclared}"
-            )
-
-        unimplemented = sorted(declared - implemented)
-        if unimplemented:
-            raise RulesetError(
-                f"gates declared in ruleset.yaml but not implemented: {unimplemented}"
-            )
+            unimplemented = sorted(declared - implemented)
+            if unimplemented:
+                raise RulesetError(
+                    f"{kind} declared in ruleset.yaml but not implemented: {unimplemented}"
+                )
 
 
 def _canonical(mapping: dict[str, Any]) -> bytes:
@@ -94,11 +124,61 @@ def _canonical(mapping: dict[str, Any]) -> bytes:
     return json.dumps(mapping, sort_keys=True, separators=(",", ":")).encode("utf-8")
 
 
+def _clauses_from(raw_postcondition: Any) -> tuple[str, tuple[Clause, ...]]:
+    """Parse the postcondition block, rejecting anything malformed."""
+    if not isinstance(raw_postcondition, dict):
+        raise RulesetError("ruleset key 'postcondition' must be a mapping")
+
+    for key in ("id", "clauses"):
+        if key not in raw_postcondition:
+            raise RulesetError(f"postcondition is missing required key: {key!r}")
+
+    raw_clauses = raw_postcondition["clauses"]
+    if not isinstance(raw_clauses, list) or not raw_clauses:
+        raise RulesetError("postcondition key 'clauses' must be a non-empty list")
+
+    clauses: list[Clause] = []
+    seen: set[str] = set()
+    for position, raw in enumerate(raw_clauses):
+        if not isinstance(raw, dict):
+            raise RulesetError(f"clause at position {position} must be a mapping")
+        for key in ("id", "expr", "consumes"):
+            if key not in raw:
+                raise RulesetError(f"clause at position {position} is missing {key!r}")
+        if not isinstance(raw["consumes"], list):
+            raise RulesetError(
+                f"clause at position {position} declares 'consumes' as "
+                f"{type(raw['consumes']).__name__}, expected a list"
+            )
+        clause_id = str(raw["id"])
+        if clause_id in seen:
+            raise RulesetError(f"duplicate clause id in postcondition: {clause_id!r}")
+        seen.add(clause_id)
+        clauses.append(
+            Clause(
+                id=clause_id,
+                expr=str(raw["expr"]),
+                consumes=tuple(str(key) for key in raw["consumes"]),
+            )
+        )
+
+    return str(raw_postcondition["id"]), tuple(clauses)
+
+
 def ruleset_from_mapping(mapping: dict[str, Any]) -> Ruleset:
     """Build a Ruleset from already-parsed YAML, rejecting anything malformed."""
-    for key in ("family", "version", "gates"):
+    for key in ("family", "version", "safe_price", "postcondition", "gates"):
         if key not in mapping:
             raise RulesetError(f"ruleset is missing required key: {key!r}")
+
+    strategy = str(mapping["safe_price"])
+    if strategy not in SAFE_PRICE_STRATEGIES:
+        raise RulesetError(
+            f"ruleset declares unknown safe_price strategy {strategy!r}; "
+            f"expected one of {sorted(SAFE_PRICE_STRATEGIES)}"
+        )
+
+    postcondition_id, clauses = _clauses_from(mapping["postcondition"])
 
     raw_gates = mapping["gates"]
     if not isinstance(raw_gates, list) or not raw_gates:
@@ -113,9 +193,18 @@ def ruleset_from_mapping(mapping: dict[str, Any]) -> Ruleset:
         if not isinstance(raw, dict):
             raise RulesetError(f"gate at position {position} must be a mapping")
 
-        for key in ("id", "code", "consumes", "safe_price"):
+        for key in ("id", "code", "consumes"):
             if key not in raw:
                 raise RulesetError(f"gate at position {position} is missing {key!r}")
+
+        # Refused rather than ignored: this key is what a stale pre-collapse
+        # ruleset.yaml still carries, and ignoring it would load a file that
+        # describes two strategies into an engine that implements one.
+        if "safe_price" in raw:
+            raise RulesetError(
+                f"gate at position {position} declares a per-gate 'safe_price'; "
+                "the strategy is declared once for the set"
+            )
 
         if not isinstance(raw["consumes"], list):
             raise RulesetError(
@@ -128,19 +217,11 @@ def ruleset_from_mapping(mapping: dict[str, Any]) -> Ruleset:
             raise RulesetError(f"duplicate gate id in ruleset: {gate_id!r}")
         seen.add(gate_id)
 
-        strategy = str(raw["safe_price"])
-        if strategy not in SAFE_PRICE_STRATEGIES:
-            raise RulesetError(
-                f"gate {gate_id!r} declares unknown safe_price strategy "
-                f"{strategy!r}; expected one of {sorted(SAFE_PRICE_STRATEGIES)}"
-            )
-
         gates.append(
             Gate(
                 id=gate_id,
                 code=str(raw["code"]),
                 consumes=tuple(str(key) for key in raw["consumes"]),
-                safe_price=strategy,
             )
         )
 
@@ -153,13 +234,16 @@ def ruleset_from_mapping(mapping: dict[str, Any]) -> Ruleset:
     canonical = {
         "family": family,
         "version": version,
+        "safe_price": strategy,
+        "postcondition": {
+            "id": postcondition_id,
+            "clauses": [
+                {"id": c.id, "expr": c.expr, "consumes": list(c.consumes)}
+                for c in clauses
+            ],
+        },
         "gates": [
-            {
-                "id": gate.id,
-                "code": gate.code,
-                "consumes": list(gate.consumes),
-                "safe_price": gate.safe_price,
-            }
+            {"id": gate.id, "code": gate.code, "consumes": list(gate.consumes)}
             for gate in gates
         ],
     }
@@ -167,6 +251,8 @@ def ruleset_from_mapping(mapping: dict[str, Any]) -> Ruleset:
     return Ruleset(
         family=family,
         version=version,
+        safe_price=strategy,
+        postcondition=Postcondition(id=postcondition_id, clauses=clauses),
         gates=tuple(gates),
         digest=hashlib.sha256(_canonical(canonical)).hexdigest()[:_DIGEST_CHARS],
     )

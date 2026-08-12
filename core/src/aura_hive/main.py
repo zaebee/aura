@@ -111,10 +111,14 @@ class NegotiationService:
 
                 # Copied ahead of the result branches for the same reason the
                 # Connector copies it ahead of its own: this response is built
-                # field by field, and a receipt attached inside one branch is a
-                # receipt the other branches drop.
-                if neg.receipt is not None and neg.receipt.version:
-                    response.receipt = neg.receipt
+                # field by field, and a token attached inside one branch is a
+                # token the other branches drop.
+                #
+                # The receipt itself no longer travels here at all. It is
+                # addressed to an auditor and reaches them through the
+                # structured log; what the counterparty gets is this handle,
+                # which the auditor resolves. See DECISION_RECEIPT.md §1.1.
+                response.dispute_token = neg.dispute_token
 
                 res_name, res_val = betterproto.which_one_of(neg, "result")
                 if res_name == "accepted" and res_val:

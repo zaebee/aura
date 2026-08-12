@@ -13,8 +13,6 @@ if TYPE_CHECKING:
 import betterproto
 import grpclib.client
 import nats
-from aura_core import decision_outcome_name
-from aura_core_gen.aura.core.v1 import DecisionReceipt
 from fastapi import (
     Depends,
     FastAPI,
@@ -200,71 +198,6 @@ class NegotiationRequestHTTP(BaseModel):
     agent_did: str
 
 
-def receipt_to_json(receipt: DecisionReceipt | None) -> dict[str, Any] | None:
-    """
-    Render a decision receipt for a machine consumer.
-
-    Nested as one object rather than spread across the response's top-level
-    keys: the deferred premise hash and policy stamp land in this same message,
-    and flattening would make each of them a separate decision about the shape
-    of this endpoint.
-
-    Two properties are what make the result usable by someone who does not run
-    our code. The signature block carries its own EIP-712 domain, so a consumer
-    rebuilds it and calls `ecrecover` without knowing how we are configured. And
-    `outcome` travels as the name that was signed rather than its protobuf
-    integer, so reconstructing the signed content needs no mapping step — which
-    is where a consumer would otherwise get it wrong.
-
-    Absences are reported as null rather than as empty shapes. An empty
-    signature object invites a reader to check its fields and find blanks; an
-    empty derivation asserts gates that never ran.
-    """
-    # By value, not by reference. betterproto default-constructs a message
-    # field on access rather than returning None, so `response.receipt` is a
-    # DecisionReceipt of blanks when the core never set one. An identity check
-    # here never fires, and every receipt-less response would render an object
-    # full of empty strings — the opposite of the rule this function follows.
-    #
-    # `version` is the sentinel because `mint` always sets it: a receipt that
-    # exists has one, and a default-constructed one does not.
-    if receipt is None or not receipt.version:
-        return None
-
-    signature = receipt.signature
-    derivation = receipt.derivation
-
-    return {
-        "version": receipt.version,
-        "canonical_prefix": receipt.canonical_prefix,
-        "outcome": decision_outcome_name(receipt.outcome),
-        "outcome_gate": receipt.outcome_gate,
-        "claim_hash": receipt.claim_hash,
-        "emission_hash": receipt.emission_hash,
-        "ruleset_version": receipt.ruleset_version,
-        "derivation": (
-            {
-                "gate_sequence": derivation.gate_sequence,
-                "derivation_hash": derivation.derivation_hash,
-            }
-            if derivation is not None and derivation.derivation_hash
-            else None
-        ),
-        "signature": (
-            {
-                "scheme": signature.scheme,
-                "domain": signature.domain,
-                "domain_version": signature.domain_version,
-                "chain_id": signature.chain_id,
-                "signer": signature.signer,
-                "signature": signature.signature,
-            }
-            if signature is not None and signature.signature
-            else None
-        ),
-    }
-
-
 @app.post("/v1/negotiate")
 async def negotiate(
     request: Request,
@@ -293,11 +226,36 @@ async def negotiate(
 
         result_name, result_val = betterproto.which_one_of(response, "result")
 
+        # No receipt, in any shape. It is addressed to an auditor and reaches
+        # them through the core's structured log (DECISION_RECEIPT.md §1.1).
+        #
+        # Trimming it to `version` + `canonical_prefix` was not enough. The
+        # prefix is a 64-bit digest over eleven content fields, ten of which a
+        # counterparty either holds or can guess — a reviewer recovered the
+        # model's own proposed price and the gate that fired from
+        # {session_token, price, prefix} plus the published rule set version, in
+        # 7.3M SHA-256 and 8.1 seconds on one CPython thread. And `version` was
+        # worse than the prefix: `_attest` degrades to the UNSIGNED name on any
+        # signing failure, so watching this field was a live feed of whether our
+        # transaction protein was reachable, while `receipt: null` versus an
+        # object said whether minting had happened at all.
+        #
+        # Nothing evidential is lost. The counterparty received the prefix
+        # without the signature block, so it was never probative in their hands:
+        # they could not tell a real receipt from one we made up. `dispute_token`
+        # is a handle the auditor resolves, which is what the prefix was
+        # supposed to be.
+        #
+        # This does NOT close the channel — see §3.4. `proposed_price` still
+        # leaks, and a repeat counterparty on one item averages the jitter down
+        # to about 0.09% of the base over 100 sessions. What it closes is
+        # one-shot recovery of the model's own proposed price and which gate
+        # fired.
         output = {
             "session_token": response.session_token,
             "status": result_name,
             "valid_until": response.valid_until_timestamp,
-            "receipt": receipt_to_json(response.receipt),
+            "dispute_token": response.dispute_token,
         }
 
         if result_name == "accepted" and result_val:

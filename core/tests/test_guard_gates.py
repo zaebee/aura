@@ -13,7 +13,11 @@ order rather than a hand-written if-chain.
 """
 
 import pytest
-from aura_hive.hive.proteins.guard.engine import OutputGuard, SafetyViolation
+from aura_hive.hive.proteins.guard.engine import (
+    GuardUnavailable,
+    OutputGuard,
+    SafetyViolation,
+)
 from aura_hive.hive.proteins.guard.ruleset import RulesetError, load_ruleset
 
 
@@ -103,6 +107,62 @@ class TestGateOrder:
         )
 
 
+class TestTheMarginGateAgreesWithPsi:
+    """
+    G4 and PSI_MIN_MARGIN state the same rule and must decide it the same way.
+
+    The receipt leans on that: `override_scope="value"` with equal digests is
+    reported as "a substitution that left no trace", which is only a sound
+    reading if a gate that fails implies psi that fails. While G4 read
+    `(price - cost) / price >= m` in binary floats against the RAW setting and
+    psi read `price * (1 - m) >= cost` in Decimal against the CLAMPED one, the
+    two disagreed in both directions.
+    """
+
+    def test_a_price_psi_accepts_is_not_refused_by_the_gate(self) -> None:
+        """
+        2094.00 at cost 1696.14 and m = 0.19 is EXACTLY right: 2094 x 0.81 is
+        1696.14 to the cent. The float ratio makes it 0.18999999999999995 and
+        refuses it. This is the guard's own substitute formula's output, so the
+        old gate refused prices the guard itself would have offered — 9,444 of
+        them in a 1.6M-case scan.
+        """
+
+        class _Nineteen:
+            min_profit_margin = 0.19
+
+        engine = guard(_Nineteen())
+        assert engine.validate_decision(
+            decision(price=2094.00), context(floor=1000.0, cost=1696.14)
+        )
+        assert engine.check_postcondition(
+            {"price": 2094.00}, {"floor_price": 1000.0, "internal_cost": 1696.14}
+        ).holds
+
+    def test_a_non_finite_margin_does_not_open_the_gate(self) -> None:
+        """
+        `min_profit_margin` is env-configurable and `float("nan")` parses clean.
+        G3 checks presence, not range, so the NaN reached G4 — where
+        `margin < nan` is False and every proposal passed, while psi used the
+        clamped default and refused everything below cost/0.9. One typo, a
+        systematic UNAVAILABLE outage rather than a loud misconfiguration.
+        """
+
+        class _NotANumber:
+            min_profit_margin = float("nan")
+
+        engine = guard(_NotANumber())
+        with pytest.raises(SafetyViolation) as caught:
+            engine.validate_decision(
+                decision(price=1010.0), context(floor=1000.0, cost=1000.0)
+            )
+
+        assert caught.value.code == "MIN_MARGIN_VIOLATION"
+        assert not engine.check_postcondition(
+            {"price": 1010.0}, {"floor_price": 1000.0, "internal_cost": 1000.0}
+        ).holds
+
+
 class TestDeclarationMatchesImplementation:
     def test_the_engine_implements_exactly_the_declared_gates(self) -> None:
         """
@@ -110,32 +170,39 @@ class TestDeclarationMatchesImplementation:
         but not implemented never fires while the rule set says it does; one
         implemented but not declared runs outside anything a receipt records.
         """
-        load_ruleset().validate_against(set(OutputGuard.gate_ids()))
+        load_ruleset().validate_against(
+            set(OutputGuard.gate_ids()), set(OutputGuard.clause_ids())
+        )
 
     def test_an_engine_missing_a_declared_gate_is_rejected(self) -> None:
         with pytest.raises(RulesetError, match="G4_MARGIN_VIOLATION"):
             load_ruleset().validate_against(
-                set(OutputGuard.gate_ids()) - {"G4_MARGIN_VIOLATION"}
+                set(OutputGuard.gate_ids()) - {"G4_MARGIN_VIOLATION"},
+                set(OutputGuard.clause_ids()),
             )
 
 
 class TestSafePriceStrategy:
-    def test_the_margin_gate_prices_above_the_floor_markup(self) -> None:
+    def test_the_reason_no_longer_selects_a_formula(self) -> None:
         """
-        floor/(1-m) against floor*1.05: the two formulas are not interchangeable,
-        which is why the gate declares which one applies.
+        The strategy is declared once for the set now (ruleset.yaml
+        `safe_price: safe_offer`), not per gate, so which gate fired no longer
+        changes which formula prices the substitute. Transitional: this is the
+        old `margin` formula standing in for every reason until Task 3 replaces
+        it with the real `safe_offer` computation.
         """
         engine = guard(_Safety())
 
         margin_price = engine.calculate_safe_price(context(), "MIN_MARGIN_VIOLATION")
         markup_price = engine.calculate_safe_price(context(), "FLOOR_PRICE_VIOLATION")
 
-        assert margin_price > markup_price
+        assert margin_price == markup_price
 
-    def test_missing_settings_gets_the_conservative_formula(self) -> None:
+    def test_missing_settings_gets_the_same_formula(self) -> None:
         """
-        G3 declares `safe_price: margin` precisely so a misconfigured deployment
-        does not answer with the cheaper number.
+        Every reason prices the same way now that the strategy is set-wide, so
+        a misconfigured deployment does not answer with a cheaper number by
+        virtue of which gate happened to fire.
         """
         engine = guard(_Safety())
 
@@ -143,14 +210,16 @@ class TestSafePriceStrategy:
             context(), "SETTINGS_MISSING"
         ) == engine.calculate_safe_price(context(), "MIN_MARGIN_VIOLATION")
 
-    def test_an_unrecognised_reason_falls_back_to_the_floor_markup(self) -> None:
+    def test_an_unrecognised_reason_still_yields_a_price(self) -> None:
         """
         Callers pass reasons the rule set does not name — FAILURE_RECOVERY comes
-        from the Membrane, not from a gate — and those still need a price.
+        from the Membrane, not from a gate — and those still need a price. There
+        is one formula now, so an unrecognised reason gets the same answer as
+        every other.
         """
         assert guard(_Safety()).calculate_safe_price(
             context(), "FAILURE_RECOVERY"
-        ) == pytest.approx(1050.0)
+        ) == pytest.approx(1111.12)
 
 
 class TestSafePriceNeverUndercutsTheFloor:
@@ -249,15 +318,26 @@ class TestUnusableInputsStillNameAGate:
             {"floor_price": 1000.0, "internal_cost": "unknown"},
         )
 
-    def test_a_null_floor_still_yields_a_safe_price(self) -> None:
+    def test_a_null_floor_and_absent_cost_refuses_rather_than_pricing_at_zero(
+        self,
+    ) -> None:
         """
-        Reached from inside `skill.py`'s SafetyViolation handler, which is a
-        sibling of its generic `except Exception` rather than nested inside it.
-        A raise here escapes the skill entirely.
+        A null floor and no internal_cost at all used to both default to
+        Decimal(0), producing a "safe price" of 0.0 — a value that fails the
+        guard's own G1_PRICE_POSITIVE gate and psi's `price > 0`, and unlike
+        an exception, one a caller could forward as a real counter-offer
+        without ever learning it was never priced. There is no trustworthy
+        premise left when neither input is usable, so this now refuses.
+
+        Reached from inside `skill.py`'s SafetyViolation handler, which
+        catches this specific exception rather than letting it escape the
+        skill (see test_guard_safe_offer.py's TestGuardUnavailable for the
+        engine-level cases, and test_guard_unavailable.py for that handling).
         """
-        assert guard(_Safety()).calculate_safe_price(
-            {"floor_price": None}, "FLOOR_PRICE_VIOLATION"
-        ) == pytest.approx(0.0)
+        with pytest.raises(GuardUnavailable):
+            guard(_Safety()).calculate_safe_price(
+                {"floor_price": None}, "FLOOR_PRICE_VIOLATION"
+            )
 
 
 class TestFailClosedOnIncompleteSettings:

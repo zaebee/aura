@@ -1,11 +1,20 @@
 """
 Mints and checks what the Membrane can attest about a decision.
 
-Two formats, and the difference is the point. `AURA-RECEIPT-V1` carries an
+Two formats, and the difference is the point. `AURA-RECEIPT-V2` carries an
 EIP-712 signature over its content fields and can be attributed to the agent
-that produced it. `AURA-RECEIPT-V0-UNSIGNED` carries everything else and says in
+that produced it. `AURA-RECEIPT-V2-UNSIGNED` carries everything else and says in
 its own name that it carries no attestation, which is what a deployment with no
 key configured honestly produces.
+
+The number is the format generation; the suffix is attestation. V0 and V1 read
+as though they were successive formats, but they were one format signed and
+unsigned — the generation never actually changed between them. V2 is the first
+real generation bump: `issued_at`, `decision_id` and `request_id` enter the
+signed content, binding a receipt to the one decision it describes instead of
+to an equivalence class of decisions that happen to share a claim and an
+emission. V0 and V1 are deleted rather than deprecated — no persisted receipt
+exists anywhere to read back in the old shape.
 
 They are separate names rather than one name and a flag, so a consumer written
 against the signed format cannot be satisfied by a downgrade, and `verify`
@@ -46,8 +55,8 @@ from eth_account.messages import encode_typed_data
 # unsigned one, so a consumer written against it cannot be satisfied by a
 # downgrade. A deployment with no key configured produces the unsigned format
 # and says so — that is the honest report, not an error.
-RECEIPT_VERSION = "AURA-RECEIPT-V0-UNSIGNED"
-SIGNED_VERSION = "AURA-RECEIPT-V1"
+RECEIPT_VERSION = "AURA-RECEIPT-V2-UNSIGNED"
+SIGNED_VERSION = "AURA-RECEIPT-V2"
 
 # Kept DISTINCT from the domain TradeIntent signs under (`HackathonRiskRouter`).
 #
@@ -63,12 +72,6 @@ _SIGNATURE_SCHEME = "eip712"
 # Width of the human-legible handle, in hex characters. Enough to be distinctive
 # in a log line, and not a commitment — nothing is bound until something signs.
 _PREFIX_CHARS = 16
-
-# Gates that alter prose and nothing else, so an override under one of them
-# leaves claim and emission hashing alike. Naming them is what lets `verify`
-# distinguish that legitimate case from a receipt claiming a substitution that
-# did not happen.
-_PROSE_ONLY_GATES = frozenset({"DLP_BLOCK"})
 
 
 @dataclass(frozen=True)
@@ -119,10 +122,14 @@ def canonical_claim(intent: Intent) -> str:
 
     if params_name == "negotiation" and params_value is not None:
         negotiation: NegotiationIntent = params_value
+        # An unset currency renders empty rather than defaulting to one. A
+        # denomination nobody stated is not USD; inventing one would make two
+        # different decisions share a digest.
         return (
             f"action={action};"
             f"item={negotiation.item_identifier};"
-            f"price={negotiation.price:.2f}"
+            f"price={negotiation.price:.2f};"
+            f"currency={negotiation.currency_code}"
         )
 
     shape = f"action={action};params={params_name or 'none'}"
@@ -189,22 +196,28 @@ def claim_digest(intent: Intent) -> str:
 
 def _content_fields(receipt: DecisionReceipt) -> str:
     """
-    The fields the prefix commits to, concatenated in fixed order.
+    The fields the prefix and the signature commit to, in fixed order.
 
-    Order is part of the canonical form: reordering would produce a different
-    prefix and fail verification, which is the intended behaviour rather than an
-    inconvenience.
+    Order is part of the canonical form: reordering produces a different prefix
+    and fails verification, which is intended rather than inconvenient.
+
+    `issued_at`, `decision_id` and `request_id` are here rather than alongside
+    because binding that is not signed is decorative — anyone can rewrite it.
     """
     derivation = receipt.derivation or DecisionDerivation()
     return "\n".join(
         [
             receipt.version,
+            receipt.issued_at,
+            receipt.decision_id,
+            receipt.request_id,
             receipt.claim_hash,
             receipt.ruleset_version,
             derivation.derivation_hash,
             receipt.emission_hash,
             decision_outcome_name(receipt.outcome),
             receipt.outcome_gate,
+            receipt.override_scope,
         ]
     )
 
@@ -221,14 +234,17 @@ def mint(
     outcome_gate: str = "",
     ruleset_version: str = "",
     derivation: DecisionDerivation | None = None,
+    issued_at: str = "",
+    decision_id: str = "",
+    request_id: str = "",
+    override_scope: str = "",
 ) -> DecisionReceipt:
     """
     Build the receipt for one decision.
 
-    `claim` is what the Transformer proposed; `emission` is what is actually
-    being sent. Passing the same Intent for both is correct when the Membrane
-    changed nothing — the two hashes agreeing is then a fact a reader can check,
-    not an assumption.
+    `claim` is what the Transformer proposed; `emission` is what is being sent.
+    Passing the same Intent for both is correct when the Membrane changed
+    nothing — the two hashes agreeing is then a fact a reader can check.
     """
     receipt = DecisionReceipt(
         version=RECEIPT_VERSION,
@@ -237,6 +253,10 @@ def mint(
         emission_hash=claim_digest(emission),
         outcome=outcome,
         outcome_gate=outcome_gate,
+        issued_at=issued_at,
+        decision_id=decision_id,
+        request_id=request_id,
+        override_scope=override_scope,
     )
     if derivation is not None:
         receipt.derivation = derivation
@@ -367,26 +387,50 @@ def verify(receipt: DecisionReceipt) -> VerificationResult:
 
     changed = receipt.claim_hash != receipt.emission_hash
 
-    if receipt.outcome == DecisionOutcome.DECISION_OUTCOME_OVERRIDE and not changed:
-        # A prose-only gate legitimately leaves the two equal, because prose is
-        # outside the claim. Any other gate claiming a substitution that left no
-        # trace is a receipt describing something that did not happen.
-        if receipt.outcome_gate not in _PROSE_ONLY_GATES:
+    if receipt.outcome == DecisionOutcome.DECISION_OUTCOME_OVERRIDE:
+        # Checked in both directions. A value-scoped override that left the
+        # digests alike describes a substitution that did not happen; a
+        # prose-scoped one whose digests differ describes prose reaching the
+        # decidable content, which prose is defined not to do.
+        if receipt.override_scope == "prose" and changed:
             failures.append(
-                "override recorded but claim and emission hash alike, and "
-                f"{receipt.outcome_gate!r} is not a prose-only gate"
+                "override scoped to prose but the claim and emission digests differ"
+            )
+        elif receipt.override_scope != "prose" and not changed:
+            failures.append(
+                "override recorded but claim and emission hash alike, and the "
+                f"scope is {receipt.override_scope or 'unset'!r} rather than 'prose'"
             )
 
     if receipt.outcome == DecisionOutcome.DECISION_OUTCOME_EMIT and changed:
         failures.append("emit recorded but the emission does not match the claim")
 
-    # Named rather than counted, so a caller reads what is missing instead of a
-    # number they have to look up. The premise hash and the policy stamp are
-    # still unbuilt, so they stay listed even on a signed receipt: a signature
-    # attests to what the receipt says, not to everything a reader might want.
-    unverifiable = ["premises", "policy"]
+    # A rule set judged this decision, so it must say how. The witness used to
+    # be optional: a receipt could name the rules and record nothing about their
+    # application, and verify would pass it.
+    derivation_missing = not (derivation.gate_sequence or derivation.derivation_hash)
+    judged = receipt.outcome in (
+        DecisionOutcome.DECISION_OUTCOME_EMIT,
+        DecisionOutcome.DECISION_OUTCOME_OVERRIDE,
+    )
+    if judged and receipt.ruleset_version and derivation_missing:
+        failures.append(
+            f"receipt cites rule set {receipt.ruleset_version!r} but carries no derivation"
+        )
+
+    # Computed, not a constant. A caller reads what this verifier could not
+    # establish about THIS receipt, so the list stays true as fields land.
+    unverifiable: list[str] = []
     if not attested:
-        unverifiable.insert(0, "signature")
+        unverifiable.append("signature")
+    # Always. verify() is handed the receipt and never the Intent, so it cannot
+    # establish that claim_hash digests the decision the model actually made.
+    # Naming it is the difference between a verifier and a rubber stamp.
+    unverifiable.append("emission_content")
+    if not receipt.issued_at:
+        unverifiable.append("freshness")
+    # Still unbuilt; see DECISION_RECEIPT.md §3.1 and §3.5.
+    unverifiable.extend(["premises", "policy"])
 
     return VerificationResult(
         ok=not failures,

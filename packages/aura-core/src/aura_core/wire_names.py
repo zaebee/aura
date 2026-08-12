@@ -24,6 +24,11 @@ _DECISION_OUTCOMES = {
     1: "emit",
     2: "override",
     3: "refuse",
+    # No verdict could be established, as opposed to a verdict against the
+    # decision. Named rather than left to the fallback because this string is
+    # signed: `outcome_4` would be a signature over a name that means nothing to
+    # a reader, and the name is the whole reason the integer is not signed.
+    4: "unavailable",
 }
 
 

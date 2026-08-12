@@ -1,6 +1,9 @@
 import hashlib
+import hmac
+import secrets
 from collections.abc import Callable
 from dataclasses import dataclass
+from decimal import ROUND_CEILING, Decimal, localcontext
 from typing import Any
 
 import structlog
@@ -11,15 +14,46 @@ from .ruleset import Ruleset, load_ruleset
 
 logger = structlog.get_logger(__name__)
 
-# Markup applied to the floor when a gate asks for the `floor_markup` strategy.
-# Not operator-tunable: unlike min_profit_margin this is the shape of the
-# fallback rather than a policy dial, so it belongs with the rules.
-_FLOOR_MARKUP = 1.05
+# Markup floor for the substitute. Not operator-tunable: unlike
+# min_profit_margin this is the shape of the fallback rather than a policy dial.
+_FLOOR_MARKUP = Decimal("1.05")
 
-# Used when the configured margin cannot be read or is out of range. Matches
-# the default on SafetySettings, so a deployment that loses its setting behaves
-# like one that never overrode it.
-_DEFAULT_MARGIN = 0.1
+# Used when the configured margin cannot be read or is out of range. Matches the
+# default on SafetySettings, so a deployment that loses its setting behaves like
+# one that never overrode it.
+_DEFAULT_MARGIN = Decimal("0.1")
+
+# Cent, as the quantum every emitted price is rounded to.
+_CENT = Decimal("0.01")
+
+# Precision for the arithmetic in calculate_safe_price, widened from the
+# default 28-digit context.
+#
+# A `floor_price` arrives over a protobuf `double`, whose magnitude can reach
+# ~1.8e308. Quantizing a value that large to the cent needs a digit for every
+# place from there down to the hundredths — over 300 of them — and the
+# default context's quantize raises decimal.InvalidOperation rather than
+# rounding when the result does not fit in its precision. 400 digits covers
+# a double's full range with room to spare for the 1.05x markup.
+_QUANTIZE_PRECISION = 400
+
+# Upper bound on the multiplicative noise applied to a substitute price.
+#
+# Without it the substitute is a deterministic function of the hidden floor, and
+# a counterparty who receives one inverts it exactly. This bounds the disclosure
+# rather than closing it: the constant is public, so they still learn the floor
+# to within 3%. Closing the channel outright means refusing instead of
+# countering, which is a product decision taken the other way.
+_SAFE_OFFER_JITTER = Decimal("0.03")
+
+# Keyed on request_id so the noise is constant within a negotiation — redrawn
+# per decision, a counterparty averages it away over rounds.
+#
+# Process-lifetime random rather than configured, because nothing needs to
+# reproduce the price: the post-condition checks the value. So there is no
+# setting to add, no fail-closed branch for a missing secret, and nothing to
+# rotate. A restart mid-session reshuffles it, which only adds noise.
+_JITTER_SECRET = secrets.token_bytes(32)
 
 
 def _numeric(mapping: dict, key: str, default: float = 0.0) -> float:
@@ -45,6 +79,50 @@ def _numeric(mapping: dict, key: str, default: float = 0.0) -> float:
     except (TypeError, ValueError):
         logger.warning("guard_unusable_numeric_input", key=key, value=repr(value))
         return default
+
+
+def _decimal(mapping: dict, key: str, default: Decimal = Decimal(0)) -> Decimal:
+    """
+    Read a money value as Decimal, tolerating a caller who did not send one.
+
+    Via `str` rather than the float directly: Decimal(0.1) is
+    0.1000000000000000055511151231257827, and money arithmetic that starts there
+    ends somewhere a cent away.
+
+    NaN and +/-Infinity are legal `double` wire values but are not usable
+    money — they cannot be ordered or quantized, and `Decimal(str(value))`
+    parses them without error, so nothing upstream of this catches them.
+    Treated the same as a missing value: the input carried no trustworthy
+    number either way, so this returns `default` rather than propagating a
+    value that would raise the first time calculate_safe_price compares or
+    quantizes it.
+    """
+    value = mapping.get(key, None)
+    if value is None:
+        return default
+    try:
+        parsed = Decimal(str(value))
+    except (TypeError, ValueError, ArithmeticError):
+        logger.warning("guard_unusable_numeric_input", key=key, value=repr(value))
+        return default
+    if not parsed.is_finite():
+        logger.warning("guard_unusable_numeric_input", key=key, value=repr(value))
+        return default
+    return parsed
+
+
+def _jitter(request_id: str) -> Decimal:
+    """
+    Multiplicative noise in [0, _SAFE_OFFER_JITTER), stable for one request_id.
+
+    An empty request_id yields zero rather than a random draw: a caller with no
+    session to key on gets the deterministic price, and the absence is visible
+    in the number rather than hidden behind noise nobody can reproduce.
+    """
+    if not request_id:
+        return Decimal(0)
+    digest = hmac.new(_JITTER_SECRET, request_id.encode("utf-8"), "sha256").digest()
+    return _SAFE_OFFER_JITTER * Decimal(int.from_bytes(digest, "big")) / Decimal(2**256)
 
 
 # Separates records in the canonical sequence. ASCII unit separator: it cannot
@@ -126,6 +204,29 @@ class SafetyViolation(Exception):
         self.derivation = derivation
 
 
+class GuardUnavailable(Exception):
+    """
+    Raised when the guard could not establish a verdict at all.
+
+    A sibling of SafetyViolation rather than a subclass. A rule judging against
+    a decision and a judgment that never happened send an operator to different
+    places — one to the offer, one to the dependency that is down — and a caller
+    that catches one must not silently catch the other.
+    """
+
+    def __init__(self, message: str, code: str = "GUARD_UNAVAILABLE") -> None:
+        super().__init__(message)
+        self.code = code
+
+
+@dataclass(frozen=True)
+class PostconditionResult:
+    """Whether the emitted value satisfies psi, and which clause stopped it."""
+
+    holds: bool
+    failed_clause: str | None
+
+
 class OutputGuard:
     """
     Deterministic safety layer for Aura Core.
@@ -140,11 +241,7 @@ class OutputGuard:
         # Refuse to run against a rule set that does not describe this engine.
         # Doing it here rather than at import time means a bad rule set fails
         # where it can be attributed, and a test can supply its own.
-        self.ruleset.validate_against(set(self.gate_ids()))
-
-        self._safe_price_strategies = {
-            gate.code: gate.safe_price for gate in self.ruleset.gates
-        }
+        self.ruleset.validate_against(set(self.gate_ids()), set(self.clause_ids()))
 
     # Gate id -> the predicate that decides it. The ids are the contract with
     # ruleset.yaml: `Ruleset.validate_against(gate_ids())` refuses to run if the
@@ -190,19 +287,37 @@ class OutputGuard:
         return True
 
     def _gate_margin_violation(self, decision: dict, context: dict) -> bool:
-        price = _numeric(decision, "price")
-        internal_cost = _numeric(context, "internal_cost")
-        margin = (price - internal_cost) / price if price > 0 else 0
+        # Deliberately the SAME predicate as `_clause_min_margin`, on the same
+        # Decimal arithmetic and the same clamped margin. The gate used to read
+        # `(price - cost) / price >= self.settings.min_profit_margin` in binary
+        # floats against the RAW setting, and the two disagreements that
+        # produced were not cosmetic:
+        #
+        #   * the ratio form is not decidable on money — over a 1.6M-case scan
+        #     of admissible inputs, 9,444 proposals FAILED this gate while psi
+        #     held on the very same numbers, so the Membrane substituted a price
+        #     under a MIN_MARGIN_VIOLATION receipt recording a violation that
+        #     had not occurred;
+        #   * `min_profit_margin` is env-configurable and `float("nan")` parses
+        #     clean. G3 checks presence, not range, so a NaN reached here, and
+        #     `margin < nan` is False — the gate passed everything while psi,
+        #     reading the clamped default, refused everything below cost/0.9.
+        #     One config typo, a systematic UNAVAILABLE outage.
+        #
+        # The receipt's override_scope check ("value scope with equal digests is
+        # a substitution that left no trace") is only sound if a failing gate
+        # implies psi is violated. Reading the two the same way is what makes
+        # that implication true rather than nearly true.
+        price = _decimal(decision, "price")
+        internal_cost = _decimal(context, "internal_cost")
+        min_margin = self._configured_margin()
 
-        # Reached only after G3_SETTINGS_PRESENT passed, so settings are here.
-        min_margin = self.settings.min_profit_margin
-        if margin < min_margin:
+        if price * (1 - min_margin) < internal_cost:
             logger.warning(
                 "safety_margin_violation",
-                offered_price=price,
-                internal_cost=internal_cost,
-                margin=margin,
-                min_margin=min_margin,
+                offered_price=str(price),
+                internal_cost=str(internal_cost),
+                min_margin=str(min_margin),
             )
             return False
         return True
@@ -219,6 +334,11 @@ class OutputGuard:
         """The gates this engine can evaluate, for cross-checking the rule set."""
         return tuple(cls._MESSAGES)
 
+    @classmethod
+    def clause_ids(cls) -> tuple[str, ...]:
+        """The post-condition clauses this engine can evaluate."""
+        return ("PSI_PRICE_POSITIVE", "PSI_ABOVE_FLOOR", "PSI_MIN_MARGIN")
+
     def _predicate(self, gate_id: str) -> Callable[[dict, dict], bool]:
         return {
             "G1_PRICE_POSITIVE": self._gate_price_positive,
@@ -226,6 +346,59 @@ class OutputGuard:
             "G3_SETTINGS_PRESENT": self._gate_settings_present,
             "G4_MARGIN_VIOLATION": self._gate_margin_violation,
         }[gate_id]
+
+    # Clause id -> the predicate that decides it. The ids are the contract with
+    # ruleset.yaml exactly as the gate ids are: `validate_against` refuses to
+    # construct if the two drift in either direction.
+    #
+    # Every one of these reads the EMITTED value. That is the whole distinction
+    # from the gates, which read what the model proposed.
+    def _clause_price_positive(self, emission: dict, context: dict) -> bool:
+        return _decimal(emission, "price") > 0
+
+    def _clause_above_floor(self, emission: dict, context: dict) -> bool:
+        return _decimal(emission, "price") >= _decimal(context, "floor_price")
+
+    def _clause_min_margin(self, emission: dict, context: dict) -> bool:
+        # Multiplicative, not (price - cost)/price >= m. The ratio form is not
+        # decidable in binary floats on money: where the price is exactly right,
+        # it evaluates to 0.09999999999999995 against 0.1. psi is fail-closed,
+        # so that artefact would cost a live negotiation.
+        price = _decimal(emission, "price")
+        cost = _decimal(context, "internal_cost")
+        return price * (1 - self._configured_margin()) >= cost
+
+    def _clause_predicate(self, clause_id: str) -> Callable[[dict, dict], bool]:
+        return {
+            "PSI_PRICE_POSITIVE": self._clause_price_positive,
+            "PSI_ABOVE_FLOOR": self._clause_above_floor,
+            "PSI_MIN_MARGIN": self._clause_min_margin,
+        }[clause_id]
+
+    def check_postcondition(self, emission: dict, context: dict) -> PostconditionResult:
+        """
+        Whether what is about to be sent satisfies what the rule set guarantees.
+
+        Walked in declared order and stopped at the first failure, so the reason
+        a decision was held back does not depend on evaluation accidents.
+
+        A raising predicate is a failure, not an exception to propagate: a
+        post-condition that could not be evaluated has not been established, and
+        the emission must not proceed on the strength of a crash.
+        """
+        for clause in self.ruleset.postcondition.clauses:
+            try:
+                held = self._clause_predicate(clause.id)(emission, context)
+            except Exception as exc:
+                logger.error(
+                    "guard_postcondition_unevaluable", clause=clause.id, error=str(exc)
+                )
+                return PostconditionResult(holds=False, failed_clause=clause.id)
+            if not held:
+                logger.warning("guard_postcondition_failed", clause=clause.id)
+                return PostconditionResult(holds=False, failed_clause=clause.id)
+
+        return PostconditionResult(holds=True, failed_clause=None)
 
     def evaluate(self, decision: dict, context: dict) -> Derivation:
         """
@@ -276,57 +449,106 @@ class OutputGuard:
 
         return True
 
-    def _configured_margin(self) -> float:
+    def _configured_margin(self) -> Decimal:
         """
-        The configured minimum margin, clamped to a range that keeps
-        floor/(1-m) at or above the floor.
+        The configured minimum margin as Decimal, clamped to a range that keeps
+        the substitute at or above the floor.
 
         A margin at or above 1.0 makes the formula undefined or negative. A
-        margin below 0.0 is worse and was not caught before: floor/(1-(-0.5))
-        is floor/1.5, so a floor of 1000 came back as a "safe" price of 666.67.
-        `min_profit_margin` is env-configurable with no lower bound declared, so
-        that is one operator typo away, and the substitute price exists
+        margin below 0.0 is worse: floor/(1-(-0.5)) is floor/1.5, so a floor of
+        1000 came back as a "safe" price of 666.67, and the substitute exists
         precisely to be the thing that cannot undercut the floor.
-
-        This is also reached without any gate having run — the Membrane calls
-        `calculate_safe_price` directly on FAILURE_RECOVERY — so a bad setting
-        cannot be assumed to have been caught upstream.
         """
-        if self.settings is None:
-            return _DEFAULT_MARGIN
-
-        raw = getattr(self.settings, "min_profit_margin", None)
+        raw = (
+            getattr(self.settings, "min_profit_margin", None) if self.settings else None
+        )
         if raw is None:
             return _DEFAULT_MARGIN
 
         try:
-            margin = float(raw)
-        except (TypeError, ValueError):
+            margin = Decimal(str(raw))
+        except (TypeError, ValueError, ArithmeticError):
             logger.error("guard_margin_setting_unreadable_using_default", raw=raw)
             return _DEFAULT_MARGIN
 
-        if not 0.0 <= margin < 1.0:
-            logger.error("guard_margin_setting_out_of_range", margin=margin)
+        # NaN and +/-Infinity parse above without error — `min_profit_margin`
+        # is env-configurable and `float("nan")` parses clean — but the old
+        # float comparison `0.0 <= nan < 1.0` degraded to False and fell
+        # through below; decimal.Decimal's comparison raises InvalidOperation
+        # on NaN instead of returning False, so the range check below never
+        # gets a chance to reject it. Checked explicitly, ahead of the range
+        # check, so a non-finite margin degrades exactly like an
+        # out-of-range one rather than raising.
+        if not margin.is_finite():
+            logger.error("guard_margin_setting_out_of_range", margin=str(margin))
+            return _DEFAULT_MARGIN
+
+        if not Decimal(0) <= margin < Decimal(1):
+            logger.error("guard_margin_setting_out_of_range", margin=str(margin))
             return _DEFAULT_MARGIN
 
         return margin
 
-    def calculate_safe_price(self, context: dict, reason: str) -> float:
+    def calculate_safe_price(
+        self, context: dict, reason: str = "", request_id: str = ""
+    ) -> float:
         """
-        Deterministic substitute price, by the strategy the firing gate declared.
+        The deterministic substitute, by the one strategy the rule set declares.
 
-        `reason` is a gate code where one fired, but not always: the Membrane
-        passes FAILURE_RECOVERY when the Transformer itself blew up, and no gate
-        was involved. Anything the rule set does not name gets the floor markup.
+        Rounds UP. `round()` goes to the nearest cent, which for a margin
+        substitute is toward breaching it half the time — at floor=100 and m=0.1
+        it produced 111.11 for a required 111.1111..., and a lower price is a
+        lower margin. A value that exists to be safe rounds toward the guarantee.
+
+        Reads `internal_cost`, not just the floor: the margin rule is stated
+        against cost, and where cost exceeds floor no price derived from the
+        floor alone can satisfy it.
+
+        `reason` is unused since the strategies collapsed. It stays in the
+        signature because two call sites pass it positionally, and removing it
+        is churn in a change that is already touching the arithmetic.
+
+        NaN and +/-Infinity in `floor_price` or `internal_cost` are read as
+        `Decimal(0)` by `_decimal` — treated the same as a value that was
+        never sent. Where the other of the two is a real, finite, positive
+        number, that 0 can only ever be outweighed inside `max(...)`, so it
+        never pulls the result below what the trustworthy input alone would
+        require.
+
+        Where BOTH land on a non-positive value this way — absent, unparseable,
+        non-finite, or genuinely zero or negative, in any combination — there
+        is no trustworthy premise left, and this raises `GuardUnavailable`
+        instead of returning a price nothing in the inputs justifies. A prior
+        version returned `0.0` here: a value that fails the guard's own
+        G1_PRICE_POSITIVE gate and psi's `price > 0`, and unlike an exception,
+        one a caller could forward as a real counter-offer without ever
+        learning it was never priced.
+
+        Raises:
+            GuardUnavailable: neither `floor_price` nor `internal_cost` yields
+                a usable positive value to price a substitute from.
         """
-        floor = _numeric(context, "floor_price")
-        strategy = self._safe_price_strategies.get(reason, "floor_markup")
+        floor = _decimal(context, "floor_price")
+        cost = _decimal(context, "internal_cost")
 
-        if strategy == "margin":
-            min_m = self._configured_margin()
-            return float(round(floor / (1 - min_m), 2))
+        if floor <= 0 and cost <= 0:
+            raise GuardUnavailable(
+                "cannot compute a safe price: neither floor_price nor "
+                "internal_cost is a usable positive value"
+            )
 
-        return float(round(floor * _FLOOR_MARKUP, 2))
+        margin = self._configured_margin()
+
+        # Widened precision: see _QUANTIZE_PRECISION. floor/cost/margin are
+        # already guaranteed finite by this point, so nothing here raises
+        # InvalidOperation for want of range — only for want of digits, which
+        # this closes.
+        with localcontext() as ctx:
+            ctx.prec = _QUANTIZE_PRECISION
+            base = max(_FLOOR_MARKUP * floor, max(floor, cost) / (1 - margin))
+            jittered = base * (1 + _jitter(request_id))
+            quantized = jittered.quantize(_CENT, rounding=ROUND_CEILING)
+        return float(quantized)
 
     def validate_transaction(
         self,

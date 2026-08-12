@@ -156,6 +156,7 @@ class HiveAggregator(Aggregator[Any, Context]):
                         agent_did=str(getattr(signal.agent, "did", "unknown"))
                         if hasattr(signal, "agent")
                         else "unknown",
+                        currency_code=str(getattr(signal, "currency_code", "")),
                     ),
                     request_id=str(getattr(signal, "request_id", "")),
                 )
@@ -231,6 +232,7 @@ class HiveAggregator(Aggregator[Any, Context]):
                 bid_amount=payload.bid_amount,
                 reputation=payload.agent.reputation_score if payload.agent else 1.0,
                 agent_did=payload.agent.did if payload.agent else "unknown",
+                currency_code=payload.currency_code,
             ),
             request_id=signal.identifier,
         )
@@ -296,6 +298,9 @@ class HiveAggregator(Aggregator[Any, Context]):
                 bid_amount=0.0,
                 reputation=payload.agent.reputation_score if payload.agent else 1.0,
                 agent_did=payload.agent.did if payload.agent else "unknown",
+                # PerceptionSignal carries no currency_code — vision discovery
+                # has no denomination to offer until the agent states a bid.
+                currency_code="",
             ),
             request_id=signal.identifier,
         )
@@ -368,6 +373,9 @@ class HiveAggregator(Aggregator[Any, Context]):
                 bid_amount=bid_amount,
                 reputation=1.0,
                 agent_did=agent_did,
+                # TelegramSignal carries no currency_code — the bid is parsed
+                # from free-text callback data with no denomination attached.
+                currency_code="",
             ),
             request_id=signal.identifier,
         )

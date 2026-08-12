@@ -13,43 +13,63 @@
 # who tunes a knob forks the rule set.
 
 family: guard/negotiation
-version: 1.0.0
+version: 2.0.0
+
+# One substitute strategy for the whole set, not one per gate.
+#
+# `floor_markup` and `margin` used to differ, and the difference was the bug:
+# max(floor*1.05, max(floor, internal_cost)/(1-m)) is >= what `margin` produced
+# in every case, so keeping both bought nothing and let a gate pick the weaker
+# one. Every gate now errs toward the seller by construction.
+safe_price: safe_offer
+
+# What the guard guarantees about the value it lets out — as opposed to the
+# gates, which say what it checked about the value the model proposed. Those
+# are different claims, and only the second one was ever written down.
+#
+# Checked on the emission, on both the pass and override paths. Clause ids are
+# the contract with the engine exactly as gate ids are: the predicates are
+# Python, matched by id, cross-checked in both directions at construction.
+#
+# PSI_MIN_MARGIN is multiplicative rather than (price - cost)/price >= m. The
+# ratio form is not decidable in binary floats on money, and psi is fail-closed,
+# so a 5e-17 artefact would refuse a correct decision.
+postcondition:
+  id: PSI_NEGOTIATION_V1
+  clauses:
+    - id: PSI_PRICE_POSITIVE
+      expr: "price > 0"
+      consumes: [price]
+
+    - id: PSI_ABOVE_FLOOR
+      expr: "price >= floor_price"
+      consumes: [price, floor_price]
+
+    - id: PSI_MIN_MARGIN
+      expr: "price * (1 - min_profit_margin) >= internal_cost"
+      consumes: [price, internal_cost]
 
 # Evaluated in this order. The first gate to fail is the binding reason, and it
-# is the one recorded on Intent.outcome_gate; the rest are not evaluated.
+# is the one recorded on the receipt; the rest are not evaluated. The order
+# reproduces the if-chain that shipped before the rules were extracted, so
+# decisions keep the reason they were refused under.
 #
-# The order is not a preference. It is the behaviour that shipped before the
-# rules were extracted: the floor check ran ahead of the fail-closed settings
-# check, so a below-floor price on a misconfigured deployment was refused for
-# the floor. Reordering these changes which reason real decisions carry.
-#
-# `consumes` names premise keys, never their values. It is what the receipt's
-# step sequence will record (§3.4), and recording a value there would leak the
-# floor the DLP gate exists to protect.
-#
-# `safe_price` selects the substitute the Membrane offers when the gate fires:
-#   margin       — floor / (1 - min_profit_margin), the higher of the two
-#   floor_markup — floor * safe_price_multiplier
+# `consumes` names premise keys, never their values.
 gates:
   - id: G1_PRICE_POSITIVE
     code: INVALID_PRICE
     consumes: [price]
-    safe_price: floor_markup
 
   - id: G2_FLOOR_VIOLATION
     code: FLOOR_PRICE_VIOLATION
     consumes: [price, floor_price]
-    safe_price: floor_markup
 
   # Fail-closed: a deployment that cannot read its own margin setting must not
-  # answer with the cheaper formula, so this gate asks for `margin` — which
-  # yields a price above the floor markup and errs toward the seller.
+  # answer at all rather than answer with a formula it cannot evaluate.
   - id: G3_SETTINGS_PRESENT
     code: SETTINGS_MISSING
     consumes: []
-    safe_price: margin
 
   - id: G4_MARGIN_VIOLATION
     code: MIN_MARGIN_VIOLATION
     consumes: [price, internal_cost]
-    safe_price: margin

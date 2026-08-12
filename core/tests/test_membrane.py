@@ -6,6 +6,7 @@ from aura_core_gen.aura.core.v1 import (
     AgentIdentity,
     Context,
     ContextType,
+    DecisionOutcome,
     HiveContextData,
     Intent,
     NegotiationIntent,
@@ -20,7 +21,11 @@ from aura_hive.hive.proteins.guard import GuardSkill
 @pytest.mark.asyncio
 async def test_membrane_rule1_floor_price_override():
     """
-    Rule 1: If price < floor_price, override to counter-offer at floor_price + 5%.
+    Rule 1: If price < floor_price, override to a guard-computed counter-offer.
+
+    The substitute price is the `safe_offer` strategy every gate shares since
+    the strategy collapse: max(1.05*floor, max(floor, cost)/(1-margin)),
+    rounded up to the cent, with no request_id so no jitter is applied here.
     """
     from aura_hive.config.policy import SafetySettings
     from aura_hive.hive.proteins.guard.engine import OutputGuard
@@ -51,7 +56,9 @@ async def test_membrane_rule1_floor_price_override():
     safe_decision = await membrane.inspect_outbound(decision, context)
 
     assert safe_decision.action == ActionType.ACTION_TYPE_COUNTER
-    assert safe_decision.negotiation.price == 105.0  # 100 * 1.05
+    assert safe_decision.negotiation.price == pytest.approx(
+        111.12
+    )  # ceil(100 / (1 - 0.1), cent)
     assert "FLOOR_PRICE_VIOLATION" in safe_decision.reasoning
     assert safe_decision.metadata.to_dict()["original_price"] == "95.0"
 
@@ -93,7 +100,15 @@ async def test_membrane_rule2_data_leak_prevention():
     safe_decision = await membrane.inspect_outbound(decision, context)
 
     assert "floor_price" not in safe_decision.negotiation.message.lower()
-    assert "cannot disclose internal pricing" in safe_decision.negotiation.message
+    # Neutral phrasing, not "I cannot disclose internal pricing details." —
+    # that line announced a DLP rule had fired. See
+    # core/tests/test_membrane_override_message.py for the message-shape
+    # regression tests.
+    # Bare number, because this Context states no currency. The `$` this
+    # asserted was hardcoded, so a JPY negotiation was quoted in dollars.
+    assert (
+        "My counter-offer for this item is 120.00." == safe_decision.negotiation.message
+    )
     assert "DLP block" in safe_decision.reasoning
 
 
@@ -134,10 +149,23 @@ async def test_membrane_combined_violations():
     safe_decision = await membrane.inspect_outbound(decision, context)
 
     assert safe_decision.action == ActionType.ACTION_TYPE_COUNTER
-    assert safe_decision.negotiation.price == 105.0
+    assert safe_decision.negotiation.price == pytest.approx(
+        111.12
+    )  # ceil(100 / (1 - 0.1), cent)
     assert "floor_price" not in safe_decision.negotiation.message.lower()
     assert "FLOOR_PRICE_VIOLATION" in safe_decision.reasoning
     assert "DLP block" in safe_decision.reasoning
+
+    # DLP fires first and records "DLP_BLOCK" as the gate; the price override
+    # follows in the same outcome class, so first-wins keeps the earlier gate.
+    # `override_scope` answers a different question — did the decidable content
+    # change — and so is monotonic toward "value": the price DID move, the two
+    # digests differ, and a receipt saying "prose" here is the one `verify()`
+    # rejects. It is not required to agree with `outcome_gate`; requiring that
+    # is what produced a receipt the Membrane minted and the verifier refused.
+    assert safe_decision.receipt.outcome == DecisionOutcome.DECISION_OUTCOME_OVERRIDE
+    assert safe_decision.receipt.outcome_gate == "DLP_BLOCK"
+    assert safe_decision.receipt.override_scope == "value"
 
 
 @pytest.mark.asyncio

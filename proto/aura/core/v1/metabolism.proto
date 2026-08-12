@@ -161,6 +161,7 @@ message NegotiationOffer {
   double bid_amount = 1;
   float reputation = 2;
   string agent_did = 3;
+  string currency_code = 4;  // ISO 4217, as it arrived on the request
 }
 
 message BeeContextData {
@@ -195,6 +196,14 @@ enum DecisionOutcome {
   DECISION_OUTCOME_EMIT = 1;       // passed every gate unaltered
   DECISION_OUTCOME_OVERRIDE = 2;   // a gate fired; a safe value was substituted
   DECISION_OUTCOME_REFUSE = 3;     // a gate fired; the action was rejected
+
+  // No verdict could be established: the guard's own post-condition did not
+  // hold, or a fact it needed could not be looked up. Distinct from REFUSE
+  // because a rule judging against a decision and a judgment that never
+  // happened send an operator to different places — one to the offer, one to
+  // the dependency that is down. AR4SI calls this tier "none"; its -1 is
+  // "a verifier malfunction occurred".
+  DECISION_OUTCOME_UNAVAILABLE = 4;
 }
 
 // The ordered record of how the guard reached its verdict, and a digest over it.
@@ -228,19 +237,30 @@ message DecisionDerivation {
 
 // What the Membrane can attest about one decision, in one place.
 //
-// NOT YET A RECEIPT IN THE SENSE THE SPEC MEANS. VISION §5.1.7 is explicit that
-// a receipt without a valid verifier signature is not a receipt regardless of
-// any other field, and the signature (§3.7) and premise hash (§3.1) are not
-// built. `version` says UNSIGNED for exactly that reason: a consumer must not be
-// able to mistake this for the attested article, and a later signed format must
-// not be satisfiable by downgrading to this one.
+// The signature (§3.7) IS built: EIP-712 over the content fields, under a
+// domain of its own so a receipt signature is not a valid trade authorisation.
+// A deployment with no key configured emits AURA-RECEIPT-V2-UNSIGNED and says
+// so in `version` — the honest report rather than an error, and the reason the
+// two formats are separate names rather than one name and a flag.
 //
-// What it does carry is everything checkable without a key: which rules judged
-// the decision, how they were applied, what the model proposed, and what was
-// actually sent. See docs/DECISION_RECEIPT.md §3.
+// The premise hash (§3.1) is still unbuilt, and on our premises it can only
+// ever be a commitment opened to a trusted party: they are low-entropy enough
+// that anyone holding the salt recovers them. `verify()` reports what it could
+// not check rather than answering "ok" over a skipped one.
+//
+// Addressed to an AUDITOR, not to the counterparty (§1.1). `outcome_gate` names
+// the rule that fired, the rule set maps that gate to a substitute-price
+// strategy, and the price is already in the response — together that
+// reconstructs most of the hidden floor. Nothing on this message reaches the
+// HTTP client. See docs/DECISION_RECEIPT.md §3.
 message DecisionReceipt {
-  // Format identifier. `AURA-RECEIPT-V0-UNSIGNED` today. The signed format gets
-  // its own name rather than a flag on this one.
+  // Format identifier: `AURA-RECEIPT-V2` signed, `AURA-RECEIPT-V2-UNSIGNED`
+  // otherwise. The number is the format generation and the suffix is
+  // attestation; the signed format takes its own name rather than a flag on
+  // this one, so a consumer written against it cannot be satisfied by a
+  // downgrade. NOT sent to the client: it degrades to the unsigned name on any
+  // signing failure, which would be a live feed of whether the transaction
+  // protein is reachable.
   string version = 1;
 
   // Canonical digest of the decision the Transformer proposed, before the
@@ -249,7 +269,7 @@ message DecisionReceipt {
   // the digest irreproducible.
   string claim_hash = 2;
 
-  // The rule set that judged it: `guard/negotiation@1.0.0+<hex16>`. Empty when
+  // The rule set that judged it: `guard/negotiation@2.0.0+<hex16>`. Empty when
   // no rule set was consulted.
   string ruleset_version = 3;
 
@@ -272,8 +292,29 @@ message DecisionReceipt {
 
   // Who signed, and how. Absent on an unsigned receipt, which is the honest
   // report rather than an error: a deployment with no key configured produces
-  // AURA-RECEIPT-V0-UNSIGNED and says so in `version`.
+  // AURA-RECEIPT-V2-UNSIGNED and says so in `version`.
   ReceiptSignature signature = 11;
+
+  // When the Membrane settled this decision, RFC3339 UTC. Freshness by the
+  // synchronized-clock route of RFC 9334 §10. It is our clock and means nothing
+  // to a party that does not trust us — which the audience decision says is not
+  // the reader this is for.
+  string issued_at = 12;
+
+  // The Intent this receipt describes, and the negotiation session it belongs
+  // to. Without them a receipt is about a shape of decision rather than one
+  // decision: two deals for the same item at the same price produced a
+  // byte-identical receipt, signature included, and an auditor could not
+  // reconcile either against anything.
+  string decision_id = 13;
+  string request_id = 14;
+
+  // Why claim and emission hash alike under an override: "prose" when the
+  // substitution touched only free text, "value" when it touched the decidable
+  // content. Empty unless outcome is OVERRIDE. Lets a verifier check the
+  // pairing in both directions without a hardcoded list of gates that goes
+  // stale the moment a prose-only gate is added.
+  string override_scope = 15;
 
   // Reserved for the two fields still blocked on a decision rather than on
   // code. premise_hash (§3.1) waits on who holds the salt — and on the finding
@@ -334,6 +375,21 @@ message Intent {
   // boundary, never by the Transformer.
   DecisionReceipt receipt = 16;
 
+  // The counterparty's handle on this decision, and the only thing about the
+  // receipt they get. A random UUID minted at emission — never derived from
+  // receipt content, so there is no preimage to enumerate — logged beside the
+  // receipt so an auditor can resolve a citation back to the decision.
+  //
+  // Deliberately NOT a field on DecisionReceipt: it is not signed content, and
+  // putting it there would be a second format bump immediately after V2. It is
+  // also not `decision_id`, which is signed content the auditor reconciles; the
+  // client holds nothing that is part of an attestation.
+  //
+  // `session_token` does not serve this purpose. It names a SESSION and the
+  // receipt describes one DECISION, so a dispute over the third round of a
+  // negotiation cannot be cited with it.
+  string dispute_token = 17;
+
   // Strictly typed action params
   oneof params {
     NegotiationIntent negotiation = 10;
@@ -361,6 +417,10 @@ message NegotiationIntent {
   double price = 3;
   string message = 4;
   string thought = 5;
+
+  // Stamped by the Membrane from context, never by the Transformer: the
+  // denomination is a property of the request, not something the model decides.
+  string currency_code = 6;
 }
 
 message AuditIntent {
@@ -443,11 +503,20 @@ message NegotiationObservation {
     OfferRejected rejected = 7;
   }
 
-  // Carried through from the Intent the Connector acted on, so it survives to
-  // the client. Every message in this chain is re-assembled field by field
-  // rather than passed along, so the receipt has to be copied deliberately at
-  // each hop or it is silently dropped — which is where it used to die.
-  DecisionReceipt receipt = 8;
+  // Reserved: the receipt travelled through here to be rendered into the HTTP
+  // response, and no longer goes to the client in any shape — it is addressed
+  // to an auditor and reaches them through the Membrane's structured log
+  // (docs/DECISION_RECEIPT.md §1.1). Nothing downstream read this field once
+  // NegotiateResponse stopped carrying one, and a transport hop to a
+  // destination that no longer exists reads as load-bearing to the next person.
+  reserved 8;
+  reserved "receipt";
+
+  // What DOES reach the client: the handle they cite in a dispute. Every
+  // message in this chain is re-assembled field by field rather than passed
+  // along, so this has to be copied deliberately at each hop or it is silently
+  // dropped — which is where the receipt used to die.
+  string dispute_token = 9;
 }
 
 message OfferAccepted {

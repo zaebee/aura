@@ -153,7 +153,9 @@ class TestFailSafe:
             )
 
         assert "Membrane Override" in decision.reasoning
-        assert decision.negotiation.price == 1050.0
+        # ceil(1000 / (1 - 0.1), cent): the guard's safe_offer substitute price,
+        # with no request_id so no jitter is applied here.
+        assert decision.negotiation.price == pytest.approx(1111.12)
 
 
 class TestSeriesShape:

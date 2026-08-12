@@ -93,9 +93,22 @@ async def test_membrane_outbound_override(mocker):
 
     # Mock Guard Protein
     mock_guard = MagicMock()
-    # Simulate a violation
-    mock_guard.execute = AsyncMock(
-        return_value=Observation(
+
+    async def _guard_execute(intent: str, params: dict) -> Observation:
+        # The Membrane now also asks this mock to check the post-condition on
+        # the substitute it is about to emit. This double is about the
+        # override *mechanism* — that a guard-reported safe_price and reason
+        # travel onto the replacement Intent — not about psi, which
+        # test_membrane_postcondition.py covers against a real guard. Report
+        # it as holding unconditionally so this test keeps its original scope.
+        if intent == "check_postcondition":
+            return Observation(
+                success=True,
+                metadata=protobuf.Struct().from_dict(
+                    {"holds": True, "failed_clause": ""}
+                ),
+            )
+        return Observation(
             success=False,
             metadata=protobuf.Struct().from_dict(
                 {
@@ -104,7 +117,8 @@ async def test_membrane_outbound_override(mocker):
                 }
             ),
         )
-    )
+
+    mock_guard.execute = AsyncMock(side_effect=_guard_execute)
     registry.register("guard", mock_guard)
 
     membrane = HiveMembrane(registry=registry)
