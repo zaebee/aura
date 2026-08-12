@@ -82,7 +82,7 @@ the same defence.
 **Probe cost.** Rate limiting per (counterparty, item) is the only mechanism that changes the
 picture: it does not close the channel — nothing does — but it stretches seventeen probes over
 longer than the price stays current. That is its own piece of work in the gateway, and it needs a
-number nobody has yet: how long a price is expected to remain valid.
+number nobody has yet: how long a price is expected to remain valid. Filed as #283.
 
 **Stochastic refusal near the floor** would break the proof by making acceptance non-deterministic.
 Rejected: it costs revenue on honest bids and destroys predictability for the buyers the system
