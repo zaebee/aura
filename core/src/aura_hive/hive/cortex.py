@@ -10,12 +10,14 @@ from prometheus_client import start_http_server
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
+from aura_hive.config.attestation import AttestationSettings
 from aura_hive.hive.aggregator import HiveAggregator
 from aura_hive.hive.connector import HiveConnector
 from aura_hive.hive.generator import HiveGenerator
 from aura_hive.hive.membrane import HiveMembrane
 from aura_hive.hive.metabolism import MetabolicLoop
 from aura_hive.hive.metabolism.security import AuditSigner
+from aura_hive.hive.proteins.attestation import AttestationEngine, AttestationSkill
 from aura_hive.hive.proteins.blockchain_data.skill import GoldRushSkill
 from aura_hive.hive.proteins.coherence import CoherenceSkill
 from aura_hive.hive.proteins.discovery import DiscoverySkill
@@ -45,6 +47,56 @@ if TYPE_CHECKING:
     from aura_hive.hive.metabolism import MetabolicLoop
 
 logger = structlog.get_logger("hive.cortex")
+
+
+def build_attestation(
+    private_key_hex: str, settings: AttestationSettings
+) -> AttestationSkill | None:
+    """
+    The attestation protein, or nothing.
+
+    Registered on key presence rather than on a feature flag. A flag that can
+    be set true without a key is another "enabled but not working" state, and
+    that is exactly what this replaces: signing used to be gated on
+    `crypto.enabled`, a flag about payment locks, which was false everywhere
+    and would not have signed anything if it were true, because no EVM key was
+    ever plumbed into the deployment.
+
+    A module-level function rather than a method, so the decision can be tested
+    without booting a cell.
+    """
+    # Stripped before anything looks at it. A secret written with `echo` rather
+    # than `printf` carries a trailing newline, which is the most common way a
+    # real key arrives malformed — and without this it is indistinguishable
+    # from a corrupt one, so the cell refuses to boot over an invisible
+    # character.
+    private_key_hex = private_key_hex.strip()
+
+    if not private_key_hex:
+        logger.info("attestation_disabled_no_key")
+        return None
+
+    try:
+        engine = AttestationEngine(private_key_hex)
+    except Exception as exc:
+        # Deliberately fatal. The alternatives are booting while believing we
+        # attest, or failing per-decision — and a deployment that cannot read
+        # its own signing key is the "enabled but not working" state this
+        # protein exists to make unrepresentable.
+        #
+        # The setting is named because the operator has to know which one is
+        # wrong; the value never is, and the underlying libraries do not echo
+        # it either ("Non-hexadecimal digit found", "must be exactly 32 bytes").
+        raise ValueError(
+            f"AURA_ATTESTATION__PRIVATE_KEY is set but unusable: {exc}"
+        ) from exc
+
+    skill = AttestationSkill()
+    skill.bind(settings, engine)
+    # The address, never the key. This is the only place a deployment states
+    # which signer its receipts will recover to.
+    logger.info("attestation_signer_ready", address=engine.address)
+    return skill
 
 
 class HiveCell:
@@ -240,6 +292,12 @@ class HiveCell:
         blockchain_data = GoldRushSkill()
         blockchain_data.bind(self.settings.blockchain_data, {"registry": self.registry})
 
+        # 10. Attestation (registered only when a key is present)
+        attestation = build_attestation(
+            get_raw_key(self.settings.attestation.private_key),
+            self.settings.attestation,
+        )
+
         # Register all in the SkillRegistry
         self.registry.register("persistence", persistence)
         self.registry.register("pulse", pulse)
@@ -252,6 +310,8 @@ class HiveCell:
         self.registry.register("blockchain_data", blockchain_data)
         if transaction:
             self.registry.register("transaction", transaction)
+        if attestation:
+            self.registry.register("attestation", attestation)
 
         # Inject fully-populated registry into skills that cross-call peers
         guard.inject_registry(self.registry)

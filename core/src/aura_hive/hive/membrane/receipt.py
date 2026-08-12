@@ -265,13 +265,26 @@ def mint(
     return receipt
 
 
-def signing_payload(receipt: DecisionReceipt, chain_id: int) -> dict[str, Any]:
+def signing_payload(
+    receipt: DecisionReceipt,
+    chain_id: int,
+    domain: str = "",
+    domain_version: str = "",
+) -> dict[str, Any]:
     """
     EIP-712 structured data for a receipt, as it will read once signed.
 
     Computed against the signed form's content fields — `version` is one of
     them, so signing the unsigned form would produce an attestation over a
     document that no longer exists the moment the version is bumped.
+
+    `domain` and `domain_version` default to the constants below, which is what
+    minting wants: a new receipt is signed under today's domain. Verification
+    passes the values the receipt itself recorded, so a receipt stays checkable
+    after the constants move. Leaving them to the constants on both sides made
+    the two recorded fields decoration, and worse than decoration — a bumped
+    version made every earlier receipt recover to a different address and be
+    reported as a forgery rather than as a domain mismatch.
     """
     probe = replace(receipt, version=SIGNED_VERSION)
     return {
@@ -284,8 +297,8 @@ def signing_payload(receipt: DecisionReceipt, chain_id: int) -> dict[str, Any]:
             "DecisionReceipt": [{"name": "content", "type": "string"}],
         },
         "domain": {
-            "name": RECEIPT_EIP712_DOMAIN,
-            "version": RECEIPT_EIP712_VERSION,
+            "name": domain or RECEIPT_EIP712_DOMAIN,
+            "version": domain_version or RECEIPT_EIP712_VERSION,
             "chainId": chain_id,
         },
         "primaryType": "DecisionReceipt",
@@ -326,13 +339,25 @@ def _check_signature(receipt: DecisionReceipt) -> list[str]:
     Needs no key material — verification is public by construction, which is
     why it lives here rather than behind the protein that holds the private
     key. The domain is rebuilt from the receipt's own fields, so a reader needs
-    no out-of-band configuration.
+    no out-of-band configuration and an old receipt survives the constants
+    moving.
+
+    Reading the domain out of the document being checked sounds circular and is
+    not: a forger who edits `domain` or `domain_version` changes the message
+    that gets recovered, so the recovered address stops matching the `signer`
+    the receipt claims, and the check below refuses it. The fields tell the
+    verifier which document to reconstruct; they do not tell it whom to trust.
     """
     signature = receipt.signature
     if signature is None or not signature.signature:
         return ["receipt claims the signed format but carries no signature"]
 
-    payload = signing_payload(receipt, chain_id=signature.chain_id)
+    payload = signing_payload(
+        receipt,
+        chain_id=signature.chain_id,
+        domain=signature.domain,
+        domain_version=signature.domain_version,
+    )
     try:
         recovered = Account.recover_message(
             encode_typed_data(full_message=payload), signature=signature.signature

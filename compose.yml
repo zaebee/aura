@@ -29,6 +29,13 @@ services:
       AURA_SERVER__OTEL_SERVICE_NAME: "aura-core"
       AURA_SERVER__OTEL_EXPORTER_OTLP_ENDPOINT: "http://jaeger:4317"
       AURA_SERVER__PROMETHEUS_URL: "http://prometheus:9090"
+      # Decision receipt attestation. Its own key, unrelated to the crypto
+      # settings below — this service has an explicit environment map and no
+      # env_file, and .env is not copied into the image, so a key set in .env
+      # reaches the container only by being named here. Unset means receipts
+      # are emitted AURA-RECEIPT-V2-UNSIGNED, which is a valid configuration.
+      AURA_ATTESTATION__PRIVATE_KEY: ${AURA_ATTESTATION__PRIVATE_KEY:-}
+      AURA_ATTESTATION__CHAIN_ID: ${AURA_ATTESTATION__CHAIN_ID:-84532}
       # Crypto Payment Configuration (disabled by default)
       AURA_CRYPTO__ENABLED: ${AURA_CRYPTO__ENABLED:-false}
       AURA_CRYPTO__PROVIDER: ${AURA_CRYPTO__PROVIDER:-solana}

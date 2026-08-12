@@ -39,8 +39,9 @@ decided during the V2 design and it is the premise the rest of this document res
 everything below as answering "what does an auditor need", not "what can we hand a stranger".
 
 The reason is that we pay the full cost of counterparty verification — EIP-712, a self-describing
-domain, a `verify()` needing no key or configuration, an address resolvable through ERC-8004 — and
-cannot deliver the thing those buy. A counterparty-facing verifier needs the original input, a
+domain, a `verify()` needing no key or configuration — and cannot deliver the thing those buy. (The
+list was longer: an address resolvable through ERC-8004 was on it until attestation moved to its own
+key, §3.7.) A counterparty-facing verifier needs the original input, a
 freshness challenge it chose, and a transparency log. We have none of the three: `verify()` receives
 the receipt and nothing else, `issued_at` is our own clock, and no receipt is published anywhere a
 third party can watch.
@@ -73,7 +74,7 @@ signal → M(in) → A(perceive) → T(think) → M(out) ⇐ RECEIPT MINTED HERE
 
 The receipt is `Intent.receipt`, a typed `DecisionReceipt` in
 `aura/core/v1/metabolism.proto`. It is minted after the verdict is settled and signed by the
-transaction protein, which owns the key; a receipt that cannot be signed is emitted unsigned rather
+attestation protein, which owns the key; a receipt that cannot be signed is emitted unsigned rather
 than costing the decision.
 
 One step now sits between the verdict and the mint:
@@ -609,23 +610,32 @@ Three limits worth stating rather than discovering later:
 
 ### 3.7 `signature` and `canonical-prefix`
 
-**Implemented.** EIP-712 over the receipt's content fields, signed with the agent's existing
-**EVM key** — not the Ed25519 scheme this document first sketched.
+**Implemented.** EIP-712 over the receipt's content fields, signed with a **dedicated attestation
+key** — not the Ed25519 scheme this document first sketched, and no longer the agent's spending key.
 
-The reason is key distribution, not convenience. **A signature under a key nobody can attribute is
-decoration.** Signing is the easy half; giving a reader a way to learn that the key is ours is the
-hard one, and the EVM identity already has an answer — the recovered address resolves against the
-ERC-8004 identity registry. A fresh Ed25519 key would have had no such story, and inventing one is a
-larger piece of work than all of step 5.
+**The history matters, because the argument that chose EIP-712 has since been abandoned.** The
+original reason was key distribution: a signature under a key nobody can attribute is decoration,
+and the EVM identity already had an answer — the recovered address resolved against the ERC-8004
+identity registry. A fresh key would have had no such story. That is why receipts were signed by the
+same `EVMProvider` that does `transfer_usdc`, and why the spending key was accepted as the signer
+with domain separation as the mitigation.
 
-That argument was originally made about a counterparty. §1.1 has since decided the reader is an
-auditor, and the argument survives the change intact but buys less: an auditor could have been given
-a key out of band. It is a cost already paid rather than one worth paying again — and if the audience
-widens later, this is the piece that is already right.
+**That is no longer what happens.** The key lives in the `attestation` protein, has its own setting,
+signs nothing else, and is not registered anywhere on-chain. So the attribution story is now the one
+the old argument called insufficient: the address means something because
+`docs/attestation-signers.md` says it was ours, not because it is published.
 
-**The cost, stated plainly: the EVM key is a spending key.** The same `EVMProvider` that signs
-receipts also does `transfer_usdc`. The mitigation that matters is domain separation, which is
-exactly what EIP-712 domains are for:
+The trade was made knowingly. Gating attestation on the spending key meant gating it on
+`crypto.enabled` — a flag about payment locks — which was false in every deployed configuration, so
+**nothing was ever signed at all**. A key that can be attributed but is never used attributes
+nothing. §1.1 having settled that the reader is an auditor is what makes the trade payable: an
+auditor can be handed a signer list out of band, which is exactly what that file is. Should the
+audience widen to counterparties again, registering the attestation address is the piece of work
+this defers, and it is smaller than it was — one address to publish rather than a signing scheme to
+design.
+
+EIP-712 survives the change on its own merits, because domain separation is worth having even
+between keys that are already separate:
 
 ```python
 domain = {"name": "AuraDecisionReceipt", "version": "1", "chainId": <id>}
@@ -639,6 +649,15 @@ a receipt has no contract — which makes the domain structurally different, not
 The `ReceiptSignature` message is self-describing: scheme, domain, domain version, chain id, signer,
 signature. A verifier rebuilds the domain from the receipt alone and needs no out-of-band
 configuration, which is what VISION §5.2.2 means by a receipt being self-contained for replay.
+
+**`verify()` reads all four domain fields back out of the receipt, and that is load-bearing rather
+than tidy.** It used to take `chain_id` from the receipt and `name`/`version` from module constants,
+which made the two recorded fields decoration — and worse: bumping `RECEIPT_EIP712_VERSION` made
+every receipt signed before the bump recover to a different address, so the verifier reported honest
+records as **forgeries** rather than as a domain mismatch. Reading the fields back is not circular. A
+forger who edits them changes the document being reconstructed, so the recovered address stops
+matching the `signer` the receipt still claims and the check refuses it. The fields say which
+document to rebuild; they do not say whom to trust.
 
 **Two formats, not one format with a flag.** `AURA-RECEIPT-V2` is signed; `AURA-RECEIPT-V2-UNSIGNED`
 is what a deployment with no key configured honestly produces. Separate names so a consumer written
@@ -972,8 +991,26 @@ next person.
 
 ### Recovering the signer
 
-**Read `version` first.** `AURA-RECEIPT-V2-UNSIGNED` means the deployment had no key configured and
-`signature` is `null`. Everything else in the receipt is still checkable to the extent described
+**Read `version` first.** `AURA-RECEIPT-V2-UNSIGNED` means the deployment had no attestation key
+configured and `signature` is `null`. That is a legitimate configuration rather than a fault: the key
+lives in `AURA_ATTESTATION__PRIVATE_KEY`, a deployment may run without one, and the decision is
+emitted either way — losing a negotiation because a key was unreachable would trade the guarantee for
+the attestation.
+
+Until the attestation protein existed this sentence was false. Signing was gated on
+`crypto.enabled`, a flag about payment locks, which was false in every deployed configuration — and
+would not have signed anything had it been true, because no signing key was plumbed into the
+deployment at all. `UNSIGNED` meant "crypto payments are off", not "no key configured". The key now
+has its own section, its own protein, and no feature flag: the protein is registered when a key is
+present and not otherwise.
+
+Which address a deployment signs with is stated once at boot —
+`attestation_signer_ready address=0x…` — and recorded in `docs/attestation-signers.md`. That file is
+the durable half of the story: a signature recovers to an address, but only the record says the
+address was ours. Verifying a past signature never needs the private key, so keys may rotate and be
+lost without taking the corpus with them.
+
+Everything else in the receipt is still checkable to the extent described
 above, but nobody has vouched for it. Treating one as the other is the downgrade the two names exist
 to prevent.
 
@@ -1023,9 +1060,17 @@ Note there is **no `verifyingContract`** — a receipt has no contract, and its 
 makes this domain structurally different from the one `TradeIntent` is signed under. Adding a zeroed
 one produces a different domain separator and the recovery fails.
 
-The recovered address is then resolved against the ERC-8004 identity registry to learn whether it is
-ours. That step is the point of using the EVM key: the address means something because it is already
-published, not because we assert it.
+**The recovered address is then looked up in `docs/attestation-signers.md`**, which records which
+address was ours, in which environment, from when, and whether it has since been retired or
+compromised.
+
+That is weaker than it used to be, and the change is deliberate. Receipts were once signed by the
+agent's spending key so the address could be resolved against the ERC-8004 identity registry — the
+address meaning something because it was published rather than asserted. But that tied attestation
+to the crypto payment configuration, which was disabled everywhere, so no receipt was ever signed.
+An attributable key that is never used attributes nothing. The signer is now a dedicated key and the
+attribution is a file we maintain; §3.7 states the trade in full. Publishing the attestation address
+would restore the stronger story and is one address' worth of work, deferred rather than dismissed.
 
 ### What the fields tell you
 
@@ -1124,9 +1169,10 @@ format above is the contract, and a consumer reimplementing it owes us nothing.
    dispute, against whom. Until that has an answer this stays deferred, and the reasoning above is
    the reasoning — not the absence of a place to put bytes.
 5. ~~Sign with the identity key; wire `canonical-prefix` into logs and frontend.~~ **DONE for the
-   backend.** EIP-712 with the existing EVM key under a domain of its own (§3.7); signing lives in
-   the transaction protein, which owns the key, and verification in `membrane/receipt.py`, which
-   needs none. `canonical_prefix` is on every `membrane_receipt` log line, beside the full receipt.
+   backend.** EIP-712 under a domain of its own (§3.7); signing lives in the attestation protein,
+   which owns the key, and verification in `membrane/receipt.py`, which needs none. It was the
+   agent's existing EVM key until attestation moved to a dedicated one — see §3.7 for why that
+   trade was made and what it cost. `canonical_prefix` is on every `membrane_receipt` log line, beside the full receipt.
 
    **The frontend half is not done, and the audience decision changed what it would be.** The
    gateway puts no part of the receipt on the wire at all (§1.1, §3.4, §7), so a UI built for the

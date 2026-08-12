@@ -638,14 +638,21 @@ class TestSigningTheReceipt:
     """
 
     class _Signer:
-        """Stands in for the transaction protein, which owns the EVM key."""
+        """
+        Stands in for the attestation protein, which owns the signing key.
+
+        Named `transaction` until the key moved out of the payments protein.
+        These tests were the only coverage the Membrane's signing hop had, and
+        they were coupled to it by the protein's NAME rather than by the
+        capability, which is why a search for `sign_receipt` did not find them.
+        """
 
         def __init__(self, account: object | None = None, fail: bool = False) -> None:
             self.account = account
             self.fail = fail
 
         def get_name(self) -> str:
-            return "transaction"
+            return "attestation"
 
         async def execute(self, intent: str, params: dict) -> Observation:
             if self.fail:
@@ -827,7 +834,7 @@ class TestTheReceiptLogClaimsOnlyWhatItKnows:
         guard = GuardSkill()
         guard.bind(_Safety(), OutputGuard(safety_settings=_Safety()))
         registry.register(guard.get_name(), guard)
-        registry.register("transaction", TestSigningTheReceipt._Signer(account))
+        registry.register("attestation", TestSigningTheReceipt._Signer(account))
         membrane = HiveMembrane(registry=registry)
 
         with patch(

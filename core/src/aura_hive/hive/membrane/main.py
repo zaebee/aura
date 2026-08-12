@@ -437,16 +437,21 @@ class HiveMembrane(Membrane[Any, Intent, Context]):
             return receipt
 
         try:
-            # Looked up rather than accessed: settings with no crypto section
-            # is a configuration a deployment may legitimately have, and an
-            # expected absence should not be discovered by throwing. The try
-            # still wraps it, because the promise that nothing here costs the
-            # decision should hold from where the code sits rather than from
-            # someone having checked each line.
-            crypto = getattr(self.settings, "crypto", None)
-            chain_id = int(getattr(crypto, "evm_chain_id", 0) or 0)
+            # Looked up rather than accessed: settings with no attestation
+            # section is a configuration a deployment may legitimately have,
+            # and an expected absence should not be discovered by throwing. The
+            # try still wraps it, because the promise that nothing here costs
+            # the decision should hold from where the code sits rather than
+            # from someone having checked each line.
+            #
+            # `attestation` rather than `transaction`: the key that vouches for
+            # an audit record has nothing to do with the one that moves money,
+            # and asking the payments protein meant a deployment had to enable
+            # payment locks before a single receipt could be signed.
+            attestation = getattr(self.settings, "attestation", None)
+            chain_id = int(getattr(attestation, "chain_id", 0) or 0)
             obs = await self.registry.execute(
-                "transaction",
+                "attestation",
                 "sign_receipt",
                 {"payload": signing_payload(receipt, chain_id=chain_id)},
             )
@@ -460,14 +465,35 @@ class HiveMembrane(Membrane[Any, Intent, Context]):
             logger.warning("membrane_receipt_unsigned", error=obs.error)
             return receipt
 
-        meta = obs.metadata.to_dict() if obs.metadata is not None else {}
-        signer = str(meta.get("signer") or "")
-        signature = str(meta.get("signature") or "")
-        if not signer or not signature:
-            logger.warning("membrane_receipt_unsigned", error="signer reported neither")
-            return receipt
+        # Inside the try for the same reason the call is. Reading the reply and
+        # stamping it onto the receipt used to sit outside it, which meant the
+        # promise above — that nothing here costs the decision — held only
+        # because someone had checked each of these lines and found nothing
+        # that raises. That is not a guarantee, it is an audit with a shelf
+        # life, and `to_dict()` on a message this method does not construct is
+        # exactly where the next surprise would arrive.
+        try:
+            # Truthiness, not identity: falsy for a default-constructed Struct
+            # and for an explicit `metadata=None` alike. The identity form was
+            # not dead here — `Observation(metadata=None)` really is `None`, so
+            # it did fire — but `docs/CLAUDE.md` names this the safe form
+            # precisely so a reader never has to work out which of the three
+            # betterproto absence behaviours applies at a given line.
+            meta = obs.metadata.to_dict() if obs.metadata else {}
+            signer = str(meta.get("signer") or "")
+            signature = str(meta.get("signature") or "")
+            if not signer or not signature:
+                logger.warning(
+                    "membrane_receipt_unsigned", error="signer reported neither"
+                )
+                return receipt
 
-        return signed(receipt, signer=signer, signature=signature, chain_id=chain_id)
+            return signed(
+                receipt, signer=signer, signature=signature, chain_id=chain_id
+            )
+        except Exception as e:
+            logger.warning("membrane_receipt_unsigned", error=str(e))
+            return receipt
 
     async def _postcondition_holds(
         self, price: float, guard_context: dict[str, Any], verdict: _Verdict
