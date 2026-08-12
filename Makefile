@@ -59,22 +59,29 @@ keeper-audit: $(PROTO_SENTINEL)
 	# One bee.Keeper cycle, then exit. Without --once main.py is a NATS daemon.
 	PYTHONPATH=$(KEEPER_PATH) uv run python -m aura_keeper.main --once
 
+# Every suite below syncs its own package before running. These are workspace
+# members, not dependencies of the root, so `uv sync --group dev` never reaches
+# what they declare — their tests used to run on whatever the root env happened
+# to carry. That worked by coincidence until it didn't: gradio was quietly
+# supplying api-gateway's python-multipart, and the day gradio became optional
+# two gateway modules died at collection, nowhere near anything under test.
+# --inexact adds each package's deps to what is already synced rather than
+# pruning it; --no-sync then stops `uv run` reverting the additive install.
 test: $(PROTO_SENTINEL)
 	# Run core tests
-	PYTHONPATH=$(CORE_PATH) uv run pytest core/tests/ -v
-	# Run api-gateway tests (env is provided by api-gateway/tests/conftest.py).
-	# Sync the gateway's own declared deps rather than trusting the root env to
-	# happen to carry them: it is a workspace member, not a root dependency, so
-	# `uv sync --group dev` never reaches its declarations, and until something
-	# else stopped pulling python-multipart in nobody could tell. --inexact adds
-	# them to what is already synced; --no-sync stops `uv run` reverting that.
+	uv sync --package core --inexact
+	PYTHONPATH=$(CORE_PATH) uv run --no-sync pytest core/tests/ -v
+	# Run api-gateway tests (env is provided by api-gateway/tests/conftest.py)
 	uv sync --package api-gateway --inexact
 	PYTHONPATH=$(GATEWAY_PATH) uv run --no-sync pytest api-gateway/tests/ -v
 	# Run telegram-bot tests with isolated path to avoid 'src' collision
-	PYTHONPATH=$(TG_PATH) uv run pytest synapses/telegram-bot/tests/ -v
-	# Run bee.Keeper tests from the root env: its transformer imports dspy, which
-	# is declared in the root pyproject rather than the agent's own.
-	PYTHONPATH=$(KEEPER_PATH) uv run pytest agents/bee-keeper/tests/ -v
+	uv sync --package telegram-bot --inexact
+	PYTHONPATH=$(TG_PATH) uv run --no-sync pytest synapses/telegram-bot/tests/ -v
+	# Run bee.Keeper tests. Syncing the agent is not enough on its own: its
+	# transformer imports dspy, which is declared in the root pyproject rather
+	# than the agent's own — --inexact is what keeps that reachable.
+	uv sync --package aura-keeper --inexact
+	PYTHONPATH=$(KEEPER_PATH) uv run --no-sync pytest agents/bee-keeper/tests/ -v
 	# Run bee.Evolver tests in its own env — it deliberately has no aura-core dep.
 	cd agents/bee-evolver && uv run --group dev pytest tests/ -v
 	# Run the aura-core packaging guard: it builds the wheel in place and asserts
