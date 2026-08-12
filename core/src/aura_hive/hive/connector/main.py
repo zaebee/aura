@@ -46,6 +46,59 @@ class HiveConnector(BaseConnector):
         self.market_service = market_service
         self.settings = settings
 
+    async def act(self, action: Any, context: Any) -> Observation:
+        """
+        Archive the receipt, then act.
+
+        Written here rather than in the Membrane that mints it: this is the
+        step that performs I/O, and putting a Postgres round-trip inside a
+        boundary check would pay negotiation latency for an archive. The
+        Genome's `act` dispatches steps or falls back to `_handle_legacy`, and
+        recording before that delegation means every decision is archived on
+        both paths — including the refusals, which are the disputes most
+        likely to arrive.
+
+        `Any` rather than `Intent`/`Context` because the Genome declares it
+        that way; narrowing here is a Liskov violation mypy refuses.
+        """
+        await self._record_receipt(action)
+        return await super().act(action, context)
+
+    async def _record_receipt(self, action: Intent) -> None:
+        """
+        Fail-open, deliberately and completely.
+
+        The rule the receipt log line already follows: reporting on a decision
+        must never take that decision down. The cost is that archive holes are
+        possible and silent, which is why the failure is its own event — an
+        archive that sometimes never arrives is worse than one that expires,
+        because nothing announces it.
+        """
+        if not action.receipt or not action.dispute_token:
+            return
+
+        try:
+            observation = await self.registry.execute(
+                "persistence",
+                "record_receipt",
+                {
+                    "receipt": action.receipt.to_dict(),
+                    "dispute_token": action.dispute_token,
+                },
+            )
+            if not observation.success:
+                logger.warning(
+                    "receipt_record_failed",
+                    dispute_token=action.dispute_token,
+                    error=observation.error,
+                )
+        except Exception as e:
+            logger.warning(
+                "receipt_record_failed",
+                dispute_token=action.dispute_token,
+                error=str(e),
+            )
+
     async def _handle_legacy(self, action: Intent, context: Context) -> Observation:
         """
         Handle Intents that do not have steps.
