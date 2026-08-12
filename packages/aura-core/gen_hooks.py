@@ -77,6 +77,13 @@ class CustomBuildHook(BuildHookInterface):
                 )
                 neg_v1.write_text(content)
 
+            # gen-proto/ is VCS-ignored, and hatchling honours VCS ignore rules
+            # when it selects files — so the wheel's `packages` entry alone is
+            # not enough to carry the transcription. force_include bypasses the
+            # ignore rules; without it the build stays green but ships a genome
+            # that only the dev tree (editable install) can find.
+            build_data.setdefault("force_include", {})[str(out_dir)] = "aura_core_gen"
+
             logger.info("✅ DNA expressed and packages initialized.")
 
         except Exception as e:
