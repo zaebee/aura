@@ -12,6 +12,7 @@ adjusted to match.
 """
 
 from typing import Any
+from unittest.mock import patch
 
 import pytest
 from aura_core import SkillRegistry
@@ -27,7 +28,7 @@ from aura_core_gen.aura.core.v1 import (
 from aura_hive.config.attestation import AttestationSettings
 from aura_hive.config.policy import SafetySettings
 from aura_hive.hive.membrane.main import HiveMembrane
-from aura_hive.hive.membrane.receipt import signing_payload
+from aura_hive.hive.membrane.receipt import signing_payload, verify
 from aura_hive.hive.proteins.attestation import AttestationEngine, AttestationSkill
 from aura_hive.hive.proteins.guard import GuardSkill
 from aura_hive.hive.proteins.guard.engine import OutputGuard
@@ -80,6 +81,57 @@ def verifies(receipt: DecisionReceipt) -> bool:
         encode_typed_data(full_message=payload), signature=raw
     )
     return bool(recovered == receipt.signature.signer)
+
+
+@pytest.mark.asyncio
+async def test_an_old_receipt_still_verifies_after_the_domain_constants_move() -> None:
+    """
+    The receipt records `domain` and `domain_version`, and `verify()` must read
+    them back rather than rebuilding the domain from whatever the module
+    constants say today.
+
+    Otherwise the two fields are decoration: bump `RECEIPT_EIP712_VERSION` —
+    the tidy-up the settings comment warns about for `chain_id` — and every
+    receipt signed before the bump is reported not as a domain mismatch but as
+    a **forgery**, because recovery under the new domain yields a different
+    address than the one the receipt claims. That is the worst failure mode
+    available: the verifier accusing an honest record.
+
+    Reading the fields back is safe. A forger who edits them changes the
+    document being recovered, so the recovered address stops matching the
+    `signer` the receipt claims, and the existing check fails them.
+    """
+    from aura_hive.hive.membrane import receipt as receipt_module
+
+    account = Account.create()
+    old_receipt = await mint(account, chain_id=84532)
+    assert verify(old_receipt).ok
+
+    with patch.object(receipt_module, "RECEIPT_EIP712_VERSION", "9"):
+        result = verify(old_receipt)
+
+    assert result.ok, result.failures
+
+
+@pytest.mark.asyncio
+async def test_editing_the_recorded_domain_does_not_forge_a_receipt() -> None:
+    """
+    The other half of reading the domain out of the receipt.
+
+    If the fields told the verifier whom to trust, this would be a hole. They
+    tell it which document to reconstruct: editing them changes the message
+    recovered, so the recovered address stops matching the `signer` the receipt
+    still claims, and the existing signer check refuses it.
+    """
+    receipt = await mint(Account.create(), chain_id=84532)
+    assert verify(receipt).ok
+
+    receipt.signature.domain = "SomeOtherDomain"
+
+    result = verify(receipt)
+
+    assert not result.ok
+    assert any("recovers to" in failure for failure in result.failures), result.failures
 
 
 @pytest.mark.asyncio
