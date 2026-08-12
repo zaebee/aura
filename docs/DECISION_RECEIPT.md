@@ -471,8 +471,12 @@ Three limits worth stating rather than discovering later:
   cannot be violated by any call site. The other half is by construction rather than structural: the
   `ValueError` that catches an `override` recorded with no scope only fires on the call that
   *establishes* the gate, so an `override` recorded downstream of an existing gate would pass
-  through silently. No path reaches that today, and the note is here so the next person adding an
-  override path knows they are the case it was written for.
+  through silently. And when it does fire, it **escapes**: neither `inspect_outbound` nor
+  `MetabolicLoop.execute` wraps the Membrane call, so the exception leaves the cycle and the
+  negotiation is lost rather than refused — the same failure `_context_number` exists to prevent for
+  a different `ValueError` in the same file, and the wrong failure for the component whose job is to
+  be the thing that does not let a bad decision out. No path reaches either today, and the note is
+  here so the next person adding an override path knows they are the case it was written for.
 
 - **`refuse` receipts carry no derivation.** VISION §5.1.4 wants a real digest there, since a
   refusal is a closed derivation onto the refusal symbol. Ours are Membrane-level checks (KYC,
@@ -568,7 +572,9 @@ nowhere in this document or the repo did anything state what holding that rule s
 That is the difference between a certificate and a version string, and the gap was not academic.
 Writing the missing statement down found a live bug.
 
-**The bug.** With `floor_price = 100`, `min_profit_margin = 0.1`, and `internal_cost` unset:
+**The bug**, under the pre-collapse per-gate strategy — the same inputs produce 112.16 today, and
+§4 walks that through. With `floor_price = 100`, `min_profit_margin = 0.1`, and `internal_cost`
+unset:
 
 - `membrane/main.py` defaults `internal_cost` to `floor_price`, so cost = 100;
 - the model proposes 92; `G2_FLOOR_VIOLATION` fails and `OutputGuard.evaluate` returns immediately,
