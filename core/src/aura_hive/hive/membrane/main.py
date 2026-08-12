@@ -7,7 +7,6 @@ import structlog
 from aura_core import (
     Membrane,
     SkillRegistry,
-    decision_outcome_name,
     make_struct,
 )
 from aura_core_gen.aura.core.v1 import (
@@ -355,10 +354,7 @@ class HiveMembrane(Membrane[Any, Intent, Context]):
             logger.info(
                 "membrane_receipt",
                 prefix=emission.receipt.canonical_prefix,
-                outcome=decision_outcome_name(emission.receipt.outcome),
-                gate=emission.receipt.outcome_gate or None,
-                ruleset=emission.receipt.ruleset_version or None,
-                signed=_is_signed(emission.receipt),
+                receipt=emission.receipt.to_dict(),
             )
         except Exception as e:  # nosec B110
             # The same rule `_record_intervention` follows, and for the same

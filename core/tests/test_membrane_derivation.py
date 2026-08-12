@@ -673,12 +673,16 @@ class TestTheReceiptLogClaimsOnlyWhatItKnows:
     """
     `attested` is a word `verify` owns: it means the signature recovered to the
     signer the receipt claims. The log line never recovers anything — it knows
-    only whether a signature is attached — so it says `signed`.
+    only whether a signature is attached.
 
-    Using the stronger word for the weaker fact is the conflation
-    `VerificationResult` separates `ok` from `attested` to avoid, and a log
-    asserting attestation nobody performed is the same overstatement in a
-    cheaper place.
+    The log now carries `receipt.to_dict()` rather than a hand-picked scalar, so
+    that fact is read from the document itself: betterproto omits an empty
+    `signature` field from the dict rather than emitting it null, so an unsigned
+    receipt's logged payload carries no `signature` key at all and a signed
+    one's does. A reader checking presence, not a top-level `signed` flag this
+    module used to compute, cannot claim an attestation nobody performed — the
+    same overstatement `VerificationResult` separates `ok` from `attested` to
+    avoid, in a cheaper place.
     """
 
     def logged(self, calls: list) -> dict:
@@ -697,7 +701,7 @@ class TestTheReceiptLogClaimsOnlyWhatItKnows:
                 counter_intent(price=500.0), negotiation_context()
             )
 
-        assert self.logged(calls)["signed"] is False
+        assert "signature" not in self.logged(calls)["receipt"]
 
     @pytest.mark.asyncio
     async def test_a_signed_decision_is(self) -> None:
@@ -718,7 +722,7 @@ class TestTheReceiptLogClaimsOnlyWhatItKnows:
                 counter_intent(price=500.0), negotiation_context()
             )
 
-        assert self.logged(calls)["signed"] is True
+        assert "signature" in self.logged(calls)["receipt"]
 
     def test_a_signature_block_with_no_signature_is_not_signed(self) -> None:
         """

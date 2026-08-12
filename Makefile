@@ -199,3 +199,7 @@ tools-simulate:
 tools-buyer:
 	# Run agent negotiation simulation
 	PYTHONPATH=$(TOOL_PATH) uv run python tools/simulators/autonomous_buyer.py
+
+verify-receipts:
+	# Check the receipts a running Hive left in its log (LOG=path, or stdin when unset)
+	PYTHONPATH=$(TOOL_PATH):. uv run python tools/verify_receipts.py $(LOG)
