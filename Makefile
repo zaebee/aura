@@ -71,6 +71,10 @@ test: $(PROTO_SENTINEL)
 	PYTHONPATH=$(KEEPER_PATH) uv run pytest agents/bee-keeper/tests/ -v
 	# Run bee.Evolver tests in its own env — it deliberately has no aura-core dep.
 	cd agents/bee-evolver && uv run --group dev pytest tests/ -v
+	# Run the aura-core packaging guard: it builds the wheel in place and asserts
+	# the hook-generated aura_core_gen actually lands in it. No PYTHONPATH — the
+	# guard inspects the built artifact, it never imports aura_core.
+	uv run pytest packages/aura-core/tests/ -v
 	# Run mcp-server tests if they exist.
 	# aura-mcp's runtime deps (fastmcp) aren't in the root dev group, so add them
 	# additively (--inexact keeps the already-synced dev deps, avoids aura-worker's
