@@ -22,6 +22,11 @@ class Umbilical:
     FRPC_SHA256: str = (
         "720a9fe2a3299346572544909a78c023344c88bde13c55b921e298e8c5ded21f"
     )
+    FRPC_DOWNLOAD_ATTEMPTS: int = 3
+
+    # What curl calls a transient error, and what a release CDN actually does
+    # under load. Anything else is a verdict, not a blip.
+    _RETRIABLE_STATUS: frozenset[int] = frozenset({408, 429, 500, 502, 503, 504})
 
     def __init__(
         self,
@@ -47,6 +52,55 @@ class Umbilical:
 
         self.process: asyncio.subprocess.Process | None = None
 
+    def _is_transient(self, exc: httpx.HTTPError) -> bool:
+        if isinstance(exc, httpx.TransportError):
+            return True
+        if isinstance(exc, httpx.HTTPStatusError):
+            return exc.response.status_code in self._RETRIABLE_STATUS
+        return False
+
+    async def _fetch_frpc_archive(self, url: str, dest: Path) -> str:
+        """Stream the archive to dest, returning its hex digest.
+
+        A single dropped connection used to end the worker's whole run: the
+        release CDN closed the socket without a response, and the traceback said
+        only "Server disconnected", naming neither the file nor where it came
+        from. Blips get another go; a 404 or a bad gateway-less error does not.
+        """
+        for attempt in range(1, self.FRPC_DOWNLOAD_ATTEMPTS + 1):
+            sha256 = hashlib.sha256()
+            try:
+                async with httpx.AsyncClient(follow_redirects=True) as client:
+                    async with client.stream("GET", url, timeout=60.0) as response:
+                        response.raise_for_status()
+                        async with aiofiles.open(dest, "wb") as f:
+                            async for chunk in response.aiter_bytes(chunk_size=8192):
+                                await f.write(chunk)
+                                sha256.update(chunk)
+            except httpx.HTTPError as exc:
+                dest.unlink(missing_ok=True)
+                if not self._is_transient(exc):
+                    raise
+                if attempt == self.FRPC_DOWNLOAD_ATTEMPTS:
+                    raise RuntimeError(
+                        f"Could not download frpc from {url} after "
+                        f"{self.FRPC_DOWNLOAD_ATTEMPTS} attempts: {exc}"
+                    ) from exc
+
+                delay = 2**attempt
+                logger.warning(
+                    "frpc download failed, retrying",
+                    attempt=attempt,
+                    of=self.FRPC_DOWNLOAD_ATTEMPTS,
+                    retry_in=delay,
+                    error=str(exc),
+                )
+                await asyncio.sleep(delay)
+            else:
+                return sha256.hexdigest()
+
+        raise AssertionError("unreachable: the loop either returns or raises")
+
     async def ensure_frpc(self) -> None:
         if self.frpc_path.exists():
             return
@@ -60,20 +114,12 @@ class Umbilical:
         logger.info("Downloading frpc", version=self.FRPC_VERSION)
 
         tar_path: Path = self.bin_dir / frp_file
-        sha256 = hashlib.sha256()
+        digest: str = await self._fetch_frpc_archive(frp_url, tar_path)
 
-        async with httpx.AsyncClient(follow_redirects=True) as client:
-            async with client.stream("GET", frp_url, timeout=60.0) as response:
-                response.raise_for_status()
-                async with aiofiles.open(tar_path, "wb") as f:
-                    async for chunk in response.aiter_bytes(chunk_size=8192):
-                        await f.write(chunk)
-                        sha256.update(chunk)
-
-        if sha256.hexdigest() != self.FRPC_SHA256:
+        if digest != self.FRPC_SHA256:
             tar_path.unlink()
             raise RuntimeError(
-                f"Checksum verification failed for frpc! Expected {self.FRPC_SHA256}, got {sha256.hexdigest()}"
+                f"Checksum verification failed for frpc! Expected {self.FRPC_SHA256}, got {digest}"
             )
 
         logger.info("Checksum verified. Extracting...")
