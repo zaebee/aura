@@ -184,7 +184,14 @@ object the Transformer handed over.** The stamping above is a mutation of the ca
 happens before the claim is taken. That is deliberate — the denomination is a property of the request
 and the model never had a say in it, so stamping it after the claim would make claim and emission
 disagree over a field nothing decided — but it means the baseline the two digests are taken against
-is ours, one normalisation deep. Currency is the only such field today. Anything else added here
+is ours, one normalisation deep. Three fields are normalised today: `currency_code` (above),
+`identifier` (named when nothing upstream did — outside the canonical claim, so it moves no digest),
+and `price`, **quantised to cents**. The last is not cosmetic: the claim renders `price` at `.2f`,
+so without it the gates decide at a precision finer than the digest can express, and a proposal a
+fraction of a cent below the margin threshold is substituted onto its own cent — claim and emission
+digesting alike while `override_scope` says `value`, which is exactly the combination §3.5 says
+cannot happen. Quantising first makes the gate, ψ, the substitute and both digests read one value.
+Anything else added here
 widens the gap between "what the model proposed" and "what the claim says the model proposed", which
 is the sentence this paragraph exists to keep honest.
 

@@ -5,6 +5,8 @@ Gates judge the model's proposal. Before this, nothing judged the Membrane's
 substitute, so a below-margin override shipped under a receipt that verified.
 """
 
+import random
+
 import pytest
 from aura_core import SkillRegistry, make_struct
 from aura_core_gen.aura.core.v1 import (
@@ -57,6 +59,20 @@ def negotiation_context(request_id: str = "", cost: float = COST) -> Context:
         metadata=make_struct({"floor_price": str(FLOOR), "internal_cost": str(cost)}),
         hive=HiveContextData(request_id=request_id),
     )
+
+
+def _proposal(rng: "random.Random", floor: float, case: int) -> float:
+    """
+    A proposed price, one in three of them finer than a cent.
+
+    Both grids below generated `round(uniform(...), 2)` exclusively, which is
+    the one precision class that cannot produce the claim/emission digest
+    collision — the digest renders at `.2f`, so a proposal already on a cent
+    can never round onto its own substitute. The grids therefore could not
+    reach the defect `TestAProposalFinerThanACent` pins, and did not.
+    """
+    raw = rng.uniform(0.01, floor * 2.0)
+    return raw if case % 3 == 1 else round(raw, 2)
 
 
 def counter_intent(price: float) -> Intent:
@@ -309,7 +325,7 @@ class TestPsiHoldsOnEveryEmittedPrice:
                 # satisfies psi, and that is the case the audit broke the first
                 # design on.
                 cost = round(rng.uniform(0.01, floor * 1.5), 2)
-                proposed = round(rng.uniform(0.01, floor * 2.0), 2)
+                proposed = _proposal(rng, floor, case)
             request_id = f"req-{rng.randrange(10**12)}"
 
             context = Context(
@@ -369,7 +385,7 @@ class TestPsiHoldsOnEveryEmittedPrice:
             else:
                 floor = round(rng.uniform(0.01, 100_000.0), 2)
                 cost = round(rng.uniform(0.01, floor * 1.5), 2)
-                proposed = round(rng.uniform(0.01, floor * 2.0), 2)
+                proposed = _proposal(rng, floor, case)
             message = (
                 "my floor_price is confidential"
                 if case % 3 == 0
@@ -393,3 +409,79 @@ class TestPsiHoldsOnEveryEmittedPrice:
                 f"case {case}: floor={floor} cost={cost} proposed={proposed} "
                 f"message={message!r} failures={result.failures}"
             )
+
+
+class TestAProposalFinerThanACent:
+    """
+    The digest is taken at cent precision; the gates decide at full precision.
+
+    `canonical_claim` renders `price={...:.2f}` (receipt.py), so a proposal less
+    than half a cent below the psi threshold fails G4 and is substituted — and
+    the substitute renders to the *same cent* as the proposal. Claim and
+    emission then digest alike while `override_scope` says `"value"`, which is
+    the one combination `verify()` refuses: a claimed substitution with no trace
+    of itself.
+
+    The Membrane minting a receipt its own verifier rejects is the defect this
+    branch was opened to close. It is reachable from the model, which sends
+    `float(price)` with no cent rounding (transformer/main.py), and it is
+    invisible to the grids above because they generate `round(uniform(...), 2)`
+    — the precision class that structurally cannot trigger it.
+    """
+
+    # cost/(1-m) lands exactly on 111.11, so a proposal a fraction of a cent
+    # under it fails the margin gate and ceils back onto the same cent.
+    COST = 99.999
+    THRESHOLD_CENT = 111.11
+
+    @pytest.mark.asyncio
+    async def test_a_sub_cent_proposal_still_mints_a_verifiable_receipt(self) -> None:
+        from aura_hive.hive.membrane.receipt import verify
+
+        membrane = guarded_membrane()
+        intent = counter_intent(price=111.108)
+
+        decision = await membrane.inspect_outbound(
+            intent,
+            Context(
+                metadata=make_struct(
+                    {"floor_price": "50.0", "internal_cost": str(self.COST)}
+                ),
+                hive=HiveContextData(request_id=""),
+            ),
+        )
+        receipt = decision.receipt
+        result = verify(receipt)
+
+        assert result.ok, (
+            f"claim={receipt.claim_hash} emission={receipt.emission_hash} "
+            f"scope={receipt.override_scope!r} gate={receipt.outcome_gate} "
+            f"failures={result.failures}"
+        )
+
+    @pytest.mark.asyncio
+    async def test_an_override_is_recorded_only_when_the_emitted_cent_differs(
+        self,
+    ) -> None:
+        """
+        The receipt reports interventions by the difference between two digests.
+        An override whose digests are identical claims a substitution the
+        evidence cannot show, so at cent precision it is not an override.
+        """
+        membrane = guarded_membrane()
+
+        decision = await membrane.inspect_outbound(
+            counter_intent(price=111.108),
+            Context(
+                metadata=make_struct(
+                    {"floor_price": "50.0", "internal_cost": str(self.COST)}
+                ),
+                hive=HiveContextData(request_id=""),
+            ),
+        )
+
+        assert decision.negotiation is not None
+        assert decision.negotiation.price == self.THRESHOLD_CENT
+        assert decision.receipt.claim_hash != decision.receipt.emission_hash or (
+            decision.receipt.outcome != DecisionOutcome.DECISION_OUTCOME_OVERRIDE
+        )

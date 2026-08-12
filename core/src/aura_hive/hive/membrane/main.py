@@ -586,15 +586,26 @@ class HiveMembrane(Membrane[Any, Intent, Context]):
         sanitisation — builds a replacement and leaves the caller's object
         alone.
 
-        The one exception is `currency_code`, stamped onto the caller's
-        `NegotiationIntent` from the Context below. That is normalisation, not a
-        decision: the denomination is a property of the request and the model
-        never had a say in it. It is written before `claim` and the emission can
-        diverge, deliberately, so both digests cover the same denomination
-        rather than differing over a field nothing decided. The consequence is
-        worth stating plainly and `DECISION_RECEIPT.md` §3.2 now does: what
-        `claim_hash` digests is the proposal **as normalised by the Membrane**,
-        not the byte-exact object the Transformer handed over.
+        The exceptions are three normalisations, all written below before
+        `claim` and the emission can diverge, and all of them properties of the
+        request rather than decisions the model made:
+
+        - `identifier`, named here when nothing upstream named it, so the
+          receipt binds to one decision. Outside the canonical claim, so it
+          moves no digest.
+        - `currency_code`, stamped from the Context. The denomination is a
+          property of the request and the model never had a say in it; writing
+          it early means both digests cover the same denomination rather than
+          differing over a field nothing decided.
+        - `price`, quantised to cents — the precision the receipt renders at.
+          Without this the gates decide on a value finer than the one the
+          digest covers, and a sub-cent proposal could be substituted onto its
+          own cent, producing a receipt that claims a substitution its own
+          digests cannot show.
+
+        The consequence is worth stating plainly and `DECISION_RECEIPT.md` §3.2
+        now does: what `claim_hash` digests is the proposal **as normalised by
+        the Membrane**, not the byte-exact object the Transformer handed over.
 
         That is not tidiness. The receipt reports what the Membrane did by
         comparing a digest of what was proposed against a digest of what is
@@ -713,6 +724,32 @@ class HiveMembrane(Membrane[Any, Intent, Context]):
         # claim and the emission carry it and the two digests stay comparable.
         if neg_intent is not None and hive is not None:
             neg_intent.currency_code = hive.offer.currency_code
+
+        # Quantised to cents here, for the same reason as currency and in the
+        # same place: so that what the gates decide on is what the digest
+        # covers.
+        #
+        # `canonical_claim` renders `price={...:.2f}`, so the receipt speaks in
+        # cents while the gates and psi decide in full `Decimal`. A proposal
+        # less than half a cent below the psi threshold failed G4, was
+        # substituted, and the substitute rendered to the *same cent* — so the
+        # claim and the emission digested alike while `override_scope` said
+        # `"value"`, the one combination `verify()` refuses. The Membrane minted
+        # a receipt its own verifier rejected: a claimed substitution with no
+        # trace of itself.
+        #
+        # `round(p, 2)` and `f"{p:.2f}"` are the same correct-rounding of the
+        # same binary double, so rounding here cannot change what the receipt
+        # would have said the price was. What it does change is that the gate,
+        # psi, the substitute and both digests now all read one value. A
+        # proposal that rounds *up* through a threshold is emitted at the
+        # rounded value, which is the value that passed — so the guarantee
+        # "the price that left satisfies psi" is unweakened.
+        #
+        # Model-reachable rather than theoretical: the Transformer passes
+        # `float(price)` from the model with no cent rounding of its own.
+        if neg_intent is not None:
+            neg_intent.price = round(neg_intent.price, 2)
 
         # 1. Handle explicit failures
         if decision.action == ActionType.ACTION_TYPE_ERROR:
