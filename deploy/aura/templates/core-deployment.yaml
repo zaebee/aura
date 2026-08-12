@@ -82,6 +82,17 @@ spec:
                 secretKeyRef:
                   name: "{{ .Release.Name }}-secrets"
                   key: "solana-private-key"
+            # Signs decision receipts. Its own key, not the spending key above:
+            # a deployment attests its decisions without enabling payment locks.
+            # `optional` because the pod must keep starting before anyone
+            # creates it — it then logs `attestation_disabled_no_key` and emits
+            # AURA-RECEIPT-V2-UNSIGNED, which is a legitimate configuration.
+            - name: AURA_ATTESTATION__PRIVATE_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: "{{ .Release.Name }}-secrets"
+                  key: "attestation-private-key"
+                  optional: true
             - name: AURA_CRYPTO__SOLANA_RPC_URL
               value: "https://api.mainnet-beta.solana.com"
             - name: AURA_CRYPTO__SOLANA_USDC_MINT

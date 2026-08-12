@@ -972,8 +972,26 @@ next person.
 
 ### Recovering the signer
 
-**Read `version` first.** `AURA-RECEIPT-V2-UNSIGNED` means the deployment had no key configured and
-`signature` is `null`. Everything else in the receipt is still checkable to the extent described
+**Read `version` first.** `AURA-RECEIPT-V2-UNSIGNED` means the deployment had no attestation key
+configured and `signature` is `null`. That is a legitimate configuration rather than a fault: the key
+lives in `AURA_ATTESTATION__PRIVATE_KEY`, a deployment may run without one, and the decision is
+emitted either way — losing a negotiation because a key was unreachable would trade the guarantee for
+the attestation.
+
+Until the attestation protein existed this sentence was false. Signing was gated on
+`crypto.enabled`, a flag about payment locks, which was false in every deployed configuration — and
+would not have signed anything had it been true, because no signing key was plumbed into the
+deployment at all. `UNSIGNED` meant "crypto payments are off", not "no key configured". The key now
+has its own section, its own protein, and no feature flag: the protein is registered when a key is
+present and not otherwise.
+
+Which address a deployment signs with is stated once at boot —
+`attestation_signer_ready address=0x…` — and recorded in `docs/attestation-signers.md`. That file is
+the durable half of the story: a signature recovers to an address, but only the record says the
+address was ours. Verifying a past signature never needs the private key, so keys may rotate and be
+lost without taking the corpus with them.
+
+Everything else in the receipt is still checkable to the extent described
 above, but nobody has vouched for it. Treating one as the other is the downgrade the two names exist
 to prevent.
 
