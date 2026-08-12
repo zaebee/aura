@@ -37,6 +37,10 @@ dependencies = [
     "redis>=5.0.0",
     "aura-core",
     "betterproto>=2.0.0b7",
+    # Declared directly, though it arrives transitively through web3 as well:
+    # the attestation protein depends on it and deliberately does NOT depend on
+    # web3, since signing a receipt needs an account and an encoder, not a chain.
+    "eth-account>=0.13.7",
     "pygithub>=2.1.1",
     "web3>=7.0.0",
 ]
