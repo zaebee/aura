@@ -99,19 +99,19 @@ Aura Hive uses **Technical Folklore** — bio-organic metaphors layered over pre
 | Bio-Organic Term | Technical Equivalent | Rationale | Code Reference |
 |------------------|---------------------|-----------|----------------|
 | **Bee** | Autonomous Service | Self-contained, cooperative agents with agency | `agents/bee-keeper/` |
-| **ATCG-M** | Service Architecture Pattern | DNA analogy for fractal 5-nucleotide structure | `FOUNDATIONS.md:27` |
+| **ATCG-M** | Service Architecture Pattern | DNA analogy for fractal 5-nucleotide structure | `FOUNDATION.md:27` |
 | **A (Aggregator)** | Input/Sensor Layer | Collects signals from environment | `dna.py:153-156` |
 | **T (Transformer)** | Reasoning/LLM Layer | Processes signals via Ona (DSPy, LangChain) | `dna.py:160-163` |
 | **C (Connector)** | Output/Action Layer | Acts through Jules (Proteins/Skills) | `dna.py:167-170` |
 | **G (Generator)** | Event/Chronicle Layer | Pulses state updates and events | `dna.py:174-177` |
-| **M (Membrane)** | Input/Output Guards | Immune system: validates inputs, enforces rules | `core/src/aura_hive/hive/membrane/main.py` |
-| **Bloodstream** | NATS Event Bus (Binary Protobuf) | Circulatory system distributes binary-encoded signals via JetStream | `FOUNDATIONS.md:14` |
+| **M (Membrane)** | Input/Output Guards | Immune system: validates inputs, enforces rules | `core/src/hive/membrane.py` |
+| **Bloodstream** | NATS Event Bus (Binary Protobuf) | Circulatory system distributes binary-encoded signals via JetStream | `FOUNDATION.md:14` |
 | **Proteins** | Skill Adapters (SkillProtocol) | Enzymes enable specific external interactions | `dna.py:184-202` |
 | **Sacred Chambers** | Directory Roles | Poetic names for filesystem organization | `dna.py:50-75` |
 | **Genome** | `aura-core` package | Immutable DNA (Protocols, BaseModels, Types) | `packages/aura-core/` |
 | **Nucleus** | `core` | The sovereign brain | `core/` |
-| **Organs** | `core/src/aura_hive/hive/proteins/` | Specialized skills implementing SkillProtocol | `core/src/aura_hive/hive/proteins/` |
-| **Citizens** | `agents/` + `synapses/` | Active Subjects (goals) + Passive Servants (translation) | `agents/`, `synapses/` |
+| **Organs** | `core/src/hive/proteins/` | Specialized skills implementing SkillProtocol | `core/src/hive/proteins/` |
+| **Citizens** | `agents/` + `adapters/` | Active Subjects (goals) + Passive Servants (translation) | `agents/`, `adapters/` |
 | **Ona** | LLM Reasoning Engine | The thinking substrate (DSPy, LangChain) | N/A (conceptual) |
 | **Jules** | External Action Engine | The doing substrate (API calls, I/O) | N/A (conceptual) |
 
@@ -126,7 +126,7 @@ Aura Hive uses **Technical Folklore** — bio-organic metaphors layered over pre
 
 Visual diagrams are aligned with the canonical architecture defined in:
 
-* `docs/FOUNDATIONS.md` — Ontological hierarchy and ATCG-M metabolism
+* `docs/FOUNDATION.md` — Ontological hierarchy and ATCG-M metabolism
 * `packages/aura-core/src/aura_core/dna.py` — Protocol definitions
 * `HIVE_STATE.md` — Operational status and audit log
 * Reference implementations: `agents/bee-keeper/`, `core/src/hive/`
@@ -136,15 +136,15 @@ Visual diagrams are aligned with the canonical architecture defined in:
 ## Navigation
 
 ### 🧬 Hive-Level Maps (`visual/hive/`)
-- **[ATCG-M Fractal Pattern](hive/atcg-fractal.md)** — How EVERY Bee follows the same 5-nucleotide structure
-- **[Four Ontological Levels](hive/four-levels.md)** — Genome, Nucleus, Organs, Citizens hierarchy
-- **[Sacred Chambers Map](hive/chambers-map.md)** — Poetic directory roles with bio-organic names
+- **[ATCG-M Fractal Pattern](/docs/visual/hive/atcg-fractal)** — How EVERY Bee follows the same 5-nucleotide structure
+- **[Four Ontological Levels](/docs/visual/hive/four-levels)** — Genome, Nucleus, Organs, Citizens hierarchy
+- **[Sacred Chambers Map](/docs/visual/hive/chambers-map)** — Poetic directory roles with bio-organic names
 
 ### 🔬 Component-Level Views (`visual/components/`)
-- **[Membrane Guard Patterns](components/membrane-guards.md)** — Security architecture: inbound/outbound validation
+- **[Membrane Guard Patterns](/docs/visual/components/membrane-guards)** — Security architecture: inbound/outbound validation
 
 ### 🩸 Pipeline & Event Flows (`visual/pipelines/`)
-- **[NATS Bloodstream Events](pipelines/nats-events.md)** — Inter-bee choreography via pub/sub events
+- **[NATS Bloodstream Events](/docs/visual/pipelines/nats-events)** — Inter-bee choreography via pub/sub events
 
 ---
 
