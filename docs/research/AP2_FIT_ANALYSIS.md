@@ -93,7 +93,7 @@ seller's side of the transaction, judging the seller's own LLM.
 | Verifiable, self-describing evidence | `DecisionReceipt` AURA-RECEIPT-V2: EIP-712, self-describing domain, verifier needs no key material | `proto/aura/core/v1/metabolism.proto:256`, `core/src/aura_hive/hive/membrane/receipt.py:335` |
 | Domain separation (a receipt is not an authorization) | `AuraDecisionReceipt` domain deliberately differs from `HackathonRiskRouter` (TradeIntent) | `core/src/aura_hive/hive/membrane/receipt.py:66-69` |
 | Versioned, discriminable schemas (`vct`) | Versioned, content-hashed rule set: `guard/negotiation@2.0.0+<hex>`; cross-checked both ways | `ruleset.yaml`, `DECISION_RECEIPT.md` §3.3 |
-| Constraint evaluation as a separate primitive | G1–G4 gates + ψ postcondition, fail-closed, declared-then-cross-checked | `core/src/aura_hive/hive/proteins/guard/ruleset.yaml:58-75` |
+| Constraint evaluation as a separate primitive | G1–G4 gates + ψ postcondition, fail-closed, declared-then-cross-checked | `core/src/aura_hive/hive/proteins/guard/ruleset.yaml:37-50,58-75` |
 | Honest boundary: "proves authorization, not intent" | Aura documents the same limit: `claim_hash` covers decidable content, prose is stripped; a receipt cannot prove the decision "ever happened" to a stranger | `DECISION_RECEIPT.md` §3.2, §7 |
 
 Aura is *ahead* of AP2 in one respect: it ships a **postcondition (ψ)** checked
@@ -246,7 +246,7 @@ with AP2 as the buyer-side complement, not a replacement.
 | Receipt `verify()` keyless | `core/src/aura_hive/hive/membrane/receipt.py:377` |
 | Attestation asked from `attestation`, not `transaction` | `core/src/aura_hive/hive/membrane/main.py:447-450` |
 | Outbound membrane boundary | `core/src/aura_hive/hive/membrane/main.py:631` |
-| Guard gates + ψ postcondition | `core/src/aura_hive/hive/proteins/guard/ruleset.yaml:58-75` |
+| Guard gates + ψ postcondition | `core/src/aura_hive/hive/proteins/guard/ruleset.yaml:37-50,58-75` |
 | `DecisionReceipt` proto | `proto/aura/core/v1/metabolism.proto:256` |
 | `Intent` proto | `metabolism.proto:360` |
 | High-value UI trigger / x402 cap | `core/src/aura_hive/config/policy.py:12-13` |
