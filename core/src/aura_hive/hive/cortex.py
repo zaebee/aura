@@ -58,7 +58,10 @@ logger = structlog.get_logger("hive.cortex")
 def _async_url(url: str) -> str:
     if "+asyncpg" in url:
         return url
-    return url.replace("postgresql://", "postgresql+asyncpg://", 1)
+    for prefix in ("postgresql://", "postgres://"):
+        if url.startswith(prefix):
+            return url.replace(prefix, "postgresql+asyncpg://", 1)
+    return url
 
 
 def build_async_engine(url: str) -> tuple[AsyncEngine, async_sessionmaker]:
@@ -78,10 +81,8 @@ def build_async_engine(url: str) -> tuple[AsyncEngine, async_sessionmaker]:
     @event.listens_for(engine.sync_engine, "connect")
     def _register_vector_codec(dbapi_connection: Any, _connection_record: Any) -> None:
         from pgvector.asyncpg import register_vector
-        from sqlalchemy.util.concurrency import await_fallback
 
-        raw = dbapi_connection.driver_connection
-        await_fallback(register_vector(raw))
+        dbapi_connection.run_async(register_vector)
 
     return engine, async_sessionmaker(bind=engine, class_=AsyncSession)
 

@@ -22,7 +22,10 @@ if config.config_file_name is not None:
 
 target_url = db_url
 if "+asyncpg" not in target_url:
-    target_url = target_url.replace("postgresql://", "postgresql+asyncpg://", 1)
+    for prefix in ("postgresql://", "postgres://"):
+        if target_url.startswith(prefix):
+            target_url = target_url.replace(prefix, "postgresql+asyncpg://", 1)
+            break
 config.set_main_option("sqlalchemy.url", target_url)
 
 target_metadata = Base.metadata
@@ -57,10 +60,11 @@ async def run_migrations_online() -> None:
         poolclass=pool.NullPool,
     )
 
-    async with connectable.connect() as connection:
-        await connection.run_sync(do_run_migrations)
-
-    await connectable.dispose()
+    try:
+        async with connectable.connect() as connection:
+            await connection.run_sync(do_run_migrations)
+    finally:
+        await connectable.dispose()
 
 
 if context.is_offline_mode():

@@ -31,8 +31,8 @@ class ItemRepository:
 
     async def get_first(self) -> dict[str, Any] | None:
         async with self._session() as session:
-            result = await session.execute(select(InventoryItem))
-            item = result.scalar_one_or_none()
+            result = await session.execute(select(InventoryItem).limit(1))
+            item = result.scalars().first()
             return ItemSchema.model_validate(item).model_dump() if item else None
 
     async def upsert_asset(self, asset: Asset) -> None:

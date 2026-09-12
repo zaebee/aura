@@ -8,7 +8,7 @@ from aura_core import SkillProtocol, make_struct
 from aura_core_gen.aura.assets.v1 import Asset
 from aura_core_gen.aura.core.v1 import Observation
 from sqlalchemy import Engine, text
-from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 from sqlalchemy.orm import Session, sessionmaker
 
 from aura_hive.config.database import DatabaseSettings
@@ -85,17 +85,16 @@ class PersistenceSkill(
     def bind(
         self,
         settings: DatabaseSettings,
-        provider: tuple,
+        provider: tuple[sessionmaker, Engine, redis.Redis]
+        | tuple[sessionmaker, Engine, redis.Redis, async_sessionmaker],
     ) -> None:
         self.settings = settings
-        self.provider, self.engine, self.redis = (
-            provider[0],
-            provider[1],
-            provider[2],
-        )
-        # 4th element (async_sessionmaker) arrives from Task 2's cortex wiring;
-        # repos switch to it in Task 6. Kept aside, not consumed yet.
-        self._async_provider = provider[3] if len(provider) > 3 else None
+        sync_factory, self.engine, self.redis, *rest = provider
+        self.provider = sync_factory
+        # 4th element (async_sessionmaker) arrives from the dual-engine
+        # cortex wiring; converted repos switch to it, the rest stay sync
+        # until Phase 2.
+        self._async_provider = rest[0] if rest else None
         if self.redis:
             self.cache = RedisCache(self.redis)
 

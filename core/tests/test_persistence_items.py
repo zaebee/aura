@@ -83,6 +83,35 @@ async def test_read_item_requires_id():
 
 
 @pytest.mark.asyncio
+async def test_get_first_item_with_many_rows():
+    """get_first must not raise MultipleResultsFound when rows pile up.
+
+    The sync code used `.first()` (implicit LIMIT 1); the async port must
+    keep that property instead of `scalar_one_or_none()` on an unbounded
+    select.
+    """
+    from aura_hive.hive.proteins.persistence.engine import InventoryItem
+
+    item = InventoryItem(
+        id="item-1",
+        name="Room",
+        base_price=200.0,
+        floor_price=150.0,
+        is_active=True,
+        meta={},
+    )
+    session_mock = _make_async_session_mock()
+    result_mock = MagicMock()
+    result_mock.scalars.return_value.first.return_value = item
+    session_mock.execute.return_value = result_mock
+
+    skill = _make_skill_with_session(session_mock)
+    obs = await skill.execute("get_first_item", {})
+
+    assert obs.success is True
+
+
+@pytest.mark.asyncio
 async def test_legacy_upsert_item_creates_record():
     session_mock = _make_async_session_mock()
     session_mock.query.return_value.filter_by.return_value.first.return_value = None
