@@ -71,7 +71,7 @@ class PersistenceSkill(
 
         # Entity SQL lives in dedicated repositories; the _get_session reference
         # is bound lazily and only invoked at operation time (after bind()).
-        self._deals = DealRepository(self._get_session)
+        self._deals = DealRepository(self._get_async_session)
         self._items = ItemRepository(self._get_async_session)
         self._wallets = WalletRepository(self._get_async_session)
         self._receipts = ReceiptRepository(self._get_async_session)
@@ -271,7 +271,7 @@ class PersistenceSkill(
 
     async def _create_deal(self, params: dict[str, Any]) -> Observation:
         try:
-            await asyncio.to_thread(self._deals.create, params)
+            await self._deals.create(params)
             return Observation(success=True)
         except Exception as e:
             return Observation(success=False, error=str(e))
@@ -280,7 +280,7 @@ class PersistenceSkill(
         deal_id = params.get("deal_id")
         if not deal_id:
             return Observation(success=False, error="deal_id_required")
-        result = await asyncio.to_thread(self._deals.get_by_id, deal_id)
+        result = await self._deals.get_by_id(deal_id)
         if result:
             return Observation(success=True, metadata=make_struct(result))
         return Observation(success=False, error="deal_not_found")
@@ -289,7 +289,7 @@ class PersistenceSkill(
         memo = params.get("memo")
         if not memo:
             return Observation(success=False, error="memo_required")
-        result = await asyncio.to_thread(self._deals.get_by_memo, memo)
+        result = await self._deals.get_by_memo(memo)
         if result:
             return Observation(success=True, metadata=make_struct(result))
         return Observation(success=False, error="deal_not_found")
@@ -338,9 +338,7 @@ class PersistenceSkill(
         if not deal_id or not status:
             return Observation(success=False, error="deal_id_and_status_required")
         try:
-            success = await asyncio.to_thread(
-                self._deals.update_status, deal_id, status, params
-            )
+            success = await self._deals.update_status(deal_id, status, params)
             return Observation(success=success)
         except Exception as e:
             return Observation(success=False, error=str(e))
@@ -381,20 +379,16 @@ class PersistenceSkill(
 
     async def _log_metabolic_cost(self, params: dict[str, Any]) -> Observation:
         try:
-
-            def log() -> None:
-                with self._get_session() as session:
-                    cost = MetabolicCost(
-                        amount=params["amount"],
-                        currency=params["currency"],
-                        network=params["network"],
-                        endpoint=params["endpoint"],
-                        transaction_hash=params.get("tx_hash"),
-                    )
-                    session.add(cost)
-                    session.commit()
-
-            await asyncio.to_thread(log)
+            async with self._get_async_session() as session:
+                cost = MetabolicCost(
+                    amount=params["amount"],
+                    currency=params["currency"],
+                    network=params["network"],
+                    endpoint=params["endpoint"],
+                    transaction_hash=params.get("tx_hash"),
+                )
+                session.add(cost)
+                await session.commit()
             return Observation(success=True)
         except Exception as e:
             return Observation(success=False, error=str(e))
