@@ -78,23 +78,22 @@ class TestNonFinite:
     InvalidOperation on NaN instead, so the rewrite needs its own explicit
     handling for all three inputs, and must never raise.
 
-    A non-finite margin falls back to _DEFAULT_MARGIN (0.1), matching the
-    settings-missing path. A non-finite floor_price or internal_cost is read
-    as 0 — the same fallback already used for a value that was never sent
-    (see TestCostAboveFloor and the null-floor case in
+    A non-finite margin refuses with MARGIN_UNAVAILABLE: substituting the
+    default priced every decision at a margin the operator never configured
+    while the receipts stayed clean. A non-finite floor_price or
+    internal_cost is read as 0 — the same fallback already used for a value
+    that was never sent (see TestCostAboveFloor and the null-floor case in
     test_guard_gates.py) — since it appears only inside `max(...)`, a 0 can
     only be outweighed by the other, trustworthy input, never pull the price
     below what that input alone requires.
     """
 
     @pytest.mark.parametrize("margin", [float("nan"), float("inf"), float("-inf")])
-    def test_a_non_finite_margin_falls_back_to_the_default(self, margin: float) -> None:
+    def test_a_non_finite_margin_refuses(self, margin: float) -> None:
         guard = OutputGuard(safety_settings=Settings(margin))
-        price = guard.calculate_safe_price(
-            {"floor_price": 100.0, "internal_cost": 100.0}
-        )
-        assert price == 111.12
-        assert holds(price, 100.0, 100.0, 0.1)
+        with pytest.raises(GuardUnavailable) as caught:
+            guard.calculate_safe_price({"floor_price": 100.0, "internal_cost": 100.0})
+        assert caught.value.code == "MARGIN_UNAVAILABLE"
 
     @pytest.mark.parametrize("floor", [float("nan"), float("inf")])
     def test_a_non_finite_floor_does_not_raise_and_still_satisfies_the_rule(
