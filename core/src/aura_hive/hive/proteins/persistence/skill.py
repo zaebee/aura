@@ -8,6 +8,7 @@ from aura_core import SkillProtocol, make_struct
 from aura_core_gen.aura.assets.v1 import Asset
 from aura_core_gen.aura.core.v1 import Observation
 from sqlalchemy import Engine, text
+from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import Session, sessionmaker
 
 from aura_hive.config.database import DatabaseSettings
@@ -72,7 +73,7 @@ class PersistenceSkill(
         # is bound lazily and only invoked at operation time (after bind()).
         self._deals = DealRepository(self._get_session)
         self._items = ItemRepository(self._get_session)
-        self._wallets = WalletRepository(self._get_session)
+        self._wallets = WalletRepository(self._get_async_session)
         self._receipts = ReceiptRepository(self._get_session)
 
     def get_name(self) -> str:
@@ -102,6 +103,11 @@ class PersistenceSkill(
         if not self.provider:
             raise RuntimeError("provider_not_initialized")
         return cast(Session, self.provider())
+
+    def _get_async_session(self) -> AsyncSession:
+        if not self._async_provider:
+            raise RuntimeError("async_provider_not_initialized")
+        return cast(AsyncSession, self._async_provider())
 
     async def initialize(self) -> bool:
         if not self.settings or not self.provider:
@@ -363,14 +369,12 @@ class PersistenceSkill(
         if not wallet_address:
             return Observation(success=False, error="wallet_address_required")
         asset_domain = params.get("asset_domain", "")
-        await asyncio.to_thread(self._wallets.sanctify, wallet_address, asset_domain)
+        await self._wallets.sanctify(wallet_address, asset_domain)
         return Observation(success=True)
 
     async def _is_wallet_sanctified(self, params: dict[str, Any]) -> Observation:
         wallet_address = params.get("wallet_address")
-        sanctified = await asyncio.to_thread(
-            self._wallets.is_sanctified, wallet_address
-        )
+        sanctified = await self._wallets.is_sanctified(wallet_address)
         return Observation(
             success=True,
             metadata=make_struct({"sanctified": sanctified}),
