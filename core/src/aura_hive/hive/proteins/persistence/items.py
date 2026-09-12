@@ -1,7 +1,7 @@
 """ItemRepository — inventory-item persistence, split out of PersistenceSkill.
 
-Read / upsert / vector-search over InventoryItem. Synchronous; callers wrap in
-``asyncio.to_thread``. Domain-specific attributes are applied via the tissue
+Read / upsert / vector-search over InventoryItem. Async; the skill awaits
+these methods directly. Domain-specific attributes are applied via the tissue
 enzymes during asset upsert, keeping tissue specificity out of the skill.
 """
 
@@ -9,7 +9,8 @@ from collections.abc import Callable
 from typing import Any, cast
 
 from aura_core_gen.aura.assets.v1 import Asset
-from sqlalchemy.orm import Session
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from .engine import InventoryItem
 from .schema import ItemSchema
@@ -17,25 +18,30 @@ from .tissue import ASSET_ENZYMES
 
 
 class ItemRepository:
-    """CRUD + semantic search for InventoryItem over a session factory."""
+    """CRUD + semantic search for InventoryItem over an async session factory."""
 
-    def __init__(self, session_factory: Callable[[], Session]) -> None:
+    def __init__(self, session_factory: Callable[[], AsyncSession]) -> None:
         self._session = session_factory
 
-    def get_by_id(self, item_id: str) -> dict[str, Any] | None:
-        with self._session() as session:
-            item = session.query(InventoryItem).filter_by(id=item_id).first()
+    async def get_by_id(self, item_id: str) -> dict[str, Any] | None:
+        async with self._session() as session:
+            result = await session.execute(select(InventoryItem).filter_by(id=item_id))
+            item = result.scalar_one_or_none()
             return ItemSchema.model_validate(item).model_dump() if item else None
 
-    def get_first(self) -> dict[str, Any] | None:
-        with self._session() as session:
-            item = session.query(InventoryItem).first()
+    async def get_first(self) -> dict[str, Any] | None:
+        async with self._session() as session:
+            result = await session.execute(select(InventoryItem))
+            item = result.scalar_one_or_none()
             return ItemSchema.model_validate(item).model_dump() if item else None
 
-    def upsert_asset(self, asset: Asset) -> None:
+    async def upsert_asset(self, asset: Asset) -> None:
         """Upsert from a native Asset, dispatching tissue-specific attributes."""
-        with self._session() as session:
-            item = session.query(InventoryItem).filter_by(id=asset.identifier).first()
+        async with self._session() as session:
+            result = await session.execute(
+                select(InventoryItem).filter_by(id=asset.identifier)
+            )
+            item = result.scalar_one_or_none()
             if not item:
                 item = InventoryItem(id=asset.identifier)
                 session.add(item)
@@ -57,13 +63,14 @@ class ItemRepository:
             if enzyme:
                 enzyme(asset, item)
 
-            session.commit()
+            await session.commit()
 
-    def upsert_legacy(self, params: dict[str, Any]) -> None:
+    async def upsert_legacy(self, params: dict[str, Any]) -> None:
         """Backward-compatible dictionary-based upsert."""
         item_id = params.get("id")
-        with self._session() as session:
-            item = session.query(InventoryItem).filter_by(id=item_id).first()
+        async with self._session() as session:
+            result = await session.execute(select(InventoryItem).filter_by(id=item_id))
+            item = result.scalar_one_or_none()
             if item:
                 item.name = params.get("name", item.name)
                 item.base_price = params.get("base_price", item.base_price)
@@ -80,15 +87,15 @@ class ItemRepository:
                     embedding=params.get("embedding"),
                 )
                 session.add(item)
-            session.commit()
+            await session.commit()
 
-    def search_by_vector(
+    async def search_by_vector(
         self, query_vector: Any, limit: int, min_similarity: float | None
     ) -> list[dict[str, Any]]:
         """Cosine-distance semantic search over item embeddings."""
-        with self._session() as session:
-            results = (
-                session.query(
+        async with self._session() as session:
+            result = await session.execute(
+                select(
                     InventoryItem,
                     InventoryItem.embedding.cosine_distance(query_vector).label(
                         "distance"
@@ -96,11 +103,11 @@ class ItemRepository:
                 )
                 .order_by(InventoryItem.embedding.cosine_distance(query_vector))
                 .limit(limit)
-                .all()
             )
+            rows = result.all()
 
             response_items: list[dict[str, Any]] = []
-            for item, distance in results:
+            for item, distance in rows:
                 similarity = 1 - distance
                 if min_similarity and similarity < min_similarity:
                     continue

@@ -72,7 +72,7 @@ class PersistenceSkill(
         # Entity SQL lives in dedicated repositories; the _get_session reference
         # is bound lazily and only invoked at operation time (after bind()).
         self._deals = DealRepository(self._get_session)
-        self._items = ItemRepository(self._get_session)
+        self._items = ItemRepository(self._get_async_session)
         self._wallets = WalletRepository(self._get_async_session)
         self._receipts = ReceiptRepository(self._get_session)
 
@@ -174,13 +174,13 @@ class PersistenceSkill(
         item_id = params.get("item_id")
         if not item_id:
             return Observation(success=False, error="item_id_required")
-        result = await asyncio.to_thread(self._items.get_by_id, item_id)
+        result = await self._items.get_by_id(item_id)
         if result:
             return Observation(success=True, metadata=make_struct(result))
         return Observation(success=False, error="item_not_found")
 
     async def _get_first_item(self, params: dict[str, Any]) -> Observation:
-        result = await asyncio.to_thread(self._items.get_first)
+        result = await self._items.get_first()
         if result:
             return Observation(success=True, metadata=make_struct(result))
         return Observation(success=False, error="no_items_found")
@@ -352,14 +352,14 @@ class PersistenceSkill(
         if not asset or not isinstance(asset, Asset):
             return await self._legacy_upsert_item(params)
         try:
-            await asyncio.to_thread(self._items.upsert_asset, asset)
+            await self._items.upsert_asset(asset)
             return Observation(success=True)
         except Exception as e:
             return Observation(success=False, error=str(e))
 
     async def _legacy_upsert_item(self, params: dict[str, Any]) -> Observation:
         try:
-            await asyncio.to_thread(self._items.upsert_legacy, params)
+            await self._items.upsert_legacy(params)
             return Observation(success=True)
         except Exception as e:
             return Observation(success=False, error=str(e))
@@ -401,8 +401,7 @@ class PersistenceSkill(
             return Observation(success=False, error=str(e))
 
     async def _vector_search(self, params: dict[str, Any]) -> Observation:
-        results = await asyncio.to_thread(
-            self._items.search_by_vector,
+        results = await self._items.search_by_vector(
             params.get("query_vector"),
             params.get("limit", 5),
             params.get("min_similarity"),
