@@ -1,10 +1,11 @@
 from logging.config import fileConfig
 
 from alembic import context
-from hive.proteins.persistence.engine import Base  # noqa: E402
+from aura_hive.config import get_settings
+from aura_hive.hive.proteins.persistence.engine import Base  # noqa: E402
 from sqlalchemy import engine_from_config, pool
 
-from config import settings
+settings = get_settings()
 
 config = context.config
 
