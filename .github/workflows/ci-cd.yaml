@@ -11,6 +11,7 @@ on:
             - "**/*.md"
     pull_request:
         branches: ["main"]
+    workflow_dispatch:
 
 concurrency:
     group: ${{ github.workflow }}-${{ github.ref }}
@@ -200,6 +201,14 @@ jobs:
         steps:
             - uses: actions/checkout@v7
 
+            - name: Preflight Cluster Reachability
+              run: |
+                  if ! kubectl cluster-info --request-timeout=10s; then
+                    echo "::error::Kubernetes cluster unreachable (see #277). Is minikube running on the self-hosted runner?"
+                    exit 1
+                  fi
+                  kubectl get nodes
+
             - name: Deploy to Cluster
               env:
                   TG_TOKEN: ${{ secrets.AURA_TELEGRAM_TOKEN }}
@@ -231,7 +240,7 @@ jobs:
 
                   echo "🚀 Deploying to Cluster..."
                   helm dependency update ./deploy/aura
-                  helm upgrade aura ./deploy/aura --install \
+                  helm upgrade aura ./deploy/aura --install --wait --timeout 5m \
                     --set core.image.tag=sha-$SHORT_SHA \
                     --set gateway.image.tag=sha-$SHORT_SHA \
                     --set frontend.image.tag=sha-$SHORT_SHA \
@@ -239,5 +248,7 @@ jobs:
 
             - name: Verify Rollout
               run: |
-                  kubectl rollout status deployment/aura-core --timeout=60s
-                  kubectl rollout status deployment/aura-telegram --timeout=60s
+                  kubectl rollout status deployment/aura-core --timeout=120s
+                  kubectl rollout status deployment/aura-gateway --timeout=120s
+                  kubectl rollout status deployment/aura-frontend --timeout=120s
+                  kubectl rollout status deployment/aura-telegram --timeout=120s
