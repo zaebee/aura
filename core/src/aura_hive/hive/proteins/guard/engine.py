@@ -473,24 +473,29 @@ class OutputGuard:
 
         try:
             margin = Decimal(str(raw))
+            # NaN and +/-Infinity parse above without error — `min_profit_margin`
+            # is env-configurable and `float("nan")` parses clean — but the old
+            # float comparison `0.0 <= nan < 1.0` degraded to False and fell
+            # through below; decimal.Decimal's comparison raises InvalidOperation
+            # on NaN instead of returning False, so the range check below never
+            # gets a chance to reject it. Checked explicitly, ahead of the range
+            # check, so a non-finite margin is rejected exactly like an
+            # out-of-range one rather than raising.
+            #
+            # Kept inside the try: `is_finite` itself is quiet even for a
+            # signaling NaN, and the finiteness check above keeps NaN away from
+            # the comparison — but any decimal signalling (today or after a
+            # future reorder) lands in ArithmeticError and fails closed here
+            # instead of escaping the guard.
+            if not margin.is_finite():
+                logger.error("guard_margin_setting_out_of_range", margin=str(margin))
+                return None
+
+            if not Decimal(0) <= margin < Decimal(1):
+                logger.error("guard_margin_setting_out_of_range", margin=str(margin))
+                return None
         except (TypeError, ValueError, ArithmeticError):
             logger.error("guard_margin_setting_unreadable", raw=raw)
-            return None
-
-        # NaN and +/-Infinity parse above without error — `min_profit_margin`
-        # is env-configurable and `float("nan")` parses clean — but the old
-        # float comparison `0.0 <= nan < 1.0` degraded to False and fell
-        # through below; decimal.Decimal's comparison raises InvalidOperation
-        # on NaN instead of returning False, so the range check below never
-        # gets a chance to reject it. Checked explicitly, ahead of the range
-        # check, so a non-finite margin is rejected exactly like an
-        # out-of-range one rather than raising.
-        if not margin.is_finite():
-            logger.error("guard_margin_setting_out_of_range", margin=str(margin))
-            return None
-
-        if not Decimal(0) <= margin < Decimal(1):
-            logger.error("guard_margin_setting_out_of_range", margin=str(margin))
             return None
 
         return margin

@@ -378,6 +378,7 @@ class TestFailClosedOnIncompleteSettings:
         "margin",
         [
             pytest.param(float("nan"), id="nan"),
+            pytest.param("snan", id="snan"),
             pytest.param(float("inf"), id="inf"),
             pytest.param(float("-inf"), id="-inf"),
             pytest.param(1.5, id="above-one"),
