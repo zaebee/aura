@@ -8,6 +8,7 @@ from aura_core import SkillProtocol, make_struct
 from aura_core_gen.aura.assets.v1 import Asset
 from aura_core_gen.aura.core.v1 import Observation
 from sqlalchemy import Engine, text
+from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 from sqlalchemy.orm import Session, sessionmaker
 
 from aura_hive.config.database import DatabaseSettings
@@ -44,6 +45,7 @@ class PersistenceSkill(
         self.provider: sessionmaker | None = None
         self.engine: Engine | None = None
         self.redis: redis.Redis | None = None
+        self._async_provider: Any | None = None
         self.cache: RedisCache | None = None
         self._capabilities = {
             "init_db": self._init_db,
@@ -70,8 +72,8 @@ class PersistenceSkill(
         # Entity SQL lives in dedicated repositories; the _get_session reference
         # is bound lazily and only invoked at operation time (after bind()).
         self._deals = DealRepository(self._get_session)
-        self._items = ItemRepository(self._get_session)
-        self._wallets = WalletRepository(self._get_session)
+        self._items = ItemRepository(self._get_async_session)
+        self._wallets = WalletRepository(self._get_async_session)
         self._receipts = ReceiptRepository(self._get_session)
 
     def get_name(self) -> str:
@@ -83,10 +85,16 @@ class PersistenceSkill(
     def bind(
         self,
         settings: DatabaseSettings,
-        provider: tuple[sessionmaker, Engine, redis.Redis],
+        provider: tuple[sessionmaker, Engine, redis.Redis]
+        | tuple[sessionmaker, Engine, redis.Redis, async_sessionmaker],
     ) -> None:
         self.settings = settings
-        self.provider, self.engine, self.redis = provider
+        sync_factory, self.engine, self.redis, *rest = provider
+        self.provider = sync_factory
+        # 4th element (async_sessionmaker) arrives from the dual-engine
+        # cortex wiring; converted repos switch to it, the rest stay sync
+        # until Phase 2.
+        self._async_provider = rest[0] if rest else None
         if self.redis:
             self.cache = RedisCache(self.redis)
 
@@ -94,6 +102,11 @@ class PersistenceSkill(
         if not self.provider:
             raise RuntimeError("provider_not_initialized")
         return cast(Session, self.provider())
+
+    def _get_async_session(self) -> AsyncSession:
+        if not self._async_provider:
+            raise RuntimeError("async_provider_not_initialized")
+        return cast(AsyncSession, self._async_provider())
 
     async def initialize(self) -> bool:
         if not self.settings or not self.provider:
@@ -160,13 +173,13 @@ class PersistenceSkill(
         item_id = params.get("item_id")
         if not item_id:
             return Observation(success=False, error="item_id_required")
-        result = await asyncio.to_thread(self._items.get_by_id, item_id)
+        result = await self._items.get_by_id(item_id)
         if result:
             return Observation(success=True, metadata=make_struct(result))
         return Observation(success=False, error="item_not_found")
 
     async def _get_first_item(self, params: dict[str, Any]) -> Observation:
-        result = await asyncio.to_thread(self._items.get_first)
+        result = await self._items.get_first()
         if result:
             return Observation(success=True, metadata=make_struct(result))
         return Observation(success=False, error="no_items_found")
@@ -338,14 +351,14 @@ class PersistenceSkill(
         if not asset or not isinstance(asset, Asset):
             return await self._legacy_upsert_item(params)
         try:
-            await asyncio.to_thread(self._items.upsert_asset, asset)
+            await self._items.upsert_asset(asset)
             return Observation(success=True)
         except Exception as e:
             return Observation(success=False, error=str(e))
 
     async def _legacy_upsert_item(self, params: dict[str, Any]) -> Observation:
         try:
-            await asyncio.to_thread(self._items.upsert_legacy, params)
+            await self._items.upsert_legacy(params)
             return Observation(success=True)
         except Exception as e:
             return Observation(success=False, error=str(e))
@@ -355,14 +368,12 @@ class PersistenceSkill(
         if not wallet_address:
             return Observation(success=False, error="wallet_address_required")
         asset_domain = params.get("asset_domain", "")
-        await asyncio.to_thread(self._wallets.sanctify, wallet_address, asset_domain)
+        await self._wallets.sanctify(wallet_address, asset_domain)
         return Observation(success=True)
 
     async def _is_wallet_sanctified(self, params: dict[str, Any]) -> Observation:
         wallet_address = params.get("wallet_address")
-        sanctified = await asyncio.to_thread(
-            self._wallets.is_sanctified, wallet_address
-        )
+        sanctified = await self._wallets.is_sanctified(wallet_address)
         return Observation(
             success=True,
             metadata=make_struct({"sanctified": sanctified}),
@@ -389,8 +400,7 @@ class PersistenceSkill(
             return Observation(success=False, error=str(e))
 
     async def _vector_search(self, params: dict[str, Any]) -> Observation:
-        results = await asyncio.to_thread(
-            self._items.search_by_vector,
+        results = await self._items.search_by_vector(
             params.get("query_vector"),
             params.get("limit", 5),
             params.get("min_similarity"),

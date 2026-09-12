@@ -77,12 +77,16 @@ class LockedDeal(Base):
     block_number: Mapped[str | None] = mapped_column(String, nullable=True)
     from_address: Mapped[str | None] = mapped_column(String, nullable=True)
     created_at: Mapped[datetime] = mapped_column(
-        DateTime, nullable=False, default=lambda: datetime.now(UTC)
+        DateTime(timezone=True), nullable=False, default=lambda: datetime.now(UTC)
     )
-    expires_at: Mapped[datetime] = mapped_column(DateTime, nullable=False, index=True)
-    paid_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    expires_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, index=True
+    )
+    paid_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
     updated_at: Mapped[datetime] = mapped_column(
-        DateTime,
+        DateTime(timezone=True),
         nullable=False,
         default=lambda: datetime.now(UTC),
         onupdate=lambda: datetime.now(UTC),
@@ -97,7 +101,7 @@ class SanctifiedWallet(Base):
     wallet_address: Mapped[str] = mapped_column(String, primary_key=True)
     asset_domain: Mapped[str] = mapped_column(String, nullable=False, default="")
     created_at: Mapped[datetime] = mapped_column(
-        DateTime, nullable=False, default=lambda: datetime.now(UTC)
+        DateTime(timezone=True), nullable=False, default=lambda: datetime.now(UTC)
     )
 
 
@@ -112,7 +116,7 @@ class MetabolicCost(Base):
     endpoint: Mapped[str] = mapped_column(String, nullable=False)
     transaction_hash: Mapped[str | None] = mapped_column(String, nullable=True)
     timestamp: Mapped[datetime] = mapped_column(
-        DateTime, nullable=False, default=lambda: datetime.now(UTC)
+        DateTime(timezone=True), nullable=False, default=lambda: datetime.now(UTC)
     )
 
 
@@ -152,7 +156,7 @@ class DecisionReceiptRecord(Base):
     # When the row was written — deliberately separate from `issued_at`, so a
     # divergence between deciding and recording is visible rather than hidden.
     recorded_at: Mapped[datetime] = mapped_column(
-        DateTime, nullable=False, default=lambda: datetime.now(UTC)
+        DateTime(timezone=True), nullable=False, default=lambda: datetime.now(UTC)
     )
 
 
