@@ -82,17 +82,12 @@ spec:
               name: "{{ .Release.Name }}-secrets"
               key: "stcp-key"
         command: ["frpc", "-c", "/etc/frp/frpc.toml"]
-        # command: ["/usr/local/bin/entrypoint.sh"]
         volumeMounts:
         - name: config-volume
           mountPath: /etc/frp/
         - name: token-volume
           mountPath: /etc/frp-token/token
           subPath: frp-token
-        - name: entrypoint-volume
-          mountPath: /usr/local/bin/entrypoint.sh
-          subPath: entrypoint.sh
-          readOnly: true
       volumes:
       - name: config-volume
         configMap:
@@ -103,7 +98,3 @@ spec:
           items:
           - key: frp-client-token
             path: frp-token
-      - name: entrypoint-volume
-        configMap:
-          name: {{ .Release.Name }}-frpc-entrypoint-config
-          defaultMode: 0755
