@@ -33,6 +33,8 @@ class WalletRepository:
             await session.commit()
 
     async def is_sanctified(self, wallet_address: str | None) -> bool:
+        if wallet_address is None:
+            return False
         async with self._session() as session:
             result = await session.execute(
                 select(SanctifiedWallet).filter_by(wallet_address=wallet_address)

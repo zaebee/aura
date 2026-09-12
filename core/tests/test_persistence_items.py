@@ -131,3 +131,43 @@ async def test_legacy_upsert_item_creates_record():
     assert obs.success is True
     session_mock.add.assert_called_once()
     session_mock.commit.assert_called_once()
+
+
+@pytest.mark.asyncio
+async def test_vector_search_without_query_returns_empty():
+    """No query vector means no query — empty results, not a DB error."""
+    session_mock = _make_async_session_mock()
+
+    skill = _make_skill_with_session(session_mock)
+    obs = await skill.execute("vector_search", {"query_vector": None, "limit": 5})
+
+    assert obs.success is True
+    assert obs.metadata.to_dict()["results"] == []
+    session_mock.execute.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_vector_search_skips_rows_without_embedding():
+    """A NULL embedding yields a NULL distance — skipped, never fatal."""
+    from aura_hive.hive.proteins.persistence.engine import InventoryItem
+
+    item = InventoryItem(
+        id="item-1",
+        name="Room",
+        base_price=200.0,
+        floor_price=150.0,
+        is_active=True,
+        meta={},
+    )
+    session_mock = _make_async_session_mock()
+    result_mock = MagicMock()
+    result_mock.all.return_value = [(item, None), (item, 0.05)]
+    session_mock.execute.return_value = result_mock
+
+    skill = _make_skill_with_session(session_mock)
+    obs = await skill.execute("vector_search", {"query_vector": [0.1] * 8, "limit": 5})
+
+    assert obs.success is True
+    results = obs.metadata.to_dict()["results"]
+    assert len(results) == 1
+    assert results[0]["similarity_score"] == pytest.approx(0.95)

@@ -106,3 +106,17 @@ async def test_is_wallet_sanctified_false():
 
     assert obs.success is True
     assert obs.metadata.to_dict()["sanctified"] is False
+
+
+@pytest.mark.asyncio
+async def test_is_wallet_sanctified_none_skips_the_query():
+    """A None address is unsanctified by definition — no DB round-trip."""
+    session_mock = _make_async_session_mock()
+
+    skill = _make_skill_with_session(session_mock)
+
+    obs = await skill.execute("is_wallet_sanctified", {"wallet_address": None})
+
+    assert obs.success is True
+    assert obs.metadata.to_dict()["sanctified"] is False
+    session_mock.execute.assert_not_called()

@@ -93,6 +93,8 @@ class ItemRepository:
         self, query_vector: Any, limit: int, min_similarity: float | None
     ) -> list[dict[str, Any]]:
         """Cosine-distance semantic search over item embeddings."""
+        if query_vector is None:
+            return []
         async with self._session() as session:
             result = await session.execute(
                 select(
@@ -108,6 +110,11 @@ class ItemRepository:
 
             response_items: list[dict[str, Any]] = []
             for item, distance in rows:
+                if distance is None:
+                    # No embedding on this row: cosine_distance is NULL.
+                    # Skipped, never fatal (matches the negotiation-history
+                    # rule for malformed entries).
+                    continue
                 similarity = 1 - distance
                 if min_similarity and similarity < min_similarity:
                     continue
