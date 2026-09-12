@@ -156,31 +156,27 @@ Add the builder (place near the top-level helpers):
 def _async_url(url: str) -> str:
     if "+asyncpg" in url:
         return url
-    return url.replace("postgresql://", "postgresql+asyncpg://", 1)
+    for prefix in ("postgresql://", "postgres://"):
+        if url.startswith(prefix):
+            return url.replace(prefix, "postgresql+asyncpg://", 1)
+    return url
 
 
 def build_async_engine(url: str) -> tuple[AsyncEngine, async_sessionmaker]:
     """Async engine plus session factory, with the pgvector codec registered.
 
-    Registration runs per pooled connection (candidate A): a `connect`
-    listener that marks each fresh DBAPI connection. If the listener
-    approach cannot await registration on this SQLAlchemy version, fall
-    back to candidate B — an explicit `register_vector` call inside the
-    session factory below (once per acquired connection, guarded by a
-    `connection.info` flag). The probe test in
-    `test_persistence_async_engine.py` is the arbiter: it must pass under
-    pool growth either way.
+    Registration runs per pooled connection: a `connect` listener calling
+    the driver's purpose-built `dbapi_connection.run_async(register_vector)`
+    (the SQLAlchemy-supported way to run awaitables inside pool event
+    handlers — verified green by the probe test, including pool growth).
     """
     engine = create_async_engine(_async_url(url))
 
     @event.listens_for(engine.sync_engine, "connect")
-    def _register_vector_codec(dbapi_connection, _connection_record):  # noqa: ANN001, ANN202
+    def _register_vector_codec(dbapi_connection: Any, _connection_record: Any) -> None:
         from pgvector.asyncpg import register_vector
 
-        from sqlalchemy.util.concurrency import await_fallback
-
-        raw = dbapi_connection.driver_connection
-        await_fallback(register_vector(raw))
+        dbapi_connection.run_async(register_vector)
 
     return engine, async_sessionmaker(bind=engine, class_=AsyncSession)
 ```
@@ -260,18 +256,24 @@ from sqlalchemy.ext.asyncio import async_engine_from_config
 
 from aura_hive.hive.proteins.persistence.engine import Base  # noqa: E402
 
-from aura_hive.config import get_settings
-
-settings = get_settings()
+# URL straight from the environment (as implemented): the full Settings
+# would validate unrelated proteins (LLM key), and standalone
+# DatabaseSettings has no env support of its own.
+db_url = os.environ.get("AURA_DATABASE__URL", "")
+if not db_url:
+    raise RuntimeError("AURA_DATABASE__URL is required to run migrations")
 
 config = context.config
 
 if config.config_file_name is not None:
     fileConfig(config.config_file_name)
 
-target_url = str(settings.database.url)
+target_url = db_url
 if "+asyncpg" not in target_url:
-    target_url = target_url.replace("postgresql://", "postgresql+asyncpg://", 1)
+    for prefix in ("postgresql://", "postgres://"):
+        if target_url.startswith(prefix):
+            target_url = target_url.replace(prefix, "postgresql+asyncpg://", 1)
+            break
 config.set_main_option("sqlalchemy.url", target_url)
 
 target_metadata = Base.metadata
@@ -306,10 +308,11 @@ async def run_migrations_online() -> None:
         poolclass=pool.NullPool,
     )
 
-    async with connectable.connect() as connection:
-        await connection.run_sync(do_run_migrations)
-
-    await connectable.dispose()
+    try:
+        async with connectable.connect() as connection:
+            await connection.run_sync(do_run_migrations)
+    finally:
+        await connectable.dispose()
 
 
 def run_migrations_offline_entry() -> None:
@@ -517,8 +520,9 @@ async def get_by_id(self, item_id: str) -> dict[str, Any] | None:
         return ItemSchema.model_validate(item).model_dump() if item else None
 ```
 
-Pattern for writes (shown for `upsert_legacy`; `upsert_asset` keeps its
-enzyme/tissue logic verbatim, only session handling changes):
+Pattern for writes (shown for `upsert_legacy`; `upsert_asset` is converted
+the same way — `select()` + `await session.execute(...)` + `await
+session.commit()` — keeping its enzyme/tissue logic verbatim):
 
 ```python
 async def upsert_legacy(self, params: dict[str, Any]) -> None:
@@ -597,11 +601,13 @@ Simplest honest form:
 def bind(
     self,
     settings: DatabaseSettings,
-    provider: tuple,
+    provider: tuple[sessionmaker, Engine, redis.Redis]
+    | tuple[sessionmaker, Engine, redis.Redis, async_sessionmaker],
 ) -> None:
     self.settings = settings
-    self.provider, self.engine, self.redis = provider[0], provider[1], provider[2]
-    self._async_provider = provider[3] if len(provider) > 3 else None
+    sync_factory, self.engine, self.redis, *rest = provider
+    self.provider = sync_factory
+    self._async_provider = rest[0] if rest else None
     if self.redis:
         self.cache = RedisCache(self.redis)
 ```
