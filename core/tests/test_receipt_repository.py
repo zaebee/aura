@@ -8,8 +8,9 @@ a month after the decision found nothing.
 """
 
 import json
-from unittest.mock import MagicMock
+from unittest.mock import AsyncMock, MagicMock
 
+import pytest
 from aura_core_gen.aura.core.v1 import DecisionReceipt
 from aura_hive.hive.proteins.persistence.receipts import ReceiptRepository
 
@@ -32,13 +33,16 @@ def a_receipt() -> dict:
 
 def a_session() -> MagicMock:
     session = MagicMock()
-    session.__enter__ = MagicMock(return_value=session)
-    session.__exit__ = MagicMock(return_value=False)
+    session.__aenter__ = AsyncMock(return_value=session)
+    session.__aexit__ = AsyncMock(return_value=False)
+    session.execute = AsyncMock()
+    session.commit = AsyncMock()
     return session
 
 
 class TestRecording:
-    def test_the_indexed_columns_are_taken_from_the_document(self) -> None:
+    @pytest.mark.asyncio
+    async def test_the_indexed_columns_are_taken_from_the_document(self) -> None:
         """
         Derived here rather than passed in, so an index cannot disagree with
         the receipt it indexes.
@@ -46,7 +50,7 @@ class TestRecording:
         session = a_session()
         repo = ReceiptRepository(MagicMock(return_value=session))
 
-        repo.record(a_receipt(), dispute_token="tok-abc")
+        await repo.record(a_receipt(), dispute_token="tok-abc")
 
         row = session.add.call_args[0][0]
         assert row.dispute_token == "tok-abc"
@@ -56,7 +60,8 @@ class TestRecording:
         assert row.receipt == a_receipt()
         session.commit.assert_called_once()
 
-    def test_the_whole_document_is_stored_not_a_decomposition(self) -> None:
+    @pytest.mark.asyncio
+    async def test_the_whole_document_is_stored_not_a_decomposition(self) -> None:
         """
         `verify()` takes a document. Every normalisation is a chance to
         reassemble something at read time that differs from what was signed.
@@ -64,12 +69,13 @@ class TestRecording:
         session = a_session()
         repo = ReceiptRepository(MagicMock(return_value=session))
 
-        repo.record(a_receipt(), dispute_token="tok-abc")
+        await repo.record(a_receipt(), dispute_token="tok-abc")
 
         stored = session.add.call_args[0][0].receipt
         assert stored == a_receipt()
 
-    def test_a_stored_receipt_survives_json_and_still_parses(self) -> None:
+    @pytest.mark.asyncio
+    async def test_a_stored_receipt_survives_json_and_still_parses(self) -> None:
         """
         The column is JSON, so the document goes through a serialisation the
         receipt never asked for. This is the property the whole archive rests
@@ -78,7 +84,7 @@ class TestRecording:
         session = a_session()
         repo = ReceiptRepository(MagicMock(return_value=session))
 
-        repo.record(a_receipt(), dispute_token="tok-abc")
+        await repo.record(a_receipt(), dispute_token="tok-abc")
         stored = session.add.call_args[0][0].receipt
 
         parsed = DecisionReceipt().from_dict(json.loads(json.dumps(stored)))
@@ -89,7 +95,10 @@ class TestRecording:
 
 
 class TestADocumentThatCarriesNulls:
-    def test_a_null_field_stores_an_empty_string_not_the_word_none(self) -> None:
+    @pytest.mark.asyncio
+    async def test_a_null_field_stores_an_empty_string_not_the_word_none(
+        self,
+    ) -> None:
         """
         `str(None)` is `"None"`, and an indexed column holding that literal is
         a row that exists and cannot be found — the worst shape of silent
@@ -102,7 +111,7 @@ class TestADocumentThatCarriesNulls:
         session = a_session()
         repo = ReceiptRepository(MagicMock(return_value=session))
 
-        repo.record(
+        await repo.record(
             a_receipt() | {"decisionId": None, "requestId": None, "issuedAt": None},
             dispute_token="tok-abc",
         )
@@ -114,29 +123,38 @@ class TestADocumentThatCarriesNulls:
 
 
 class TestFinding:
-    def test_a_known_token_returns_the_document(self) -> None:
+    @pytest.mark.asyncio
+    async def test_a_known_token_returns_the_document(self) -> None:
         session = a_session()
         row = MagicMock()
         row.receipt = a_receipt()
-        session.query.return_value.filter_by.return_value.first.return_value = row
+        result_mock = MagicMock()
+        result_mock.scalar_one_or_none.return_value = row
+        session.execute.return_value = result_mock
         repo = ReceiptRepository(MagicMock(return_value=session))
 
-        assert repo.find_by_dispute_token("tok-abc") == a_receipt()
+        assert await repo.find_by_dispute_token("tok-abc") == a_receipt()
 
-    def test_an_unknown_token_returns_nothing_rather_than_raising(self) -> None:
+    @pytest.mark.asyncio
+    async def test_an_unknown_token_returns_nothing_rather_than_raising(
+        self,
+    ) -> None:
         """
         A token that was never issued is a legitimate answer to give an
         auditor — someone may have invented it — not a failure.
         """
         session = a_session()
-        session.query.return_value.filter_by.return_value.first.return_value = None
+        result_mock = MagicMock()
+        result_mock.scalar_one_or_none.return_value = None
+        session.execute.return_value = result_mock
         repo = ReceiptRepository(MagicMock(return_value=session))
 
-        assert repo.find_by_dispute_token("never-issued") is None
+        assert await repo.find_by_dispute_token("never-issued") is None
 
 
 class TestASessionCanBeReassembled:
-    def test_two_decisions_in_one_session_share_a_request_id(self) -> None:
+    @pytest.mark.asyncio
+    async def test_two_decisions_in_one_session_share_a_request_id(self) -> None:
         """
         `request_id` exists so an auditor holding one token can pull the whole
         negotiation rather than the single turn they were cited. Nothing else
@@ -147,8 +165,8 @@ class TestASessionCanBeReassembled:
 
         first = a_receipt()
         second = a_receipt() | {"decisionId": "dec-3333"}
-        repo.record(first, dispute_token="tok-one")
-        repo.record(second, dispute_token="tok-two")
+        await repo.record(first, dispute_token="tok-one")
+        await repo.record(second, dispute_token="tok-two")
 
         rows = [call[0][0] for call in session.add.call_args_list]
         assert [row.decision_id for row in rows] == ["dec-1111", "dec-3333"]

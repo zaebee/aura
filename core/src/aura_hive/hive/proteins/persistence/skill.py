@@ -74,7 +74,7 @@ class PersistenceSkill(
         self._deals = DealRepository(self._get_session)
         self._items = ItemRepository(self._get_async_session)
         self._wallets = WalletRepository(self._get_async_session)
-        self._receipts = ReceiptRepository(self._get_session)
+        self._receipts = ReceiptRepository(self._get_async_session)
 
     def get_name(self) -> str:
         return "persistence"
@@ -308,7 +308,7 @@ class PersistenceSkill(
             return Observation(success=False, error="dispute_token_required")
 
         try:
-            await asyncio.to_thread(self._receipts.record, receipt, dispute_token)
+            await self._receipts.record(receipt, dispute_token)
             return Observation(success=True)
         except Exception as e:
             return Observation(success=False, error=str(e))
@@ -325,7 +325,7 @@ class PersistenceSkill(
         if not token:
             return Observation(success=False, error="dispute_token_required")
 
-        result = await asyncio.to_thread(self._receipts.find_by_dispute_token, token)
+        result = await self._receipts.find_by_dispute_token(token)
         if result is None:
             # Not an error. A token that was never issued is a legitimate
             # answer to give an auditor — someone may have invented it.

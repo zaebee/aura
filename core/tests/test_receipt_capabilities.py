@@ -5,7 +5,7 @@ A `make resolve-dispute` command and a future internal endpoint should be two
 thin callers of one query rather than two implementations of it.
 """
 
-from unittest.mock import MagicMock
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 from aura_hive.config.database import DatabaseSettings
@@ -28,14 +28,22 @@ def skill_with(session: MagicMock) -> PersistenceSkill:
         url="postgresql://user:password@localhost:5432/aura_db",
         redis_url="redis://localhost:6379/0",
     )
-    skill.bind(settings, (MagicMock(return_value=session), MagicMock(), None))
+    async_sessionmaker_mock = MagicMock(return_value=session)
+    skill.bind(
+        settings,
+        (MagicMock(return_value=session), MagicMock(), None, async_sessionmaker_mock),
+    )
     return skill
 
 
 def a_session() -> MagicMock:
     session = MagicMock()
+    session.__aenter__ = AsyncMock(return_value=session)
+    session.__aexit__ = AsyncMock(return_value=False)
     session.__enter__ = MagicMock(return_value=session)
     session.__exit__ = MagicMock(return_value=False)
+    session.execute = AsyncMock()
+    session.commit = AsyncMock()
     return session
 
 
@@ -93,6 +101,9 @@ class TestFinding:
         row = MagicMock()
         row.receipt = a_receipt()
         session.query.return_value.filter_by.return_value.first.return_value = row
+        result_mock = MagicMock()
+        result_mock.scalar_one_or_none.return_value = row
+        session.execute.return_value = result_mock
 
         obs = await skill_with(session).execute(
             "find_receipt_by_dispute_token", {"dispute_token": "tok-abc"}
@@ -105,6 +116,9 @@ class TestFinding:
     async def test_an_unknown_token_is_not_found_rather_than_an_error(self) -> None:
         session = a_session()
         session.query.return_value.filter_by.return_value.first.return_value = None
+        result_mock = MagicMock()
+        result_mock.scalar_one_or_none.return_value = None
+        session.execute.return_value = result_mock
 
         obs = await skill_with(session).execute(
             "find_receipt_by_dispute_token", {"dispute_token": "never-issued"}
