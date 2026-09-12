@@ -18,11 +18,6 @@ logger = structlog.get_logger(__name__)
 # min_profit_margin this is the shape of the fallback rather than a policy dial.
 _FLOOR_MARKUP = Decimal("1.05")
 
-# Used when the configured margin cannot be read or is out of range. Matches the
-# default on SafetySettings, so a deployment that loses its setting behaves like
-# one that never overrode it.
-_DEFAULT_MARGIN = Decimal("0.1")
-
 # Cent, as the quantum every emitted price is rounded to.
 _CENT = Decimal("0.01")
 
@@ -284,6 +279,13 @@ class OutputGuard:
         if getattr(self.settings, "min_profit_margin", None) is None:
             logger.error("guard_margin_setting_missing_fail_closed")
             return False
+        if self._usable_margin() is None:
+            # Present but unusable — NaN, ±inf, out of [0, 1), or
+            # unparseable. Presence alone let these through to G4 and the
+            # substitute, where they priced every decision at a default the
+            # operator never configured while the receipts stayed clean.
+            logger.error("guard_margin_setting_unusable_fail_closed")
+            return False
         return True
 
     def _gate_margin_violation(self, decision: dict, context: dict) -> bool:
@@ -449,27 +451,31 @@ class OutputGuard:
 
         return True
 
-    def _configured_margin(self) -> Decimal:
+    def _usable_margin(self) -> Decimal | None:
         """
-        The configured minimum margin as Decimal, clamped to a range that keeps
-        the substitute at or above the floor.
+        The configured minimum margin as Decimal, or None when it is unusable.
 
-        A margin at or above 1.0 makes the formula undefined or negative. A
-        margin below 0.0 is worse: floor/(1-(-0.5)) is floor/1.5, so a floor of
-        1000 came back as a "safe" price of 666.67, and the substitute exists
-        precisely to be the thing that cannot undercut the floor.
+        Unusable means missing, unparseable, non-finite (NaN, ±inf — all of
+        which `Decimal(str(...))` accepts without error), or outside [0, 1).
+        A margin at or above 1.0 makes the formula undefined or negative; a
+        margin below 0.0 undercuts the floor (floor/(1-(-0.5)) is floor/1.5).
+
+        Returns None rather than raising so G3 can report *which* gate
+        refused the decision; `_configured_margin` turns the same None into
+        the raise the direct-call paths (substitute price, post-condition)
+        need to refuse instead of pricing on a number nobody configured.
         """
         raw = (
             getattr(self.settings, "min_profit_margin", None) if self.settings else None
         )
         if raw is None:
-            return _DEFAULT_MARGIN
+            return None
 
         try:
             margin = Decimal(str(raw))
         except (TypeError, ValueError, ArithmeticError):
-            logger.error("guard_margin_setting_unreadable_using_default", raw=raw)
-            return _DEFAULT_MARGIN
+            logger.error("guard_margin_setting_unreadable", raw=raw)
+            return None
 
         # NaN and +/-Infinity parse above without error — `min_profit_margin`
         # is env-configurable and `float("nan")` parses clean — but the old
@@ -477,16 +483,36 @@ class OutputGuard:
         # through below; decimal.Decimal's comparison raises InvalidOperation
         # on NaN instead of returning False, so the range check below never
         # gets a chance to reject it. Checked explicitly, ahead of the range
-        # check, so a non-finite margin degrades exactly like an
+        # check, so a non-finite margin is rejected exactly like an
         # out-of-range one rather than raising.
         if not margin.is_finite():
             logger.error("guard_margin_setting_out_of_range", margin=str(margin))
-            return _DEFAULT_MARGIN
+            return None
 
         if not Decimal(0) <= margin < Decimal(1):
             logger.error("guard_margin_setting_out_of_range", margin=str(margin))
-            return _DEFAULT_MARGIN
+            return None
 
+        return margin
+
+    def _configured_margin(self) -> Decimal:
+        """
+        The configured minimum margin, fail-closed.
+
+        Used to substitute the SafetySettings default when the setting was
+        missing or unusable, so a deployment whose margin was present but
+        broken priced every decision at 0.10 while the receipts stayed clean
+        and the operator believed their configured margin was in force. Now
+        raises: G3 refuses the gated path with a derivation, and this raise
+        refuses the direct paths (substitute price, post-condition clauses).
+        """
+        margin = self._usable_margin()
+        if margin is None:
+            raise GuardUnavailable(
+                "cannot establish the configured profit margin: "
+                "min_profit_margin is missing or unusable",
+                code="MARGIN_UNAVAILABLE",
+            )
         return margin
 
     def calculate_safe_price(

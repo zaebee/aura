@@ -142,10 +142,14 @@ class TestTheMarginGateAgreesWithPsi:
     def test_a_non_finite_margin_does_not_open_the_gate(self) -> None:
         """
         `min_profit_margin` is env-configurable and `float("nan")` parses clean.
-        G3 checks presence, not range, so the NaN reached G4 — where
-        `margin < nan` is False and every proposal passed, while psi used the
-        clamped default and refused everything below cost/0.9. One typo, a
-        systematic UNAVAILABLE outage rather than a loud misconfiguration.
+        Presence alone used to let the NaN reach G4 — where `margin < nan` is
+        False and every proposal passed, while psi used the clamped default
+        and refused everything below cost/0.9. One typo, a systematic
+        UNAVAILABLE outage rather than a loud misconfiguration.
+
+        Now G3 itself rejects a present-but-unusable margin, so the decision
+        fails closed with SETTINGS_MISSING and a derivation, instead of
+        reaching G4 at all.
         """
 
         class _NotANumber:
@@ -157,7 +161,7 @@ class TestTheMarginGateAgreesWithPsi:
                 decision(price=1010.0), context(floor=1000.0, cost=1000.0)
             )
 
-        assert caught.value.code == "MIN_MARGIN_VIOLATION"
+        assert caught.value.code == "SETTINGS_MISSING"
         assert not engine.check_postcondition(
             {"price": 1010.0}, {"floor_price": 1000.0, "internal_cost": 1000.0}
         ).holds
@@ -231,22 +235,24 @@ class TestSafePriceNeverUndercutsTheFloor:
     negative value is an operator typo away: floor/(1-(-0.5)) is floor/1.5, and
     a floor of 1000 came back as 666.67. The old guard only rejected margins at
     or above 1.0, which catches the undefined case and misses this one.
+
+    The old code answered every one of these cases by substituting the 0.10
+    default — a margin the operator never configured, under receipts claiming
+    the rule held. Now there is no substitute to offer: an unusable margin
+    refuses with MARGIN_UNAVAILABLE instead of inventing a price.
     """
 
     @pytest.mark.parametrize("margin", [-0.5, -0.01, 1.0, 1.5])
-    def test_a_margin_outside_the_valid_range_never_prices_below_the_floor(
-        self, margin: float
-    ) -> None:
+    def test_a_margin_outside_the_valid_range_refuses(self, margin: float) -> None:
         class _Configured:
             min_profit_margin = margin
 
-        price = guard(_Configured()).calculate_safe_price(
-            context(), "MIN_MARGIN_VIOLATION"
-        )
+        with pytest.raises(GuardUnavailable) as caught:
+            guard(_Configured()).calculate_safe_price(context(), "MIN_MARGIN_VIOLATION")
 
-        assert price >= 1000.0
+        assert caught.value.code == "MARGIN_UNAVAILABLE"
 
-    def test_a_margin_that_is_not_a_number_still_yields_a_price(self) -> None:
+    def test_a_margin_that_is_not_a_number_refuses(self) -> None:
         """
         Reached without a gate having run: the Membrane calls this directly on
         FAILURE_RECOVERY, so a bad setting cannot be assumed already caught.
@@ -255,9 +261,10 @@ class TestSafePriceNeverUndercutsTheFloor:
         class _Broken:
             min_profit_margin = None
 
-        price = guard(_Broken()).calculate_safe_price(context(), "SETTINGS_MISSING")
+        with pytest.raises(GuardUnavailable) as caught:
+            guard(_Broken()).calculate_safe_price(context(), "SETTINGS_MISSING")
 
-        assert price >= 1000.0
+        assert caught.value.code == "MARGIN_UNAVAILABLE"
 
     def test_a_valid_margin_is_still_honoured(self) -> None:
         """The clamp must not flatten every deployment onto the default."""
@@ -364,5 +371,34 @@ class TestFailClosedOnIncompleteSettings:
 
         with pytest.raises(SafetyViolation) as caught:
             guard(_Null()).validate_decision(decision(price=2000.0), context())
+
+        assert caught.value.code == "SETTINGS_MISSING"
+
+    @pytest.mark.parametrize(
+        "margin",
+        [
+            pytest.param(float("nan"), id="nan"),
+            pytest.param(float("inf"), id="inf"),
+            pytest.param(float("-inf"), id="-inf"),
+            pytest.param(1.5, id="above-one"),
+            pytest.param(1.0, id="exactly-one"),
+            pytest.param(-0.2, id="negative"),
+            pytest.param("ten percent", id="unparseable"),
+        ],
+    )
+    def test_a_present_but_unusable_margin_is_misconfiguration(
+        self, margin: object
+    ) -> None:
+        """
+        G3 used to check presence only (`is None`), so every one of these
+        passed it and priced on the substituted default. Presence without
+        usability is the misconfiguration G3 exists to catch.
+        """
+
+        class _Unusable:
+            min_profit_margin = margin
+
+        with pytest.raises(SafetyViolation) as caught:
+            guard(_Unusable()).validate_decision(decision(price=2000.0), context())
 
         assert caught.value.code == "SETTINGS_MISSING"
