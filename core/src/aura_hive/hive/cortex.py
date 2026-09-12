@@ -7,7 +7,13 @@ from aura_core import SkillProtocol, SkillRegistry, get_raw_key
 from opentelemetry.instrumentation.grpc import GrpcInstrumentorServer
 from opentelemetry.instrumentation.langchain import LangchainInstrumentor
 from prometheus_client import start_http_server
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, event
+from sqlalchemy.ext.asyncio import (
+    AsyncEngine,
+    AsyncSession,
+    async_sessionmaker,
+    create_async_engine,
+)
 from sqlalchemy.orm import sessionmaker
 
 from aura_hive.config.attestation import AttestationSettings
@@ -47,6 +53,37 @@ if TYPE_CHECKING:
     from aura_hive.hive.metabolism import MetabolicLoop
 
 logger = structlog.get_logger("hive.cortex")
+
+
+def _async_url(url: str) -> str:
+    if "+asyncpg" in url:
+        return url
+    return url.replace("postgresql://", "postgresql+asyncpg://", 1)
+
+
+def build_async_engine(url: str) -> tuple[AsyncEngine, async_sessionmaker]:
+    """Async engine plus session factory, with the pgvector codec registered.
+
+    Registration runs per pooled connection (candidate A): a `connect`
+    listener that marks each fresh DBAPI connection. If the listener
+    approach cannot await registration on this SQLAlchemy version, fall
+    back to candidate B — an explicit `register_vector` call inside the
+    session factory below (once per acquired connection, guarded by a
+    `connection.info` flag). The probe test in
+    `test_persistence_async_engine.py` is the arbiter: it must pass under
+    pool growth either way.
+    """
+    engine = create_async_engine(_async_url(url))
+
+    @event.listens_for(engine.sync_engine, "connect")
+    def _register_vector_codec(dbapi_connection: Any, _connection_record: Any) -> None:
+        from pgvector.asyncpg import register_vector
+        from sqlalchemy.util.concurrency import await_fallback
+
+        raw = dbapi_connection.driver_connection
+        await_fallback(register_vector(raw))
+
+    return engine, async_sessionmaker(bind=engine, class_=AsyncSession)
 
 
 def build_attestation(
@@ -196,9 +233,15 @@ class HiveCell:
         # 1. Persistence
         engine = create_engine(str(self.settings.database.url))
         SessionLocal = sessionmaker(bind=engine)
+        async_engine, AsyncSessionLocal = build_async_engine(
+            str(self.settings.database.url)
+        )
         redis_client = redis.from_url(str(self.settings.database.redis_url))
         persistence = PersistenceSkill()
-        persistence.bind(self.settings.database, (SessionLocal, engine, redis_client))
+        persistence.bind(
+            self.settings.database,
+            (SessionLocal, engine, redis_client, AsyncSessionLocal),
+        )
 
         # 2. Pulse
         signer = None

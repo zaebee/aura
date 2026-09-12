@@ -44,6 +44,7 @@ class PersistenceSkill(
         self.provider: sessionmaker | None = None
         self.engine: Engine | None = None
         self.redis: redis.Redis | None = None
+        self._async_provider: Any | None = None
         self.cache: RedisCache | None = None
         self._capabilities = {
             "init_db": self._init_db,
@@ -83,10 +84,17 @@ class PersistenceSkill(
     def bind(
         self,
         settings: DatabaseSettings,
-        provider: tuple[sessionmaker, Engine, redis.Redis],
+        provider: tuple,
     ) -> None:
         self.settings = settings
-        self.provider, self.engine, self.redis = provider
+        self.provider, self.engine, self.redis = (
+            provider[0],
+            provider[1],
+            provider[2],
+        )
+        # 4th element (async_sessionmaker) arrives from Task 2's cortex wiring;
+        # repos switch to it in Task 6. Kept aside, not consumed yet.
+        self._async_provider = provider[3] if len(provider) > 3 else None
         if self.redis:
             self.cache = RedisCache(self.redis)
 
