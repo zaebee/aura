@@ -117,7 +117,9 @@ def get_allowed_chambers() -> list[str]:
     name; only the prefixes matter to code, so a mapping is accepted (keys
     used) as well as a plain list.
     """
-    value = _load_manifest().get("allowed_chambers") or []
+    value = _load_manifest().get("allowed_chambers")
+    if value is None:
+        value = []
     if isinstance(value, dict):
         value = list(value.keys())
     if not isinstance(value, list):

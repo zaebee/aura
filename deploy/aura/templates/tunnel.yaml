@@ -86,8 +86,7 @@ spec:
         - name: config-volume
           mountPath: /etc/frp/
         - name: token-volume
-          mountPath: /etc/frp-token/token
-          subPath: frp-token
+          mountPath: /etc/frp-token
       volumes:
       - name: config-volume
         configMap:
@@ -97,4 +96,4 @@ spec:
           secretName: "{{ .Release.Name }}-secrets"
           items:
           - key: frp-client-token
-            path: frp-token
+            path: token
