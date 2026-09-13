@@ -34,6 +34,7 @@ from .metabolism import (
     get_raw_key,
     map_action,
 )
+from .nats_state import NATS_HEALTH_SERVICE, NatsConnectionState, NatsConnectionTracker
 from .struct_utils import make_struct
 from .wire_names import decision_outcome_name
 
@@ -73,4 +74,8 @@ __all__ = [
     "get_raw_key",
     "map_action",
     "make_struct",
+    # NATS connection state
+    "NATS_HEALTH_SERVICE",
+    "NatsConnectionState",
+    "NatsConnectionTracker",
 ]

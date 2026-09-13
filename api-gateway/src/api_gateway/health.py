@@ -186,11 +186,19 @@ async def check_core_service_health(
         )
 
 
+def _nats_dependency(get_nats_state: Callable[[], str] | None) -> dict[str, str]:
+    """NATS state for health output, or nothing when there is no client."""
+    if get_nats_state is None:
+        return {}
+    return {"nats": get_nats_state()}
+
+
 def register_health_endpoints(
     app: FastAPI,
     get_stub: Callable[[], health_pb2_grpc.HealthStub | None],
     health_check_timeout: float,
     slow_threshold_ms: float = 100.0,
+    get_nats_state: Callable[[], str] | None = None,
 ) -> None:
     """Register health check endpoints on FastAPI application.
 
@@ -199,6 +207,11 @@ def register_health_endpoints(
         get_stub: Callable returning the current gRPC Health service stub (or None)
         health_check_timeout: Timeout for health checks in seconds
         slow_threshold_ms: Log warning if health check exceeds this duration
+        get_nats_state: Callable returning the NATS connection state word
+            ("connected"/"disconnected"/"closed"), or None if the gateway
+            has no NATS client. Reported, never traffic-shaping: NATS state
+            is visible in dependencies/checks but does not change status
+            codes — readiness still follows the Core Service alone.
     """
 
     @app.get("/healthz")
@@ -261,12 +274,19 @@ def register_health_endpoints(
                 status_code=503,
                 detail={
                     "status": "not_ready",
-                    "dependencies": {"core_service": core_status.status.value},
+                    "dependencies": {
+                        "core_service": core_status.status.value,
+                        **_nats_dependency(get_nats_state),
+                    },
                 },
             )
 
         return ReadinessResponse(
-            status="ready", dependencies={"core_service": HealthStatus.OK.value}
+            status="ready",
+            dependencies={
+                "core_service": HealthStatus.OK.value,
+                **_nats_dependency(get_nats_state),
+            },
         )
 
     @app.get("/health", response_model=HealthResponse)
@@ -307,5 +327,6 @@ def register_health_endpoints(
             checks={
                 "api_gateway": HealthStatus.OK.value,
                 "core_service": core_status.status.value,
+                **_nats_dependency(get_nats_state),
             },
         )

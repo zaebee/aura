@@ -4,6 +4,7 @@ Pulse Protein Internal - NATS JetStream Provider for Binary Bloodstream.
 Handles binary proto serialization and JetStream publishing using chromosomal DNA.
 """
 
+import asyncio
 import logging
 import uuid
 from datetime import UTC, datetime
@@ -11,7 +12,7 @@ from typing import Any, cast
 
 import nats
 import nats.errors
-from aura_core import make_struct
+from aura_core import NatsConnectionTracker, make_struct
 from aura_core_gen.aura.core.v1 import (
     ActionType,
     AlertEvent,
@@ -41,20 +42,59 @@ class JetStreamProvider:
         self._signer = signer
         self.nc: nats.NATS | None = None
         self.js: nats.js.JetStreamContext | None = None
+        self.tracker = NatsConnectionTracker("core-pulse")
+
+    @property
+    def nats_state(self) -> str:
+        """Connection state word for health output."""
+        return self.tracker.as_str()
 
     async def connect(self) -> bool:
-        """Connect to NATS and initialize JetStream context."""
+        """Connect to NATS and initialize JetStream context.
+
+        Reconnect behaviour is explicit (matching the library defaults)
+        and lifecycle callbacks feed the shared tracker. Cancellation
+        propagates — a shutting-down process must not report it as a
+        connection failure. Anything opened and then failed is closed
+        again: a leaked socket is a slow file-descriptor bleed.
+        """
+        nc = None
         try:
-            nc = await nats.connect(self.nats_url)
+            nc = await nats.connect(
+                self.nats_url,
+                connect_timeout=5,
+                reconnect_time_wait=2,
+                max_reconnect_attempts=60,
+                disconnected_cb=self.tracker.on_disconnected,
+                reconnected_cb=self.tracker.on_reconnected,
+                closed_cb=self.tracker.on_closed,
+            )
             self.nc = nc
             self.js = nc.jetstream()
+            self.tracker.mark_connected()
             logger.info(f"Connected to NATS JetStream at {self.nats_url}")
             return True
-        except nats.errors.NoServersError as e:
-            logger.warning(f"NATS connection failed (no servers): {e}")
-            return False
+        except asyncio.CancelledError:
+            if nc is not None:
+                await nc.close()
+            self.nc = None
+            raise
         except Exception as e:
-            logger.warning(f"NATS connection failed: {e}")
+            # Single handler: anything opened above is closed, whatever
+            # failed. Separate except-blocks per error type would leak
+            # the socket if the type arrives after connect() succeeded
+            # (e.g. from jetstream()), so the type only selects the log.
+            # The handle is cleared too: a closed socket left in self.nc
+            # would look usable to later callers.
+            if nc is not None:
+                await nc.close()
+            self.nc = None
+            if isinstance(e, nats.errors.NoServersError):
+                logger.warning(f"NATS connection failed (no servers): {e}")
+            elif isinstance(e, nats.errors.TimeoutError):
+                logger.warning(f"NATS connection timed out: {e}")
+            else:
+                logger.warning(f"NATS connection failed: {e}")
             return False
 
     def _create_trace_context(
@@ -330,6 +370,9 @@ class JetStreamProvider:
 class JetStreamSubscriber:
     """
     JetStream subscriber for consuming binary proto messages.
+
+    No connection tracker: nothing constructs this class today, so there
+    is no socket to watch. Wire one in if it ever gets a caller.
     """
 
     def __init__(self, nats_url: str):
@@ -340,11 +383,21 @@ class JetStreamSubscriber:
 
     async def connect(self) -> bool:
         """Connect to NATS and initialize JetStream context."""
+        nc = None
         try:
-            self.nc = await nats.connect(self.nats_url)
-            self.js = self.nc.jetstream()
+            nc = await nats.connect(self.nats_url)
+            self.nc = nc
+            self.js = nc.jetstream()
             return True
+        except asyncio.CancelledError:
+            if nc is not None:
+                await nc.close()
+            self.nc = None
+            raise
         except Exception:
+            if nc is not None:
+                await nc.close()
+            self.nc = None
             return False
 
     async def subscribe(

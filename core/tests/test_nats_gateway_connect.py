@@ -1,0 +1,106 @@
+"""NatsSignalGateway connection lifecycle: callbacks, state, error taxonomy."""
+
+import asyncio
+from unittest.mock import AsyncMock, MagicMock, patch
+
+import nats.errors
+import pytest
+from aura_hive.nats_gateway import NatsSignalGateway
+
+
+def _gateway() -> NatsSignalGateway:
+    return NatsSignalGateway("nats://localhost:4222", metabolism=MagicMock())
+
+
+@pytest.mark.asyncio
+async def test_successful_start_marks_tracker_connected():
+    gateway = _gateway()
+    nc = MagicMock()
+    nc.subscribe = AsyncMock(return_value=MagicMock())
+
+    with patch(
+        "aura_hive.nats_gateway.nats.connect", new=AsyncMock(return_value=nc)
+    ) as mock_connect:
+        assert await gateway.start() is True
+
+    assert gateway.nats_state == "connected"
+    _, kwargs = mock_connect.call_args
+    assert kwargs["disconnected_cb"] == gateway.tracker.on_disconnected
+    assert kwargs["reconnected_cb"] == gateway.tracker.on_reconnected
+    assert kwargs["closed_cb"] == gateway.tracker.on_closed
+
+
+@pytest.mark.asyncio
+async def test_no_servers_leaves_tracker_disconnected():
+    gateway = _gateway()
+
+    with patch(
+        "aura_hive.nats_gateway.nats.connect",
+        new=AsyncMock(side_effect=nats.errors.NoServersError),
+    ):
+        assert await gateway.start() is False
+
+    assert gateway.nats_state == "disconnected"
+
+
+@pytest.mark.asyncio
+async def test_cancellation_propagates_instead_of_reporting_failure():
+    gateway = _gateway()
+
+    with (
+        patch(
+            "aura_hive.nats_gateway.nats.connect",
+            new=AsyncMock(side_effect=asyncio.CancelledError),
+        ),
+        pytest.raises(asyncio.CancelledError),
+    ):
+        await gateway.start()
+
+
+@pytest.mark.asyncio
+async def test_subscribe_failure_closes_the_open_connection():
+    """connect() succeeded but subscribe() raised: no leaked socket."""
+    gateway = _gateway()
+    nc = MagicMock()
+    nc.subscribe = AsyncMock(side_effect=RuntimeError("no stream"))
+    nc.close = AsyncMock()
+
+    with patch("aura_hive.nats_gateway.nats.connect", new=AsyncMock(return_value=nc)):
+        assert await gateway.start() is False
+
+    nc.close.assert_awaited_once()
+    assert gateway.nats_state == "disconnected"
+
+
+@pytest.mark.asyncio
+async def test_typed_error_after_connect_still_closes():
+    """A TimeoutError arriving from subscribe() must not bypass cleanup."""
+    gateway = _gateway()
+    nc = MagicMock()
+    nc.subscribe = AsyncMock(side_effect=nats.errors.TimeoutError)
+    nc.close = AsyncMock()
+
+    with patch("aura_hive.nats_gateway.nats.connect", new=AsyncMock(return_value=nc)):
+        assert await gateway.start() is False
+
+    nc.close.assert_awaited_once()
+    assert gateway.nats_state == "disconnected"
+    assert gateway.nc is None
+
+
+@pytest.mark.asyncio
+async def test_cancel_after_connect_closes_and_propagates():
+    """Cancellation landing after connect() still releases the socket."""
+    gateway = _gateway()
+    nc = MagicMock()
+    nc.subscribe = AsyncMock(side_effect=asyncio.CancelledError)
+    nc.close = AsyncMock()
+
+    with (
+        patch("aura_hive.nats_gateway.nats.connect", new=AsyncMock(return_value=nc)),
+        pytest.raises(asyncio.CancelledError),
+    ):
+        await gateway.start()
+
+    nc.close.assert_awaited_once()
+    assert gateway.nc is None

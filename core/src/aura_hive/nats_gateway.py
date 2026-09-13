@@ -10,12 +10,14 @@ Channels:
 - Outbound: NATS reply inbox        (observation back to synapse)
 """
 
+import asyncio
 from typing import TYPE_CHECKING, Any
 
 import betterproto
 import nats
 import nats.errors
 import structlog
+from aura_core import NatsConnectionTracker
 from aura_core_gen.aura.core.v1 import Observation
 
 if TYPE_CHECKING:
@@ -49,29 +51,58 @@ class NatsSignalGateway:
         self.signal_subject = signal_subject
         self.nc: nats.NATS | None = None
         self._sub: Any = None
+        self.tracker = NatsConnectionTracker("core-signal-gateway")
+
+    @property
+    def nats_state(self) -> str:
+        """Connection state word for health output."""
+        return self.tracker.as_str()
 
     async def start(self) -> bool:
         """Connect to NATS and start subscribing to synapse signals."""
+        nc = None
         try:
-            self.nc = await nats.connect(
+            nc = await nats.connect(
                 self.nats_url,
                 connect_timeout=5,
                 reconnect_time_wait=2,
                 max_reconnect_attempts=60,
+                disconnected_cb=self.tracker.on_disconnected,
+                reconnected_cb=self.tracker.on_reconnected,
+                closed_cb=self.tracker.on_closed,
             )
-            self._sub = await self.nc.subscribe(
+            self.nc = nc
+            self._sub = await nc.subscribe(
                 self.signal_subject,
                 queue=QUEUE_GROUP,
                 cb=self._on_signal,
             )
+            self.tracker.mark_connected()
             logger.info(
                 "nats_gateway_started",
                 subject=self.signal_subject,
                 queue_group=QUEUE_GROUP,
             )
             return True
+        except asyncio.CancelledError:
+            if nc is not None:
+                await nc.close()
+            self.nc = None
+            raise
         except Exception as e:
-            logger.error("nats_gateway_start_failed", error=e, exc_info=True)
+            # Single handler, same reason as the pulse provider: whatever
+            # failed after connect() — including a typed error from
+            # subscribe() — the socket is closed and the handle cleared;
+            # the type selects the log.
+            if nc is not None:
+                await nc.close()
+            self.nc = None
+            if isinstance(e, nats.errors.NoServersError):
+                logger.error("nats_gateway_no_servers", error=str(e))
+            elif isinstance(e, nats.errors.TimeoutError):
+                logger.error("nats_gateway_connect_timeout", error=str(e))
+            else:
+                logger.error("nats_gateway_start_failed", error=e, exc_info=True)
             return False
 
     async def _on_signal(self, msg: "Msg") -> None:

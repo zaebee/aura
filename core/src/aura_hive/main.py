@@ -15,7 +15,6 @@ from aura_core_gen.aura.negotiation.v1 import (
     SearchResponse,
     SearchResultItem,
 )
-from grpclib.health.service import Health
 from grpclib.server import Server
 from opentelemetry import trace
 
@@ -29,6 +28,7 @@ from aura_hive.hive.metabolism.logging_config import (
     get_logger,
 )
 from aura_hive.nats_gateway import NatsSignalGateway
+from aura_hive.nats_health import build_nats_health_service
 
 tracer = trace.get_tracer(__name__)
 
@@ -322,8 +322,12 @@ async def serve() -> None:
         metabolism=None, market_service=cell.market_service
     )
 
-    # 3. Start grpclib Server early with Health Service
-    health_service = Health()
+    # 3. Start grpclib Server early with Health Service. Overall ("") stays
+    # SERVING no matter what; NATS state rides a named service filled in
+    # below as the connections come up (degraded-by-design: visible, never
+    # traffic-shaping).
+    nats_trackers: list = []
+    health_service = build_nats_health_service(lambda: nats_trackers)
     server = Server([negotiation_service, health_service])
 
     # Heartbeat Deal loop (needs metabolism)
@@ -366,12 +370,20 @@ async def serve() -> None:
         metabolism = await cell.build_organism()
         negotiation_service.metabolism = metabolism
 
-        # 5. Start NATS Signal Gateway
+        # 5. Start NATS Signal Gateway. Trackers join the holder read by the
+        # named health service: pulse first (built inside the organism),
+        # then the signal gateway owned here.
+        from aura_hive.hive.proteins.pulse.skill import PulseSkill
+
+        pulse_skill = cell.registry.get("pulse")
+        if isinstance(pulse_skill, PulseSkill) and pulse_skill.provider is not None:
+            nats_trackers.append(pulse_skill.provider.tracker)
         gateway = NatsSignalGateway(
             nats_url=get_settings().server.nats_url,
             metabolism=metabolism,
         )
         await gateway.start()
+        nats_trackers.append(gateway.tracker)
         logger.info("metabolism_ready")
 
         asyncio.create_task(heartbeat_deal_loop(metabolism))
