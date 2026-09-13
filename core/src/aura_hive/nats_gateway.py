@@ -10,12 +10,14 @@ Channels:
 - Outbound: NATS reply inbox        (observation back to synapse)
 """
 
+import asyncio
 from typing import TYPE_CHECKING, Any
 
 import betterproto
 import nats
 import nats.errors
 import structlog
+from aura_core import NatsConnectionTracker
 from aura_core_gen.aura.core.v1 import Observation
 
 if TYPE_CHECKING:
@@ -49,6 +51,12 @@ class NatsSignalGateway:
         self.signal_subject = signal_subject
         self.nc: nats.NATS | None = None
         self._sub: Any = None
+        self.tracker = NatsConnectionTracker("core-signal-gateway")
+
+    @property
+    def nats_state(self) -> str:
+        """Connection state word for health output."""
+        return self.tracker.as_str()
 
     async def start(self) -> bool:
         """Connect to NATS and start subscribing to synapse signals."""
@@ -58,7 +66,11 @@ class NatsSignalGateway:
                 connect_timeout=5,
                 reconnect_time_wait=2,
                 max_reconnect_attempts=60,
+                disconnected_cb=self.tracker.on_disconnected,
+                reconnected_cb=self.tracker.on_reconnected,
+                closed_cb=self.tracker.on_closed,
             )
+            self.tracker.mark_connected()
             self._sub = await self.nc.subscribe(
                 self.signal_subject,
                 queue=QUEUE_GROUP,
@@ -70,6 +82,14 @@ class NatsSignalGateway:
                 queue_group=QUEUE_GROUP,
             )
             return True
+        except nats.errors.NoServersError as e:
+            logger.error("nats_gateway_no_servers", error=str(e))
+            return False
+        except nats.errors.TimeoutError as e:
+            logger.error("nats_gateway_connect_timeout", error=str(e))
+            return False
+        except asyncio.CancelledError:
+            raise
         except Exception as e:
             logger.error("nats_gateway_start_failed", error=e, exc_info=True)
             return False
