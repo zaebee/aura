@@ -176,7 +176,7 @@ async def test_verify_payment_finds_matching_transfer() -> None:
 
 
 @pytest.mark.asyncio
-async def test_verify_payment_rpc_error_is_none_not_raise() -> None:
+async def test_verify_payment_rpc_error_raises() -> None:
     provider = _provider()
     provider.client.post = AsyncMock(side_effect=RuntimeError("rpc down"))
 

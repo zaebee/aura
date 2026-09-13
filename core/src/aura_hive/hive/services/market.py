@@ -199,7 +199,10 @@ class MarketService:
 
         decrypted_secret = decrypt_obs.metadata.to_dict().get("secret", "")
 
-        paid_at_raw = deal.get("paid_at")
+        # `confirm_ground_state` writes `paid_at`, but this dict more often
+        # arrives via `deal.update(proof_data)`, which carries `confirmed_at`
+        # instead. Prefer the stored stamp, fall back to the proof's.
+        paid_at_raw = deal.get("paid_at", deal.get("confirmed_at"))
         paid_at_ts = (
             int(datetime.fromisoformat(paid_at_raw).timestamp())
             if isinstance(paid_at_raw, str)

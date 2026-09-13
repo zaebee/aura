@@ -89,6 +89,9 @@ async def test_full_flow_negotiate_accept_payment_reveal() -> None:
     ]
     resp = await service.check_status(deal["id"])
     assert resp.status == "PAID"
+    expected_ts = int(datetime.fromisoformat(proof["confirmed_at"]).timestamp())
+    assert resp.secret.paid_at == expected_ts
+    assert resp.proof.confirmed_at == expected_ts
 
     intents = [c.args[0] for c in persistence.execute.await_args_list]
     assert "confirm_ground_state" in intents
