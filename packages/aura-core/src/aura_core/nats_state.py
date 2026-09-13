@@ -22,6 +22,12 @@ import structlog
 logger = structlog.get_logger(__name__)
 
 
+#: gRPC Health service name carrying core NATS state (see
+#: `aura_hive.nats_health`). Gateway reads it for `/health` details;
+#: readiness never follows it.
+NATS_HEALTH_SERVICE = "aura.nats.v1.NatsHealth"
+
+
 class NatsConnectionState(str, enum.Enum):
     """Observable NATS connection state."""
 
