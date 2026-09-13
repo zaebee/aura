@@ -12,7 +12,11 @@ async def test_persistence_skill_initialize() -> None:
         url="postgresql://user:password@localhost:5432/aura_db",
         redis_url="redis://localhost:6379/0",
     )
-    mock_sessionmaker = MagicMock()
+    mock_session = MagicMock()
+    mock_session.__aenter__ = AsyncMock(return_value=mock_session)
+    mock_session.__aexit__ = AsyncMock(return_value=False)
+    mock_session.execute = AsyncMock()
+    mock_sessionmaker = MagicMock(return_value=mock_session)
     mock_engine = MagicMock()
     mock_redis = AsyncMock()
     mock_redis.ping.return_value = True

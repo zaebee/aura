@@ -29,10 +29,7 @@ def skill_with(session: MagicMock) -> PersistenceSkill:
         redis_url="redis://localhost:6379/0",
     )
     async_sessionmaker_mock = MagicMock(return_value=session)
-    skill.bind(
-        settings,
-        (MagicMock(return_value=session), MagicMock(), None, async_sessionmaker_mock),
-    )
+    skill.bind(settings, (async_sessionmaker_mock, MagicMock(), None))
     return skill
 
 

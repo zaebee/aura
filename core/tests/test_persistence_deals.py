@@ -33,11 +33,8 @@ def _make_skill_with_session(session_mock: MagicMock) -> PersistenceSkill:
         url="postgresql://user:password@localhost:5432/aura_db",
         redis_url="redis://localhost:6379/0",
     )
-    sessionmaker_mock = MagicMock(return_value=session_mock)
     async_sessionmaker_mock = MagicMock(return_value=session_mock)
-    skill.bind(
-        settings, (sessionmaker_mock, MagicMock(), None, async_sessionmaker_mock)
-    )
+    skill.bind(settings, (async_sessionmaker_mock, MagicMock(), None))
     return skill
 
 
