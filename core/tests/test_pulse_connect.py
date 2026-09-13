@@ -71,3 +71,21 @@ async def test_cancellation_propagates_instead_of_reporting_failure():
         pytest.raises(asyncio.CancelledError),
     ):
         await provider.connect()
+
+
+@pytest.mark.asyncio
+async def test_jetstream_failure_closes_the_open_connection():
+    """connect() succeeded but jetstream() raised: no leaked socket."""
+    provider = _provider()
+    nc = MagicMock()
+    nc.jetstream.side_effect = RuntimeError("no jetstream")
+    nc.close = AsyncMock()
+
+    with patch(
+        "aura_hive.hive.proteins.pulse.engine.nats.connect",
+        new=AsyncMock(return_value=nc),
+    ):
+        assert await provider.connect() is False
+
+    nc.close.assert_awaited_once()
+    assert provider.tracker.as_str() == "disconnected"

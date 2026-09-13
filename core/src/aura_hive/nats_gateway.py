@@ -60,8 +60,9 @@ class NatsSignalGateway:
 
     async def start(self) -> bool:
         """Connect to NATS and start subscribing to synapse signals."""
+        nc = None
         try:
-            self.nc = await nats.connect(
+            nc = await nats.connect(
                 self.nats_url,
                 connect_timeout=5,
                 reconnect_time_wait=2,
@@ -70,12 +71,13 @@ class NatsSignalGateway:
                 reconnected_cb=self.tracker.on_reconnected,
                 closed_cb=self.tracker.on_closed,
             )
-            self.tracker.mark_connected()
-            self._sub = await self.nc.subscribe(
+            self.nc = nc
+            self._sub = await nc.subscribe(
                 self.signal_subject,
                 queue=QUEUE_GROUP,
                 cb=self._on_signal,
             )
+            self.tracker.mark_connected()
             logger.info(
                 "nats_gateway_started",
                 subject=self.signal_subject,
@@ -89,8 +91,12 @@ class NatsSignalGateway:
             logger.error("nats_gateway_connect_timeout", error=str(e))
             return False
         except asyncio.CancelledError:
+            if nc is not None:
+                await nc.close()
             raise
         except Exception as e:
+            if nc is not None:
+                await nc.close()
             logger.error("nats_gateway_start_failed", error=e, exc_info=True)
             return False
 

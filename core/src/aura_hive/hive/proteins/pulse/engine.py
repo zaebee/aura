@@ -55,8 +55,10 @@ class JetStreamProvider:
         Reconnect behaviour is explicit (matching the library defaults)
         and lifecycle callbacks feed the shared tracker. Cancellation
         propagates — a shutting-down process must not report it as a
-        connection failure.
+        connection failure. Anything opened and then failed is closed
+        again: a leaked socket is a slow file-descriptor bleed.
         """
+        nc = None
         try:
             nc = await nats.connect(
                 self.nats_url,
@@ -79,8 +81,12 @@ class JetStreamProvider:
             logger.warning(f"NATS connection timed out: {e}")
             return False
         except asyncio.CancelledError:
+            if nc is not None:
+                await nc.close()
             raise
         except Exception as e:
+            if nc is not None:
+                await nc.close()
             logger.warning(f"NATS connection failed: {e}")
             return False
 
@@ -367,11 +373,19 @@ class JetStreamSubscriber:
 
     async def connect(self) -> bool:
         """Connect to NATS and initialize JetStream context."""
+        nc = None
         try:
-            self.nc = await nats.connect(self.nats_url)
-            self.js = self.nc.jetstream()
+            nc = await nats.connect(self.nats_url)
+            self.nc = nc
+            self.js = nc.jetstream()
             return True
+        except asyncio.CancelledError:
+            if nc is not None:
+                await nc.close()
+            raise
         except Exception:
+            if nc is not None:
+                await nc.close()
             return False
 
     async def subscribe(

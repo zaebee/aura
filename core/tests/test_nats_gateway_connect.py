@@ -55,3 +55,18 @@ async def test_cancellation_propagates_instead_of_reporting_failure():
         pytest.raises(asyncio.CancelledError),
     ):
         await gateway.start()
+
+
+@pytest.mark.asyncio
+async def test_subscribe_failure_closes_the_open_connection():
+    """connect() succeeded but subscribe() raised: no leaked socket."""
+    gateway = _gateway()
+    nc = MagicMock()
+    nc.subscribe = AsyncMock(side_effect=RuntimeError("no stream"))
+    nc.close = AsyncMock()
+
+    with patch("aura_hive.nats_gateway.nats.connect", new=AsyncMock(return_value=nc)):
+        assert await gateway.start() is False
+
+    nc.close.assert_awaited_once()
+    assert gateway.nats_state == "disconnected"
