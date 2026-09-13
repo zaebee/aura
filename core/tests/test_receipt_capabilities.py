@@ -100,7 +100,6 @@ class TestFinding:
         session = a_session()
         row = MagicMock()
         row.receipt = a_receipt()
-        session.query.return_value.filter_by.return_value.first.return_value = row
         result_mock = MagicMock()
         result_mock.scalar_one_or_none.return_value = row
         session.execute.return_value = result_mock
@@ -115,7 +114,6 @@ class TestFinding:
     @pytest.mark.asyncio
     async def test_an_unknown_token_is_not_found_rather_than_an_error(self) -> None:
         session = a_session()
-        session.query.return_value.filter_by.return_value.first.return_value = None
         result_mock = MagicMock()
         result_mock.scalar_one_or_none.return_value = None
         session.execute.return_value = result_mock

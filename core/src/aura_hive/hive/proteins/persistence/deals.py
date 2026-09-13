@@ -8,12 +8,26 @@ directly.
 from collections.abc import Callable
 from datetime import UTC, datetime
 from typing import Any
+from uuid import UUID
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from .engine import DealStatus, LockedDeal
 from .schema import DealSchema
+
+
+def _deal_uuid(value: Any) -> UUID:
+    """Coerce a deal id to UUID.
+
+    Callers arrive with both shapes (`market.py` passes UUID objects,
+    Redis-backed dicts carry strings), and asyncpg — unlike psycopg2 —
+    does not coerce: a str INSERT lands fine while a str lookup silently
+    misses. Normalise at the boundary so the two cannot disagree.
+    """
+    if isinstance(value, UUID):
+        return value
+    return UUID(str(value))
 
 
 class DealRepository:
@@ -25,7 +39,7 @@ class DealRepository:
     async def create(self, params: dict[str, Any]) -> None:
         async with self._session() as session:
             deal = LockedDeal(
-                id=params["id"],
+                id=_deal_uuid(params["id"]),
                 item_id=params["item_id"],
                 item_name=params["item_name"],
                 final_price=params["final_price"],
@@ -40,8 +54,14 @@ class DealRepository:
             await session.commit()
 
     async def get_by_id(self, deal_id: str) -> dict[str, Any] | None:
+        try:
+            db_id = _deal_uuid(deal_id)
+        except (ValueError, AttributeError, TypeError):
+            # Malformed identifier: "never issued" is an answer, not a fault
+            # (same rule as an unknown dispute token in receipts).
+            return None
         async with self._session() as session:
-            result = await session.execute(select(LockedDeal).filter_by(id=deal_id))
+            result = await session.execute(select(LockedDeal).filter_by(id=db_id))
             deal = result.scalar_one_or_none()
             return DealSchema.model_validate(deal).model_dump() if deal else None
 
@@ -56,8 +76,12 @@ class DealRepository:
     async def update_status(
         self, deal_id: str, status: str, params: dict[str, Any]
     ) -> bool:
+        try:
+            db_id = _deal_uuid(deal_id)
+        except (ValueError, AttributeError, TypeError):
+            return False
         async with self._session() as session:
-            result = await session.execute(select(LockedDeal).filter_by(id=deal_id))
+            result = await session.execute(select(LockedDeal).filter_by(id=db_id))
             deal = result.scalar_one_or_none()
             if not deal:
                 return False
