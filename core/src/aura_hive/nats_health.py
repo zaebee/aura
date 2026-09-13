@@ -20,7 +20,12 @@ from grpclib.health.service import OVERALL, Health
 
 
 class _NatsHealthServiceKey:
-    """Names the service for grpclib's per-service lookup."""
+    """Names the service for grpclib's per-service lookup.
+
+    The key must expose `__mapping__` in `/package.Service/Method` form —
+    plain strings crash `_service_name`, and OVERALL (an object, not "")
+    shows the same shape is required.
+    """
 
     def __mapping__(self) -> dict[str, Any]:
         return {f"/{NATS_HEALTH_SERVICE}/Check": None}
@@ -40,7 +45,12 @@ def build_nats_health_service(
     get_trackers: Callable[[], list[NatsConnectionTracker]],
     check_ttl: float = 5.0,
 ) -> Health:
-    """gRPC Health service with overall pinned SERVING plus NATS state."""
+    """gRPC Health service with overall pinned SERVING plus NATS state.
+
+    `check_ttl` bounds staleness: the named service can lag a drop by up
+    to this many seconds. Kept near the K8s probe period (10s) so a
+    `/health` scrape never reports ancient news.
+    """
 
     async def check_nats() -> bool | None:
         return await check_trackers(get_trackers())

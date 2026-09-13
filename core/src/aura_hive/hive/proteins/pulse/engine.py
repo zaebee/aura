@@ -77,14 +77,18 @@ class JetStreamProvider:
         except asyncio.CancelledError:
             if nc is not None:
                 await nc.close()
+            self.nc = None
             raise
         except Exception as e:
             # Single handler: anything opened above is closed, whatever
             # failed. Separate except-blocks per error type would leak
             # the socket if the type arrives after connect() succeeded
             # (e.g. from jetstream()), so the type only selects the log.
+            # The handle is cleared too: a closed socket left in self.nc
+            # would look usable to later callers.
             if nc is not None:
                 await nc.close()
+            self.nc = None
             if isinstance(e, nats.errors.NoServersError):
                 logger.warning(f"NATS connection failed (no servers): {e}")
             elif isinstance(e, nats.errors.TimeoutError):
@@ -366,6 +370,9 @@ class JetStreamProvider:
 class JetStreamSubscriber:
     """
     JetStream subscriber for consuming binary proto messages.
+
+    No connection tracker: nothing constructs this class today, so there
+    is no socket to watch. Wire one in if it ever gets a caller.
     """
 
     def __init__(self, nats_url: str):
@@ -385,10 +392,12 @@ class JetStreamSubscriber:
         except asyncio.CancelledError:
             if nc is not None:
                 await nc.close()
+            self.nc = None
             raise
         except Exception:
             if nc is not None:
                 await nc.close()
+            self.nc = None
             return False
 
     async def subscribe(

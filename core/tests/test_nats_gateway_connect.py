@@ -85,3 +85,22 @@ async def test_typed_error_after_connect_still_closes():
 
     nc.close.assert_awaited_once()
     assert gateway.nats_state == "disconnected"
+    assert gateway.nc is None
+
+
+@pytest.mark.asyncio
+async def test_cancel_after_connect_closes_and_propagates():
+    """Cancellation landing after connect() still releases the socket."""
+    gateway = _gateway()
+    nc = MagicMock()
+    nc.subscribe = AsyncMock(side_effect=asyncio.CancelledError)
+    nc.close = AsyncMock()
+
+    with (
+        patch("aura_hive.nats_gateway.nats.connect", new=AsyncMock(return_value=nc)),
+        pytest.raises(asyncio.CancelledError),
+    ):
+        await gateway.start()
+
+    nc.close.assert_awaited_once()
+    assert gateway.nc is None

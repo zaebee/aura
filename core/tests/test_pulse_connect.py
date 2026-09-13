@@ -107,3 +107,25 @@ async def test_typed_error_after_connect_still_closes():
 
     nc.close.assert_awaited_once()
     assert provider.tracker.as_str() == "disconnected"
+    assert provider.nc is None
+
+
+@pytest.mark.asyncio
+async def test_cancel_after_connect_closes_and_propagates():
+    """Cancellation landing after connect() still releases the socket."""
+    provider = _provider()
+    nc = MagicMock()
+    nc.jetstream.side_effect = asyncio.CancelledError
+    nc.close = AsyncMock()
+
+    with (
+        patch(
+            "aura_hive.hive.proteins.pulse.engine.nats.connect",
+            new=AsyncMock(return_value=nc),
+        ),
+        pytest.raises(asyncio.CancelledError),
+    ):
+        await provider.connect()
+
+    nc.close.assert_awaited_once()
+    assert provider.nc is None

@@ -87,13 +87,16 @@ class NatsSignalGateway:
         except asyncio.CancelledError:
             if nc is not None:
                 await nc.close()
+            self.nc = None
             raise
         except Exception as e:
             # Single handler, same reason as the pulse provider: whatever
             # failed after connect() — including a typed error from
-            # subscribe() — the socket is closed; the type selects the log.
+            # subscribe() — the socket is closed and the handle cleared;
+            # the type selects the log.
             if nc is not None:
                 await nc.close()
+            self.nc = None
             if isinstance(e, nats.errors.NoServersError):
                 logger.error("nats_gateway_no_servers", error=str(e))
             elif isinstance(e, nats.errors.TimeoutError):
