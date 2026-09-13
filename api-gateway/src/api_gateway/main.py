@@ -13,6 +13,8 @@ if TYPE_CHECKING:
 import betterproto
 import grpclib.client
 import nats
+import nats.errors
+from aura_core import NatsConnectionTracker
 from fastapi import (
     Depends,
     FastAPI,
@@ -85,8 +87,31 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None]:
     _health_stub = _health_pb2_grpc.HealthStub(_health_channel)
     logger.info("health_stub_initialized", grpc_target=settings.core_service_host)
 
-    # NATS Connection for Vision RPC
-    app.state.nc = await nats.connect(settings.nats_url)
+    # NATS Connection for Vision RPC. Reconnect behaviour is explicit
+    # (matching the library defaults) rather than inherited silently, and
+    # lifecycle callbacks feed the shared tracker surfaced in /readyz
+    # and /health — reported, never traffic-shaping.
+    nats_tracker = _gateway_nats_tracker
+    app.state.nats_tracker = nats_tracker
+    try:
+        app.state.nc = await nats.connect(
+            settings.nats_url,
+            connect_timeout=5,
+            reconnect_time_wait=2,
+            max_reconnect_attempts=60,
+            disconnected_cb=nats_tracker.on_disconnected,
+            reconnected_cb=nats_tracker.on_reconnected,
+            closed_cb=nats_tracker.on_closed,
+        )
+    except nats.errors.NoServersError as e:
+        logger.error("nats_no_servers_at_startup", url=settings.nats_url, error=str(e))
+        raise
+    except nats.errors.TimeoutError as e:
+        logger.error(
+            "nats_connect_timeout_at_startup", url=settings.nats_url, error=str(e)
+        )
+        raise
+    nats_tracker.mark_connected()
 
     logger.info(
         "startup_complete",
@@ -114,6 +139,10 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None]:
 
 app = FastAPI(title="Aura Agent Gateway", version="1.0", lifespan=lifespan)
 
+# Tracker exists from import so /readyz answers before lifespan runs;
+# lifespan reuses the same instance.
+_gateway_nats_tracker = NatsConnectionTracker("gateway-vision")
+
 # Register health endpoints FIRST — before middleware and other routes
 # so Kubernetes liveness probes respond immediately on process start.
 register_health_endpoints(
@@ -121,6 +150,7 @@ register_health_endpoints(
     get_stub=lambda: _health_stub,
     health_check_timeout=settings.health_check_timeout,
     slow_threshold_ms=settings.health_check_slow_threshold_ms,
+    get_nats_state=_gateway_nats_tracker.as_str,
 )
 
 app.add_middleware(
