@@ -84,20 +84,22 @@ class NatsSignalGateway:
                 queue_group=QUEUE_GROUP,
             )
             return True
-        except nats.errors.NoServersError as e:
-            logger.error("nats_gateway_no_servers", error=str(e))
-            return False
-        except nats.errors.TimeoutError as e:
-            logger.error("nats_gateway_connect_timeout", error=str(e))
-            return False
         except asyncio.CancelledError:
             if nc is not None:
                 await nc.close()
             raise
         except Exception as e:
+            # Single handler, same reason as the pulse provider: whatever
+            # failed after connect() — including a typed error from
+            # subscribe() — the socket is closed; the type selects the log.
             if nc is not None:
                 await nc.close()
-            logger.error("nats_gateway_start_failed", error=e, exc_info=True)
+            if isinstance(e, nats.errors.NoServersError):
+                logger.error("nats_gateway_no_servers", error=str(e))
+            elif isinstance(e, nats.errors.TimeoutError):
+                logger.error("nats_gateway_connect_timeout", error=str(e))
+            else:
+                logger.error("nats_gateway_start_failed", error=e, exc_info=True)
             return False
 
     async def _on_signal(self, msg: "Msg") -> None:

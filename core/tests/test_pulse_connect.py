@@ -89,3 +89,21 @@ async def test_jetstream_failure_closes_the_open_connection():
 
     nc.close.assert_awaited_once()
     assert provider.tracker.as_str() == "disconnected"
+
+
+@pytest.mark.asyncio
+async def test_typed_error_after_connect_still_closes():
+    """A NoServersError arriving after connect() must not bypass cleanup."""
+    provider = _provider()
+    nc = MagicMock()
+    nc.jetstream.side_effect = nats.errors.NoServersError
+    nc.close = AsyncMock()
+
+    with patch(
+        "aura_hive.hive.proteins.pulse.engine.nats.connect",
+        new=AsyncMock(return_value=nc),
+    ):
+        assert await provider.connect() is False
+
+    nc.close.assert_awaited_once()
+    assert provider.tracker.as_str() == "disconnected"

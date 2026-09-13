@@ -74,20 +74,23 @@ class JetStreamProvider:
             self.tracker.mark_connected()
             logger.info(f"Connected to NATS JetStream at {self.nats_url}")
             return True
-        except nats.errors.NoServersError as e:
-            logger.warning(f"NATS connection failed (no servers): {e}")
-            return False
-        except nats.errors.TimeoutError as e:
-            logger.warning(f"NATS connection timed out: {e}")
-            return False
         except asyncio.CancelledError:
             if nc is not None:
                 await nc.close()
             raise
         except Exception as e:
+            # Single handler: anything opened above is closed, whatever
+            # failed. Separate except-blocks per error type would leak
+            # the socket if the type arrives after connect() succeeded
+            # (e.g. from jetstream()), so the type only selects the log.
             if nc is not None:
                 await nc.close()
-            logger.warning(f"NATS connection failed: {e}")
+            if isinstance(e, nats.errors.NoServersError):
+                logger.warning(f"NATS connection failed (no servers): {e}")
+            elif isinstance(e, nats.errors.TimeoutError):
+                logger.warning(f"NATS connection timed out: {e}")
+            else:
+                logger.warning(f"NATS connection failed: {e}")
             return False
 
     def _create_trace_context(

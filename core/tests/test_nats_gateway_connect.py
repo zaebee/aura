@@ -70,3 +70,18 @@ async def test_subscribe_failure_closes_the_open_connection():
 
     nc.close.assert_awaited_once()
     assert gateway.nats_state == "disconnected"
+
+
+@pytest.mark.asyncio
+async def test_typed_error_after_connect_still_closes():
+    """A TimeoutError arriving from subscribe() must not bypass cleanup."""
+    gateway = _gateway()
+    nc = MagicMock()
+    nc.subscribe = AsyncMock(side_effect=nats.errors.TimeoutError)
+    nc.close = AsyncMock()
+
+    with patch("aura_hive.nats_gateway.nats.connect", new=AsyncMock(return_value=nc)):
+        assert await gateway.start() is False
+
+    nc.close.assert_awaited_once()
+    assert gateway.nats_state == "disconnected"
