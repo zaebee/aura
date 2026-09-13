@@ -7,14 +7,13 @@ from aura_core import SkillProtocol, SkillRegistry, get_raw_key
 from opentelemetry.instrumentation.grpc import GrpcInstrumentorServer
 from opentelemetry.instrumentation.langchain import LangchainInstrumentor
 from prometheus_client import start_http_server
-from sqlalchemy import create_engine, event
+from sqlalchemy import event
 from sqlalchemy.ext.asyncio import (
     AsyncEngine,
     AsyncSession,
     async_sessionmaker,
     create_async_engine,
 )
-from sqlalchemy.orm import sessionmaker
 
 from aura_hive.config.attestation import AttestationSettings
 from aura_hive.hive.aggregator import HiveAggregator
@@ -232,8 +231,6 @@ class HiveCell:
         """Instantiate and bind all Proteins according to the Trinity Pattern."""
 
         # 1. Persistence
-        engine = create_engine(str(self.settings.database.url))
-        SessionLocal = sessionmaker(bind=engine)
         async_engine, AsyncSessionLocal = build_async_engine(
             str(self.settings.database.url)
         )
@@ -241,7 +238,7 @@ class HiveCell:
         persistence = PersistenceSkill()
         persistence.bind(
             self.settings.database,
-            (SessionLocal, engine, redis_client, AsyncSessionLocal),
+            (AsyncSessionLocal, async_engine, redis_client),
         )
 
         # 2. Pulse

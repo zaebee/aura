@@ -1,4 +1,3 @@
-import asyncio
 from datetime import datetime
 from typing import Any, cast
 
@@ -7,9 +6,8 @@ import structlog
 from aura_core import SkillProtocol, make_struct
 from aura_core_gen.aura.assets.v1 import Asset
 from aura_core_gen.aura.core.v1 import Observation
-from sqlalchemy import Engine, text
-from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
-from sqlalchemy.orm import Session, sessionmaker
+from sqlalchemy import text
+from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, async_sessionmaker
 
 from aura_hive.config.database import DatabaseSettings
 
@@ -30,7 +28,7 @@ logger = structlog.get_logger(__name__)
 class PersistenceSkill(
     SkillProtocol[
         DatabaseSettings,
-        tuple[sessionmaker, Engine, redis.Redis],
+        tuple[async_sessionmaker, AsyncEngine, redis.Redis],
         dict[str, Any],
         Observation,
     ]
@@ -42,10 +40,9 @@ class PersistenceSkill(
 
     def __init__(self) -> None:
         self.settings: DatabaseSettings | None = None
-        self.provider: sessionmaker | None = None
-        self.engine: Engine | None = None
+        self.provider: async_sessionmaker | None = None
+        self.engine: AsyncEngine | None = None
         self.redis: redis.Redis | None = None
-        self._async_provider: Any | None = None
         self.cache: RedisCache | None = None
         self._capabilities = {
             "init_db": self._init_db,
@@ -71,10 +68,10 @@ class PersistenceSkill(
 
         # Entity SQL lives in dedicated repositories; the _get_session reference
         # is bound lazily and only invoked at operation time (after bind()).
-        self._deals = DealRepository(self._get_async_session)
-        self._items = ItemRepository(self._get_async_session)
-        self._wallets = WalletRepository(self._get_async_session)
-        self._receipts = ReceiptRepository(self._get_async_session)
+        self._deals = DealRepository(self._get_session)
+        self._items = ItemRepository(self._get_session)
+        self._wallets = WalletRepository(self._get_session)
+        self._receipts = ReceiptRepository(self._get_session)
 
     def get_name(self) -> str:
         return "persistence"
@@ -85,28 +82,17 @@ class PersistenceSkill(
     def bind(
         self,
         settings: DatabaseSettings,
-        provider: tuple[sessionmaker, Engine, redis.Redis]
-        | tuple[sessionmaker, Engine, redis.Redis, async_sessionmaker],
+        provider: tuple[async_sessionmaker, AsyncEngine, redis.Redis],
     ) -> None:
         self.settings = settings
-        sync_factory, self.engine, self.redis, *rest = provider
-        self.provider = sync_factory
-        # 4th element (async_sessionmaker) arrives from the dual-engine
-        # cortex wiring; converted repos switch to it, the rest stay sync
-        # until Phase 2.
-        self._async_provider = rest[0] if rest else None
+        self.provider, self.engine, self.redis = provider
         if self.redis:
             self.cache = RedisCache(self.redis)
 
-    def _get_session(self) -> Session:
+    def _get_session(self) -> AsyncSession:
         if not self.provider:
             raise RuntimeError("provider_not_initialized")
-        return cast(Session, self.provider())
-
-    def _get_async_session(self) -> AsyncSession:
-        if not self._async_provider:
-            raise RuntimeError("async_provider_not_initialized")
-        return cast(AsyncSession, self._async_provider())
+        return cast(AsyncSession, self.provider())
 
     async def initialize(self) -> bool:
         if not self.settings or not self.provider:
@@ -127,13 +113,9 @@ class PersistenceSkill(
         )
 
         try:
-
-            def check() -> bool:
-                with self._get_session() as session:
-                    session.execute(text("SELECT 1"))
-                return True
-
-            return await asyncio.to_thread(check)
+            async with self._get_session() as session:
+                await session.execute(text("SELECT 1"))
+            return True
         except Exception as e:
             logger.error(f"persistence_initialization_failed: {e}")
             return False
@@ -160,11 +142,8 @@ class PersistenceSkill(
         if not self.engine:
             return Observation(success=False, error="engine_not_initialized")
         try:
-
-            def create() -> None:
-                Base.metadata.create_all(bind=cast(Engine, self.engine))
-
-            await asyncio.to_thread(create)
+            async with self.engine.begin() as connection:
+                await connection.run_sync(Base.metadata.create_all)
             return Observation(success=True)
         except Exception as e:
             return Observation(success=False, error=str(e))
@@ -379,7 +358,7 @@ class PersistenceSkill(
 
     async def _log_metabolic_cost(self, params: dict[str, Any]) -> Observation:
         try:
-            async with self._get_async_session() as session:
+            async with self._get_session() as session:
                 cost = MetabolicCost(
                     amount=params["amount"],
                     currency=params["currency"],
