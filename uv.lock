@@ -202,6 +202,7 @@ dependencies = [
     { name = "pydantic-settings" },
     { name = "pynacl" },
     { name = "python-multipart" },
+    { name = "redis" },
     { name = "structlog" },
     { name = "uvicorn" },
 ]
@@ -231,6 +232,7 @@ requires-dist = [
     { name = "pydantic-settings", specifier = ">=2.0.0" },
     { name = "pynacl", specifier = "~=1.6.2" },
     { name = "python-multipart", specifier = ">=0.0.12" },
+    { name = "redis", specifier = ">=5.0.0" },
     { name = "structlog", specifier = ">=25.0.0" },
     { name = "uvicorn", specifier = ">=0.40.0" },
 ]
