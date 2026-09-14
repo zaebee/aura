@@ -60,6 +60,15 @@ class Settings(BaseSettings):
         100.0  # Log warning if health check exceeds this duration (milliseconds)
     )
 
+    # Probe rate limiting: floor binary-search stretched past price validity
+    # (see probe_limit.py). 17 probes at 5/hour take 3.4h — longer than a
+    # price stays valid — so a recovered floor is stale on arrival.
+    probe_limit: int = 5
+    probe_window_s: int = 3600
+    # Comma-separated agent DIDs exempt from probe limiting (regular
+    # negotiators, indistinguishable from slow probers by this signal alone).
+    probe_whitelist: str = ""
+
     @model_validator(mode="after")
     def validate_otel_config(self) -> "Settings":
         """Validate OpenTelemetry configuration."""

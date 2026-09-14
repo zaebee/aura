@@ -28,3 +28,8 @@ dependencies = [
 
 [tool.uv.sources]
 aura-core = { workspace = true }
+
+[dependency-groups]
+dev = [
+    "fakeredis>=2.38.0",
+]

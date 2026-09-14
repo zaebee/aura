@@ -1,4 +1,5 @@
 import json
+import math
 import uuid
 from collections.abc import AsyncGenerator, Awaitable, Callable
 from contextlib import asynccontextmanager
@@ -14,6 +15,7 @@ import betterproto
 import grpclib.client
 import nats
 import nats.errors
+import redis.asyncio as redis
 from aura_core import NatsConnectionTracker
 from fastapi import (
     Depends,
@@ -113,6 +115,34 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None]:
         raise
     nats_tracker.mark_connected()
 
+    # Redis + probe limiter. A failed Redis connection must not take the
+    # gateway down: without a budget store every bid is allowed (fail-open
+    # toward availability; the floor channel is a confidentiality concern,
+    # not a safety one).
+    from .probe_limit import ProbeLimiter
+
+    redis_client = None
+    try:
+        redis_client = redis.from_url(settings.redis_url)
+        await redis_client.ping()
+    except Exception as e:
+        logger.warning("probe_limiter_redis_unavailable", error=str(e))
+        redis_client = None
+    app.state.redis = redis_client
+    whitelist = frozenset(
+        did.strip() for did in settings.probe_whitelist.split(",") if did.strip()
+    )
+    app.state.probe_limiter = (
+        ProbeLimiter(
+            app.state.redis,
+            limit=settings.probe_limit,
+            window_s=settings.probe_window_s,
+            whitelist=whitelist,
+        )
+        if app.state.redis is not None
+        else None
+    )
+
     logger.info(
         "startup_complete",
         grpc_target=settings.core_service_host,
@@ -126,6 +156,9 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None]:
         if hasattr(app.state, "nc") and app.state.nc:
             await app.state.nc.drain()
             await app.state.nc.close()
+
+        if getattr(app.state, "redis", None) is not None:
+            await app.state.redis.aclose()
 
         channel.close()  # Synchronous in grpclib
 
@@ -240,6 +273,34 @@ async def negotiate(
     logger.info(
         "negotiate_request_received", item_id=payload.item_id, agent_did=agent_did
     )
+
+    probe_limiter = getattr(request.app.state, "probe_limiter", None)
+    if probe_limiter is not None:
+        try:
+            allowed, retry_after = await probe_limiter.check(agent_did, payload.item_id)
+        except Exception as e:
+            # Fail-open toward availability: a Redis outage at runtime must
+            # degrade to unlimited bids, never to 500s. The floor channel
+            # is a confidentiality concern, not a safety one.
+            logger.warning(
+                "probe_limiter_failed_at_runtime",
+                agent_did=agent_did,
+                item_id=payload.item_id,
+                error=str(e),
+            )
+            allowed, retry_after = True, 0.0
+        if not allowed:
+            logger.info(
+                "probe_rate_limited",
+                agent_did=agent_did,
+                item_id=payload.item_id,
+                retry_after_s=round(retry_after, 1),
+            )
+            raise HTTPException(
+                status_code=429,
+                detail="probe rate limit exceeded",
+                headers={"Retry-After": str(max(1, math.ceil(retry_after)))},
+            )
 
     try:
         from aura_core_gen.aura.negotiation.v1 import (
