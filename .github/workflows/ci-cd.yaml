@@ -242,8 +242,16 @@ jobs:
 
                   echo "🚀 Deploying to Cluster..."
                   helm dependency update ./deploy/aura
-                  helm upgrade aura ./deploy/aura --install --wait --timeout 5m \
-                    --atomic --cleanup-on-fail \
+                  # No --wait/--atomic here: they also wait for LoadBalancer
+                  # EXTERNAL-IPs, which minikube never assigns, so every
+                  # deploy would time out after a full successful rollout.
+                  # (--atomic implies --wait, same trap.) Readiness is
+                  # enforced by Verify Rollout below (kubectl rollout status
+                  # waits on pods only). A failed rollout leaves the release
+                  # `failed`, not `pending`, so the next upgrade is never
+                  # locked out.
+                  helm upgrade aura ./deploy/aura --install --timeout 5m \
+                    --cleanup-on-fail \
                     --set core.image.tag=sha-$SHORT_SHA \
                     --set gateway.image.tag=sha-$SHORT_SHA \
                     --set frontend.image.tag=sha-$SHORT_SHA \
