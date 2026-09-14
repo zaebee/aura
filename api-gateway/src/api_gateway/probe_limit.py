@@ -82,7 +82,15 @@ class ProbeLimiter:
         if count <= self.limit:
             return True, 0.0
 
-        oldest = await self.redis.zrange(key, 0, 0, withscores=True)
+        # Blocked probes must not consume budget: without this removal a
+        # client that keeps retrying would extend its own lockout forever
+        # (every blocked probe counts) and bloat the set. The removal and
+        # oldest-read ride one pipeline — no extra round trips.
+        pipe = self.redis.pipeline()
+        pipe.zrem(key, member)
+        pipe.zrange(key, 0, 0, withscores=True)
+        _, oldest = await pipe.execute()
+
         retry_after = (
             self.window_s - (timestamp - oldest[0][1]) if oldest else self.window_s
         )

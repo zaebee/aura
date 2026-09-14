@@ -286,7 +286,7 @@ async def negotiate(
             raise HTTPException(
                 status_code=429,
                 detail="probe rate limit exceeded",
-                headers={"Retry-After": str(int(retry_after))},
+                headers={"Retry-After": str(max(1, int(retry_after)))},
             )
 
     try:

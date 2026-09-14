@@ -109,6 +109,26 @@ async def test_retry_after_fits_inside_window() -> None:
     assert 0 < retry_after <= 600
 
 
+@pytest.mark.asyncio
+async def test_blocked_probes_do_not_extend_the_lockout() -> None:
+    """Spamming while blocked must not push recovery further out."""
+    import fakeredis.aioredis
+
+    redis_client = fakeredis.aioredis.FakeRedis()
+    limiter = _limiter(redis_client, limit=1, window_s=600)
+    now = time.time()
+
+    await limiter.check("did:key:a", "item-1", now=now)
+    for _ in range(10):
+        allowed, _ = await limiter.check("did:key:a", "item-1", now=now)
+        assert allowed is False
+
+    # Once the single real probe slides out, budget is back — the 10
+    # blocked ones left no trace.
+    allowed, _ = await limiter.check("did:key:a", "item-1", now=now + 601)
+    assert allowed is True
+
+
 def test_negotiate_returns_429_with_retry_after_when_limited() -> None:
     """429 wiring at the endpoint: shape, code, Retry-After header."""
     from unittest.mock import AsyncMock
@@ -153,3 +173,48 @@ def test_negotiate_returns_429_with_retry_after_when_limited() -> None:
     assert response.status_code == 429
     assert response.headers["Retry-After"] == "30"
     assert response.json()["detail"] == "probe rate limit exceeded"
+
+
+def test_negotiate_retry_after_never_zero() -> None:
+    """A sub-second retry_after still tells the client to wait."""
+    from unittest.mock import AsyncMock
+
+    from api_gateway.main import app
+    from api_gateway.security import verify_public_membrane
+    from fastapi import Request
+    from fastapi.testclient import TestClient
+
+    async def _bypass(request: Request) -> str:
+        request.state.parsed_body = {
+            "item_id": "sku-1",
+            "bid_amount": 100.0,
+            "currency": "USD",
+            "agent_did": "did:key:test",
+        }
+        return "did:key:test"
+
+    limiter = AsyncMock()
+    limiter.check.return_value = (False, 0.5)
+    app.dependency_overrides[verify_public_membrane] = _bypass
+    app.state.probe_limiter = limiter
+    try:
+        response = TestClient(app).post(
+            "/v1/negotiate",
+            json={
+                "item_id": "sku-1",
+                "bid_amount": 100.0,
+                "currency": "USD",
+                "agent_did": "did:key:test",
+            },
+            headers={
+                "X-Agent-ID": "did:key:test",
+                "X-Timestamp": "1234567890",
+                "X-Signature": "fake-sig",
+            },
+        )
+    finally:
+        app.dependency_overrides.clear()
+        app.state.probe_limiter = None
+
+    assert response.status_code == 429
+    assert response.headers["Retry-After"] == "1"
