@@ -61,6 +61,18 @@ spec:
             periodSeconds: {{ .Values.telegram.livenessProbe.periodSeconds }}
             timeoutSeconds: {{ .Values.telegram.livenessProbe.timeoutSeconds }}
             failureThreshold: {{ .Values.telegram.livenessProbe.failureThreshold }}
+          # Startup gate: the container needs 40s+ of cold start (heavy
+          # imports, NATS + gRPC init). Until this succeeds, liveness and
+          # readiness are held — so they keep fast runtime thresholds
+          # instead of a flat initial delay that slows every deploy.
+          startupProbe:
+            httpGet:
+              path: /healthz
+              port: health
+            initialDelaySeconds: {{ .Values.telegram.startupProbe.initialDelaySeconds }}
+            periodSeconds: {{ .Values.telegram.startupProbe.periodSeconds }}
+            timeoutSeconds: {{ .Values.telegram.startupProbe.timeoutSeconds }}
+            failureThreshold: {{ .Values.telegram.startupProbe.failureThreshold }}
           readinessProbe:
             httpGet:
               path: /readyz
