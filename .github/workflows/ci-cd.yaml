@@ -218,6 +218,7 @@ jobs:
                   FRP_TOKEN: ${{ secrets.FRP_CLIENT_TOKEN }}
                   ENC_KEY: ${{ secrets.AURA_SECRET_ENCRYPTION_KEY }}
                   STCP_KEY: ${{ secrets.AURA_INFRA_STCP_KEY }}
+                  ATTEST_KEY: ${{ secrets.AURA_ATTESTATION_PRIVATE_KEY }}
               run: |
                   SHORT_SHA=$(git rev-parse --short HEAD)
                   CHART_VERSION="0.1.${{ github.run_number }}"
@@ -236,11 +237,13 @@ jobs:
                     --from-literal=frp-client-token="$FRP_TOKEN" \
                     --from-literal=solana-private-key="$SOL_KEY" \
                     --from-literal=stcp-key="$STCP_KEY" \
+                    --from-literal=attestation-private-key="$ATTEST_KEY" \
                     --dry-run=client -o yaml | kubectl apply -f -
 
                   echo "🚀 Deploying to Cluster..."
                   helm dependency update ./deploy/aura
                   helm upgrade aura ./deploy/aura --install --wait --timeout 5m \
+                    --atomic --cleanup-on-fail \
                     --set core.image.tag=sha-$SHORT_SHA \
                     --set gateway.image.tag=sha-$SHORT_SHA \
                     --set frontend.image.tag=sha-$SHORT_SHA \
