@@ -1,4 +1,5 @@
 import json
+import math
 import uuid
 from collections.abc import AsyncGenerator, Awaitable, Callable
 from contextlib import asynccontextmanager
@@ -275,7 +276,19 @@ async def negotiate(
 
     probe_limiter = getattr(request.app.state, "probe_limiter", None)
     if probe_limiter is not None:
-        allowed, retry_after = await probe_limiter.check(agent_did, payload.item_id)
+        try:
+            allowed, retry_after = await probe_limiter.check(agent_did, payload.item_id)
+        except Exception as e:
+            # Fail-open toward availability: a Redis outage at runtime must
+            # degrade to unlimited bids, never to 500s. The floor channel
+            # is a confidentiality concern, not a safety one.
+            logger.warning(
+                "probe_limiter_failed_at_runtime",
+                agent_did=agent_did,
+                item_id=payload.item_id,
+                error=str(e),
+            )
+            allowed, retry_after = True, 0.0
         if not allowed:
             logger.info(
                 "probe_rate_limited",
@@ -286,7 +299,7 @@ async def negotiate(
             raise HTTPException(
                 status_code=429,
                 detail="probe rate limit exceeded",
-                headers={"Retry-After": str(max(1, int(retry_after)))},
+                headers={"Retry-After": str(max(1, math.ceil(retry_after)))},
             )
 
     try:

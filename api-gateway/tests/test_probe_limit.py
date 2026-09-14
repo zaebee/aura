@@ -11,6 +11,7 @@ slow probers by this signal alone) bypass the limiter entirely.
 
 import time
 
+import httpx
 import pytest
 from api_gateway.probe_limit import ProbeLimiter
 
@@ -218,3 +219,64 @@ def test_negotiate_retry_after_never_zero() -> None:
 
     assert response.status_code == 429
     assert response.headers["Retry-After"] == "1"
+
+
+def _post_negotiate() -> httpx.Response:
+    from unittest.mock import AsyncMock, patch
+
+    from api_gateway.main import app
+    from api_gateway.security import verify_public_membrane
+    from aura_core_gen.aura.negotiation.v1 import NegotiateResponse
+    from fastapi import Request
+    from fastapi.testclient import TestClient
+
+    async def _bypass(request: Request) -> str:
+        request.state.parsed_body = {
+            "item_id": "sku-1",
+            "bid_amount": 100.0,
+            "currency": "USD",
+            "agent_did": "did:key:test",
+        }
+        return "did:key:test"
+
+    mock_stub = AsyncMock()
+    mock_stub.negotiate.return_value = NegotiateResponse(
+        session_token="sess",
+        valid_until_timestamp=1,
+        dispute_token="tok",
+    )
+    app.dependency_overrides[verify_public_membrane] = _bypass
+    try:
+        with patch("api_gateway.main.stub", mock_stub, create=True):
+            return TestClient(app).post(
+                "/v1/negotiate",
+                json={
+                    "item_id": "sku-1",
+                    "bid_amount": 100.0,
+                    "currency": "USD",
+                    "agent_did": "did:key:test",
+                },
+                headers={
+                    "X-Agent-ID": "did:key:test",
+                    "X-Timestamp": "1234567890",
+                    "X-Signature": "fake-sig",
+                },
+            )
+    finally:
+        app.dependency_overrides.clear()
+        app.state.probe_limiter = None
+
+
+def test_negotiate_passes_through_when_limiter_fails() -> None:
+    """Fail-open: a Redis outage at runtime degrades to unlimited, not 500."""
+    from unittest.mock import AsyncMock
+
+    from api_gateway.main import app
+
+    limiter = AsyncMock()
+    limiter.check.side_effect = RuntimeError("redis down")
+    app.state.probe_limiter = limiter
+
+    response = _post_negotiate()
+
+    assert response.status_code == 200
