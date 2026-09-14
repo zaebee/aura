@@ -225,9 +225,9 @@ src/hive/
 
 **Legal chambers include:**
 - Root level: `agents/`, `synapses/`, `api-gateway/`, `packages/`, `proto/`, `docs/`, `deploy/`, `tools/`, `tests/`
-- Within services: `src/hive/`, `migrations/`, `scripts/`, `data/`
-- Within `src/`: `config/`, `llm/`, `guard/`, `prompts/`, `services/`, `crypto/`
-- Within `hive/`: `proteins/`, `metabolism/`
+- Within services: `src/` (code), `migrations/`, `scripts/`, `data/`
+- Within core `src/aura_hive/`: `config/`, `hive/`
+- Within `hive/`: `proteins/`, `metabolism/`, `services/`, nucleotides (`aggregator/`, `transformer/`, `connector/`, `generator/`, `membrane/`)
 
 ### Protein Examples
 
