@@ -131,6 +131,10 @@ frontend:
 # Telegram Bot Service Configuration
 telegram:
   healthPort: 8080
+  # Cold start takes 40s+ (heavy imports: aiogram, gRPC, NATS), so the
+  # startupProbe below gates liveness/readiness instead of a flat
+  # initialDelay that would slow every deploy and still risk killing
+  # a slow boot. Liveness/readiness keep fast runtime thresholds.
   livenessProbe:
     initialDelaySeconds: 15
     periodSeconds: 10
@@ -141,6 +145,11 @@ telegram:
     periodSeconds: 10
     timeoutSeconds: 2
     failureThreshold: 3
+  startupProbe:
+    initialDelaySeconds: 10
+    periodSeconds: 10
+    timeoutSeconds: 2
+    failureThreshold: 12
   image:
     repository: ghcr.io/zaebee/aura-telegram-bot
     tag: latest
