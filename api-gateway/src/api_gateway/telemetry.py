@@ -6,10 +6,10 @@ from opentelemetry.sdk.resources import Resource
 from opentelemetry.sdk.trace import TracerProvider
 from opentelemetry.sdk.trace.export import BatchSpanProcessor, ConsoleSpanExporter
 
-# Deliberate duplication with core's telemetry engine: 60 lines of stable
-# setup code (untouched except namespace moves). The only shared home
-# would be the Genome (aura-core), which carries no OpenTelemetry SDK —
-# and adding SDK weight there for this helper violates ontological
+# Deliberate duplication with core's telemetry engine: 60 lines of
+# stable setup code (untouched except namespace moves). The only shared
+# home would be the Genome (aura-core), which carries no OpenTelemetry
+# SDK — and adding SDK weight there for this helper violates ontological
 # purity. Revisit if the two ever diverge in behavior.
 
 
