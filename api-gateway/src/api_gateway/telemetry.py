@@ -6,9 +6,11 @@ from opentelemetry.sdk.resources import Resource
 from opentelemetry.sdk.trace import TracerProvider
 from opentelemetry.sdk.trace.export import BatchSpanProcessor, ConsoleSpanExporter
 
-# TODO: Consider refactoring this into a shared package to avoid duplication
-# between api-gateway and core. For now, duplication is acceptable
-# to keep each service independent and avoid complex dependency management.
+# Deliberate duplication with core's telemetry engine: 60 lines of
+# stable setup code (untouched except namespace moves). The only shared
+# home would be the Genome (aura-core), which carries no OpenTelemetry
+# SDK — and adding SDK weight there for this helper violates ontological
+# purity. Revisit if the two ever diverge in behavior.
 
 
 def init_telemetry(
