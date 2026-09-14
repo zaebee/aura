@@ -131,13 +131,17 @@ frontend:
 # Telegram Bot Service Configuration
 telegram:
   healthPort: 8080
+  # Cold start takes 40s+ (heavy imports: aiogram, gRPC, NATS). Probes
+  # starting at 15s killed every boot before the health server could
+  # listen — CrashLoop on a healthy app, and every helm --wait on
+  # telegram timing out (this is what stalled deploys).
   livenessProbe:
-    initialDelaySeconds: 15
+    initialDelaySeconds: 60
     periodSeconds: 10
     timeoutSeconds: 2
     failureThreshold: 3
   readinessProbe:
-    initialDelaySeconds: 15
+    initialDelaySeconds: 60
     periodSeconds: 10
     timeoutSeconds: 2
     failureThreshold: 3
