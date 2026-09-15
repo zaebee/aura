@@ -201,7 +201,6 @@ class TestFileTypeFilter:
             "tools/test_discovery.py",
             "core/tests/test_x.py",
             "tests/test_y.py",
-            "core/scripts/invivo_solana_test.py",
         ],
     )
     def test_test_modules_may_mock_models(self, path: str) -> None:

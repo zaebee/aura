@@ -534,56 +534,112 @@ class OutboundPipeline:
             neg_intent.price = round(neg_intent.price, 2)
 
         # 1. Handle explicit failures
-        if decision.action == ActionType.ACTION_TYPE_ERROR:
-            # Same default as the guard block below: an unspecified cost reads
-            # as the floor rather than as free, so a context that never
-            # supplied one does not vacuously satisfy the margin clause.
-            internal_cost = _context_number(ctx_meta, "internal_cost", floor_price)
-            guard_context = {
-                "floor_price": floor_price,
-                "internal_cost": internal_cost,
-                "request_id": request_id,
-            }
+        recovered = await self._recover_from_failure(
+            decision, claim, floor_price, ctx_meta, request_id, verdict
+        )
+        if recovered is not None:
+            return recovered
 
-            safe_price = floor_price * 1.05
-            if self.substitution.registry:
-                obs_safe = await self.substitution.registry.execute(
-                    "guard",
-                    "get_safe_price",
-                    {
-                        # The SAME context psi is checked against, floor and
-                        # cost together. Asking for a substitute priced from
-                        # the floor alone and then judging it against the cost
-                        # starves this path wherever cost > floor x (1 - m):
-                        # floor 1000, cost 1200, m 0.1 yielded 1111.11,
-                        # PSI_MIN_MARGIN refused it, and the recovery that
-                        # exists to keep a broken decision alive emitted
-                        # nothing. Pre-branch it emitted an unsafe price
-                        # instead; neither is the substitute the guard can
-                        # actually compute from these premises.
-                        "context": guard_context,
-                        "reason": "FAILURE_RECOVERY",
-                        "request_id": request_id,
-                    },
-                )
-                if obs_safe.success:
-                    meta = (
-                        obs_safe.metadata.to_dict()
-                        if obs_safe.metadata is not None
-                        else {}
-                    )
-                    safe_price = _context_number(meta, "safe_price", safe_price)
+        # 2. DLP Check
+        claim, decision, neg_intent = await self._screen_dlp(
+            decision, claim, neg_intent, verdict
+        )
 
-            return await self.substitution.offer(
-                decision,
-                safe_price,
-                "FAILURE_RECOVERY",
-                verdict,
-                guard_context,
-                request_id,
-                claim,
+        # Non-negotiation actions skip straight to judging: _judge_with_guard
+        # opens with the same gate, so this method holds no verdict logic of
+        # its own — only the shared premises both paths compute from.
+        internal_cost = _context_number(ctx_meta, "internal_cost", floor_price)
+        guard_context = {
+            "floor_price": floor_price,
+            "internal_cost": internal_cost,
+            "request_id": request_id,
+        }
+
+        price = neg_intent.price if neg_intent else 0.0
+
+        # 3. Call Guard Protein for validation
+        return await self._judge_with_guard(
+            decision,
+            claim,
+            neg_intent,
+            price,
+            guard_context,
+            verdict,
+            request_id,
+            floor_price,
+        )
+
+    async def _recover_from_failure(
+        self,
+        decision: Intent,
+        claim: Intent,
+        floor_price: float,
+        ctx_meta: dict[str, Any],
+        request_id: str,
+        verdict: _Verdict,
+    ) -> Intent | None:
+        """ACTION_TYPE_ERROR path: price a substitute or return None.
+
+        Returns None when the decision is not an explicit failure, so the
+        caller falls through to the next stage.
+        """
+        if decision.action != ActionType.ACTION_TYPE_ERROR:
+            return None
+        # Same default as the guard block below: an unspecified cost reads
+        # as the floor rather than as free, so a context that never
+        # supplied one does not vacuously satisfy the margin clause.
+        internal_cost = _context_number(ctx_meta, "internal_cost", floor_price)
+        guard_context = {
+            "floor_price": floor_price,
+            "internal_cost": internal_cost,
+            "request_id": request_id,
+        }
+
+        safe_price = floor_price * 1.05
+        if self.substitution.registry:
+            obs_safe = await self.substitution.registry.execute(
+                "guard",
+                "get_safe_price",
+                {
+                    # The SAME context psi is checked against, floor and
+                    # cost together. Asking for a substitute priced from
+                    # the floor alone and then judging it against the cost
+                    # starves this path wherever cost > floor x (1 - m):
+                    # floor 1000, cost 1200, m 0.1 yielded 1111.11,
+                    # PSI_MIN_MARGIN refused it, and the recovery that
+                    # exists to keep a broken decision alive emitted
+                    # nothing. Pre-branch it emitted an unsafe price
+                    # instead; neither is the substitute the guard can
+                    # actually compute from these premises.
+                    "context": guard_context,
+                    "reason": "FAILURE_RECOVERY",
+                    "request_id": request_id,
+                },
             )
+            if obs_safe.success:
+                meta = (
+                    obs_safe.metadata.to_dict() if obs_safe.metadata is not None else {}
+                )
+                safe_price = _context_number(meta, "safe_price", safe_price)
 
+        return await self.substitution.offer(
+            decision,
+            safe_price,
+            "FAILURE_RECOVERY",
+            verdict,
+            guard_context,
+            request_id,
+            claim,
+        )
+
+    async def _screen_dlp(
+        self, decision: Intent, claim: Intent, neg_intent: Any, verdict: _Verdict
+    ) -> tuple[Intent, Intent, Any]:
+        """Sanitise DLP leaks, returning the working triple.
+
+        Claim stays the Transformer original; decision and neg_intent
+        move to the sanitised copy when the message is rewritten.
+        """
         # 2. DLP Check
         message = neg_intent.message if neg_intent and neg_intent.message else ""
         if "floor_price" in message.lower():
@@ -649,21 +705,29 @@ class OutboundPipeline:
             neg_intent = (
                 betterproto.which_one_of(decision, "params")[1] if neg_intent else None
             )
+        return claim, decision, neg_intent
 
+    async def _judge_with_guard(
+        self,
+        decision: Intent,
+        claim: Intent,
+        neg_intent: Any,
+        price: float,
+        guard_context: dict[str, Any],
+        verdict: _Verdict,
+        request_id: str,
+        floor_price: float,
+    ) -> Intent:
+        """Validate against the guard, substitute or refuse, emit.
+
+        guard_context, price and floor_price arrive computed: the
+        caller builds them once so the two paths cannot disagree.
+        """
         if decision.action not in [
             ActionType.ACTION_TYPE_ACCEPT,
             ActionType.ACTION_TYPE_COUNTER,
         ]:
             return await self.substitution.finish(claim, decision, verdict, request_id)
-
-        internal_cost = _context_number(ctx_meta, "internal_cost", floor_price)
-        guard_context = {
-            "floor_price": floor_price,
-            "internal_cost": internal_cost,
-            "request_id": request_id,
-        }
-
-        price = neg_intent.price if neg_intent else 0.0
 
         # 3. Call Guard Protein for validation
         #
