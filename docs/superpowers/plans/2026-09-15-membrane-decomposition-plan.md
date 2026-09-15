@@ -139,7 +139,7 @@ git commit -m "refactor(membrane): extract verdict, shaping, metrics modules"
 
 **Interfaces:**
 - Consumes: `verdict._Verdict`, `shaping` helpers, `metrics._record_intervention` (Task 1); `registry: SkillRegistry | None`, `settings` (the same objects `HiveMembrane.__init__` already holds).
-- Produces: `InboundScreening.check(signal)`, `Attestation.sign(receipt)`, `Postcondition.verify(emission, context)`, `Substitution.offer(reason, context)`, `OutboundPipeline.run(decision, context, verdict)` — all `async`, all raising exactly what the moved bodies raise today.
+- Produces: `InboundScreening.check(signal)`, `Attestation.sign(receipt)`, `Postcondition.verify(price, guard_context, verdict)`, `Substitution.offer(original, safe_price, reason, verdict, guard_context, request_id, claim=None)` (+ `finish(claim, emission, verdict, request_id)`), `OutboundPipeline.run(decision, context, verdict)` — all `async`, all raising exactly what the moved bodies raise today (true signatures the verbatim bodies require; an earlier draft sketched narrower ones).
 
 - [ ] **Step 1: Create `inbound.py`**
 
