@@ -34,8 +34,9 @@ already-available registry and settings:
 
 - `InboundScreening.check(signal) -> signal`
 - `Attestation.sign(receipt) -> receipt`
-- `Postcondition.verify(emission, context) -> holds`
-- `Substitution.offer(reason, context) -> Intent`
+- `Postcondition.verify(price, guard_context, verdict) -> holds`
+- `Substitution.offer(original, safe_price, reason, verdict, guard_context, request_id, claim=None) -> Intent`
+- `Substitution.finish(claim, emission, verdict, request_id) -> Intent`
 - `OutboundPipeline.run(decision, context, verdict)` — attest, then
   postcondition, then substitute-on-violation, recording into the
   passed-in `_Verdict`.
