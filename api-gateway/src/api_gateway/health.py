@@ -333,7 +333,10 @@ def register_health_endpoints(
             HealthResponse: Detailed health information
         """
         start_time = time.perf_counter()
-        core_status = await check_core_service_health(get_stub(), health_check_timeout)
+        core_status, core_nats = await asyncio.gather(
+            check_core_service_health(get_stub(), health_check_timeout),
+            check_core_nats_state(get_stub(), health_check_timeout),
+        )
 
         check_duration_ms = (time.perf_counter() - start_time) * 1000
         if check_duration_ms > slow_threshold_ms:
@@ -346,7 +349,6 @@ def register_health_endpoints(
         overall_status = (
             "healthy" if core_status.status == HealthStatus.OK else "degraded"
         )
-        core_nats = await check_core_nats_state(get_stub(), health_check_timeout)
 
         return HealthResponse(
             status=overall_status,
