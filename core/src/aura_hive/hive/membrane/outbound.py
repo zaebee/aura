@@ -545,12 +545,9 @@ class OutboundPipeline:
             decision, claim, neg_intent, verdict
         )
 
-        if decision.action not in [
-            ActionType.ACTION_TYPE_ACCEPT,
-            ActionType.ACTION_TYPE_COUNTER,
-        ]:
-            return await self.substitution.finish(claim, decision, verdict, request_id)
-
+        # Non-negotiation actions skip straight to judging: _judge_with_guard
+        # opens with the same gate, so this method holds no verdict logic of
+        # its own — only the shared premises both paths compute from.
         internal_cost = _context_number(ctx_meta, "internal_cost", floor_price)
         guard_context = {
             "floor_price": floor_price,
@@ -561,116 +558,16 @@ class OutboundPipeline:
         price = neg_intent.price if neg_intent else 0.0
 
         # 3. Call Guard Protein for validation
-        #
-        # An unwired registry skips the gates — there is nothing to ask — but
-        # NOT the post-condition. It used to return here, four screens below a
-        # `_postcondition_holds` docstring stating that an unwired Membrane "is
-        # exactly the unreachable-guard case this fails closed on, not an
-        # exemption from it". The early return made that false: with no registry
-        # a price of 1.0 against a floor of 1000 was emitted, EMIT, and the
-        # receipt verified. The one branch the whole method exists to close was
-        # reachable by never wiring the thing that closes it. `_postcondition_
-        # holds` records UNAVAILABLE and refuses on its own, so falling through
-        # to it is all that is needed.
-        if self.substitution.registry:
-            # Map ActionType to strings expected by OutputGuard
-            action_map = {
-                ActionType.ACTION_TYPE_ACCEPT: "accept",
-                ActionType.ACTION_TYPE_COUNTER: "counter",
-            }
-            action_name = action_map.get(
-                decision.action, _action_label(decision.action)
-            )
-
-            obs = await self.substitution.registry.execute(
-                "guard",
-                "validate_decision",
-                {
-                    "decision": {"action": action_name, "price": price},
-                    "context": guard_context,
-                },
-            )
-
-            # A default-constructed Observation always has an empty Struct here,
-            # so this is not the usual betterproto caution — but `metadata=None`
-            # is a legal way to build one, and this read moved onto the passing
-            # path in the same change that added the derivation. It had only ever
-            # run on the failing path before. A crash here would lose the
-            # negotiation inside the one component whose job is to never let a
-            # bad decision out.
-            obs_meta = obs.metadata.to_dict() if obs.metadata is not None else {}
-
-            # Attached to the Intent the guard judged, before any replacement is
-            # built, so `_replacing` carries it across the swap like the rest of
-            # the fields that describe this decision point.
-            verdict.read_guard_report(obs_meta)
-
-            if not obs.success:
-                # Determine reason for logging/override using structured error code
-                safe_price = floor_price * 1.05
-                reason = str(obs_meta.get("error_code", "SAFETY_VIOLATION"))
-                safe_price = _context_number(obs_meta, "safe_price", safe_price)
-
-                # A gate that fired on the CONFIGURATION cannot be answered
-                # with a price.
-                #
-                # G3 fires when `min_profit_margin` is unreadable. Substituting
-                # then means pricing with the default margin — answering with
-                # the very formula the gate just declared unevaluable, which
-                # `ruleset.yaml` and `_gate_settings_present` both say must not
-                # happen ("must not answer at all rather than answer with a
-                # formula it cannot evaluate"). Only this branch disagreed.
-                #
-                # It also broke the receipt. Every other gate refuses a price
-                # for being wrong, so a failing gate implies the proposal sits
-                # strictly below a threshold the substitute is ceilinged above,
-                # and the two cannot render to the same cent. G3 holds at any
-                # price, so the substitute could land on the proposal's own
-                # cent — and since jitter is fixed within a session, a model
-                # echoing the Membrane's last counter hit that deterministically
-                # on the next round, minting `override_scope="value"` with equal
-                # digests: a claimed substitution with no trace, which `verify()`
-                # refuses.
-                #
-                # The literal is the gate's `code` in `ruleset.yaml`. Nothing
-                # cross-checks it the way `validate_against` cross-checks gate
-                # ids, so a rename there silently returns this branch to
-                # substituting — flagged in the ledger rather than solved here,
-                # because the fix is a shared constant the rule set and the
-                # Membrane both read, which is its own change.
-                if reason == "SETTINGS_MISSING":
-                    _record_intervention("outbound", reason)
-                    verdict.record(_UNAVAILABLE, reason)
-                    return await self.substitution.finish(
-                        claim,
-                        _replacing(
-                            decision,
-                            _rejection("Membrane: rule set could not be evaluated"),
-                        ),
-                        verdict,
-                        request_id,
-                    )
-
-                return await self.substitution.offer(
-                    decision,
-                    safe_price,
-                    reason,
-                    verdict,
-                    guard_context,
-                    request_id,
-                    claim,
-                )
-
-        if not await self.postcondition.verify(price, guard_context, verdict):
-            # Counted like every other refusal. A psi failure on this path is
-            # the Membrane rejecting the model's own price, and it used to be
-            # the one intervention that left no trace in the counter.
-            _record_intervention("outbound", "POSTCONDITION_VIOLATION", price=price)
-            return await self.substitution.finish(
-                claim, _replacing(decision, _rejection()), verdict, request_id
-            )
-
-        return await self.substitution.finish(claim, decision, verdict, request_id)
+        return await self._judge_with_guard(
+            decision,
+            claim,
+            neg_intent,
+            price,
+            guard_context,
+            verdict,
+            request_id,
+            floor_price,
+        )
 
     async def _recover_from_failure(
         self,
