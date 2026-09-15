@@ -73,7 +73,21 @@ class TestInbound:
         class Signal:
             bid_amount = -1.0
 
-        with pytest.raises(ValueError):
+        with pytest.raises(ValueError, match="must be positive"):
+            await membrane.inspect_inbound(Signal())
+
+        assert count("inbound", "INVALID_BID") == before + 1
+
+    @pytest.mark.asyncio
+    async def test_a_zero_bid_is_counted(self) -> None:
+        """Zero is not positive — and the guard's G1 would refuse it next."""
+        before = count("inbound", "INVALID_BID")
+        membrane = HiveMembrane()
+
+        class Signal:
+            bid_amount = 0.0
+
+        with pytest.raises(ValueError, match="must be positive"):
             await membrane.inspect_inbound(Signal())
 
         assert count("inbound", "INVALID_BID") == before + 1

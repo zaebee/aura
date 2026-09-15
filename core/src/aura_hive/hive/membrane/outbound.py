@@ -350,7 +350,8 @@ class OutboundPipeline:
     """Attest, then postcondition, then substitute-on-violation."""
 
     def __init__(self, registry: SkillRegistry | None, settings: Any) -> None:
-        self.attestation = Attestation(registry, settings)
+        # No Attestation here: Substitution owns the only one that signs
+        # (via finish); a second instance would be dead weight.
         self.postcondition = Postcondition(registry)
         self.substitution = Substitution(registry, settings)
 
