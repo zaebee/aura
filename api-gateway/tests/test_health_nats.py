@@ -16,17 +16,27 @@ from fastapi.testclient import TestClient
 from grpc_health.v1 import health_pb2
 
 
-def _app(core_status: str, nats_state: str) -> FastAPI:
-    """Health-only app: fake core stub + fixed NATS state word."""
+def _app(core_status: str, nats_state: str, core_nats: str = "connected") -> FastAPI:
+    """Health-only app: fake core stub + fixed NATS state words."""
+    from aura_core import NATS_HEALTH_SERVICE
+
     app = FastAPI()
 
     if core_status == "starting":
         stub = None
     elif core_status == "ok":
         stub = AsyncMock()
-        stub.Check.return_value = SimpleNamespace(
-            status=health_pb2.HealthCheckResponse.SERVING
-        )
+
+        async def _check(request):
+            if request.service == NATS_HEALTH_SERVICE:
+                status = {
+                    "connected": health_pb2.HealthCheckResponse.SERVING,
+                    "disconnected": health_pb2.HealthCheckResponse.NOT_SERVING,
+                }.get(core_nats, health_pb2.HealthCheckResponse.UNKNOWN)
+                return SimpleNamespace(status=status)
+            return SimpleNamespace(status=health_pb2.HealthCheckResponse.SERVING)
+
+        stub.Check.side_effect = _check
     else:
         stub = AsyncMock()
         stub.Check.side_effect = RuntimeError("core down")
@@ -68,10 +78,23 @@ def test_health_checks_include_both_core_and_nats() -> None:
     assert body["status"] == "healthy"
     assert body["checks"]["nats"] == "connected"
     assert body["checks"]["core_service"] == "ok"
+    assert body["checks"]["core_nats"] == "connected"
 
 
-def test_health_degraded_when_core_down_lists_nats_anyway() -> None:
+def test_health_reports_core_nats_drop() -> None:
+    body = (
+        TestClient(_app("ok", "connected", core_nats="disconnected"))
+        .get("/health")
+        .json()
+    )
+
+    assert body["status"] == "healthy"
+    assert body["checks"]["core_nats"] == "disconnected"
+
+
+def test_health_core_nats_unknown_when_unreachable() -> None:
     body = TestClient(_app("error", "disconnected")).get("/health").json()
 
     assert body["status"] == "degraded"
     assert body["checks"]["nats"] == "disconnected"
+    assert body["checks"]["core_nats"] == "unknown"
