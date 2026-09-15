@@ -1,6 +1,4 @@
 import uuid
-from dataclasses import dataclass, field
-from datetime import UTC, datetime
 from typing import Any, cast
 
 import betterproto
@@ -13,364 +11,54 @@ from aura_core import (
 from aura_core_gen.aura.core.v1 import (
     ActionType,
     Context,
-    DecisionDerivation,
-    DecisionOutcome,
     DecisionReceipt,
     Intent,
     NegotiationIntent,
     RWAVaultIntent,
     TradeIntent,
 )
-from prometheus_client import REGISTRY, Counter
 
 from aura_hive.config import get_settings
 
-from .receipt import mint, signed, signing_payload
+from .metrics import _get_counter, _record_intervention, membrane_interventions_total
+from .receipt import signed, signing_payload
+from .shaping import (
+    _action_label,
+    _as_dict,
+    _context_number,
+    _mint_for,
+    _neutral_price_message,
+    _quoted_price,
+    _rejection,
+    _replacing,
+)
+from .verdict import _EMIT, _OVERRIDE, _REFUSE, _UNAVAILABLE, _Verdict
+
+# Re-exports: moved to verdict.py / shaping.py / metrics.py verbatim, still
+# imported here so existing importers (tests import privates from this module)
+# survive. Listed in __all__ so ruff reads the otherwise-unused ones as
+# intentionally re-exported rather than dead imports.
+__all__ = [
+    "HiveMembrane",
+    "_EMIT",
+    "_OVERRIDE",
+    "_REFUSE",
+    "_UNAVAILABLE",
+    "_Verdict",
+    "_action_label",
+    "_as_dict",
+    "_context_number",
+    "_get_counter",
+    "_mint_for",
+    "_neutral_price_message",
+    "_quoted_price",
+    "_record_intervention",
+    "_rejection",
+    "_replacing",
+    "membrane_interventions_total",
+]
 
 logger = structlog.get_logger(__name__)
-
-
-def _get_counter(name: str, documentation: str, labelnames: list[str]) -> Counter:
-    """
-    Idempotent registration: the default REGISTRY raises on a duplicate name,
-    and tests import this module more than once.
-
-    Defined here rather than imported from the telemetry protein: the Membrane
-    is a nucleus organ and proteins sit a level below it. Four lines of
-    duplication beat an upward dependency.
-    """
-    existing = REGISTRY._names_to_collectors.get(name)
-    if existing is not None:
-        # Same name, different labels is a mistake that would otherwise surface
-        # far from its cause — as a ValueError inside .labels() at the first
-        # intervention. Raise where the mismatch was introduced.
-        registered = getattr(existing, "_labelnames", None)
-        if registered is not None and tuple(registered) != tuple(labelnames):
-            raise ValueError(
-                f"collector {name!r} is already registered with labels "
-                f"{tuple(registered)!r}, not {tuple(labelnames)!r}"
-            )
-        return cast(Counter, existing)
-    return Counter(name, documentation, labelnames)
-
-
-# Every time the guard changed or refused what the Transformer produced. This is
-# the rate to watch: it measures how often free reasoning lands somewhere the
-# guarantee has to catch, which is the only number that says whether the
-# membrane is earning its place.
-membrane_interventions_total = _get_counter(
-    "membrane_interventions_total",
-    "Decisions the Membrane altered, sanitised or rejected",
-    ["direction", "reason"],
-)
-
-
-def _record_intervention(direction: str, reason: str, **fields: Any) -> None:
-    """Count it and say so. An intervention that leaves no trace cannot be measured."""
-    try:
-        membrane_interventions_total.labels(direction=direction, reason=reason).inc()
-        # Inside the try as well: **fields is caller-supplied and could fail to
-        # serialise, and a crash while reporting an intervention is the same
-        # failure as a crash while counting one.
-        logger.warning(
-            "membrane_intervention", direction=direction, reason=reason, **fields
-        )
-    except Exception as e:
-        # Accounting must never take the guarantee down with it. The decision
-        # this call accompanies has already been made and still stands; losing a
-        # count degrades observability, raising here would lose the negotiation.
-        logger.error(
-            "membrane_metric_failed", direction=direction, reason=reason, error=str(e)
-        )
-
-
-# betterproto enums subclass int, so mypy reads a bare member access as `int`
-# (the same reason ActionType is cast at every use below). Casting once here
-# beats repeating it at each call site.
-_EMIT = cast(DecisionOutcome, DecisionOutcome.DECISION_OUTCOME_EMIT)
-_OVERRIDE = cast(DecisionOutcome, DecisionOutcome.DECISION_OUTCOME_OVERRIDE)
-_REFUSE = cast(DecisionOutcome, DecisionOutcome.DECISION_OUTCOME_REFUSE)
-_UNAVAILABLE = cast(DecisionOutcome, DecisionOutcome.DECISION_OUTCOME_UNAVAILABLE)
-
-
-@dataclass
-class _Verdict:
-    """
-    The Membrane's finding, accumulated as the outbound path proceeds.
-
-    Kept here rather than written onto the Intent as it goes, because the Intent
-    on the override path is replaced part-way and a verdict half-written onto a
-    discarded object is how `outcome_gate` nearly lost its first gate.
-
-    **`gate` and `override_scope` answer different questions, so they
-    accumulate by different rules.**
-
-    `gate` answers "which rule explains this outcome". First gate wins *within
-    an outcome class*, and resets when the class changes. Within a class the
-    earlier gate is the one that explains the finding — a decision that trips
-    DLP and then the floor check is reported as DLP_BLOCK — and holding to the
-    first also keeps the schema stable and leaves the full detail to
-    `gate_sequence`, which the auditor has. But first-wins *forever* was a bug:
-    DLP → substitution → post-condition failure shipped
-    `outcome=UNAVAILABLE, outcome_gate=DLP_BLOCK`, a receipt saying "unavailable
-    because DLP" to the one party this document is written for, and one the
-    error table contradicts (a psi failure is POSTCONDITION_VIOLATION) while
-    `verify()` checks no gate/outcome coherence for UNAVAILABLE and so ships it
-    silently. The gate that explained the previous class cannot explain the new
-    one, so it is discarded with it.
-
-    An earlier version of this docstring justified first-wins as denying an
-    adversary an oracle over the policy configuration. That reasoning is a
-    fossil: since the gateway trim the counterparty never sees `outcome_gate`
-    at all. Schema stability and `gate_sequence` are the reasons that survive.
-
-    `override_scope` answers "did the decidable content change", so it is
-    **monotonic toward "value"** and does not ride `gate` at all. It starts
-    empty, a prose-only intervention raises it to "prose", and a price
-    substitution sets "value" unconditionally. Pairing it with the winning gate
-    was the previous fix and it produced the branch's central contradiction: a
-    DLP block followed by a price substitution reported `scope="prose"` while
-    the digests differed, and `verify()` — which checks scope against the
-    emission delta — failed a receipt the Membrane had just minted. Every
-    intervention has to reach this field, because the question it answers is
-    about all of them together, not about whichever one is named.
-
-    It stays a property recomputed from `self.outcome` rather than a stored
-    value some call site is trusted to clear, so a decision that moves past
-    OVERRIDE can never leave a scope behind — there is no field to forget.
-    """
-
-    outcome: DecisionOutcome = _EMIT
-    gate: str = ""
-    ruleset_version: str = ""
-    derivation: DecisionDerivation | None = None
-    _scope: str = field(default="", repr=False)
-
-    def record(self, outcome: DecisionOutcome, gate: str, scope: str = "") -> None:
-        # Checked on EVERY OVERRIDE call, not only the one that establishes the
-        # gate. Now that scope is monotonic, the second OVERRIDE record is
-        # load-bearing on its own: it is what raises a DLP-then-substitution
-        # decision from "prose" to "value". A call site that forgot its scope
-        # there used to slip through this guard entirely and ship the receipt
-        # `verify()` rejects.
-        if outcome == _OVERRIDE and not scope:
-            raise ValueError(
-                f"gate {gate!r} recorded outcome OVERRIDE with no scope; "
-                "every OVERRIDE call site must pass 'prose' or 'value'"
-            )
-
-        if outcome != self.outcome:
-            # The class changed, so the gate that explained the old outcome is
-            # not an explanation of this one. Replace it rather than keep it.
-            self.gate = gate
-        elif not self.gate:
-            self.gate = gate
-
-        self.outcome = outcome
-
-        # Monotonic: value is absorbing, prose only fills an empty scope. Order
-        # of interventions must not change the answer to "did the decidable
-        # content change".
-        if scope == "value":
-            self._scope = "value"
-        elif scope == "prose" and self._scope != "value":
-            self._scope = "prose"
-
-    @property
-    def override_scope(self) -> str:
-        """
-        Whether this decision's interventions reached the decidable content,
-        or "" when the final outcome is not OVERRIDE.
-
-        Derived from `self.outcome` on every read instead of stored plainly,
-        so it cannot outlive the OVERRIDE outcome that justified it — see the
-        class docstring for the failure this closes.
-        """
-        return self._scope if self.outcome == _OVERRIDE else ""
-
-    def read_guard_report(self, obs_meta: dict[str, Any]) -> None:
-        """
-        Take the rule set and the derivation from what the guard reported.
-
-        `or ""` rather than a default, because `str(None)` is "None" — truthy,
-        and it would record a sequence of that literal text and a hash claiming
-        a derivation that never ran. A Struct round-trips a null value back as
-        None, so a key being present is not the same as it carrying one.
-        """
-        self.ruleset_version = str(obs_meta.get("ruleset_version") or "")
-        sequence = str(obs_meta.get("gate_sequence") or "")
-        digest = str(obs_meta.get("derivation_hash") or "")
-        # Left unset when no declared gate ran — a decision outside the guard's
-        # scope, an unwired Membrane, or one of the Membrane's own checks, none
-        # of which are declared in a rule set. Recording an empty digest there
-        # would assert a derivation that never happened.
-        if sequence or digest:
-            self.derivation = DecisionDerivation(
-                gate_sequence=sequence, derivation_hash=digest
-            )
-
-
-def _mint_for(
-    claim: Intent, emission: Intent, verdict: _Verdict, request_id: str
-) -> DecisionReceipt:
-    """
-    `claim` is what the Transformer proposed and `emission` is what is going
-    out; they are the same object when the Membrane changed nothing, and the two
-    hashes agreeing is then a fact a reader can check rather than an assumption.
-
-    `decision_id` is the emission's identifier rather than the claim's: on the
-    override path the emission is a replacement Intent, and `_replacing` carries
-    the identifier across from the original, so this still names the one
-    decision the receipt describes. `request_id` names the negotiation session
-    it belongs to, and comes from the Context the outbound path was given —
-    nothing on the Intent carries it.
-    """
-    return mint(
-        claim=claim,
-        emission=emission,
-        outcome=verdict.outcome,
-        outcome_gate=verdict.gate,
-        ruleset_version=verdict.ruleset_version,
-        derivation=verdict.derivation,
-        issued_at=datetime.now(UTC)
-        .isoformat(timespec="seconds")
-        .replace("+00:00", "Z"),
-        decision_id=emission.identifier,
-        request_id=request_id,
-        override_scope=verdict.override_scope,
-    )
-
-
-def _as_dict(struct: Any) -> dict[str, Any]:
-    """A protobuf Struct as a plain dict, tolerating one that is not there."""
-    return struct.to_dict() if struct is not None else {}
-
-
-def _replacing(original: Intent, replacement: Intent) -> Intent:
-    """
-    Carry forward the fields that name the decision point rather than the decision.
-
-    Three outbound paths return a different Intent instead of editing the one
-    they were given — the two refusals and the safe-offer override — and a fresh
-    Intent starts blank. It still stands for the same point in the metabolic
-    cycle, so identity and trace belong to it as much as to what it replaced.
-
-    The verdict does not travel here any more: it is accumulated in a `_Verdict`
-    and minted onto the emission, which is what stopped a decision that tripped
-    DLP and was then overridden from reporting the floor as its first gate.
-
-    Nothing reads `Intent.trace` today — the trace that reaches the Observation
-    comes from `Context.trace` by way of the Connector. Carrying it is cheap and
-    keeps the replacement honest before some later consumer trusts the field.
-    """
-    replacement.identifier = original.identifier
-    replacement.trace = original.trace
-    replacement.steps = original.steps
-
-    # Merged rather than copied, and the replacement wins on a conflict:
-    # `_override_with_safe_offer` records what it replaced, and carrying the
-    # original's metadata must not bury that. Keys the replacement did not set
-    # survive, which is the whole point — a hand-written replacement drops them
-    # silently, since the constructor is happy to default them and nothing warns.
-    # Read defensively. The paths that build replacements omit metadata rather
-    # than passing None, and betterproto default-constructs the field on access,
-    # so neither read can raise today. But this helper is the one place four
-    # paths funnel through, and it exists precisely because hand-built
-    # replacements lose what nobody remembered — it should not be the thing that
-    # raises on a caller who built one badly.
-    merged = {**_as_dict(original.metadata), **_as_dict(replacement.metadata)}
-    if merged:
-        replacement.metadata = make_struct(merged)
-
-    return replacement
-
-
-def _rejection(reasoning: str = "Membrane: post-condition not established") -> Intent:
-    """
-    What leaves when the Membrane cannot stand behind a decision.
-
-    Deliberately carries no price and no reason the counterparty can read: the
-    decision was stopped because we could not establish our own guarantee, and
-    saying which clause failed would describe the policy boundary to the party
-    the policy exists to hold at arm's length.
-
-    The default names the ψ failure, which is the common case. G3 passes its
-    own: refusing because the rule set cannot be evaluated is a different fact
-    from refusing because it was evaluated and failed, and the internal
-    `reasoning` is where an operator reads which one happened.
-    """
-    return Intent(
-        action=cast(ActionType, ActionType.ACTION_TYPE_REJECT),
-        reasoning=reasoning,
-    )
-
-
-def _context_number(ctx_meta: dict[str, Any], key: str, default: float) -> float:
-    """
-    Read a number out of Context.metadata that may not be one.
-
-    A Struct round-trips a JSON null back as None, and the previous read was
-    `float(str(ctx_meta.get(key, default)))` — so a null became `float("None")`
-    and a ValueError. Nothing catches it: `MetabolicLoop.execute` wraps neither
-    membrane call, so the exception leaves the cycle and the negotiation is lost.
-
-    That is the wrong failure for the component whose job is to be the thing
-    that does not let a bad decision out. Refusing safely is its business;
-    crashing on its own input is not. An unusable value reads as absent, which
-    is what the default already meant.
-    """
-    value = ctx_meta.get(key, default)
-    if value is None:
-        return default
-    try:
-        return float(str(value))
-    except (TypeError, ValueError):
-        logger.warning("membrane_unusable_context_number", key=key, value=repr(value))
-        return default
-
-
-def _quoted_price(price: float, currency_code: str) -> str:
-    """
-    A price in the denomination it is actually in.
-
-    Both messages the Membrane writes used to hardcode `$`, so a JPY
-    negotiation was told `$111.12` — the structured `currency_code` saying one
-    thing and the prose beside it another, on the one path where the Membrane
-    rather than the model is choosing the words.
-
-    No symbol table: mapping codes to glyphs is a localisation problem this
-    module has no business holding an opinion about, and getting it wrong is
-    the failure being fixed. The code itself is unambiguous in every currency.
-    An unstated denomination renders as a bare number — two call sites
-    legitimately have no source for one (§3.2) and the naive f-string would
-    leave a space before the full stop.
-    """
-    return f"{price:.2f} {currency_code}".rstrip()
-
-
-def _neutral_price_message(action: Any, price: float, currency_code: str) -> str:
-    """
-    State the price without stating that a guard produced it.
-
-    Phrased from the action rather than fixed, because the DLP block keeps the
-    model's action: sanitising an ACCEPT used to emit "My counter-offer for this
-    item is $X", which contradicts the `accepted` result the counterparty
-    receives alongside it. A message that disagrees with the decision beside it
-    is its own tell.
-    """
-    quoted = _quoted_price(price, currency_code)
-    if action == ActionType.ACTION_TYPE_ACCEPT:
-        return f"I accept your offer at {quoted}."
-    return f"My counter-offer for this item is {quoted}."
-
-
-def _action_label(action: Any) -> str:
-    """Safely convert ActionType or raw int to a lowercase name string."""
-    try:
-        name = ActionType(int(action)).name
-        return name.lower() if name else f"action_{int(action)}"
-    except (ValueError, TypeError, AttributeError):
-        return f"action_{action}"
 
 
 class HiveMembrane(Membrane[Any, Intent, Context]):
