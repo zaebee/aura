@@ -193,6 +193,33 @@ def _nats_dependency(get_nats_state: Callable[[], str] | None) -> dict[str, str]
     return {"nats": get_nats_state()}
 
 
+async def check_core_nats_state(
+    health_stub: health_pb2_grpc.HealthStub | None, timeout: float
+) -> str:
+    """Core NATS state via the named gRPC health service, best-effort.
+
+    Degraded-by-design: anything but SERVING maps to a state word rather
+    than an error — this feeds `/health` details only, never readiness.
+    """
+    if health_stub is None:
+        return "unknown"
+
+    from aura_core import NATS_HEALTH_SERVICE
+    from grpc_health.v1 import health_pb2
+
+    try:
+        request = health_pb2.HealthCheckRequest(service=NATS_HEALTH_SERVICE)
+        response = await asyncio.wait_for(health_stub.Check(request), timeout=timeout)
+        if response.status == health_pb2.HealthCheckResponse.SERVING:
+            return "connected"
+        if response.status == health_pb2.HealthCheckResponse.NOT_SERVING:
+            return "disconnected"
+        return "unknown"
+    except Exception as e:
+        logger.debug("core_nats_state_unavailable", error=str(e))
+        return "unknown"
+
+
 def register_health_endpoints(
     app: FastAPI,
     get_stub: Callable[[], health_pb2_grpc.HealthStub | None],
@@ -306,7 +333,10 @@ def register_health_endpoints(
             HealthResponse: Detailed health information
         """
         start_time = time.perf_counter()
-        core_status = await check_core_service_health(get_stub(), health_check_timeout)
+        core_status, core_nats = await asyncio.gather(
+            check_core_service_health(get_stub(), health_check_timeout),
+            check_core_nats_state(get_stub(), health_check_timeout),
+        )
 
         check_duration_ms = (time.perf_counter() - start_time) * 1000
         if check_duration_ms > slow_threshold_ms:
@@ -327,6 +357,7 @@ def register_health_endpoints(
             checks={
                 "api_gateway": HealthStatus.OK.value,
                 "core_service": core_status.status.value,
+                "core_nats": core_nats,
                 **_nats_dependency(get_nats_state),
             },
         )
