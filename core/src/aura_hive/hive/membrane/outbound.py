@@ -567,9 +567,12 @@ class OutboundPipeline:
                     },
                 )
                 if obs_safe.success:
-                    safe_price = float(
-                        str(obs_safe.metadata.to_dict().get("safe_price", safe_price))
+                    meta = (
+                        obs_safe.metadata.to_dict()
+                        if obs_safe.metadata is not None
+                        else {}
                     )
+                    safe_price = _context_number(meta, "safe_price", safe_price)
 
             return await self.substitution.offer(
                 decision,
@@ -582,7 +585,7 @@ class OutboundPipeline:
             )
 
         # 2. DLP Check
-        message = neg_intent.message if neg_intent else ""
+        message = neg_intent.message if neg_intent and neg_intent.message else ""
         if "floor_price" in message.lower():
             _record_intervention("outbound", "DLP_BLOCK")
             # The substitution here touches only the message — the sanitised
@@ -711,7 +714,7 @@ class OutboundPipeline:
                 # Determine reason for logging/override using structured error code
                 safe_price = floor_price * 1.05
                 reason = str(obs_meta.get("error_code", "SAFETY_VIOLATION"))
-                safe_price = float(str(obs_meta.get("safe_price", safe_price)))
+                safe_price = _context_number(obs_meta, "safe_price", safe_price)
 
                 # A gate that fired on the CONFIGURATION cannot be answered
                 # with a price.
