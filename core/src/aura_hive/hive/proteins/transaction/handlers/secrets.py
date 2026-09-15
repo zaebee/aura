@@ -11,13 +11,16 @@ from ..engine import SecretEncryption
 class SecretsHandlers:
     """Secrets domain. Owns only the encryption primitive."""
 
-    capabilities = {
-        "encrypt_secret": "_encrypt_secret",
-        "decrypt_secret": "_decrypt_secret",
-    }
+    # Class-level contract (no string method refs: bandit B105
+    # mistakes "_*_secret" for a hardcoded password).
+    INTENTS: tuple[str, ...] = ("encrypt_secret", "decrypt_secret")
 
     def __init__(self, encryption: SecretEncryption | None) -> None:
         self.encryption = encryption
+        self.capabilities = {
+            "encrypt_secret": self._encrypt_secret,
+            "decrypt_secret": self._decrypt_secret,
+        }
 
     async def _encrypt_secret(self, params: dict[str, Any]) -> Observation:
         assert self.encryption is not None

@@ -14,16 +14,17 @@ from ..schema import TaxCalculationParams
 class PricingHandlers:
     """Pricing domain. Owns the converter and read-only settings."""
 
-    capabilities = {
-        "calculate_tax_and_margin": "_calculate_tax_and_margin",
-        "convert_price": "_convert_price",
-    }
+    INTENTS: tuple[str, ...] = ("calculate_tax_and_margin", "convert_price")
 
     def __init__(
         self, converter: PriceConverter | None, settings: CryptoSettings | None = None
     ) -> None:
         self.converter = converter
         self.settings = settings
+        self.capabilities = {
+            "calculate_tax_and_margin": self._calculate_tax_and_margin,
+            "convert_price": self._convert_price,
+        }
 
     async def _calculate_tax_and_margin(self, params: dict[str, Any]) -> Observation:
         assert self.converter is not None

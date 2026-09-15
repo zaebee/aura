@@ -15,14 +15,15 @@ logger = structlog.get_logger(__name__)
 class EVMHandlers:
     """EVM domain. Owns only the EVM provider."""
 
-    capabilities = {
-        "transfer": "_transfer",
-        "sign_trade_intent": "_sign_trade_intent",
-        "submit_to_router": "_submit_to_router",
-    }
+    INTENTS: tuple[str, ...] = ("transfer", "sign_trade_intent", "submit_to_router")
 
     def __init__(self, evm_provider: EVMProvider | None) -> None:
         self.evm_provider = evm_provider
+        self.capabilities = {
+            "transfer": self._transfer,
+            "sign_trade_intent": self._sign_trade_intent,
+            "submit_to_router": self._submit_to_router,
+        }
 
     async def _transfer(self, params: dict[str, Any]) -> Observation:
         network = params.get("network", "base-sepolia")

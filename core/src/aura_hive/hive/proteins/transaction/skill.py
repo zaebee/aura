@@ -32,7 +32,7 @@ _HANDLER_CLASSES = (
 
 # Public contract, available before bind(): every intent exactly once.
 _CAPABILITY_ORDER: tuple[str, ...] = tuple(
-    intent for handler_cls in _HANDLER_CLASSES for intent in handler_cls.capabilities
+    intent for handler_cls in _HANDLER_CLASSES for intent in handler_cls.INTENTS
 )
 
 
@@ -82,8 +82,8 @@ class TransactionSkill(
         )
         self._capabilities = {}
         for handler in handlers:
-            for intent, method_name in handler.capabilities.items():
-                self._capabilities[intent] = getattr(handler, method_name)
+            for intent, method in handler.capabilities.items():
+                self._capabilities[intent] = method
 
     async def initialize(self) -> bool:
         if self.settings and self.settings.wallet_address and self.provider:

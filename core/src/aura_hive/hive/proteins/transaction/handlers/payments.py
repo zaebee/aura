@@ -14,19 +14,26 @@ from ..solana_engine import SolanaProvider
 class PaymentsHandlers:
     """Payment domain. Owns the provider and read-only settings."""
 
-    capabilities = {
-        "verify_payment": "_verify_payment",
-        "verify_settlement": "_verify_payment",
-        "generate_payment_request": "_generate_payment_request",
-        "get_address": "_get_address",
-        "get_network_name": "_get_network_name",
-    }
+    INTENTS: tuple[str, ...] = (
+        "verify_payment",
+        "verify_settlement",
+        "generate_payment_request",
+        "get_address",
+        "get_network_name",
+    )
 
     def __init__(
         self, provider: SolanaProvider | None, settings: CryptoSettings | None = None
     ) -> None:
         self.provider = provider
         self.settings = settings
+        self.capabilities = {
+            "verify_payment": self._verify_payment,
+            "verify_settlement": self._verify_payment,
+            "generate_payment_request": self._generate_payment_request,
+            "get_address": self._get_address,
+            "get_network_name": self._get_network_name,
+        }
 
     async def _verify_payment(self, params: dict[str, Any]) -> Observation:
         assert self.provider is not None

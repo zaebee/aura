@@ -75,7 +75,7 @@ def _provider_bundle():
 def test_handler_domains_cover_every_capability_exactly_once():
     covered: set[str] = set()
     for cls, keys in EXPECTED_BY_DOMAIN.items():
-        assert set(cls.capabilities) == keys, cls.__name__
+        assert set(cls.INTENTS) == keys, cls.__name__
         assert not (covered & keys), f"overlap in {cls.__name__}"
         covered |= keys
     assert covered == EXPECTED_CAPABILITIES

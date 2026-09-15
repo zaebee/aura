@@ -18,10 +18,7 @@ logger = structlog.get_logger(__name__)
 class RWAHandlers:
     """RWA domain. Owns the Solana provider and read-only settings."""
 
-    capabilities = {
-        "execute_rwa_collateral": "_execute_rwa_collateral",
-        "mint_rwa_vault": "_mint_rwa_vault",
-    }
+    INTENTS: tuple[str, ...] = ("execute_rwa_collateral", "mint_rwa_vault")
 
     def __init__(
         self,
@@ -30,6 +27,10 @@ class RWAHandlers:
     ) -> None:
         self.solana_provider = solana_provider
         self.settings = settings
+        self.capabilities = {
+            "execute_rwa_collateral": self._execute_rwa_collateral,
+            "mint_rwa_vault": self._mint_rwa_vault,
+        }
 
     async def _execute_rwa_collateral(self, params: dict[str, Any]) -> Observation:
         """
