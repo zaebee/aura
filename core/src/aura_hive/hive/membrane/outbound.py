@@ -360,6 +360,9 @@ class OutboundPipeline:
         """
         Judge the Transformer's decision and return the one to send.
 
+        Reads the pre-verdict Context live here — floor price and session id —
+        rather than taking them from the delegator.
+
         **No decision the Intent carries is modified in place.** Every path that
         changes one — the two refusals, the safe-offer override, the DLP
         sanitisation — builds a replacement and leaves the caller's object

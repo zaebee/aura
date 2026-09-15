@@ -15,10 +15,8 @@ import pytest
 from aura_core import SkillRegistry
 from aura_core.struct_utils import make_struct
 from aura_core_gen.aura.core.v1 import ActionType, Context, Intent, NegotiationIntent
-from aura_hive.hive.membrane.main import (
-    HiveMembrane,
-    membrane_interventions_total,
-)
+from aura_hive.hive.membrane.main import HiveMembrane
+from aura_hive.hive.membrane.metrics import membrane_interventions_total
 from aura_hive.hive.proteins.guard import GuardSkill
 from aura_hive.hive.proteins.guard.engine import OutputGuard
 
@@ -146,7 +144,7 @@ class TestFailSafe:
         """
         membrane = guarded_membrane()
 
-        with patch("aura_hive.hive.membrane.main.membrane_interventions_total") as m:
+        with patch("aura_hive.hive.membrane.metrics.membrane_interventions_total") as m:
             m.labels.side_effect = RuntimeError("registry corrupted")
             decision = await membrane.inspect_outbound(
                 counter_intent(price=500.0), negotiation_context(floor_price=1000.0)
@@ -166,7 +164,7 @@ class TestSeriesShape:
 
     def test_registering_twice_reuses_the_same_collector(self) -> None:
         """Tests import this module repeatedly; a duplicate name would raise."""
-        from aura_hive.hive.membrane.main import _get_counter
+        from aura_hive.hive.membrane.metrics import _get_counter
 
         again = _get_counter(
             "membrane_interventions_total", "ignored", ["direction", "reason"]
@@ -175,7 +173,7 @@ class TestSeriesShape:
 
     def test_the_same_name_with_different_labels_raises(self) -> None:
         """Otherwise the mismatch surfaces inside .labels(), far from its cause."""
-        from aura_hive.hive.membrane.main import _get_counter
+        from aura_hive.hive.membrane.metrics import _get_counter
 
         with pytest.raises(ValueError, match="already registered with labels"):
             _get_counter("membrane_interventions_total", "ignored", ["something_else"])

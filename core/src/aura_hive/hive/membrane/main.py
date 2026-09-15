@@ -12,47 +12,8 @@ from aura_core_gen.aura.core.v1 import (
 from aura_hive.config import get_settings
 
 from .inbound import InboundScreening
-from .metrics import _get_counter, _record_intervention, membrane_interventions_total
-from .outbound import OutboundPipeline, logger
-from .shaping import (
-    _action_label,
-    _as_dict,
-    _context_number,
-    _mint_for,
-    _neutral_price_message,
-    _quoted_price,
-    _rejection,
-    _replacing,
-)
-from .verdict import _EMIT, _OVERRIDE, _REFUSE, _UNAVAILABLE, _Verdict
-
-# Re-exports: moved to verdict.py / shaping.py / metrics.py verbatim, still
-# imported here so existing importers (tests import privates from this module)
-# survive. Listed in __all__ so ruff reads the otherwise-unused ones as
-# intentionally re-exported rather than dead imports. `logger` is the outbound
-# module's own logger re-exported under this name, so the receipt-log tests
-# that patch `membrane.main.logger` keep patching the object the moved code
-# actually logs through.
-__all__ = [
-    "HiveMembrane",
-    "_EMIT",
-    "_OVERRIDE",
-    "_REFUSE",
-    "_UNAVAILABLE",
-    "_Verdict",
-    "_action_label",
-    "_as_dict",
-    "_context_number",
-    "_get_counter",
-    "_mint_for",
-    "_neutral_price_message",
-    "_quoted_price",
-    "_record_intervention",
-    "_rejection",
-    "_replacing",
-    "logger",
-    "membrane_interventions_total",
-]
+from .outbound import OutboundPipeline
+from .verdict import _Verdict
 
 
 class HiveMembrane(Membrane[Any, Intent, Context]):
