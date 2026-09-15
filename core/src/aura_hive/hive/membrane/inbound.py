@@ -21,9 +21,9 @@ class InboundScreening:
         else:
             bid_amount = getattr(signal, "bid_amount", 0.0)
 
-        if bid_amount <= 0:
+        if bid_amount < 0:
             _record_intervention("inbound", "INVALID_BID", bid_amount=bid_amount)
-            raise ValueError("Bid amount must be positive")
+            raise ValueError("Bid amount must not be negative")
 
         injection_patterns = [
             "ignore all previous instructions",

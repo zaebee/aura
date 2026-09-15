@@ -176,5 +176,5 @@ async def test_membrane_inbound_invalid_bid():
 
     signal = Signal(negotiation=NegotiationSignal(bid_amount=-10.0))
 
-    with pytest.raises(ValueError, match="Bid amount must be positive"):
+    with pytest.raises(ValueError, match="Bid amount must not be negative"):
         await membrane.inspect_inbound(signal)
