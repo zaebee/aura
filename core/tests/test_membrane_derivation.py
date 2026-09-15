@@ -780,7 +780,7 @@ class TestNothingInAttestationCanCostTheDecision:
         membrane = guarded_membrane()
 
         with patch(
-            "aura_hive.hive.membrane.main.logger.info",
+            "aura_hive.hive.membrane.outbound.logger.info",
             side_effect=RuntimeError("log sink is gone"),
         ):
             decision = await membrane.inspect_outbound(
@@ -817,7 +817,7 @@ class TestTheReceiptLogClaimsOnlyWhatItKnows:
         membrane = guarded_membrane()
 
         with patch(
-            "aura_hive.hive.membrane.main.logger.info",
+            "aura_hive.hive.membrane.outbound.logger.info",
             side_effect=lambda *a, **kw: calls.append((a, kw)),
         ):
             await membrane.inspect_outbound(
@@ -838,7 +838,7 @@ class TestTheReceiptLogClaimsOnlyWhatItKnows:
         membrane = HiveMembrane(registry=registry)
 
         with patch(
-            "aura_hive.hive.membrane.main.logger.info",
+            "aura_hive.hive.membrane.outbound.logger.info",
             side_effect=lambda *a, **kw: calls.append((a, kw)),
         ):
             await membrane.inspect_outbound(

@@ -27,11 +27,11 @@ from aura_core_gen.aura.core.v1 import (
     TradeIntent,
     ValidationScore,
 )
-from aura_hive.hive.membrane.main import (
+from aura_hive.hive.membrane.main import HiveMembrane
+from aura_hive.hive.membrane.verdict import (
     _OVERRIDE,
     _REFUSE,
     _UNAVAILABLE,
-    HiveMembrane,
     _Verdict,
 )
 from aura_hive.hive.proteins.guard import GuardSkill

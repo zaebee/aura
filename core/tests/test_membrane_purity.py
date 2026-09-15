@@ -190,7 +190,7 @@ class TestReplacingSurvivesAMalformedOriginal:
     """
 
     def test_an_original_with_null_metadata_does_not_take_it_down(self) -> None:
-        from aura_hive.hive.membrane.main import _replacing
+        from aura_hive.hive.membrane.shaping import _replacing
 
         original = Intent(action=ActionType.ACTION_TYPE_COUNTER, metadata=None)
         replacement = Intent(action=ActionType.ACTION_TYPE_REJECT)
@@ -198,7 +198,7 @@ class TestReplacingSurvivesAMalformedOriginal:
         assert _replacing(original, replacement) is replacement
 
     def test_a_replacement_with_null_metadata_still_inherits(self) -> None:
-        from aura_hive.hive.membrane.main import _replacing
+        from aura_hive.hive.membrane.shaping import _replacing
 
         original = Intent(
             action=ActionType.ACTION_TYPE_COUNTER,
